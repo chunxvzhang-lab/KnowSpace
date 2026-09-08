@@ -1,7 +1,7 @@
 # KnowSpace
 
-<p align="center">
-  <img src="icon.png" alt="KnowSpace Logo" width="128" />
+<p align="center" style="text-align: center;">
+  <img src="icon.png" alt="KnowSpace Logo" width="128" height="128" style="max-width: 100%; height: auto; border-radius: 20px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);" />
 </p>
 
 <p align="center">
@@ -10,12 +10,12 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-v1.10.0-1D9BF0?style=flat-square&logo=github" alt="Version 1.10.0" />
+  <img src="https://img.shields.io/badge/Version-v1.11.0-1D9BF0?style=flat-square&logo=github" alt="Version 1.11.0" />
+  <img src="https://img.shields.io/badge/Command_Palette-Ctrl%2BK-00BA7C?style=flat-square" alt="Command Palette" />
   <img src="https://img.shields.io/badge/Slash_Commands-%2F-00BA7C?style=flat-square" alt="Slash Commands" />
   <img src="https://img.shields.io/badge/PDF_Print-Ctrl%2BP-8B5CF6?style=flat-square" alt="PDF Print" />
-  <img src="https://img.shields.io/badge/Mind_Map-Ctrl%2BM-00BA7C?style=flat-square" alt="Mind Map" />
-  <img src="https://img.shields.io/badge/Block_Links-%5Eblock--id-8B5CF6?style=flat-square" alt="Block Links" />
-  <img src="https://img.shields.io/badge/Knowledge_Graph-60FPS-00BA7C?style=flat-square" alt="Knowledge Graph" />
+  <img src="https://img.shields.io/badge/Mind_Map-OPML%20%7C%20FreeMind-00BA7C?style=flat-square" alt="Mind Map" />
+  <img src="https://img.shields.io/badge/Graph-1--Hop%20%7C%202--Hop%20%7C%20Clusters-8B5CF6?style=flat-square" alt="Knowledge Graph" />
   <img src="https://img.shields.io/badge/Flash_Notes-Alt%2BSpace-F59E0B?style=flat-square" alt="Flash Notes" />
   <img src="https://img.shields.io/badge/Theme-E--ink%20Paper%20%7C%20Geek%20Dark-1D9BF0?style=flat-square" alt="Themes" />
   <img src="https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" />

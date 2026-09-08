@@ -1,7 +1,7 @@
 {
   "name": "knowspace",
   "private": true,
-  "version": "1.10.0",
+  "version": "1.11.0",
   "description": "KnowSpace - Personal Knowledge Workspace",
   "author": "KnowSpace Team",
   "type": "module",
@@ -77,6 +77,7 @@
     "@vitejs/plugin-react": "^5.0.4",
     "electron": "^42.5.0",
     "electron-builder": "^26.15.3",
+    "playwright": "^1.63.0",
     "typescript": "^5.9.3",
     "vite": "^7.3.6"
   }
