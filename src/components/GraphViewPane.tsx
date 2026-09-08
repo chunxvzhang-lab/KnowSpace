@@ -83,6 +83,9 @@ export function GraphViewPane({
   const [searchQuery, setSearchQuery] = useState("");
   const [hideIsolates, setHideIsolates] = useState(true);
   const [typeFilter, setTypeFilter] = useState<"all" | "chapter" | "space">("all");
+  const [hopDepth, setHopDepth] = useState<"all" | 1 | 2>("all");
+  const [viewFilter, setViewFilter] = useState<"all" | "hubs" | "orphans">("all");
+  const [clusterByFolder, setClusterByFolder] = useState(false);
   const [showFilterDrawer, setShowFilterDrawer] = useState(false);
   const [selectedNode, setSelectedNode] = useState<{
     id: string;
@@ -117,14 +120,18 @@ export function GraphViewPane({
     }
   };
 
-  // Filtered graph elements
+  // Filtered graph elements with depth, MOC hubs, orphans, and cluster coloring
   const filteredData = useMemo(() => {
     return filterGraphData(graphData, {
-      hideIsolates,
+      hideIsolates: viewFilter === "orphans" ? false : hideIsolates,
       query: searchQuery,
       typeFilter,
+      depth: hopDepth,
+      currentDocId,
+      viewFilter,
+      clusterByFolder,
     });
-  }, [graphData, hideIsolates, searchQuery, typeFilter]);
+  }, [graphData, hideIsolates, searchQuery, typeFilter, hopDepth, currentDocId, viewFilter, clusterByFolder]);
 
   // Handle Spacebar panning mode inside graph pane
   useEffect(() => {
@@ -230,6 +237,9 @@ export function GraphViewPane({
             },
             "background-color": (ele: any) => {
               if (ele.data("isCurrent")) return currentBg;
+              if (clusterByFolder && ele.data("clusterColor")) {
+                return isEink ? normalBg : ele.data("clusterColor");
+              }
               if (ele.data("type") === "space") return spaceBg;
               return normalBg;
             },
@@ -729,34 +739,105 @@ export function GraphViewPane({
             )}
           </div>
           <div className="graph-filter-options">
-            <button
-              type="button"
-              className={`graph-filter-pill ${hideIsolates ? "is-active" : ""}`}
-              onClick={() => setHideIsolates(!hideIsolates)}
-            >
-              隐藏孤岛节点
-            </button>
-            <button
-              type="button"
-              className={`graph-filter-pill ${typeFilter === "all" ? "is-active" : ""}`}
-              onClick={() => setTypeFilter("all")}
-            >
-              全部
-            </button>
-            <button
-              type="button"
-              className={`graph-filter-pill ${typeFilter === "chapter" ? "is-active" : ""}`}
-              onClick={() => setTypeFilter("chapter")}
-            >
-              知识库文档
-            </button>
-            <button
-              type="button"
-              className={`graph-filter-pill ${typeFilter === "space" ? "is-active" : ""}`}
-              onClick={() => setTypeFilter("space")}
-            >
-              闪念 Space
-            </button>
+            <div className="graph-filter-group">
+              <span className="graph-filter-label">视野:</span>
+              <button
+                type="button"
+                className={`graph-filter-pill ${hopDepth === "all" ? "is-active" : ""}`}
+                onClick={() => setHopDepth("all")}
+                title="显示全局关系网络"
+              >
+                全局
+              </button>
+              <button
+                type="button"
+                className={`graph-filter-pill ${hopDepth === 1 ? "is-active" : ""}`}
+                onClick={() => setHopDepth(1)}
+                title="仅聚焦当前文档直接引用的 1-Hop 节点"
+              >
+                1-Hop 邻近
+              </button>
+              <button
+                type="button"
+                className={`graph-filter-pill ${hopDepth === 2 ? "is-active" : ""}`}
+                onClick={() => setHopDepth(2)}
+                title="聚焦当前文档 2-Hop 关联网络"
+              >
+                2-Hop 扩展
+              </button>
+            </div>
+
+            <div className="graph-filter-group">
+              <span className="graph-filter-label">视图:</span>
+              <button
+                type="button"
+                className={`graph-filter-pill ${viewFilter === "all" ? "is-active" : ""}`}
+                onClick={() => setViewFilter("all")}
+              >
+                全部节点
+              </button>
+              <button
+                type="button"
+                className={`graph-filter-pill ${viewFilter === "hubs" ? "is-active" : ""}`}
+                onClick={() => setViewFilter(viewFilter === "hubs" ? "all" : "hubs")}
+                title="高连接度核心枢纽节点 (连接数 >= 3)"
+              >
+                核心枢纽 (MOC)
+              </button>
+              <button
+                type="button"
+                className={`graph-filter-pill ${viewFilter === "orphans" ? "is-active" : ""}`}
+                onClick={() => setViewFilter(viewFilter === "orphans" ? "all" : "orphans")}
+                title="查找尚未建立双链的孤岛笔记 (连接数 = 0)"
+              >
+                未链接孤岛
+              </button>
+            </div>
+
+            <div className="graph-filter-group">
+              <span className="graph-filter-label">分类:</span>
+              <button
+                type="button"
+                className={`graph-filter-pill ${typeFilter === "all" ? "is-active" : ""}`}
+                onClick={() => setTypeFilter("all")}
+              >
+                全部
+              </button>
+              <button
+                type="button"
+                className={`graph-filter-pill ${typeFilter === "chapter" ? "is-active" : ""}`}
+                onClick={() => setTypeFilter("chapter")}
+              >
+                文档
+              </button>
+              <button
+                type="button"
+                className={`graph-filter-pill ${typeFilter === "space" ? "is-active" : ""}`}
+                onClick={() => setTypeFilter("space")}
+              >
+                闪念
+              </button>
+            </div>
+
+            <div className="graph-filter-group">
+              <button
+                type="button"
+                className={`graph-filter-pill ${clusterByFolder ? "is-active" : ""}`}
+                onClick={() => setClusterByFolder(!clusterByFolder)}
+                title="按笔记所在文件夹进行色彩聚类染色"
+              >
+                🎨 目录聚类
+              </button>
+              <button
+                type="button"
+                className={`graph-filter-pill ${hideIsolates && viewFilter !== "orphans" ? "is-active" : ""}`}
+                onClick={() => setHideIsolates(!hideIsolates)}
+                disabled={viewFilter === "orphans"}
+                title="隐藏没有双链关系的独立孤岛节点"
+              >
+                隐藏孤岛
+              </button>
+            </div>
           </div>
         </div>
       )}

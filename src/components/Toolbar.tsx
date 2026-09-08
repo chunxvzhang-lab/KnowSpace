@@ -13,6 +13,7 @@ import {
   Hash,
   Eye,
   Printer,
+  Command,
 } from "lucide-react";
 import type { EditorViewMode, ThemeMode } from "../core/types";
 import { ViewModeControl } from "./ViewModeControl";
@@ -48,6 +49,7 @@ type ToolbarProps = {
   onThemeChange?: (theme: ThemeMode) => void;
   onFontScaleChange: (scale: number) => void;
   onPrint?: () => void;
+  onOpenCommandPalette?: () => void;
 };
 
 export function Toolbar(props: ToolbarProps) {
@@ -76,6 +78,17 @@ export function Toolbar(props: ToolbarProps) {
       </div>
 
       <div className="toolbar-actions">
+        {props.onOpenCommandPalette && (
+          <button
+            aria-label="全局命令面板 (Ctrl+K)"
+            className="icon-button"
+            onClick={props.onOpenCommandPalette}
+            title="全局命令面板 (Ctrl+K)"
+          >
+            <Command size={16} />
+          </button>
+        )}
+
         {props.onNewFile && (
           <button
             aria-label="新建 Markdown 文件"

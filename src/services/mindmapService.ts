@@ -1011,3 +1011,9 @@ export function searchMindmapNodes(root: MindmapNode, query: string): string[] {
   return matches;
 }
 
+export {
+  escapeXml,
+  exportMindmapToOpml,
+  exportMindmapToFreeMind,
+  exportMindmapToMarkdownOutline,
+} from "./mindmapExport";

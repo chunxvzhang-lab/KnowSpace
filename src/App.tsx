@@ -30,6 +30,7 @@ import { TabBar, type TabItem } from "./components/TabBar";
 import { TocPanel } from "./components/TocPanel";
 import { Toolbar } from "./components/Toolbar";
 import { UnsavedChangesDialog } from "./components/UnsavedChangesDialog";
+import { CommandPalette, type CommandAction } from "./components/CommandPalette";
 import type {
   BookManifest,
   Bookmark,
@@ -110,6 +111,17 @@ export function App() {
   const [preferences, setPreferences] = useState(preferencesRef.current);
   const [unsavedDialogOpen, setUnsavedDialogOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [recentVisitedDocIds, setRecentVisitedDocIds] = useState<string[]>([]);
+
+  const handleOpenCommandPalette = useCallback(() => {
+    setCommandPaletteOpen(true);
+  }, []);
+
+  const handleCloseCommandPalette = useCallback(() => {
+    setCommandPaletteOpen(false);
+  }, []);
+
   // 软件启动时默认不自动打开知识图谱（保持纯净文档视图，需时由用户主动开启）
   const [isGraphPaneOpen, setIsGraphPaneOpen] = useState(false);
 
@@ -174,6 +186,15 @@ export function App() {
   const activeChapter = manifest?.chapters.find((item) => item.id === chapterId);
   const activeHeading = renderedChapter?.headings.find((heading) => heading.id === activeHeadingId);
   const activeIndex = manifest?.chapters.findIndex((item) => item.id === chapterId) ?? -1;
+
+  useEffect(() => {
+    if (chapterId) {
+      setRecentVisitedDocIds((prev) => {
+        const filtered = prev.filter((id) => id !== chapterId);
+        return [chapterId, ...filtered].slice(0, 15);
+      });
+    }
+  }, [chapterId]);
 
   const searchResults = useMemo(
     () => (renderedChapter ? findInChapter(searchQuery, renderedChapter.plainText, renderedChapter.headings, session?.source) : []),
@@ -1714,6 +1735,155 @@ export function App() {
     setSidebarOpen(true);
   }, []);
 
+  // Action commands list for Command Palette (> ...)
+  const commandActions = useMemo<CommandAction[]>(
+    () => [
+      {
+        id: "cmd-view-read",
+        title: "切换视图: 阅读模式",
+        description: "沉浸式无干扰文档阅读模式",
+        shortcut: "Alt+1",
+        category: "视图与排版",
+        run: () => setViewMode("read"),
+      },
+      {
+        id: "cmd-view-split",
+        title: "切换视图: 双栏实时预览",
+        description: "左侧编辑器，右侧实时渲染与同步滚动",
+        shortcut: "Alt+2",
+        category: "视图与排版",
+        run: () => setViewMode("split"),
+      },
+      {
+        id: "cmd-view-source",
+        title: "切换视图: 源码编辑",
+        description: "全宽纯净 Markdown 源码编辑模式",
+        shortcut: "Alt+3",
+        category: "视图与排版",
+        run: () => setViewMode("source"),
+      },
+      {
+        id: "cmd-view-mindmap",
+        title: "切换视图: 思维导图",
+        description: "将文档大纲结构转换为无限画布可视化脑图",
+        shortcut: "Ctrl+M",
+        category: "视图与排版",
+        run: () => setViewMode((m) => (m === "mindmap" ? "split" : "mindmap")),
+      },
+      {
+        id: "cmd-toggle-graph",
+        title: "切换知识图谱分栏",
+        description: "开启或收起右侧全局双向引用关系图谱",
+        shortcut: "Ctrl+G",
+        category: "视图与排版",
+        run: () => handleToggleGraphPane(),
+      },
+      {
+        id: "cmd-print-pdf",
+        title: "高保真专业 PDF 打印",
+        description: "生成高分辨率向量级打印文稿与 PDF 导出",
+        shortcut: "Ctrl+P",
+        category: "导出与分发",
+        run: () => handlePrintDocument(),
+      },
+      {
+        id: "cmd-new-file",
+        title: "新建 Markdown 笔记",
+        description: "在当前知识库中创建一个全新空白笔记",
+        shortcut: "Ctrl+N",
+        category: "文档操作",
+        run: () => createNewFile(),
+      },
+      {
+        id: "cmd-save-doc",
+        title: "保存当前笔记",
+        description: "将当前编辑中的笔记落盘保存至本地磁盘",
+        shortcut: "Ctrl+S",
+        category: "文档操作",
+        run: () => saveSession(),
+      },
+      {
+        id: "cmd-save-doc-as",
+        title: "另存为笔记...",
+        description: "将当前笔记内容导出另存到自定义目录",
+        shortcut: "Ctrl+Shift+S",
+        category: "文档操作",
+        run: () => saveSessionAs(),
+      },
+      {
+        id: "cmd-open-folder",
+        title: "打开本地知识库目录",
+        description: "加载本地包含 Markdown 笔记的文件夹",
+        shortcut: "Ctrl+Shift+O",
+        category: "知识库管理",
+        run: () => openMarkdownDirectory(),
+      },
+      {
+        id: "cmd-toggle-directory",
+        title: "展开 / 收起文档目录侧边栏",
+        description: "切换左侧工作区文件树目录的显示状态",
+        shortcut: "Ctrl+\\",
+        category: "界面交互",
+        run: () => setDirectoryOpen((open) => !open),
+      },
+      {
+        id: "cmd-toggle-fullscreen",
+        title: "切换全屏模式",
+        description: "最大化工作区进入全屏无边框书写体验",
+        shortcut: "F11",
+        category: "界面交互",
+        run: () => toggleFullscreen(),
+      },
+      {
+        id: "cmd-toggle-typewriter",
+        title: "切换打字机居中模式",
+        description: "保持当前输入光标始终居中于视口中心",
+        shortcut: "Alt+T",
+        category: "写作辅助",
+        run: () => toggleTypewriterMode(),
+      },
+      {
+        id: "cmd-theme-twitter",
+        title: "视觉主题: 暗黑深邃 (Dark)",
+        description: "适合夜间专注书写的暗色主题",
+        category: "个性化外观",
+        run: () => setPreferences((p) => ({ ...p, theme: "twitter" })),
+      },
+      {
+        id: "cmd-theme-light",
+        title: "视觉主题: 极简纯白 (Light)",
+        description: "高对比度纸张级明亮主题",
+        category: "个性化外观",
+        run: () => setPreferences((p) => ({ ...p, theme: "light" })),
+      },
+      {
+        id: "cmd-theme-eink",
+        title: "视觉主题: 电子墨水屏 (E-ink)",
+        description: "纯黑白极简无色差墨水屏质感",
+        category: "个性化外观",
+        run: () => setPreferences((p) => ({ ...p, theme: "eink" })),
+      },
+      {
+        id: "cmd-about",
+        title: "关于 KnowSpace 与帮助",
+        description: "查看当前软件版本、系统信息与开源协议",
+        category: "系统与支持",
+        run: () => setAboutOpen(true),
+      },
+    ],
+    [
+      setViewMode,
+      handleToggleGraphPane,
+      handlePrintDocument,
+      createNewFile,
+      saveSession,
+      saveSessionAs,
+      openMarkdownDirectory,
+      toggleFullscreen,
+      toggleTypewriterMode,
+    ]
+  );
+
   // Global keybindings
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -1732,6 +1902,11 @@ export function App() {
       }
 
       if (event.key === "Escape") {
+        if (commandPaletteOpen) {
+          event.preventDefault();
+          setCommandPaletteOpen(false);
+          return;
+        }
         if (lightboxMedia) {
           event.preventDefault();
           setLightboxMedia(null);
@@ -1747,6 +1922,13 @@ export function App() {
           toggleFullscreen();
           return;
         }
+      }
+
+      // Global Command Palette & Quick Switcher: Ctrl+K / Cmd+K (works everywhere, including inside editor)
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setCommandPaletteOpen((prev) => !prev);
+        return;
       }
 
       // Close active tab: Ctrl+W
@@ -1813,6 +1995,23 @@ export function App() {
         return;
       }
 
+      // Global navigation shortcuts that penetrate editor focus:
+      if (event.ctrlKey && event.key.toLowerCase() === "g") {
+        event.preventDefault();
+        handleToggleGraphPane();
+        return;
+      }
+      if (event.ctrlKey && event.key.toLowerCase() === "m") {
+        event.preventDefault();
+        setViewMode((m) => (m === "mindmap" ? "split" : "mindmap"));
+        return;
+      }
+      if (event.ctrlKey && event.key === "\\") {
+        event.preventDefault();
+        setDirectoryOpen((open) => !open);
+        return;
+      }
+
       if (isEditing) return;
 
       if (event.ctrlKey && event.key.toLowerCase() === "b") {
@@ -1831,24 +2030,13 @@ export function App() {
         event.preventDefault();
         goNext();
       }
-      if (event.ctrlKey && event.key.toLowerCase() === "g") {
-        event.preventDefault();
-        handleToggleGraphPane();
-      }
-      if (event.ctrlKey && event.key.toLowerCase() === "m") {
-        event.preventDefault();
-        setViewMode((m) => (m === "mindmap" ? "split" : "mindmap"));
-      }
-      if (event.ctrlKey && event.key === "\\") {
-        event.preventDefault();
-        setDirectoryOpen((open) => !open);
-      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [
     addBookmark,
     chapterId,
+    commandPaletteOpen,
     createNewFile,
     dualSplitTabId,
     focusSearch,
@@ -2298,6 +2486,7 @@ export function App() {
           backlinksCount={currentLinkedReferences.length}
           onOpenGlobalGraph={handleToggleGraphPane}
           isGraphOpen={isGraphPaneOpen}
+          onOpenCommandPalette={handleOpenCommandPalette}
         />
       )}
 
@@ -2345,6 +2534,7 @@ export function App() {
               });
             }}
             onPrint={handlePrintDocument}
+            onOpenCommandPalette={handleOpenCommandPalette}
           />
         )}
 
@@ -2708,6 +2898,19 @@ export function App() {
         onOverwrite={() => saveSession({ force: true })}
         onSaveAs={saveSessionAs}
         onCancel={clearConflict}
+      />
+
+      {/* Global Command Palette & Quick Switcher */}
+      <CommandPalette
+        isOpen={commandPaletteOpen}
+        onClose={handleCloseCommandPalette}
+        manifest={manifest}
+        currentChapterId={chapterId}
+        onSelectChapter={selectChapter}
+        headings={renderedChapter?.headings}
+        onJumpToHeading={(id) => jumpToHeading(id, "smooth", true)}
+        recentChapterIds={recentVisitedDocIds}
+        actions={commandActions}
       />
 
       {/* About Application Dialog */}

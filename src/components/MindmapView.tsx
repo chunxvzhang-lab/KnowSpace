@@ -36,6 +36,9 @@ import {
   findSibling,
   reparentNode,
   searchMindmapNodes,
+  exportMindmapToOpml,
+  exportMindmapToFreeMind,
+  exportMindmapToMarkdownOutline,
   type MindmapLayoutNode,
 } from "../services/mindmapService";
 import type { MindmapNode } from "../core/types";
@@ -216,6 +219,19 @@ export const MindmapView = memo(function MindmapView({
   const [editingText, setEditingText] = useState<string>("");
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; nodeId: string } | null>(null);
   const [menuPos, setMenuPos] = useState<{ left: number; top: number }>({ left: 0, top: 0 });
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!isExportMenuOpen) return;
+    const handleOutside = (e: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setIsExportMenuOpen(false);
+      }
+    };
+    window.addEventListener("mousedown", handleOutside);
+    return () => window.removeEventListener("mousedown", handleOutside);
+  }, [isExportMenuOpen]);
 
   // Safe boundary calculation for context menu to prevent bottom/right clipping
   useLayoutEffect(() => {
@@ -956,6 +972,48 @@ export const MindmapView = memo(function MindmapView({
     img.src = url;
   }, [layout, title, theme]);
 
+  const handleExportOpml = useCallback(() => {
+    const xml = exportMindmapToOpml(tree, title);
+    const blob = new Blob([xml], { type: "text/x-opml+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${title || "mindmap"}.opml`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setIsExportMenuOpen(false);
+  }, [tree, title]);
+
+  const handleExportFreeMind = useCallback(() => {
+    const xml = exportMindmapToFreeMind(tree);
+    const blob = new Blob([xml], { type: "application/x-freemind;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${title || "mindmap"}.mm`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setIsExportMenuOpen(false);
+  }, [tree, title]);
+
+  const handleExportMarkdownOutline = useCallback(() => {
+    const md = exportMindmapToMarkdownOutline(tree);
+    const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${title || "mindmap"}-outline.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setIsExportMenuOpen(false);
+  }, [tree, title]);
+
   const editingNode = useMemo(() => {
     if (!editingNodeId) return null;
     return layout.nodes.find((n) => n.id === editingNodeId) || null;
@@ -1152,16 +1210,57 @@ export const MindmapView = memo(function MindmapView({
           </div>
         </div>
 
-        <div className="mindmap-toolbar-right">
-          <button
-            type="button"
-            className="mindmap-tool-btn text-btn export-btn"
-            onClick={handleExportPng}
-            title="导出高清透明背景 PNG 图片"
-          >
-            <Download size={14} />
-            <span>导出 PNG</span>
-          </button>
+        <div className="mindmap-toolbar-right" ref={exportMenuRef}>
+          <div className="mindmap-export-dropdown">
+            <button
+              type="button"
+              className="mindmap-tool-btn text-btn export-btn"
+              onClick={() => setIsExportMenuOpen((prev) => !prev)}
+              title="导出导图为 PNG、OPML 2.0、FreeMind (.mm) 或 Markdown 大纲"
+            >
+              <Download size={14} />
+              <span>导出导图 ▾</span>
+            </button>
+            {isExportMenuOpen && (
+              <div className="mindmap-export-menu">
+                <button
+                  type="button"
+                  className="mindmap-export-menu-item"
+                  onClick={() => {
+                    setIsExportMenuOpen(false);
+                    handleExportPng();
+                  }}
+                >
+                  <span className="export-item-title">导出 PNG 图片</span>
+                  <span className="export-item-desc">高清透明背景位图 (.png)</span>
+                </button>
+                <button
+                  type="button"
+                  className="mindmap-export-menu-item"
+                  onClick={handleExportOpml}
+                >
+                  <span className="export-item-title">导出 OPML 2.0</span>
+                  <span className="export-item-desc">兼容 MindNode、OmniOutliner (.opml)</span>
+                </button>
+                <button
+                  type="button"
+                  className="mindmap-export-menu-item"
+                  onClick={handleExportFreeMind}
+                >
+                  <span className="export-item-title">导出 FreeMind (.mm)</span>
+                  <span className="export-item-desc">兼容 XMind、FreeMind、Freeplane (.mm)</span>
+                </button>
+                <button
+                  type="button"
+                  className="mindmap-export-menu-item"
+                  onClick={handleExportMarkdownOutline}
+                >
+                  <span className="export-item-title">导出 Markdown 大纲</span>
+                  <span className="export-item-desc">多级层级纯文本大纲 (.md)</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 

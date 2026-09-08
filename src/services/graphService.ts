@@ -12,6 +12,8 @@ export type GraphNodeData = {
   outDegree: number;
   isCurrent?: boolean;
   normTitle: string;
+  folderGroup?: string;
+  clusterColor?: string;
 };
 
 export type GraphEdgeData = {
@@ -259,35 +261,115 @@ export function extractLocalSubgraph(
   };
 }
 
+export const CLUSTER_PALETTE = [
+  "#38bdf8", // Sky blue
+  "#818cf8", // Indigo
+  "#34d399", // Emerald
+  "#f472b6", // Pink
+  "#fb923c", // Orange
+  "#a78bfa", // Purple
+  "#facc15", // Amber
+  "#4ade80", // Green
+  "#2dd4bf", // Teal
+  "#e879f9", // Fuchsia
+  "#94a3b8", // Slate
+];
+
+export function extractFolderGroup(path?: string, type?: GraphNodeType): string {
+  if (type === "space") return "闪念 Space";
+  if (!path) return "根目录";
+  const normalized = path.replace(/\\/g, "/").trim();
+  const parts = normalized.split("/").filter(Boolean);
+  if (parts.length <= 1) {
+    return "根目录";
+  }
+  return parts[0];
+}
+
+export function computeDirectoryClusterColors(nodes: GraphNodeData[]): Map<string, string> {
+  const groupToColor = new Map<string, string>();
+  let colorIdx = 0;
+
+  for (const node of nodes) {
+    const group = node.folderGroup || extractFolderGroup(node.path, node.type);
+    if (!groupToColor.has(group)) {
+      if (group === "根目录") {
+        groupToColor.set(group, "#94a3b8");
+      } else if (group === "闪念 Space") {
+        groupToColor.set(group, "#f59e0b");
+      } else {
+        const color = CLUSTER_PALETTE[colorIdx % CLUSTER_PALETTE.length];
+        colorIdx++;
+        groupToColor.set(group, color);
+      }
+    }
+  }
+
+  return groupToColor;
+}
+
 export function filterGraphData(
   graphData: GraphData,
   options: {
     hideIsolates?: boolean;
     query?: string;
     typeFilter?: "all" | "chapter" | "space";
+    depth?: "all" | 1 | 2;
+    currentDocId?: string | null;
+    viewFilter?: "all" | "hubs" | "orphans";
+    clusterByFolder?: boolean;
   }
 ): GraphData {
-  const { hideIsolates = false, query = "", typeFilter = "all" } = options;
-  const q = query.trim().toLowerCase();
+  const {
+    hideIsolates = false,
+    query = "",
+    typeFilter = "all",
+    depth = "all",
+    currentDocId,
+    viewFilter = "all",
+    clusterByFolder = false,
+  } = options;
 
-  let filteredNodes = graphData.nodes;
+  let baseData = graphData;
+  if ((depth === 1 || depth === 2) && currentDocId) {
+    baseData = extractLocalSubgraph(graphData, currentDocId, depth);
+  }
+
+  let filteredNodes = baseData.nodes;
 
   if (typeFilter !== "all") {
     filteredNodes = filteredNodes.filter((n) => n.type === typeFilter);
   }
 
-  if (hideIsolates) {
+  if (viewFilter === "hubs") {
+    filteredNodes = filteredNodes.filter((n) => n.inDegree + n.outDegree >= 3);
+  } else if (viewFilter === "orphans") {
+    filteredNodes = filteredNodes.filter((n) => n.inDegree + n.outDegree === 0);
+  } else if (hideIsolates) {
     filteredNodes = filteredNodes.filter((n) => n.inDegree + n.outDegree > 0 || n.isCurrent);
   }
 
+  const q = query.trim().toLowerCase();
   if (q) {
     filteredNodes = filteredNodes.filter(
       (n) => n.label.toLowerCase().includes(q) || (n.path && n.path.toLowerCase().includes(q))
     );
   }
 
+  if (clusterByFolder) {
+    const clusterMap = computeDirectoryClusterColors(filteredNodes);
+    filteredNodes = filteredNodes.map((n) => {
+      const group = extractFolderGroup(n.path, n.type);
+      return {
+        ...n,
+        folderGroup: group,
+        clusterColor: clusterMap.get(group),
+      };
+    });
+  }
+
   const allowedIds = new Set(filteredNodes.map((n) => n.id));
-  const filteredEdges = graphData.edges.filter(
+  const filteredEdges = baseData.edges.filter(
     (e) => allowedIds.has(e.source) && allowedIds.has(e.target)
   );
 

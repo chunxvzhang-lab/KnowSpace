@@ -17,6 +17,7 @@ import {
   Zap,
   GitFork,
   Network,
+  Command,
 } from "lucide-react";
 import appLogo from "../assets/icon.png";
 import type { EditorViewMode, ThemeMode, SidebarTab } from "../core/types";
@@ -40,6 +41,7 @@ type ActivityBarProps = {
   backlinksCount?: number;
   onOpenGlobalGraph?: () => void;
   isGraphOpen?: boolean;
+  onOpenCommandPalette?: () => void;
 };
 
 export function ActivityBar({
@@ -61,6 +63,7 @@ export function ActivityBar({
   backlinksCount = 0,
   onOpenGlobalGraph,
   isGraphOpen = false,
+  onOpenCommandPalette,
 }: ActivityBarProps) {
   return (
     <nav className="activity-bar" aria-label="快捷工具栏">
@@ -83,6 +86,18 @@ export function ActivityBar({
           <FolderOpen size={18} />
           {isDirty && <span className="activity-dot" />}
         </button>
+
+        {onOpenCommandPalette && (
+          <button
+            type="button"
+            className="activity-btn"
+            onClick={onOpenCommandPalette}
+            data-tooltip="全局命令中枢 (Ctrl+K)"
+            aria-label="全局命令中枢"
+          >
+            <Command size={18} />
+          </button>
+        )}
 
         <button
           type="button"
