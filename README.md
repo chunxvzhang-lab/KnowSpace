@@ -82,8 +82,28 @@
 
 ---
 
-### 2. ✍️ 现代化极客编辑、斜杠命令与上下文菜单 (Modern Editor & Smart Interactions)
-*基于 CodeMirror 6 深度打造，毫秒级实时防抖渲染，融入全键盘命令与情境感知上下文操作。*
+### 2. 🎯 全能全局命令中枢 (Command Palette & Quick Switcher · `Ctrl + K`)
+*现代化 IDE 级全键盘控制中枢，手不离键盘，毫秒级调度全系统功能、穿梭十万字知识库。*
+
+<p align="center">
+  <img src="docs/manual-images/27-command-palette.png" alt="全局命令中枢与快速切换器" width="90%" style="border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);" />
+</p>
+
+- **⚡ 三模自适应调度引擎**：
+  - **默认模式（极速文件切换器 Quick Switcher）**：输入为空时自动推荐最近访问文档（MRU 历史）并标出 `⏱️ 最近` 与 `📌 当前` 徽标；输入文本触发中英全拼、简拼拼音首字母模糊匹配，关键词实时高亮，并清晰标注所属父级路径。
+  - **`>` 动作执行模式 (Action Commands)**：输入 `>` 呼出 17+ 项核心功能全键盘调度（三大主题切换、排版模式、思维导图、全景图谱、打字机滚动锁定、PDF 导出、新建文档等），自带快捷键提示徽章，回车秒级执行。
+  - **`#` 标题大纲直达模式 (Outline Navigation)**：输入 `#` 秒速就地解析当前文档的全部 H1~H6 标题大纲树，呈现层级徽标与物理行号，回车平滑滚动直达目标小节。
+- **⌨️ 全局键盘免失焦穿透**：无论在编辑器写代码，还是在阅读区或目录树中，均可通过 `Ctrl + K` 瞬间穿透唤起；按下 `Esc` 退出时，光标焦点智能恢复至原打字位置，输入心流从不中断。
+
+---
+
+### 3. ✍️ 现代化极客编辑、斜杠命令与上下文菜单 (Modern Editor & Smart Interactions)
+*基于 CodeMirror 6 深度打造，毫秒级实时防抖渲染，融入全键盘斜杠命令与情境感知上下文操作。*
+
+<p align="center">
+  <img src="docs/manual-images/28-slash-commands.png" alt="全键盘斜杠指令菜单" width="48%" style="border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35); display: inline-block; margin-right: 2%;" />
+  <img src="docs/manual-images/29-editor-context-menu.png" alt="情境感知右键菜单" width="48%" style="border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35); display: inline-block;" />
+</p>
 
 - **⌨️ 全键盘斜杠命令补全菜单 (`/` Slash Commands)**：在行首或空格后键入 `/`（或拼音首字母），极速弹出交互式下拉建议框。内置 20+ 项原生排版模版（H1~H6 标题、待办清单 `- [ ]`、GFM 智能表格、多语言代码块、LaTeX 数学公式、Mermaid 流程架构图，以及 Note/Tip/Warning/Important/Caution 提示框），回车即填入并自动定位光标。
 - **📑 Obsidian 级情境感知右键菜单 (Context-Aware Editor Menu)**：
@@ -91,6 +111,7 @@
   - **无选区时**：一键插入标准三线表格、代码块、数学公式、架构图模版或 Callout 提示框。
   - **实时文档统计卡片**：菜单底部内嵌轻量统计面板，实时显示选中字符数、词数、行数与预估阅读耗时。
   - **三套主题深度适配**：在日光浅色、墨水屏、极客暗黑主题下均呈现精致的毛玻璃微光与高对比度交互。
+- **⚡ 全局快捷键免失焦穿透 (Keybinding Penetration)**：在 CodeMirror 6 编辑器内打字时，无需摸鼠标失焦，直接敲击 `Ctrl+K`（命令中枢）、`Ctrl+G`（全景图谱）、`Ctrl+M`（导图切换）、`Ctrl+\`（折叠侧栏）、`Ctrl+P`（矢量打印）瞬间响应，保持纯粹的键盘心流。
 - **🖼️ 剪贴板截图一键直接粘贴落盘 (`Ctrl + V`)**：截取微信、QQ、Snipaste 截图或网页图片后，在编辑器内直接粘贴，系统自动落盘至当前文档同级的 `assets/` 目录并插入 Markdown 相对路径，双栏即时渲染可见。
 - **📂 本地图片自由拖拽 (`Drop`)**：从桌面或资源管理器拖拽图片直接插入正文并自动存入 `assets/`。
 - **🔗 AST 零延迟双向高精度同步滚动**：基于源码 AST 块级行号与线性插值算法，富文本与源码高度差异无论多大均严丝合缝、彻底告别偏移。
@@ -102,7 +123,7 @@
 
 ---
 
-### 3. 📖 沉浸排版阅读、科学渲染与专业 PDF 打印 (Reader, Rendering & PDF Print)
+### 4. 📖 沉浸排版阅读、科学渲染与专业 PDF 打印 (Reader, Rendering & PDF Print)
 *专为中文与西文混合长篇知识阅读打磨的排版艺术，兼具科学工程制图与印刷级导出能力。*
 
 <p align="center">
@@ -118,7 +139,7 @@
 
 ---
 
-### 4. 🎨 三大沉浸式专属调优主题 (Three Immersive Themes)
+### 5. 🎨 三大沉浸式专属调优主题 (Three Immersive Themes)
 *覆盖日光、纸质与夜间多场景，左侧活动栏底部三态控制组一键直达。*
 
 | ☀️ 日光浅色 (Warm Amber Light) | 📖 仿电子墨水屏 (E-ink Paper) | ✨ 极客暗黑 (Geek Dark) |
@@ -131,7 +152,7 @@
 
 ---
 
-### 5. 🪟 多文档协同、左右分屏与独立新窗口 (Multi-tabs & Window Management)
+### 6. 🪟 多文档协同、左右分屏与独立新窗口 (Multi-tabs & Window Management)
 *支持多任务并行协作，多屏办公极度高效。*
 
 <p align="center">
@@ -146,7 +167,7 @@
 
 ---
 
-### 6. 🔍 知识大纲导航与全文段落卡片检索 (Search & Navigation)
+### 7. 🔍 知识大纲导航与全文段落卡片检索 (Search & Navigation)
 *结构化组织与秒级定位你的所有文档。*
 
 - **📁 目录树多级子目录折叠展开**：支持任意层级 Markdown 知识库树状结构，顶部提供「全部展开 / 全部折叠」，折叠状态本地持久化记忆。
@@ -156,7 +177,7 @@
 
 ---
 
-### 7. 🛡️ 工业级数据安全体系与系统深度集成 (Desktop System & Security)
+### 8. 🛡️ 工业级数据安全体系与系统深度集成 (Desktop System & Security)
 *本地优先，保护你的每一份心血不被丢失。*
 
 - **🗔 Windows 系统托盘后台驻留**：关闭主窗口可常驻右下角系统托盘，全局热键与闪念胶囊随时待命，托盘菜单一键唤起。
@@ -168,9 +189,18 @@
 
 ---
 
-### 8. 🌐 知识网络全景拓扑图谱与双链漫游 (Knowledge Graph & Bi-directional Links)
+### 9. 🌐 知识网络全景拓扑图谱、局部视野与双链漫游 (Knowledge Graph & Bi-directional Links)
 *打造网状立体认知，从零散碎片笔记升维为互联互通的个人数字脑神经网络。*
 
+<p align="center">
+  <img src="docs/manual-images/31-graph-depth-clustering.png" alt="知识图谱局部深度与目录色彩聚类" width="90%" style="border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);" />
+</p>
+
+- **🎯 1-Hop 邻近与 2-Hop 扩展局部视野控制 (Hop Depth Subgraphing)**：大型知识库专属减负神器，提供「`1-Hop 邻近`（仅直系双向关联）」、「`2-Hop 扩展`（二阶可达网络）」与「`全局`（宏观星系拓扑）」三档深度自由切换，彻底消除密密麻麻的“毛线球”认知过载；在局部视野下单选任意节点即刻重置为聚焦中心，带 300ms 平滑重构动效。
+- **🎨 顶级目录语义色彩聚类 (Folder Cluster Coloring)**：基于笔记根目录提取指纹哈希，采用 HSL 调和色相环算法自动为各知识板块赋予专属主题光环（翡翠绿、天空蓝、罗兰紫、珊瑚橙、琥珀黄等），统一节点边框、发光外晕与出入连接线色彩；悬浮卡片清晰标注聚类名称与完整路径，跨领域引用边界与交叉融合一目了然。
+- **🏛️ MOC 核心枢纽与未链接孤岛智能发现 (Hubs & Orphans)**：顶栏视图过滤快速切换：
+  - **核心枢纽 (MOC - Map of Content)**：一键筛出度数（入度 + 出度）$\ge 3$ 的骨干核心枢纽，快速梳理知识体系主干骨架；
+  - **未链接孤岛 (Orphans)**：一键定位全库度数等于 0 的孤立单篇笔记，开展知识库健康度体检，及时修补缺失双链。
 - **⚡ 60FPS 极速原生渲染管线**：移除了沉重的 GPU 离屏纹理快照，采用直接 2D Canvas 高性能绘制管线与 RAF 动画帧级事件节流，百量级节点缩放拖拽如丝般顺滑，告别卡顿。
 - **🌌 2.2ms 黄金螺旋 2D 有机力导向算法**：彻底根治孤岛节点垂直堆叠成列的缺陷，结合黄金角发散、库仑斥力、胡克弹簧拉力与 95px 防穿透安全边界，关联紧密笔记自动聚合成星系簇，孤岛笔记疏密有致环绕发散。
 - **🎯 智能聚焦当前文档与发光波纹 (`Crosshair`)**：多层级容错定位与 URL 解码匹配，平滑运镜并激发出 1.5s 柔和天蓝脉冲发光光晕；若遇孤岛过滤自动解禁召回。
@@ -181,9 +211,18 @@
 
 ---
 
-### 9. 🧠 交互式思维导图与块级互联 (Mind Map & Block-Level Linking)
-*结构化思维重构，将单线性文本升维为动态树状与原子块网。*
+### 10. 🧠 交互式思维导图、多格式生态导出与块级互联 (Mind Map & Block-Level Linking)
+*结构化思维重构，将单线性文本升维为动态树状与原子块网，无缝打通外部主流脑图生态。*
 
+<p align="center">
+  <img src="docs/manual-images/30-mindmap-export-modal.png" alt="思维导图多格式生态导出" width="90%" style="border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);" />
+</p>
+
+- **📤 多格式生态导出与外部工具无缝流转 (Multi-Format Mindmap Export)**：
+  - **📷 高清透明底 PNG 图片 (`.png`)**：基于 Canvas 2× 视网膜级超采样抗锯齿渲染，自动计算全脑图节点与连接线外接矩形（Bounding Box），边缘留白舒展不截断；默认透明背景，可直接拖入 PPT 演示胶片、Keynote、飞书或 Notion。
+  - **📑 OPML 2.0 通用大纲交换格式 (`.opml`)**：开放信息处理大纲工业标准，生成标准 XML 结构与 `<outline>` 树状节点，完美兼容导入 **MindNode**、**OmniOutliner**、**Logseq**、**XMind**、**Dynalist** 等外部主流大纲与脑图工具。
+  - **🧠 FreeMind 1.0.1 工业标准脑图 (`.mm`)**：遵循 FreeMind 1.0.1 DTD 标准，保真映射节点的 8 色调和色彩与多级层级结构，可被 **XMind**（全版本）、**Freeplane**、**MindManager** 原生双击打开，1:1 精准还原。
+  - **📝 Markdown 分级列表大纲 (`.md`)**：一键将整棵导图树无损序列化为规范缩进的 Markdown 无序列表（保留行内样式元数据），方便沉淀为方案大纲或输入给大语言模型 (LLM) 进行二次扩写。
 - **✨ 高能全键盘交互心流**：
   - `Tab` / `Insert`：为当前选中的节点快速创建**子主题**并立即进入就地重命名。
   - `Enter`：创建**同级主题**，灵感连绵不绝。
@@ -210,7 +249,7 @@
   - **标准行内注释持久化**：所有样式以标准 Markdown 注释（如 `<!-- style: color=#10b981,shape=capsule,align=center,width=280 -->`）保真保存，在第三方编辑器和 Git 中零侵入、纯净透明。
 - **🎛️ 极简精炼工具栏与排版**：
   - **单行工整排版**：所有按键统一施加不换行保护与标准边距，彻底杜绝文字上下分割折行；
-  - **功能聚焦**：精简移除冗余缩放与 SVG 导出按键，专注核心脑图编辑与一键导出高清 PNG 图片（画布保留鼠标滚轮平滑缩放与拖拽漫游）。
+  - **功能聚焦**：右侧集成一键「导出导图 ▾」下拉菜单（PNG、OPML、FreeMind、Markdown），画布保留鼠标滚轮平滑缩放与拖拽漫游。
 - **⚡ 节点加号与折叠按钮排版优化**：
   - **消除物理重合**：折叠按钮与悬浮加号按钮坐标动态分离，杜绝重叠；
   - **消除乱闪**：采用确定性稳定路径 ID 与内部更新防回流校验，添加子节点毫秒级平滑响应，杜绝全树重绘闪烁。
@@ -229,17 +268,17 @@
 | 快捷键 | 功能 | 说明 |
 | :--- | :--- | :--- |
 | `Alt + Space` | **呼出/隐藏闪念胶囊** | 全局秒级唤起毛玻璃速记微窗（可在软件内自由自定义） |
-| `Ctrl + P` | **打印 / 导出 PDF** | 呼出 Chromium 原生高保真打印与 A4 矢量 PDF 导出（跨页防截断） |
+| `Ctrl + K` | **全局命令面板与快速切换器** | 呼出全能中枢：快速切换笔记 (MRU)、执行系统命令 (`>`)、大纲小节秒级直达 (`#`)（编辑区免失焦直接穿透） |
+| `Ctrl + P` | **打印 / 导出 PDF** | 呼出 Chromium 原生高保真打印与 A4 矢量 PDF 导出（跨页防截断，编辑区免失焦直接穿透） |
 | `/` | **斜杠命令补全菜单** | (编辑器行首或空格后) 呼出 20+ 项排版、表格、代码、公式与 Callout 模板 |
 | `右键` | **情境感知右键菜单** | (编辑器选区/正文) 提取为新笔记、生成块引用、存入闪念、富文本排版转换 |
-| `Ctrl + M` | **思维导图视图** | 一键在 Markdown 读写与交互式思维导图间切换 |
+| `Ctrl + M` | **思维导图视图** | 一键在 Markdown 读写与交互式思维导图间切换（编辑区免失焦直接穿透） |
 | `Tab` / `Insert` | **(导图中) 添加子主题** | 为当前选中的脑图节点创建下一级子分支并就地命名 |
 | `Enter` | **(导图中) 添加同级主题** | 为当前选中的脑图节点创建同级分支 |
 | `Delete` | **(导图中) 删除主题** | 删除选中的脑图分支及其子节点（受保护根节点除外） |
 | `F2` / `Space` | **(导图中) 重命名主题** | 就地呼出悬浮输入框修改节点名称（支持双击编辑） |
 | `↑ ↓ ← →` | **(导图中) 方向键导航** | 在父子主题与兄弟主题之间键盘快速漫游定位 |
-| `Ctrl + K` | **全局命令面板与快速切换器** | 呼出全能中枢：快速切换笔记 (MRU)、执行系统命令 (`>`)、大纲小节秒级直达 (`#`) |
-| `Ctrl + G` | **打开/收起知识网络图谱** | 开启或收起右侧关联图谱，支持 1-Hop/2-Hop 局部视野与目录色彩聚类（编辑区可直接穿透） |
+| `Ctrl + G` | **打开/收起知识网络图谱** | 开启或收起右侧关联图谱，支持 1-Hop/2-Hop 局部视野与目录色彩聚类（编辑区免失焦直接穿透） |
 | `Ctrl + Enter` | **保存归档闪念** | 在闪念微窗内一键原子追加写入 `Inbox/YYYY-MM-DD.md` 收集箱 |
 | `Esc` | **隐匿微窗 / 退出全屏** | 随时隐藏闪念胶囊、退出全屏或退出思维导图模式 |
 | `Ctrl + N` | **新建文件** | 打开保存对话框创建新 Markdown 文件并进入编辑 |
@@ -253,7 +292,7 @@
 | `F10` | **专注模式 (Zen)** | 切换专注极简全宽阅读写作模式 |
 | `Alt + T` | **打字机居中滚动** | 开启/关闭活动光标行视口居中模式 |
 | `F11` | **全屏模式** | 切换沉浸式全屏阅读/写作（支持 `Esc` 退出） |
-| `Ctrl + \` | **折叠/展开目录栏** | 快捷切换左侧文件目录树显示状态 |
+| `Ctrl + \` | **折叠/展开目录栏** | 快捷切换左侧文件目录树显示状态（编辑区免失焦直接穿透） |
 | `Ctrl + F` | **搜索内容** | 呼出右侧搜索面板并快速定位关键词 |
 | `Ctrl + B` | **添加书签** | 快速记录当前小节与阅读百分比 |
 | `Alt + ←` | **上一篇** | 切换到上一章节（未保存修改时自动拦截提醒） |
@@ -261,18 +300,20 @@
 
 ---
 
-## 📦 便携版与 MSI 安装包
+## 📦 便携版与 MSI 安装包 (Downloads & Release Assets)
 
-本项目提供两种 Windows 运行与安装形式：
+本项目为 Windows 64 位系统深度优化，提供标准安装包与免安装便携版，最新 `v1.11.0` 资产已发布：
+
+> 🌐 **GitHub 官方发布主页**：[GitHub Releases · v1.11.0](https://github.com/chunxvzhang-lab/KnowSpace/releases/tag/v1.11.0)
 
 ### 1. Windows MSI 标准安装包
-- **文件**：`KnowSpace-1.10.0.msi`
-- **特点**：双击即可安装至 Windows 系统，自动创建桌面快捷方式与开始菜单官方品牌图标，支持标准控制面板卸载与静默安装。
+- **安装文件**：[`KnowSpace-1.11.0.msi`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v1.11.0/KnowSpace-1.11.0.msi) (152.3 MB)
+- **特点**：双击即可全自动安装至 Windows 系统，自动创建桌面快捷方式与开始菜单官方品牌图标，深度集成系统级 `.md` 文件关联，支持标准控制面板卸载与企业级静默安装。
 
 ### 2. Windows 绿色免安装便携版
-- **文件**：`KnowSpace-win-x64-portable.zip`
-- **直接运行**：解压后双击 `KnowSpace.exe`
-- **特点**：解压即用，无需配置 Node.js、Electron 等任何运行时；支持右键"打开方式"关联 `.md` 文件。
+- **便携文件**：[`KnowSpace-win-x64-portable.zip`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v1.11.0/KnowSpace-win-x64-portable.zip) (517.5 MB)
+- **直接运行**：解压后双击 `KnowSpace.exe` 即可直接使用完整功能。
+- **特点**：解压即用、随身携带（支持装入 U 盘或移动硬盘）；完全自包含 Electron 运行时与全套本地依赖，无需配置任何外部开发环境；支持右键「打开方式」关联 Markdown 文档。
 
 ---
 
@@ -297,23 +338,35 @@
 
 ### Key Features
 
-- **🧠 Interactive Mind Map & Block Links (`Ctrl + M`)**:
+- **🎯 All-in-One Command Palette & Quick Switcher (`Ctrl + K`)**:
+  - *Three-in-One Global Hub*: Recent file switcher with MRU history & fuzzy pinyin search, `>` action commands (theme switching, export, layout toggle), and `#` heading outline jump.
+  - *Keybinding Penetration*: Instant trigger directly from CodeMirror 6 editor without losing focus or typing flow.
+- **🖨️ High-Fidelity Vector PDF Print & Export (`Ctrl + P`)**:
+  - *Chromium Native Vector Print Engine*: Export standard A4 vector PDF directly or print via system dialog.
+  - *Intelligent Page-Break Prevention*: Custom `@media print` rules prevent code blocks, LaTeX formulas, GFM tables, and Mermaid diagrams from being cut in half across pages.
+- **🧠 Interactive Mind Map & Multi-Format Ecosystem Export (`Ctrl + M`)**:
+  - *Multi-Format Export*: Export 2× Retina transparent PNG diagrams, standard OPML 2.0 (`.opml`) for MindNode / OmniOutliner / Logseq, FreeMind 1.0.1 XML (`.mm`) for XMind / Freeplane with preserved node colors, and structured Markdown outlines.
+  - *Drag-and-Drop Reparenting*: Intuitive reorganization with cycle detection and snap glow.
+  - *In-Canvas Search & Smooth Focus*: Dynamic keyword highlight and viewport centering.
   - *Full Keyboard Flow*: `Tab` (add subtopic), `Enter` (add sibling), `Delete` (remove topic), `F2` / Double-Click (in-place rename with Chinese IME support), Arrow Keys (smooth navigation), `Ctrl+Z` / `Ctrl+Y` (undo / redo).
-  - *Right-Click Appearance Customization*: Right-click any node to customize node colors (8 harmonic palettes), node shapes (capsule, rounded, sharp rect, minimalist underline), connector line styles (bezier curves, orthogonal step lines, straight lines), and branch line colors.
+  - *Right-Click Appearance Customization*: 14 harmonic palettes, 4 node shapes (capsule, rounded, sharp rect, minimalist underline), 3 connector line styles (bezier, step, straight).
   - *Two-way Markdown Synchronization*: Losslessly serializes into clean standard hierarchical lists with inline metadata comments (`<!-- style: ... -->`), universally compatible with third-party Markdown editors and Git.
-  - *New Mindmap Creation*: Quick actions on directory tree header and empty reader state to create dedicated `.mindmap.md` files.
   - *Block-Level Atomic Linking*: Paragraph-level fingerprinting (`^block-id`), direct jumping (`[[doc#^block]]`), and elegant embed cards (`![[doc#^block]]`).
-- **🌐 60FPS Knowledge Graph & Bi-directional Links (`Ctrl + G`)**:
+- **🌐 60FPS Knowledge Graph, Local Subgraphs & Clustering (`Ctrl + G`)**:
+  - *Hop Depth Filtering*: Toggle between `1-Hop` direct neighbors, `2-Hop` extended subgraphs, and global galaxy to eliminate cognitive overload in large vaults. Click any node to dynamically re-center.
+  - *Folder Cluster Coloring*: HSL harmonic palette automatically groups notes by their root folders with matched glow borders and links.
+  - *MOC Hubs & Orphan Detection*: Filter degree $\ge 3$ core hubs or degree $= 0$ isolated notes for vault maintenance.
   - *Ultra-Smooth Canvas Engine*: 60FPS native 2D Canvas rendering pipeline with RAF throttling for hundreds of notes.
   - *Golden Spiral 2D Organic Force-Directed Layout*: Self-developed 2.2ms physics simulation that groups related notes into galaxies and smoothly orbits isolated notes without vertical stacking.
-  - *WikiLink Suggestions*: Typing `[[` pops up instant document autocomplete suggestions.
-  - *Global Cascading Refactor*: Renaming any document dynamically updates all references throughout the entire workspace.
-- **✍️ Modern Editor & Direct Image Paste**:
+  - *WikiLink Suggestions & Cascading Refactor*: Typing `[[` pops up instant document autocomplete suggestions; renaming any file automatically updates all references.
+- **✍️ Modern Editor, Slash Commands & Smart Menu**:
+  - *Slash Commands (`/`)*: Fast autocompletion for 20+ templates (headings, checklists, tables, code blocks, math, callouts, and diagrams).
+  - *Context-Aware Right-Click Menu*: Extract selected text to a new note with automatic bidirectional link insertion, create block references (`^block`), save to flash notes, or format text.
   - *Clipboard Image Paste (`Ctrl + V`)*: Paste screenshots or images directly into CodeMirror 6. Auto-saves timestamped image files into local `assets/` directory and inserts markdown syntax with instant live preview.
   - *Image Drop*: Drag-and-drop image files from desktop directly into editor.
   - *AST Precise Synchronized Scrolling*: Eliminates drift between source code and rich preview with piecewise linear interpolation.
   - *Typewriter Mode (`Alt + T`)*: Keeps the active editing line vertically centered.
-  - *Automatic Line Numbers*: Gutter line numbering on both editor and preview with hover highlights.
+  - *Keybinding Penetration*: Global hotkeys (`Ctrl+K`, `Ctrl+G`, `Ctrl+M`, `Ctrl+\`, `Ctrl+P`) respond directly from inside editor without focus shifting.
 - **📖 Reader & Scientific Diagrams**:
   - *Typography*: Beautiful 960px golden reading width, distraction-free reading experience.
   - *Mermaid Diagrams & 3× Retina Export*: Renders flowcharts, mindmaps, sequence diagrams, and class diagrams. Exports ultra-sharp 3× Retina PNG diagrams.
