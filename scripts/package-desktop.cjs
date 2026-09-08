@@ -90,7 +90,16 @@ async function main() {
     await fs.copyFile(path.join(root, "LICENSE"), path.join(docsDir, "LICENSE"));
   } catch (e) {}
   try {
-    const readmeTxt = `KnowSpace v${appVersion}\nPersonal Knowledge Workspace (个人知识工作台)\n\nDirect Run: Double-click 'KnowSpace.exe'\nInstaller: Locate MSI in 'release/KnowSpace-${appVersion}.msi'\nGitHub: https://github.com/chunxvzhang-lab/KnowSpace\n`;
+    await fs.copyFile(path.join(root, "docs", "USER_MANUAL.md"), path.join(docsDir, "USER_MANUAL.md"));
+  } catch (e) {}
+  try {
+    await fs.copyFile(path.join(root, "docs", "操作手册.md"), path.join(docsDir, "操作手册.md"));
+  } catch (e) {}
+  try {
+    await copyDirectory(path.join(root, "docs", "manual-images"), path.join(docsDir, "manual-images"));
+  } catch (e) {}
+  try {
+    const readmeTxt = `KnowSpace v${appVersion}\nPersonal Knowledge Workspace (个人知识工作台)\n\nDirect Run: Double-click 'KnowSpace.exe'\nInstaller: Locate MSI in 'release/KnowSpace-${appVersion}.msi'\nManual: Check 'docs/USER_MANUAL.md' or 'docs/操作手册.md'\nGitHub: https://github.com/chunxvzhang-lab/KnowSpace\n`;
     await fs.writeFile(path.join(docsDir, "README.txt"), readmeTxt, "utf8");
   } catch (e) {}
   try {

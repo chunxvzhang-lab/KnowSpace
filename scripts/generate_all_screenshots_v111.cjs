@@ -571,10 +571,11 @@ async function saveBoth(page, name) {
       await fileRows.nth(1).click();
       await page.waitForTimeout(600);
       await saveBoth(page, "17-dialog-unsaved.png");
-      const cancelBtn = page.locator('button:has-text("取消")');
-      if (await cancelBtn.count() > 0) await cancelBtn.click();
+      // Click "放弃更改" so session is completely clean
+      const discardBtn = page.locator('button:has-text("放弃更改")');
+      if (await discardBtn.count() > 0) await discardBtn.click();
       else await page.keyboard.press("Escape");
-      await page.waitForTimeout(400);
+      await page.waitForTimeout(500);
     }
   }
 
@@ -586,10 +587,15 @@ async function saveBoth(page, name) {
   await page.keyboard.press("Control+s");
   await page.waitForTimeout(800);
   await saveBoth(page, "18-dialog-conflict.png");
-  const conflictCancel = page.locator('.conflict-dialog button:has-text("取消"), button:has-text("取消")').first();
-  if (await conflictCancel.count() > 0) await conflictCancel.click();
-  else await page.keyboard.press("Escape");
-  await page.waitForTimeout(400);
+  // Reload from disk to clear conflict cleanly
+  const conflictReload = page.locator('button:has-text("重新载入磁盘内容")').first();
+  if (await conflictReload.count() > 0) await conflictReload.click();
+  else {
+    const cancelBtn = page.locator('.modal-conflict button:has-text("取消"), button:has-text("取消")').first();
+    if (await cancelBtn.count() > 0) await cancelBtn.click();
+    else await page.keyboard.press("Escape");
+  }
+  await page.waitForTimeout(500);
 
   // 19: Zen Focus Mode
   console.log("Capturing 19-mode-zen.png...");
@@ -634,7 +640,7 @@ async function saveBoth(page, name) {
 
   // 22: Backlinks Panel
   console.log("Capturing 22-backlinks-panel.png...");
-  const backlinksNavBtn = page.locator('button[aria-label="反向链接"], button[data-tooltip*="反向链接"]');
+  const backlinksNavBtn = page.locator('button[aria-label="反向链接与引用"], button[data-tooltip*="反向链接"]');
   if (await backlinksNavBtn.count() > 0) {
     await backlinksNavBtn.click();
     await page.waitForTimeout(700);
@@ -643,7 +649,7 @@ async function saveBoth(page, name) {
 
   // 23: Timeline Panel
   console.log("Capturing 23-timeline-panel.png...");
-  const timelineNavBtn = page.locator('button[aria-label="时空足迹"], button[aria-label="知识时空"], button[data-tooltip*="时空"]');
+  const timelineNavBtn = page.locator('button[aria-label="闪念 Space 时间线看板"], button[data-tooltip*="时间线"]');
   if (await timelineNavBtn.count() > 0) {
     await timelineNavBtn.click();
     await page.waitForTimeout(700);
@@ -683,8 +689,10 @@ async function saveBoth(page, name) {
 
   // 26: Block Reference Embed Card
   console.log("Capturing 26-block-reference.png...");
-  if (await fileRows.count() >= 2) {
-    await fileRows.nth(1).click();
+  // Click chapter 2 tab if open, or file row
+  const tabsList = page.locator(".tab-item");
+  if (await tabsList.count() >= 2) {
+    await tabsList.nth(1).click();
     await page.waitForTimeout(800);
     const embedCard = page.locator(".wikilink-embed-card");
     if (await embedCard.count() > 0) {
@@ -692,13 +700,13 @@ async function saveBoth(page, name) {
       await page.waitForTimeout(400);
     }
     await saveBoth(page, "26-block-reference.png");
-    await fileRows.nth(0).click();
+    await tabsList.nth(0).click();
     await page.waitForTimeout(600);
   }
 
   // 27: Command Palette (Ctrl+K)
   console.log("Capturing 27-command-palette.png...");
-  const cmdPaletteBtn = page.locator('button[data-tooltip*="命令中枢"], button[aria-label*="命令中枢"]').first();
+  const cmdPaletteBtn = page.locator('button[aria-label="全局命令中枢"], button[data-tooltip*="全局命令中枢"]');
   if (await cmdPaletteBtn.count() > 0) {
     await cmdPaletteBtn.click();
   } else {

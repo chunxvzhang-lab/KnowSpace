@@ -68,17 +68,17 @@ def main():
     )
     # Glow dot
     draw.ellipse([pill_x + 22, pill_y + 18, pill_x + 34, pill_y + 30], fill=(29, 155, 240, 255))
-    draw.text((pill_x + 46, pill_y + 10), "KnowSpace v1.5.0", fill=(231, 233, 234), font=font_pill_title)
-    draw.text((pill_x + 295, pill_y + 12), "•  Personal Knowledge Workspace · 个人知识工作台  •  摸鱼Lab", fill=(113, 118, 123), font=font_pill_sub)
+    draw.text((pill_x + 46, pill_y + 10), "KnowSpace v1.11.0", fill=(231, 233, 234), font=font_pill_title)
+    draw.text((pill_x + 305, pill_y + 12), "•  Personal Knowledge Workspace · 现代化知识工作台  •  摸鱼Lab", fill=(113, 118, 123), font=font_pill_sub)
 
     # Left & Right Top Badges
-    draw_rounded_rect(draw, [120, 40, 390, 86], radius=23, fill=(15, 20, 25, 220), outline=(47, 51, 54, 255), width=1)
+    draw_rounded_rect(draw, [120, 40, 420, 86], radius=23, fill=(15, 20, 25, 220), outline=(47, 51, 54, 255), width=1)
     draw.ellipse([140, 58, 150, 68], fill=(29, 155, 240, 255))
-    draw.text((160, 50), "★ 超立方空间应用图标", fill=(29, 155, 240), font=font_badge)
+    draw.text((160, 50), "★ Ctrl+K 全局命令中枢", fill=(29, 155, 240), font=font_badge)
 
-    draw_rounded_rect(draw, [W - 400, 40, W - 120, 86], radius=23, fill=(15, 20, 25, 220), outline=(47, 51, 54, 255), width=1)
-    draw.ellipse([W - 380, 58, W - 370, 68], fill=(74, 222, 128, 255))
-    draw.text((W - 360, 50), "★ 独立新窗口毫秒秒开", fill=(74, 222, 128), font=font_badge)
+    draw_rounded_rect(draw, [W - 420, 40, W - 120, 86], radius=23, fill=(15, 20, 25, 220), outline=(47, 51, 54, 255), width=1)
+    draw.ellipse([W - 400, 58, W - 390, 68], fill=(74, 222, 128, 255))
+    draw.text((W - 380, 50), "★ / 指令与导图多格式生态", fill=(74, 222, 128), font=font_badge)
 
     # 3. Main Showcase Window Mockup (Twitter Lights Out #000000 + Surface #0f1419 + Border #2f3336)
     win_x = 120
@@ -476,7 +476,7 @@ def main():
     font_dock_bold = get_font(13, bold=True)
     draw.text((win_x + 20, dock_y + 10), "● 已安全保存 (原子落盘)", fill=(74, 222, 128), font=font_dock_bold)
     draw.text((win_x + 210, dock_y + 10), "2,840 字符  •  约 6 分钟阅读", fill=(160, 166, 172), font=font_dock)
-    draw.text((win_x + win_w - 470, dock_y + 10), "LF  •  UTF-8  •  KnowSpace Engine v1.5.0  •  极客暗黑", fill=(113, 118, 123), font=font_dock)
+    draw.text((win_x + win_w - 470, dock_y + 10), "LF  •  UTF-8  •  KnowSpace Engine v1.11.0  •  极客暗黑", fill=(113, 118, 123), font=font_dock)
 
     # 4. Floating Feature Showcase Cards around the main window
     # Left Floating Badge Card
@@ -485,8 +485,8 @@ def main():
     fc1_w = 260
     fc1_h = 160
     draw_rounded_rect(draw, [fc1_x, fc1_y, fc1_x + fc1_w, fc1_y + fc1_h], radius=16, fill=(15, 20, 25, 240), outline=(29, 155, 240, 160), width=2)
-    draw.text((fc1_x + 20, fc1_y + 18), "★ 双文档分屏 & 独立窗口", fill=(29, 155, 240), font=get_font(17, bold=True))
-    draw.text((fc1_x + 20, fc1_y + 50), "• 标签页右键开启左右对比\n• 秒级脱离为完全独立窗口\n• Windows 贴靠分栏无遮挡\n• 多屏协同办公极度高效", fill=(200, 205, 210), font=get_font(13))
+    draw.text((fc1_x + 20, fc1_y + 18), "★ 全局中枢与排版指令", fill=(29, 155, 240), font=get_font(17, bold=True))
+    draw.text((fc1_x + 20, fc1_y + 50), "• Ctrl+K 瞬时检索并执行动作\n• / 斜杠指令快速插入组件\n• 极客右键上下文增强菜单\n• 双文档并排分屏对比模式", fill=(200, 205, 210), font=get_font(13))
 
     # Right Floating Badge Card
     fc2_x = W - 305
@@ -494,14 +494,15 @@ def main():
     fc2_w = 260
     fc2_h = 160
     draw_rounded_rect(draw, [fc2_x, fc2_y, fc2_x + fc2_w, fc2_y + fc2_h], radius=16, fill=(15, 20, 25, 240), outline=(29, 155, 240, 160), width=2)
-    draw.text((fc2_x + 20, fc2_y + 18), "★ 极速加载 & 智能分包", fill=(29, 155, 240), font=get_font(17, bold=True))
-    draw.text((fc2_x + 20, fc2_y + 50), "• 首屏 JS 体积缩减 84%\n• 多进程异步预读即时渲染\n• AST 零开销行号自动映射\n• Mermaid 3x 超清导出", fill=(200, 205, 210), font=get_font(13))
+    draw.text((fc2_x + 20, fc2_y + 18), "★ 图谱聚类与导图生态", fill=(29, 155, 240), font=get_font(17, bold=True))
+    draw.text((fc2_x + 20, fc2_y + 50), "• 1-Hop / 2-Hop 关联探索\n• 文件夹多色社区聚类光环\n• 脑图多格式 OPML / FreeMind\n• 3x Retina 矢量超清导出", fill=(200, 205, 210), font=get_font(13))
 
     # 5. Save image to all required target paths
     target_paths = [
         r"C:\Users\chunxvzhang\Desktop\codex\screenshot.png",
         r"C:\Users\chunxvzhang\Desktop\codex\public\screenshot.png",
         r"C:\Users\chunxvzhang\Desktop\codex\dist\screenshot.png",
+        r"C:\Users\chunxvzhang\Desktop\codex\release\KnowSpace-win-x64\screenshot.png",
         r"C:\Users\chunxvzhang\Desktop\codex\release\KnowSpace-win-x64\assets\screenshot.png",
         r"C:\Users\chunxvzhang\Desktop\codex\release\BookMD-Reader-win-x64\assets\screenshot.png",
     ]
