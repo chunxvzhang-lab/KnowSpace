@@ -15,6 +15,7 @@ import frontMatterPlugin from "markdown-it-front-matter";
 import taskLists from "markdown-it-task-lists";
 import { sha256, uniqueSlug } from "../core/ids";
 import type { Heading, RenderedChapter, SearchResult } from "../core/types";
+import { parseSearchQuery } from "./searchIndexService";
 
 let capturedFrontMatter = "";
 const maxHighlightedCodeLength = 50_000;
@@ -140,6 +141,50 @@ const markdown: MarkdownIt = new MarkdownIt({
   });
 
 markdown.disable("lheading");
+
+const cardMarkdownCache = new Map<string, string>();
+const MAX_CARD_CACHE_SIZE = 250;
+
+/**
+ * Renders concise, sanitized HTML for infinite canvas text cards.
+ * Preserves headings, lists, task list checkboxes, inline code, bold, links.
+ * Cached to ensure buttery-smooth 60fps canvas panning and dragging.
+ */
+export function renderCardMarkdown(source: string): string {
+  if (!source || typeof source !== "string") return "";
+  const cached = cardMarkdownCache.get(source);
+  if (cached !== undefined) return cached;
+
+  let result = "";
+  try {
+    const raw = markdown.render(source);
+    result = DOMPurify.sanitize(raw, {
+      USE_PROFILES: { html: true, mathMl: true },
+      ADD_TAGS: ["input", "annotation", "semantics"],
+      ADD_ATTR: [
+        "type",
+        "checked",
+        "disabled",
+        "class",
+        "data-source-line",
+        "target",
+        "rel",
+        "href",
+        "data-wikilink-target",
+        "data-wikilink-label",
+      ],
+    }) as string;
+  } catch {
+    result = DOMPurify.sanitize(source) as string;
+  }
+
+  if (cardMarkdownCache.size >= MAX_CARD_CACHE_SIZE) {
+    const firstKey = cardMarkdownCache.keys().next().value;
+    if (firstKey !== undefined) cardMarkdownCache.delete(firstKey);
+  }
+  cardMarkdownCache.set(source, result);
+  return result;
+}
 
 export async function renderMarkdown(source: string, baseUrl = window.location.href): Promise<RenderedChapter> {
   capturedFrontMatter = "";
@@ -318,12 +363,94 @@ export function findInChapter(
 ): SearchResult[] {
   const q = query.trim();
   if (!q) return [];
+  const parsed = parseSearchQuery(q);
+  if (parsed.isEmpty) return [];
   const qLower = q.toLowerCase();
+
   const results: SearchResult[] = [];
 
   if (sourceMarkdown) {
     const lines = sourceMarkdown.split("\n");
     const blocks = parseSourceBlocks(sourceMarkdown);
+
+    // If structured filters exist (tag:#, link:[[, "phrase", -exclude)
+    if (parsed.hasFilters) {
+      for (let bIdx = 0; bIdx < blocks.length && results.length < 50; bIdx++) {
+        const block = blocks[bIdx];
+        const blockText = block.text;
+        const blockLower = blockText.toLowerCase();
+
+        // Check exclusions
+        if (parsed.excludeTerms.some((ex) => blockLower.includes(ex))) {
+          continue;
+        }
+
+        // Check phrases
+        if (parsed.phrases.some((p) => !blockLower.includes(p.toLowerCase()))) {
+          continue;
+        }
+
+        // Check tags
+        if (parsed.tags.some((t) => !blockLower.includes(`#${t}`))) {
+          continue;
+        }
+
+        // Check links
+        if (parsed.links.some((l) => !blockLower.includes(`[[${l}`))) {
+          continue;
+        }
+
+        // Check include terms
+        if (parsed.includeTerms.some((t) => !blockLower.includes(t.toLowerCase()))) {
+          continue;
+        }
+
+        let firstPos = 0;
+        let primaryMatchText = q;
+        if (parsed.phrases.length > 0) {
+          firstPos = blockLower.indexOf(parsed.phrases[0].toLowerCase());
+          primaryMatchText = parsed.phrases[0];
+        } else if (parsed.tags.length > 0) {
+          firstPos = blockLower.indexOf(`#${parsed.tags[0]}`);
+          primaryMatchText = `#${parsed.tags[0]}`;
+        } else if (parsed.links.length > 0) {
+          firstPos = blockLower.indexOf(`[[${parsed.links[0]}`);
+          primaryMatchText = `[[${parsed.links[0]}]]`;
+        } else if (parsed.includeTerms.length > 0) {
+          firstPos = blockLower.indexOf(parsed.includeTerms[0].toLowerCase());
+          primaryMatchText = parsed.includeTerms[0];
+        }
+        if (firstPos === -1) firstPos = 0;
+
+        const heading = nearestHeadingForLine(lines, headings, block.startLine);
+        const start = Math.max(0, firstPos - 40);
+        const end = Math.min(blockText.length, firstPos + primaryMatchText.length + 100);
+
+        let category: SearchResult["category"] = "text";
+        if (parsed.tags.length > 0) category = "tag";
+        else if (parsed.links.length > 0) category = "link";
+        else if (parsed.phrases.length > 0) category = "phrase";
+
+        results.push({
+          id: `block-${block.startLine}-${block.endLine}`,
+          index: firstPos,
+          matchIndex: results.length,
+          lineNumber: block.startLine,
+          lineEndNumber: block.endLine,
+          lineOffset: firstPos,
+          query: q,
+          title: heading?.text ?? (block.startLine === block.endLine ? `第 ${block.startLine} 行` : `第 ${block.startLine}-${block.endLine} 行`),
+          headingId: heading?.id,
+          excerpt: compactWhitespace(blockText.length > 180 ? blockText.slice(start, end) : blockText),
+          matchedText: blockText.slice(firstPos, firstPos + primaryMatchText.length),
+          matchCountInBlock: 1,
+          category,
+        });
+      }
+      if (results.length > 0) return results;
+    }
+
+    const qLower = q.toLowerCase();
     for (let bIdx = 0; bIdx < blocks.length && results.length < 50; bIdx++) {
       const block = blocks[bIdx];
       const blockText = block.text;

@@ -17,6 +17,8 @@ import {
   AlignJustify,
   RotateCcw,
   Search,
+  FoldVertical,
+  UnfoldVertical,
 } from "lucide-react";
 import type { Heading, ThemeMode, MindmapNodeShape, MindmapLineStyle, MindmapTextAlign } from "../core/types";
 import {
@@ -1026,10 +1028,27 @@ export const MindmapView = memo(function MindmapView({
 
   const isBatchMode = selectedNodeIds.size > 1;
 
+  const [isCompact, setIsCompact] = useState(false);
+  const [isNarrow, setIsNarrow] = useState(false);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const w = entry.contentRect.width;
+        setIsCompact(w < 860);
+        setIsNarrow(w < 660);
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <div
       ref={containerRef}
-      className={`mindmap-view-container ${isDragging ? "is-dragging" : ""}`}
+      className={`mindmap-view-container ${isDragging ? "is-dragging" : ""} ${isCompact ? "is-compact" : ""} ${isNarrow ? "is-narrow" : ""}`}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
@@ -1039,18 +1058,18 @@ export const MindmapView = memo(function MindmapView({
       {/* Top Floating Clean & Spacious Control Bar */}
       <header className="mindmap-toolbar">
         <div className="mindmap-toolbar-left">
-          <span className="mindmap-toolbar-title" title={tree.text || title}>
+          <div className="mindmap-toolbar-title" title={tree.text || title}>
             <ListTree size={16} className="text-cyan" />
             <strong>{tree.text || title || "思维导图"}</strong>
-            <span className="mindmap-node-count-badge">
-              {layout.nodes.length} 节点
-            </span>
-            {selectedNodeIds.size > 1 && (
-              <span className="mindmap-node-count-badge text-cyan">
-                已选 {selectedNodeIds.size} 项
-              </span>
-            )}
+          </div>
+          <span className="mindmap-node-count-badge">
+            {layout.nodes.length} 节点
           </span>
+          {selectedNodeIds.size > 1 && (
+            <span className="mindmap-node-count-badge text-cyan">
+              已选 {selectedNodeIds.size} 项
+            </span>
+          )}
         </div>
 
         <div className="mindmap-toolbar-center">
@@ -1082,7 +1101,7 @@ export const MindmapView = memo(function MindmapView({
               <div className="mindmap-toolbar-btn-group">
                 <button
                   type="button"
-                  className="mindmap-tool-btn text-btn"
+                  className="mindmap-tool-btn text-btn secondary-action"
                   onClick={(e) => {
                     const rect = e.currentTarget.getBoundingClientRect();
                     const containerRect = containerRef.current?.getBoundingClientRect();
@@ -1106,7 +1125,7 @@ export const MindmapView = memo(function MindmapView({
           <div className="mindmap-toolbar-btn-group">
             <button
               type="button"
-              className="mindmap-tool-btn text-btn"
+              className="mindmap-tool-btn text-btn secondary-action"
               onClick={handleSelectAll}
               title="选中所有节点 (Ctrl+A)"
             >
@@ -1115,18 +1134,20 @@ export const MindmapView = memo(function MindmapView({
             </button>
             <button
               type="button"
-              className="mindmap-tool-btn text-btn"
+              className="mindmap-tool-btn text-btn secondary-action"
               onClick={handleCollapseToLevel2}
               title="仅保留 1~2 级主题"
             >
+              <FoldVertical size={13} />
               <span>折叠至2级</span>
             </button>
             <button
               type="button"
-              className="mindmap-tool-btn text-btn"
+              className="mindmap-tool-btn text-btn secondary-action"
               onClick={handleExpandAll}
               title="展开所有分支"
             >
+              <UnfoldVertical size={13} />
               <span>全部展开</span>
             </button>
           </div>
@@ -1214,18 +1235,21 @@ export const MindmapView = memo(function MindmapView({
           <div className="mindmap-export-dropdown">
             <button
               type="button"
-              className="mindmap-tool-btn text-btn export-btn"
+              className={`mindmap-tool-btn text-btn export-btn ${isExportMenuOpen ? "active" : ""}`}
               onClick={() => setIsExportMenuOpen((prev) => !prev)}
               title="导出导图为 PNG、OPML 2.0、FreeMind (.mm) 或 Markdown 大纲"
+              aria-haspopup="true"
+              aria-expanded={isExportMenuOpen}
             >
               <Download size={14} />
-              <span>导出导图 ▾</span>
+              <span>导出 ▾</span>
             </button>
             {isExportMenuOpen && (
-              <div className="mindmap-export-menu">
+              <div className="mindmap-export-menu" role="menu">
                 <button
                   type="button"
                   className="mindmap-export-menu-item"
+                  role="menuitem"
                   onClick={() => {
                     setIsExportMenuOpen(false);
                     handleExportPng();
@@ -1237,7 +1261,11 @@ export const MindmapView = memo(function MindmapView({
                 <button
                   type="button"
                   className="mindmap-export-menu-item"
-                  onClick={handleExportOpml}
+                  role="menuitem"
+                  onClick={() => {
+                    setIsExportMenuOpen(false);
+                    handleExportOpml();
+                  }}
                 >
                   <span className="export-item-title">导出 OPML 2.0</span>
                   <span className="export-item-desc">兼容 MindNode、OmniOutliner (.opml)</span>
@@ -1245,7 +1273,11 @@ export const MindmapView = memo(function MindmapView({
                 <button
                   type="button"
                   className="mindmap-export-menu-item"
-                  onClick={handleExportFreeMind}
+                  role="menuitem"
+                  onClick={() => {
+                    setIsExportMenuOpen(false);
+                    handleExportFreeMind();
+                  }}
                 >
                   <span className="export-item-title">导出 FreeMind (.mm)</span>
                   <span className="export-item-desc">兼容 XMind、FreeMind、Freeplane (.mm)</span>
@@ -1253,7 +1285,11 @@ export const MindmapView = memo(function MindmapView({
                 <button
                   type="button"
                   className="mindmap-export-menu-item"
-                  onClick={handleExportMarkdownOutline}
+                  role="menuitem"
+                  onClick={() => {
+                    setIsExportMenuOpen(false);
+                    handleExportMarkdownOutline();
+                  }}
                 >
                   <span className="export-item-title">导出 Markdown 大纲</span>
                   <span className="export-item-desc">多级层级纯文本大纲 (.md)</span>

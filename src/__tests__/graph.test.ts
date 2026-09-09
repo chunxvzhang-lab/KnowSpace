@@ -232,4 +232,34 @@ describe("graphService", () => {
     expect(graph.nodes.length).toBe(1);
     expect(manualNodes[0].isCurrent).toBe(true);
   });
+
+  it("normalizes .canvas and .markdown extensions consistently for nodes and links", () => {
+    const manifest: BookManifest = {
+      id: "canvas-book",
+      title: "Canvas Book",
+      chapters: [
+        { id: "chap-canvas", title: "ArchitectureBoard.canvas", src: "ArchitectureBoard.canvas" },
+        { id: "chap-notes", title: "Notes.markdown", src: "Notes.markdown" },
+      ],
+    };
+    const index = createBacklinkIndex([]);
+    updateDocumentInIndex(
+      index,
+      "chap-notes",
+      "Notes.markdown",
+      "Check our [[ArchitectureBoard]] for details.",
+      "Notes.markdown"
+    );
+
+    const graph = buildGraphDataFromIndex(manifest, index, "ArchitectureBoard");
+    expect(graph.nodes.length).toBe(2);
+    const canvasNode = graph.nodes.find((n) => n.id === "chap-canvas");
+    expect(canvasNode).toBeDefined();
+    expect(canvasNode?.isCurrent).toBe(true);
+    expect(canvasNode?.normTitle).toBe("architectureboard");
+
+    expect(graph.edges.length).toBe(1);
+    expect(graph.edges[0].source).toBe("chap-notes");
+    expect(graph.edges[0].target).toBe("chap-canvas");
+  });
 });

@@ -1,0 +1,309 @@
+import { describe, it, expect, vi } from "vitest";
+import {
+  parseCanvasData,
+  serializeCanvasData,
+  createDefaultCanvas,
+  computeBoundingBox,
+  getNodeAnchorPoint,
+  computeEdgePath,
+  extractCanvasToMarkdown,
+  getOptimalAnchorSides,
+  exportCanvasToSvg,
+  exportCanvasToPng,
+  downloadCanvasAsImage,
+  copyCanvasImageToClipboard,
+  reverseEdgeDirection,
+} from "../services/canvasService";
+import type { CanvasData, CanvasTextNode, CanvasFileNode, CanvasGroupNode } from "../types/canvasTypes";
+
+describe("canvasService - JSON Canvas 1.0 Specification", () => {
+  it("parses empty or invalid input safely", () => {
+    expect(parseCanvasData("")).toEqual({ nodes: [], edges: [] });
+    expect(parseCanvasData("invalid json")).toEqual({ nodes: [], edges: [] });
+    expect(parseCanvasData("{}")).toEqual({ nodes: [], edges: [] });
+  });
+
+  it("parses standard text, file, link, and group nodes", () => {
+    const json = JSON.stringify({
+      nodes: [
+        { id: "text-1", type: "text", text: "Hello Canvas", x: 10, y: 20, width: 250, height: 150, color: "1" },
+        { id: "file-1", type: "file", file: "01-架构设计.md", x: 300, y: 50, width: 320, height: 240, color: "4" },
+        { id: "link-1", type: "link", url: "https://knowspace.dev", x: 700, y: 100, width: 200, height: 100 },
+        { id: "group-1", type: "group", label: "核心系统", x: 0, y: 0, width: 900, height: 500, color: "5" },
+      ],
+      edges: [
+        { id: "edge-1", fromNode: "text-1", fromSide: "right", toNode: "file-1", toSide: "left", label: "引用" },
+      ],
+    });
+
+    const parsed = parseCanvasData(json);
+    expect(parsed.nodes).toHaveLength(4);
+    expect(parsed.nodes[0].type).toBe("text");
+    expect((parsed.nodes[0] as CanvasTextNode).text).toBe("Hello Canvas");
+    expect((parsed.nodes[1] as CanvasFileNode).file).toBe("01-架构设计.md");
+    expect(parsed.edges).toHaveLength(1);
+    expect(parsed.edges[0].label).toBe("引用");
+    expect(parsed.edges[0].toSide).toBe("left");
+  });
+
+  it("filters edges referencing non-existent nodes", () => {
+    const json = JSON.stringify({
+      nodes: [{ id: "n1", type: "text", text: "Only Node", x: 0, y: 0, width: 100, height: 100 }],
+      edges: [{ id: "e1", fromNode: "n1", toNode: "ghost-node" }],
+    });
+    const parsed = parseCanvasData(json);
+    expect(parsed.nodes).toHaveLength(1);
+    expect(parsed.edges).toHaveLength(0);
+  });
+
+  it("serializes CanvasData into formatted JSON Canvas", () => {
+    const data: CanvasData = {
+      nodes: [{ id: "t1", type: "text", text: "Test", x: 50, y: 50, width: 200, height: 100 }],
+      edges: [],
+    };
+    const json = serializeCanvasData(data);
+    expect(json).toContain('"type": "text"');
+    expect(json).toContain('"text": "Test"');
+  });
+
+  it("generates default initial canvas template", () => {
+    const defaultCanvas = createDefaultCanvas("我的空间");
+    expect(defaultCanvas.nodes.length).toBeGreaterThanOrEqual(2);
+    expect(defaultCanvas.edges.length).toBeGreaterThanOrEqual(1);
+    expect(defaultCanvas.nodes.some((n) => n.type === "group")).toBe(true);
+    expect(defaultCanvas.nodes.some((n) => n.type === "text")).toBe(true);
+  });
+
+  it("calculates bounding box accurately", () => {
+    const nodes: CanvasTextNode[] = [
+      { id: "1", type: "text", text: "A", x: 100, y: 50, width: 200, height: 100 },
+      { id: "2", type: "text", text: "B", x: 500, y: 300, width: 150, height: 80 },
+    ];
+    const bbox = computeBoundingBox(nodes);
+    expect(bbox.minX).toBe(100);
+    expect(bbox.minY).toBe(50);
+    expect(bbox.maxX).toBe(650);
+    expect(bbox.maxY).toBe(380);
+    expect(bbox.width).toBe(550);
+    expect(bbox.height).toBe(330);
+  });
+
+  it("computes anchor points and SVG edge paths", () => {
+    const node: CanvasTextNode = { id: "1", type: "text", text: "A", x: 100, y: 100, width: 200, height: 100 };
+    const rightAnchor = getNodeAnchorPoint(node, "right");
+    expect(rightAnchor).toEqual({ x: 300, y: 150 });
+
+    const topAnchor = getNodeAnchorPoint(node, "top");
+    expect(topAnchor).toEqual({ x: 200, y: 100 });
+
+    const bezierPath = computeEdgePath({ x: 100, y: 100 }, "right", { x: 300, y: 200 }, "left", "bezier");
+    expect(bezierPath).toMatch(/^M 100 100 C/);
+
+    const stepPath = computeEdgePath({ x: 100, y: 100 }, "right", { x: 300, y: 200 }, "left", "step");
+    expect(stepPath).toMatch(/^M 100 100 L/);
+
+    const straightPath = computeEdgePath({ x: 100, y: 100 }, "right", { x: 300, y: 200 }, "left", "straight");
+    expect(straightPath).toBe("M 100 100 L 300 200");
+  });
+
+  it("extracts canvas topological structure to markdown article", () => {
+    const group: CanvasGroupNode = {
+      id: "g1",
+      type: "group",
+      label: "微服务架构",
+      x: 50,
+      y: 50,
+      width: 600,
+      height: 400,
+    };
+    const t1: CanvasTextNode = {
+      id: "t1",
+      type: "text",
+      text: "### 网关服务\n负责流量接入与鉴权",
+      x: 80,
+      y: 100,
+      width: 200,
+      height: 100,
+    };
+    const f1: CanvasFileNode = {
+      id: "f1",
+      type: "file",
+      file: "用户中心.md",
+      x: 350,
+      y: 100,
+      width: 250,
+      height: 150,
+    };
+
+    const data: CanvasData = {
+      nodes: [group, t1, f1],
+      edges: [
+        { id: "e1", fromNode: "t1", fromSide: "right", toNode: "f1", toSide: "left", label: "转发请求" },
+      ],
+    };
+
+    const article = extractCanvasToMarkdown(data, "架构演化设计方案");
+    expect(article).toContain("# 架构演化设计方案");
+    expect(article).toContain("## 🏛️ 微服务架构");
+    expect(article).toContain("网关服务");
+    expect(article).toContain("[[用户中心]]");
+    expect(article).toContain("转发请求");
+  });
+
+  it("calculates optimal anchor sides based on relative position", () => {
+    const nodeA: CanvasTextNode = { id: "a", type: "text", text: "A", x: 0, y: 100, width: 100, height: 100 };
+    const nodeB: CanvasTextNode = { id: "b", type: "text", text: "B", x: 300, y: 100, width: 100, height: 100 };
+    // Node B is to the right of Node A -> A: right, B: left
+    expect(getOptimalAnchorSides(nodeA, nodeB)).toEqual({ fromSide: "right", toSide: "left" });
+    // Reverse -> B: left, A: right
+    expect(getOptimalAnchorSides(nodeB, nodeA)).toEqual({ fromSide: "left", toSide: "right" });
+
+    const nodeC: CanvasTextNode = { id: "c", type: "text", text: "C", x: 100, y: 0, width: 100, height: 100 };
+    const nodeD: CanvasTextNode = { id: "d", type: "text", text: "D", x: 100, y: 400, width: 100, height: 100 };
+    // Node D is below Node C -> C: bottom, D: top
+    expect(getOptimalAnchorSides(nodeC, nodeD)).toEqual({ fromSide: "bottom", toSide: "top" });
+    // Reverse -> D: top, C: bottom
+    expect(getOptimalAnchorSides(nodeD, nodeC)).toEqual({ fromSide: "top", toSide: "bottom" });
+  });
+
+  it("exports canvas to standalone SVG with nodes, edges, and centered labels", () => {
+    const data: CanvasData = {
+      nodes: [
+        { id: "grp-1", type: "group", label: "核心域", x: 50, y: 50, width: 400, height: 300, color: "5" },
+        { id: "card-1", type: "text", text: "### 系统模型\n- [x] 模块完成\n- [ ] 待定", x: 80, y: 90, width: 200, height: 120, color: "2" },
+        { id: "file-1", type: "file", file: "设计图.md", x: 350, y: 90, width: 180, height: 100, color: "3" },
+        { id: "link-1", type: "link", url: "https://example.com", x: 350, y: 220, width: 180, height: 80 },
+      ],
+      edges: [
+        { id: "edge-1", fromNode: "card-1", toNode: "file-1", label: "推导演化", labelShape: "pill", toEnd: "arrow" },
+        { id: "edge-2", fromNode: "card-1", toNode: "link-1", label: "参考链接", labelShape: "diamond" },
+      ],
+    };
+
+    const svg = exportCanvasToSvg(data, { theme: "light", background: "white" });
+    expect(svg).toMatch(/^<\?xml version="1\.0"/);
+    expect(svg).toContain("<svg xmlns=\"http://www.w3.org/2000/svg\"");
+    // Contains group container
+    expect(svg).toContain("📁 核心域");
+    // Contains cards
+    expect(svg).toContain("系统模型");
+    expect(svg).toContain("☑ 模块完成");
+    expect(svg).toContain("☐ 待定");
+    expect(svg).toContain("📄 设计图.md");
+    expect(svg).toContain("🔗 https://example.com");
+    // Contains centered edge labels with transform translate
+    expect(svg).toContain("推导演化");
+    expect(svg).toContain("参考链接");
+    expect(svg).toContain("class=\"canvas-edge-label\"");
+    // Diamond label shape uses polygon
+    expect(svg).toContain("<polygon points=");
+
+    // Test dark theme & transparent background
+    const darkSvg = exportCanvasToSvg(data, { theme: "dark", background: "transparent" });
+    expect(darkSvg).not.toContain("url(#canvas-dots)");
+  });
+
+  it("exports canvas to PNG data url or svg fallback safely", async () => {
+    const data: CanvasData = {
+      nodes: [
+        { id: "1", type: "text", text: "PNG Test", x: 0, y: 0, width: 200, height: 100 },
+      ],
+      edges: [],
+    };
+
+    const pngOrSvg = await exportCanvasToPng(data);
+    expect(pngOrSvg).toMatch(/^data:image\//);
+  });
+
+  it("handles image download and clipboard copy functions gracefully", async () => {
+    const data: CanvasData = {
+      nodes: [
+        { id: "1", type: "text", text: "Download Test", x: 0, y: 0, width: 200, height: 100 },
+      ],
+      edges: [],
+    };
+
+    // Spy on anchor click to prevent jsdom navigation warning
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+
+    // SVG download via DOM
+    await downloadCanvasAsImage(data, "test-canvas", "svg");
+    expect(clickSpy).toHaveBeenCalled();
+
+    // PNG download via desktop knowSpaceDesktop bridge
+    const savePngMock = vi.fn().mockResolvedValue(true);
+    (window as any).knowSpaceDesktop = { savePngData: savePngMock };
+    await downloadCanvasAsImage(data, "test-canvas", "png");
+    expect(savePngMock).toHaveBeenCalled();
+
+    clickSpy.mockRestore();
+    delete (window as any).knowSpaceDesktop;
+
+    // Clipboard copy
+    const copied = await copyCanvasImageToClipboard(data);
+    expect(typeof copied).toBe("boolean");
+  });
+
+  it("reverses edge direction properly for single-arrow, bidirectional, and undirected lines", () => {
+    // 1. Standard single arrow from A to B -> reverses to B to A with arrow at A
+    const edge1 = {
+      id: "e1",
+      fromNode: "nodeA",
+      fromSide: "right" as const,
+      toNode: "nodeB",
+      toSide: "left" as const,
+      fromEnd: "none" as const,
+      toEnd: "arrow" as const,
+    };
+    const rev1 = reverseEdgeDirection(edge1);
+    expect(rev1.fromNode).toBe("nodeB");
+    expect(rev1.fromSide).toBe("left");
+    expect(rev1.toNode).toBe("nodeA");
+    expect(rev1.toSide).toBe("right");
+    expect(rev1.fromEnd).toBe("none");
+    expect(rev1.toEnd).toBe("arrow");
+
+    // 2. Bidirectional arrow
+    const edge2 = {
+      id: "e2",
+      fromNode: "nodeA",
+      toNode: "nodeB",
+      fromEnd: "arrow" as const,
+      toEnd: "arrow" as const,
+    };
+    const rev2 = reverseEdgeDirection(edge2);
+    expect(rev2.fromNode).toBe("nodeB");
+    expect(rev2.toNode).toBe("nodeA");
+    expect(rev2.fromEnd).toBe("arrow");
+    expect(rev2.toEnd).toBe("arrow");
+
+    // 3. Backwards arrow (fromEnd arrow, toEnd none) -> reverses so target has arrow
+    const edge3 = {
+      id: "e3",
+      fromNode: "nodeA",
+      toNode: "nodeB",
+      fromEnd: "arrow" as const,
+      toEnd: "none" as const,
+    };
+    const rev3 = reverseEdgeDirection(edge3);
+    expect(rev3.fromNode).toBe("nodeB");
+    expect(rev3.toNode).toBe("nodeA");
+    expect(rev3.fromEnd).toBe("none");
+    expect(rev3.toEnd).toBe("arrow");
+
+    // 4. Undirected line (both none) -> stays undirected
+    const edge4 = {
+      id: "e4",
+      fromNode: "nodeA",
+      toNode: "nodeB",
+      fromEnd: "none" as const,
+      toEnd: "none" as const,
+    };
+    const rev4 = reverseEdgeDirection(edge4);
+    expect(rev4.fromNode).toBe("nodeB");
+    expect(rev4.toNode).toBe("nodeA");
+    expect(rev4.fromEnd).toBe("none");
+    expect(rev4.toEnd).toBe("none");
+  });
+});
+

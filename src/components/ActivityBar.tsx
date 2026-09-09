@@ -18,6 +18,7 @@ import {
   GitFork,
   Network,
   Command,
+  Boxes,
 } from "lucide-react";
 import appLogo from "../assets/icon.png";
 import type { EditorViewMode, ThemeMode, SidebarTab } from "../core/types";
@@ -242,6 +243,14 @@ export function ActivityBar({
             data-tooltip="思维导图模式 (Ctrl+M)"
           >
             <ListTree size={16} />
+          </button>
+          <button
+            type="button"
+            className={`activity-btn mini ${viewMode === "canvas" ? "active" : ""}`}
+            onClick={() => onViewModeChange("canvas")}
+            data-tooltip="空间白板模式"
+          >
+            <Boxes size={16} />
           </button>
         </div>
 

@@ -125,6 +125,13 @@ export type KnowSpaceDesktopAPI = {
     pageSize?: string;
   }) => Promise<{ success?: boolean; canceled?: boolean; filePath?: string; message?: string }>;
   printDocument?: () => Promise<{ success?: boolean; message?: string }>;
+
+  // Version Snapshots & Time Travel
+  listSnapshots?: (params: { filePath: string; rootPath?: string }) => Promise<SnapshotItem[]>;
+  readSnapshot?: (params: { filePath: string; rootPath?: string; snapshotId: string }) => Promise<SnapshotDetail | null>;
+  revertSnapshot?: (params: { filePath: string; rootPath?: string; snapshotId: string }) => Promise<SaveMarkdownResult>;
+  createManualSnapshot?: (params: { filePath: string; rootPath?: string; content: string }) => Promise<{ success: boolean; snapshotId?: string; error?: string }>;
+
   openFlashCapsule?: () => Promise<boolean>;
   hideFlashCapsule?: () => Promise<boolean>;
   getFlashShortcut?: () => Promise<string>;
@@ -211,6 +218,29 @@ export type SavePastedImageResult = {
   relativePath?: string;
   absolutePath?: string;
   error?: string;
+};
+
+export type SnapshotItem = {
+  id: string;
+  timestamp: string;
+  filePath: string;
+  hash: string;
+  charCount: number;
+  lineCount: number;
+  diffAdded: number;
+  diffRemoved: number;
+  charDelta: number;
+  reason: string;
+};
+
+export type SnapshotDetail = {
+  id: string;
+  timestamp: string;
+  filePath: string;
+  content: string;
+  hash: string;
+  charCount: number;
+  reason: string;
 };
 
 declare global {

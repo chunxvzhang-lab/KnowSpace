@@ -3,7 +3,7 @@ const fsSync = require("node:fs");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 
-const markdownExtensions = new Set([".md", ".markdown"]);
+const markdownExtensions = new Set([".md", ".markdown", ".canvas"]);
 const ignoredDirectoryNames = new Set([
   "node_modules",
   ".git",
@@ -23,7 +23,9 @@ const ignoredDirectoryNames = new Set([
   "AppData",
   "$RECYCLE.BIN",
   "System Volume Information",
+  ".knowspace",
 ]);
+const { recordSnapshot } = require("./snapshots.cjs");
 const directoryScanBatchSize = 16;
 const MAX_DIRECTORY_SCAN_FILES = 3000;
 const MAX_DIRECTORY_SCAN_DEPTH = 6;
@@ -66,7 +68,7 @@ function generateStableChapterId(relativePath) {
 }
 
 function titleFromRelativePath(relativePath) {
-  const withoutExtension = relativePath.replace(/\.(md|markdown)$/i, "");
+  const withoutExtension = relativePath.replace(/\.(md|markdown|canvas)$/i, "");
   return withoutExtension
     .split("/")
     .map((part) => part.trim())
@@ -145,7 +147,7 @@ async function buildDirectoryManifest(rootPath) {
 
 async function readMarkdownSource(absolutePath) {
   if (!isValidMarkdownPath(absolutePath)) {
-    throw new Error("只能读取 Markdown (.md / .markdown) 文件。");
+    throw new Error("只能读取 Markdown 或 Canvas (.md / .markdown / .canvas) 文件。");
   }
   const resolvedPath = path.resolve(absolutePath);
   registerPath(resolvedPath);
@@ -255,7 +257,7 @@ async function saveMarkdownFile({ absolutePath, content, expectedVersion, force 
     return {
       success: false,
       errorCode: "INVALID_EXTENSION",
-      message: "只能保存为 .md 或 .markdown 文件。",
+      message: "只能保存为 .md, .markdown 或 .canvas 文件。",
     };
   }
 
@@ -293,6 +295,13 @@ async function saveMarkdownFile({ absolutePath, content, expectedVersion, force 
     await atomicWriteFile(resolvedPath, content, { hasBom, lineEnding });
     invalidateSourceCache(resolvedPath);
     registerPath(resolvedPath);
+
+    // Record silent version snapshot asynchronously in background
+    recordSnapshot({
+      filePath: resolvedPath,
+      content,
+      reason: "save",
+    }).catch((snapErr) => console.warn("Background snapshot recording error:", snapErr));
 
     const newStats = await fs.stat(resolvedPath);
     const newVersion = {

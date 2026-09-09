@@ -14,6 +14,7 @@ import {
   Eye,
   Printer,
   Command,
+  History,
 } from "lucide-react";
 import type { EditorViewMode, ThemeMode } from "../core/types";
 import { ViewModeControl } from "./ViewModeControl";
@@ -50,6 +51,7 @@ type ToolbarProps = {
   onFontScaleChange: (scale: number) => void;
   onPrint?: () => void;
   onOpenCommandPalette?: () => void;
+  onOpenVersionHistory?: () => void;
 };
 
 export function Toolbar(props: ToolbarProps) {
@@ -110,6 +112,17 @@ export function Toolbar(props: ToolbarProps) {
           <Save size={17} />
         </button>
 
+        {props.onOpenVersionHistory && (
+          <button
+            aria-label="版本快照与历史比对 (Ctrl+Shift+H)"
+            className="icon-button"
+            onClick={props.onOpenVersionHistory}
+            title="版本快照与历史比对 (Ctrl+Shift+H)"
+          >
+            <History size={17} />
+          </button>
+        )}
+
         <button
           aria-label="上一章"
           className="icon-button"
@@ -133,14 +146,14 @@ export function Toolbar(props: ToolbarProps) {
           ref={fileInputRef}
           className="visually-hidden"
           type="file"
-          accept=".md,.markdown,text/markdown"
+          accept=".md,.markdown,.canvas,text/markdown,application/json"
           onChange={handleFileChange}
         />
         <button
-          aria-label="打开 Markdown 文件"
+          aria-label="打开文件"
           className="icon-button"
           onClick={() => fileInputRef.current?.click()}
-          title="打开单个 Markdown 文件 (Ctrl+O)"
+          title="打开单个文件 (Ctrl+O)"
         >
           <FileUp size={17} />
         </button>

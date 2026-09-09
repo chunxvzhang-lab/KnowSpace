@@ -108,22 +108,25 @@ export function DualDocumentWorkspace({
   useEffect(() => {
     if (!isDragging) return;
 
+    const currentRatioRef = { current: dualRatio };
+
     const handleMouseMove = (e: MouseEvent) => {
       if (!containerRef.current) return;
       const rect = containerRef.current.getBoundingClientRect();
       const newRatio = (e.clientX - rect.left) / rect.width;
       const clamped = Math.min(Math.max(newRatio, 0.2), 0.8);
+      currentRatioRef.current = clamped;
       setDualRatio(clamped);
-      try {
-        localStorage.setItem(DUAL_SPLIT_RATIO_KEY, clamped.toString());
-      } catch {
-        // ignore
-      }
     };
 
     const handleMouseUp = () => {
       setIsDragging(false);
       document.body.classList.remove("is-resizing-col");
+      try {
+        localStorage.setItem(DUAL_SPLIT_RATIO_KEY, currentRatioRef.current.toString());
+      } catch {
+        // ignore
+      }
     };
 
     document.body.classList.add("is-resizing-col");

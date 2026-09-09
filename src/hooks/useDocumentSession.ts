@@ -32,7 +32,7 @@ export type OpenSessionParams = {
 };
 
 const LARGE_DOC_THRESHOLD = 2_000_000; // 2MB
-const PREVIEW_DEBOUNCE_MS = 250;
+const PREVIEW_DEBOUNCE_MS = 350;
 
 export function useDocumentSession() {
   const [session, setSession] = useState<DocumentSession | null>(null);
@@ -46,6 +46,11 @@ export function useDocumentSession() {
   const previewTimerRef = useRef<number | null>(null);
   const currentRenderRevisionRef = useRef(0);
   const renderedCacheRef = useRef(new Map<string, RenderedChapter>());
+  const viewModeRef = useRef<EditorViewMode>("read");
+  viewModeRef.current = viewMode;
+  const sessionRef = useRef<DocumentSession | null>(null);
+  sessionRef.current = session;
+  const pendingRenderRef = useRef(false);
 
   const isDirty = Boolean(session && session.sourceRevision !== session.savedRevision);
   const isLargeDocument = Boolean(session && session.source.length > LARGE_DOC_THRESHOLD);
@@ -152,6 +157,9 @@ export function useDocumentSession() {
         const isLarge = newSource.length > LARGE_DOC_THRESHOLD;
         if (isLarge) {
           setAutoPreviewPaused(true);
+        } else if (viewModeRef.current === "source") {
+          // In pure source edit mode, preview is hidden; skip rendering on keystrokes to save CPU
+          pendingRenderRef.current = true;
         } else {
           setAutoPreviewPaused(false);
           previewTimerRef.current = window.setTimeout(() => {
@@ -159,7 +167,27 @@ export function useDocumentSession() {
           }, PREVIEW_DEBOUNCE_MS);
         }
 
+        sessionRef.current = nextSession;
         return nextSession;
+      });
+    },
+    [triggerRender]
+  );
+
+  const handleSetViewMode = useCallback(
+    (modeOrUpdater: EditorViewMode | ((prev: EditorViewMode) => EditorViewMode)) => {
+      setViewMode((prev) => {
+        const nextMode = typeof modeOrUpdater === "function" ? modeOrUpdater(prev) : modeOrUpdater;
+        viewModeRef.current = nextMode;
+        if (nextMode !== "source" && pendingRenderRef.current && sessionRef.current) {
+          pendingRenderRef.current = false;
+          triggerRender(
+            sessionRef.current.source,
+            sessionRef.current.baseUrl,
+            sessionRef.current.sourceRevision
+          );
+        }
+        return nextMode;
       });
     },
     [triggerRender]
@@ -171,12 +199,14 @@ export function useDocumentSession() {
       window.clearTimeout(previewTimerRef.current);
       previewTimerRef.current = null;
     }
+    pendingRenderRef.current = false;
     triggerRender(session.source, session.baseUrl, session.sourceRevision);
   }, [session, triggerRender]);
 
   const saveSession = useCallback(
-    async (options: { force?: boolean } = {}) => {
-      if (!session || !session.absolutePath || !session.writable) {
+    async (options: { force?: boolean; content?: string } = {}) => {
+      const currentSession = sessionRef.current ?? session;
+      if (!currentSession || !currentSession.absolutePath || !currentSession.writable) {
         return { success: false, message: "文档不可写或未关联磁盘文件。" };
       }
 
@@ -186,28 +216,34 @@ export function useDocumentSession() {
 
       setIsSaving(true);
       try {
+        const contentToSave = options.content !== undefined ? options.content : currentSession.source;
         const result = await window.bookMDDesktop.saveMarkdownFile({
-          absolutePath: session.absolutePath,
-          content: session.source,
-          expectedVersion: session.diskVersion,
+          absolutePath: currentSession.absolutePath,
+          content: contentToSave,
+          expectedVersion: currentSession.diskVersion,
           force: options.force ?? false,
-          hasBom: session.hasBom,
-          lineEnding: session.lineEnding,
+          hasBom: currentSession.hasBom,
+          lineEnding: currentSession.lineEnding,
         });
 
         if (result.success) {
           setSession((prev) => {
             if (!prev) return null;
-            return {
+            const updated: DocumentSession = {
               ...prev,
-              savedSource: prev.source,
+              source: contentToSave,
+              savedSource: contentToSave,
               savedRevision: prev.sourceRevision,
               diskVersion: result.diskVersion,
             };
+            sessionRef.current = updated;
+            return updated;
           });
           setConflict(null);
           // Invalidate and update cache with new disk version key
-          renderedCacheRef.current.set(result.cacheKey, renderedChapter!);
+          if (renderedChapter) {
+            renderedCacheRef.current.set(result.cacheKey, renderedChapter);
+          }
           return { success: true };
         } else {
           if (result.errorCode === "FILE_CONFLICT" && result.diskVersion) {
@@ -320,7 +356,7 @@ export function useDocumentSession() {
     openSession,
     updateSource,
     renderPreviewNow,
-    setViewMode,
+    setViewMode: handleSetViewMode,
     saveSession,
     saveSessionAs,
     reloadFromDisk,

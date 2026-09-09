@@ -10,7 +10,10 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-v1.11.0-1D9BF0?style=flat-square&logo=github" alt="Version 1.11.0" />
+  <img src="https://img.shields.io/badge/Version-v2.0.0-1D9BF0?style=flat-square&logo=github" alt="Version 2.0.0" />
+  <img src="https://img.shields.io/badge/Canvas-JSON_Canvas_1.0-00BA7C?style=flat-square" alt="Infinite Canvas" />
+  <img src="https://img.shields.io/badge/Snapshots-Ctrl%2BShift%2BH-1D9BF0?style=flat-square" alt="Version History" />
+  <img src="https://img.shields.io/badge/Search-Hybrid_Vault_Index-8B5CF6?style=flat-square" alt="Hybrid Vault Search" />
   <img src="https://img.shields.io/badge/Command_Palette-Ctrl%2BK-00BA7C?style=flat-square" alt="Command Palette" />
   <img src="https://img.shields.io/badge/Slash_Commands-%2F-00BA7C?style=flat-square" alt="Slash Commands" />
   <img src="https://img.shields.io/badge/PDF_Print-Ctrl%2BP-8B5CF6?style=flat-square" alt="PDF Print" />
@@ -30,6 +33,7 @@
 </p>
 
 <p align="center">
+  <a href="docs/全功能高清图片手册.md">🖼️ 全功能高清图片手册 (Picture Manual)</a> •
   <a href="docs/USER_MANUAL.md">📖 操作手册 (User Manual)</a> •
   <a href="#-核心能力体系">核心体系</a> •
   <a href="#-核心功能特性">功能特性</a> •
@@ -46,6 +50,9 @@
 
 ## 🏛️ 核心能力体系
 
+- **🎨 Infinite Canvas（无限空间可视化白板 · 兼容 JSON Canvas 1.0）**：标准开放的二维空间思维白板（`Ctrl+Shift+C`），**多模态卡片自由挂载**（富文本 Markdown、嵌入文档预览、逻辑分组容器），**高精度 4 锚点磁吸与贝塞尔/折线动态矢量连线**，配备右下角缩略雷达小地图与全景聚焦控制；**独创画布逆向拓扑萃取长文算法**，一键将白板因果关系逆向萃取为逻辑严密的 Markdown 专著。
+- **⏳ Local Version History（本地时间旅行与版本快照历史）**：运行在本地知识库根目录隐藏空间（`.knowspace/snapshots/`）的无感版本防丢卫士（`Ctrl+Shift+H`），**30秒去抖静默捕获与 SHA-256 哈希去重**，配备直观版本时间轴；**左右双栏 Side-by-Side 与统一 Unified 视图**，Myers LCS 逐行与行内字符微粒度高亮，**一键无损安全还原与手动里程碑快照**。
+- **🔍 Hybrid Vault Search（全库毫秒级混合检索引擎）**：全新文档级与段落级倒排索引（Inverted Index），万篇笔记键盘键入即刻（< 15ms）出结果。**深度支持结构化检索语法**：`tag:#架构`、`link:[[分布式协议]]`、`"严格短语"`、`-排除词`、时间范围过滤，提供「当前章节」与「全库检索」一键无缝切换、语法快捷辅助芯片与物理行微光脉冲联动。
 - **🎯 Command Palette & Quick Switcher（全能全局命令中枢）**：全局随时按下 `Ctrl+K`（或编辑区直接穿透触发），支持三模合一：**默认快速切换（MRU 访问历史、标题/路径/别名智能模糊过滤）**、**动作执行模式（`>` 前缀检索并执行系统功能，如主题切换、新建笔记、导出等）**、**大纲直达模式（`#` 前缀实时大纲小节检索，Enter 秒级跳入目标段落）**。
 - **🧠 Mind Map View（双向思维导图与多格式生态互通）**：Markdown 大纲一键转化为交互式多叉树脑图（`Ctrl+M`），**支持分支自由拖拽改变父子层级与同级重排（带自闭环防环保护与吸附光晕）**、**导图内实时搜索与平滑运镜聚焦**、**支持一键导出标准 OPML 2.0 (`.opml`)、FreeMind (`.mm`) XML 与 Markdown 大纲，无缝打通 XMind / MindNode / OmniOutliner 外部生态**，同时支持矢量 SVG/PNG 高清导出。
 - **🌐 Graph & Backlinks（知识图谱深度与聚类深化）**：60FPS 极速全景拓扑图谱，新增 **`1-Hop` 直接关联 / `2-Hop` 扩展网络局部深度控制**，消除大库视觉过载；新增**按笔记所在目录调和色彩聚类（Folder Cluster Coloring）**；提供 **MOC 核心枢纽节点挖掘**与**未链接孤岛笔记（Orphan）发现**。
@@ -55,7 +62,6 @@
 - **⚡ Flash Capsule（闪念胶囊）**：全局热键秒级呼出毛玻璃微窗，随叫随到，原子归档落盘至 `Inbox/` 收集箱。
 - **📖 Reader（阅读）**：纯净沉浸的 Markdown 排版阅读引擎，支持正文源码行号自动映射与双侧联动高亮。
 - **📚 Library（知识库）**：多级文档目录树折叠展开、展开状态持久化记忆、单文档与多层级知识库智能载入。
-- **🔍 Search（检索与大纲）**：全文段落卡片聚合即时检索、多级目录大纲（TOC）随动追踪与书签记忆。
 - **🎨 Visual & Lightbox（视觉与导出）**：仿电子墨水屏纸质主题、Mermaid 架构图 3× 超清导出、毛玻璃全屏灯箱。
 - **🛡️ Security（安全基石）**：系统托盘后台运行、Windows 开机自启动、本地事务原子落盘与外部修改冲突检测。
 
@@ -263,6 +269,60 @@
 
 ---
 
+### 11. 🎨 无限空间可视化白板 (Infinite Canvas · JSON Canvas 1.0 兼容 · `Ctrl + Shift + C`)
+*标准开放的二维空间思维白板，打通从零散卡片、拓扑因果连线到结构化专著的完整心智飞跃。*
+
+- **🌐 标准开放与跨生态流转 (JSON Canvas 1.0)**：原生采用社区通用规范存储为 `.canvas` 文件，与 **Obsidian Canvas** 等外部空间工具 100% 双向互通；在文件树中以专属翠绿 Boxes 图标区分，支持新建、重命名、移动与双击秒开。
+- **📦 多模态节点自由挂载**：
+  - **文本卡片 (Text Node)**：双击卡片进入行内编辑，失焦即刻渲染为标准 Markdown（完整支持公式、代码高亮与清单）；
+  - **文档卡片 (File Node)**：直接挂载库内任意笔记，卡片内支持滚动预览，双击即可无缝穿梭直达原笔记；
+  - **分组容器 (Group Node)**：半透明分类容器，带标题指示，支持框选和批量拖拽搬运；
+  - **网页链接卡片 (Link Node)**：直观内嵌外部参考网站与标签。
+- **⚡ 磁吸锚点、线型定制与反转连线流向 (`R`)**：
+  - **4 锚点高精度磁吸**：卡片上、下、左、右四周配置磁吸锚点，拖拽连线靠近目标边缘时自动对齐贴附；
+  - **丰富线型选择**：支持三次平滑贝塞尔曲线 (`bezier`)、90° 正交折线 (`step`) 与笔直直线 (`straight`)；
+  - **🔀 快捷反转连线流向 (`R`)**：选中任意连线轻按 `R` 键，秒级反转两端节点与箭头流向；悬浮工具栏配备浅蓝高亮按钮，右键菜单明示起止卡片名称与 `R` 快捷键，伴随即时 Toast 反馈；
+  - **💎 精美关系说明形状**：提供胶囊（Pill）、矩形（Rect）、真·几何对称菱形（Diamond）三种徽章形态，矢量等比自适应文本宽度，阴影自然立体。
+- **📑 媲美 Figma / Miro 的 4 大右键上下文菜单**：
+  - **空白画布**：新建各类卡片、**从剪贴板一键粘贴卡片 (`Ctrl+V`)**（自动读取剪贴板纯文本在光标处生成卡片）、适应画布 (`Shift+1`)、重置缩放 100% (`Ctrl+0`)、对齐网格（吸附至 20px 网格）、小地图与网格形态切换；
+  - **单张卡片**：Markdown 编辑、复制文本、**复制双链引用 (`[[标题]]`)**、**提取为独立知识库笔记**、**重置为默认尺寸**、图层上下移与 6 色调色板；
+  - **多选节点**：**一键打包为分组容器 (`Ctrl+G`)**（智能计算边界包围盒）、智能对齐（左对齐、居中对齐、顶端对齐）与**水平等距分布**；
+  - **分组容器**：重命名容器、**一键全选内部所有卡片**、**自适应紧凑包围内容**（智能收缩留白 24px）、**解散分组**（仅删容器保留内部卡片）。
+- **🔭 缩略雷达小地图 (Minimap)**：右下角常驻全局缩略雷达，实时呈现微缩卡片分布与高亮视口框，支持点击视框极速导航。
+- **📝 画布逆向拓扑萃取长文算法 (Canvas-to-Article)**：独创拓扑因果萃取算法，根据卡片空间坐标与有向箭头依赖关系智能构建因果链路，一键萃取生成章节完备、引用严谨的独立 Markdown 专著。
+- **📤 高清导出**：支持一键导出超高清透明底 PNG 与原生矢量 SVG。
+
+---
+
+### 12. ⏳ 本地时间旅行与版本快照历史 (Local Version History · `Ctrl + Shift + H`)
+*每一次知识创作的修改都应被忠实记录。完全运行在用户本地、安全防丢的本地时间旅行系统。*
+
+- **🛡️ 纯本地静默快照引擎**：在知识库根目录下维护 `.knowspace/snapshots/` 隐藏存储，每个快照打上绝对微秒时间戳与 SHA-256 哈希校验码，杜绝冗余重复写入。
+- **⏱️ 30 秒静默去抖与自动配额修剪**：智能识别实质性变更，在频繁保存中聚合 30 秒去抖窗口；单个文档自动滚动维护最新的 50 个优质快照点，空间轻量环保。
+- **⚖️ Side-by-Side 双栏与 Unified 单栏对比视图**：
+  - **Myers LCS 差异引擎**：毫秒级生成行级与行内字符微粒度差异对比，高对比度绿底红底清晰直观；
+  - **自由切换对比模式**：支持经典左右双栏对照与统一单栏流式查看，顶部实时统计修改行数（如 `+18 -5`）。
+- **⏮️ 一键无损安全还原与手动里程碑**：支持一键回退到任一历史节点（带防误触确认与还原保护记录），支持随时手动打下自定义里程碑快照，支持一键复制代码。
+
+---
+
+### 13. 🔍 全库毫秒级混合检索引擎与结构化语法 (Hybrid Vault Search · `Ctrl + F`)
+*全新文档级与段落级高性能倒排索引，十万字知识库键入即出（< 15ms）。*
+
+- **⚡ 毫秒级倒排索引引擎 (Inverted Index Engine)**：建立内存级 `tagIndex`、`linkIndex` 与 `termIndex`，告别单文档暴力线性扫描。
+- **🎯 强大的结构化检索语法**：
+  - **标签圈选**：`tag:#架构` 或 `tag:架构` 或 `#架构` 筛选特定标签；
+  - **双链追踪**：`link:[[分布式协议]]` 或 `link:分布式协议` 挖掘双向引用关系；
+  - **严格短语**：`"raft consensus"` 严格连续字词精确匹配；
+  - **排除负词**：`raft -paxos -废弃` 快速过滤无关分支；
+  - **时间范围**：`after:2026-09-01` / `before:2026-09-08` 精准时间穿梭。
+- **🎛️ 双模式切换与语法辅助芯片**：
+  - 顶栏一键切换 `[当前章节]` 与 `[全库检索]`；
+  - 搜索框下方配备 `tag:#`、`link:[[`、`"短语"`、`-排除` 辅助芯片，一触即填；
+  - 全库模式下结果直接标识所属章节与行号（如 `[架构总览] L12-15`），点击跨文档秒级跳转，并伴有 1.8 秒柔和电光蓝脉冲高亮。
+
+---
+
 ## ⌨️ 键盘快捷键
 
 | 快捷键 | 功能 | 说明 |
@@ -272,6 +332,12 @@
 | `Ctrl + P` | **打印 / 导出 PDF** | 呼出 Chromium 原生高保真打印与 A4 矢量 PDF 导出（跨页防截断，编辑区免失焦直接穿透） |
 | `/` | **斜杠命令补全菜单** | (编辑器行首或空格后) 呼出 20+ 项排版、表格、代码、公式与 Callout 模板 |
 | `右键` | **情境感知右键菜单** | (编辑器选区/正文) 提取为新笔记、生成块引用、存入闪念、富文本排版转换 |
+| `Ctrl + Shift + H` | **版本快照历史与双栏对比** | 呼出本地时间旅行面板，支持 Side-by-Side 逐行与行内对比、一键无损还原 |
+| `Ctrl + Shift + C` | **空间可视化白板** | 切换至无限空间白板视图，挂载多模态卡片并进行空间组织与连线 |
+| `R` | **(白板连线选中时) 反转连线流向** | 一键对调连线两端起止卡片与箭头指向，伴有 Toast 反馈 |
+| `Shift + 1` | **(白板中) 适应画布内容** | 一键平滑缩放平移至最适全景视口 (Zoom to Fit) |
+| `Ctrl + 0` | **(白板中) 重置缩放 100%** | 恢复白板视口为标准 100% 原始比例 |
+| `Ctrl + G` | **(白板多选时) 打包为分组容器** | 一键将多选卡片智能计算包围盒并打包为分组容器 |
 | `Ctrl + M` | **思维导图视图** | 一键在 Markdown 读写与交互式思维导图间切换（编辑区免失焦直接穿透） |
 | `Tab` / `Insert` | **(导图中) 添加子主题** | 为当前选中的脑图节点创建下一级子分支并就地命名 |
 | `Enter` | **(导图中) 添加同级主题** | 为当前选中的脑图节点创建同级分支 |
@@ -293,7 +359,7 @@
 | `Alt + T` | **打字机居中滚动** | 开启/关闭活动光标行视口居中模式 |
 | `F11` | **全屏模式** | 切换沉浸式全屏阅读/写作（支持 `Esc` 退出） |
 | `Ctrl + \` | **折叠/展开目录栏** | 快捷切换左侧文件目录树显示状态（编辑区免失焦直接穿透） |
-| `Ctrl + F` | **搜索内容** | 呼出右侧搜索面板并快速定位关键词 |
+| `Ctrl + F` | **搜索内容** | 呼出搜索面板（支持 tag:#、link:[[、"短语"、-排除、全库切换） |
 | `Ctrl + B` | **添加书签** | 快速记录当前小节与阅读百分比 |
 | `Alt + ←` | **上一篇** | 切换到上一章节（未保存修改时自动拦截提醒） |
 | `Alt + →` | **下一篇** | 切换到下一章节（未保存修改时自动拦截提醒） |
@@ -302,18 +368,18 @@
 
 ## 📦 便携版与 MSI 安装包 (Downloads & Release Assets)
 
-本项目为 Windows 64 位系统深度优化，提供标准安装包与免安装便携版，最新 `v1.11.0` 资产已发布：
+本项目为 Windows 64 位系统深度优化，提供标准安装包与免安装便携版，最新 `v2.0.0` 资产已发布：
 
-> 🌐 **GitHub 官方发布主页**：[GitHub Releases · v1.11.0](https://github.com/chunxvzhang-lab/KnowSpace/releases/tag/v1.11.0)
+> 🌐 **GitHub 官方发布主页**：[GitHub Releases · v2.0.0](https://github.com/chunxvzhang-lab/KnowSpace/releases/tag/v2.0.0)
 
 ### 1. Windows MSI 标准安装包
-- **安装文件**：[`KnowSpace-1.11.0.msi`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v1.11.0/KnowSpace-1.11.0.msi) (152.3 MB)
-- **特点**：双击即可全自动安装至 Windows 系统，自动创建桌面快捷方式与开始菜单官方品牌图标，深度集成系统级 `.md` 文件关联，支持标准控制面板卸载与企业级静默安装。
+- **安装文件**：[`KnowSpace-2.0.0.msi`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.0.0/KnowSpace-2.0.0.msi)
+- **特点**：双击即可全自动安装至 Windows 系统，自动创建桌面快捷方式与开始菜单官方品牌图标，深度集成系统级 `.md` 与 `.canvas` 文件关联，支持标准控制面板卸载与企业级静默安装。
 
 ### 2. Windows 绿色免安装便携版
-- **便携文件**：[`KnowSpace-win-x64-portable.zip`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v1.11.0/KnowSpace-win-x64-portable.zip) (517.5 MB)
+- **便携文件**：[`KnowSpace-win-x64-portable.zip`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.0.0/KnowSpace-win-x64-portable.zip)
 - **直接运行**：解压后双击 `KnowSpace.exe` 即可直接使用完整功能。
-- **特点**：解压即用、随身携带（支持装入 U 盘或移动硬盘）；完全自包含 Electron 运行时与全套本地依赖，无需配置任何外部开发环境；支持右键「打开方式」关联 Markdown 文档。
+- **特点**：解压即用、随身携带（支持装入 U 盘或移动硬盘）；完全自包含 Electron 运行时与全套本地依赖，无需配置任何外部开发环境；支持右键「打开方式」关联 Markdown 与白板文档。
 
 ---
 
@@ -338,6 +404,18 @@
 
 ### Key Features
 
+- **🎨 Infinite Canvas (JSON Canvas 1.0 Compatible · `Ctrl + Shift + C`)**:
+  - *Open Standard Compatibility*: Full support for JSON Canvas 1.0 (`.canvas`), seamlessly interoperable with Obsidian Canvas and third-party spatial tools.
+  - *Multimodal Cards & Anchors*: Markdown text nodes, embedded document nodes with live scrolling, and draggable grouping containers. 4-anchor magnetic snap with smooth cubic bezier, orthogonal, and straight connector lines.
+  - *Minimap Radar & Reverse Longform Extraction*: Persistent minimap navigation with viewport indicator; one-click algorithmic reverse extraction transforms canvas spatial causality topology into a structured Markdown article!
+- **⏳ Local Version History & Side-by-Side Diff (`Ctrl + Shift + H`)**:
+  - *Silent Snapshot Engine*: Maintains local version history in `.knowspace/snapshots/` with 30s debounce, SHA-256 deduplication, and automatic pruning (latest 50 versions).
+  - *Side-by-Side & Unified Diffs*: Myers LCS-powered line-by-line diffing with granular intra-line character diff highlight and additions/deletions stats.
+  - *One-Click Safe Rollback*: Non-destructive revert to any snapshot with safety confirmation and manual snapshot creation.
+- **🔍 Hybrid Vault Search & Inverted Index Engine (`Ctrl + F`)**:
+  - *Millisecond Full-Vault Search*: High-performance inverted index (`tagIndex`, `linkIndex`, `termIndex`) delivers results in < 15ms.
+  - *Structured Query Syntax*: Supports `tag:#tag` or `tag:tag`, `link:[[doc]]`, `"exact phrase"`, `-exclusion`, and date ranges (`after:`, `before:`).
+  - *Scope Switching & Highlight Pulse*: Instant toggle between Current Chapter and Entire Vault, fast syntax helper chips, and smooth line scroll with glowing pulse animation.
 - **🎯 All-in-One Command Palette & Quick Switcher (`Ctrl + K`)**:
   - *Three-in-One Global Hub*: Recent file switcher with MRU history & fuzzy pinyin search, `>` action commands (theme switching, export, layout toggle), and `#` heading outline jump.
   - *Keybinding Penetration*: Instant trigger directly from CodeMirror 6 editor without losing focus or typing flow.

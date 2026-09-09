@@ -1,4 +1,4 @@
-import { ChevronRight, FileText, Folder, FolderOpen, FolderMinus, Edit3, ListTree } from "lucide-react";
+import { ChevronRight, FileText, Folder, FolderOpen, FolderMinus, Edit3, ListTree, Boxes } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { BookManifest, ChapterManifest } from "../core/types";
 
@@ -9,6 +9,7 @@ type ChapterListProps = {
   onSelectChapter: (chapterId: string) => void;
   onRenameChapter?: (chapter: ChapterManifest) => void;
   onNewMindmap?: () => void;
+  onNewCanvas?: () => void;
 };
 
 type TreeNode = {
@@ -25,6 +26,7 @@ export function ChapterList({
   onSelectChapter,
   onRenameChapter,
   onNewMindmap,
+  onNewCanvas,
 }: ChapterListProps) {
   const activeChapter = useMemo(
     () => manifest.chapters.find((chapter) => chapter.id === activeChapterId),
@@ -32,9 +34,9 @@ export function ChapterList({
   );
   // By default, hide Space flash notes from the main document directory tree unless currently opened
   const filteredChapters = useMemo(() => {
-    const isCurrentInSpace = Boolean(activeChapter?.src && activeChapter.src.toLowerCase().startsWith("space/"));
+    const isCurrentInSpace = Boolean(activeChapter?.src && activeChapter.src.replace(/\\/g, "/").toLowerCase().startsWith("space/"));
     return manifest.chapters.filter((ch) => {
-      const isSpace = ch.src.toLowerCase().startsWith("space/");
+      const isSpace = ch.src.replace(/\\/g, "/").toLowerCase().startsWith("space/");
       return !isSpace || isCurrentInSpace;
     });
   }, [manifest.chapters, activeChapter?.src]);
@@ -66,10 +68,21 @@ export function ChapterList({
               type="button"
               className="tree-action-btn"
               onClick={onNewMindmap}
-              title="新建思维导图 (交互模式)"
+              title="新建思维导图 (Ctrl+M)"
               aria-label="新建思维导图"
             >
               <ListTree size={13} />
+            </button>
+          )}
+          {onNewCanvas && (
+            <button
+              type="button"
+              className="tree-action-btn"
+              onClick={onNewCanvas}
+              title="新建空间白板 (.canvas)"
+              aria-label="新建空间白板"
+            >
+              <Boxes size={13} />
             </button>
           )}
           {openFolders.size > 0 && (
@@ -175,7 +188,13 @@ function TreeRow({
         onClick={() => onSelectChapter(node.chapter!.id)}
         title={node.chapter.src}
       >
-        <FileText size={13} />
+        {node.name.toLowerCase().endsWith(".canvas") ? (
+          <Boxes size={13} color="#10b981" />
+        ) : node.name.toLowerCase().endsWith(".mindmap.md") ? (
+          <ListTree size={13} color="#06b6d4" />
+        ) : (
+          <FileText size={13} />
+        )}
         <span className="tree-file-title">{fileLabel(node.name)}</span>
         {isActive && isDirty && <span className="tree-dirty-dot" title="未保存" />}
       </button>
@@ -200,7 +219,7 @@ function TreeRow({
 function buildTree(chapters: ChapterManifest[]): TreeNode[] {
   const root: TreeNode = { name: "root", path: "", children: [] };
   for (const chapter of chapters) {
-    const parts = chapter.src.split("/").filter(Boolean);
+    const parts = chapter.src.replace(/\\/g, "/").split("/").filter(Boolean);
     let current = root;
     parts.forEach((part, index) => {
       const path = parts.slice(0, index + 1).join("/");
@@ -229,7 +248,7 @@ function sortNodes(nodes: TreeNode[]): void {
 
 function collectParentFolderPaths(src?: string): string[] {
   if (!src) return [];
-  const parts = src.split("/").filter(Boolean);
+  const parts = src.replace(/\\/g, "/").split("/").filter(Boolean);
   const paths: string[] = [];
   for (let index = 1; index < parts.length; index += 1) {
     paths.push(parts.slice(0, index).join("/"));

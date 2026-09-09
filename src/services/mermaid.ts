@@ -53,6 +53,13 @@ function cleanupStrayNodes(id: string): void {
   }
 }
 
+const MAX_MERMAID_CACHE_SIZE = 50;
+const mermaidSvgCache = new Map<string, string>();
+
+export function clearMermaidCache(): void {
+  mermaidSvgCache.clear();
+}
+
 export async function renderMermaid(
   container: HTMLElement,
   options: RenderMermaidOptions = {},
@@ -80,10 +87,23 @@ export async function renderMermaid(
     diagram.setAttribute("data-mermaid-theme", theme);
     diagram.classList.remove("mermaid-rendered", "mermaid-error");
 
+    const cacheKey = `${theme}:${source}`;
+    if (mermaidSvgCache.has(cacheKey)) {
+      diagram.textContent = "";
+      diagram.innerHTML = mermaidSvgCache.get(cacheKey)!;
+      diagram.classList.add("mermaid-rendered");
+      continue;
+    }
+
     const id = `bookmd-mermaid-${Date.now()}-${(renderId += 1)}`;
     try {
       const { svg } = await mermaid.render(id, source);
       cleanupStrayNodes(id);
+      mermaidSvgCache.set(cacheKey, svg);
+      if (mermaidSvgCache.size > MAX_MERMAID_CACHE_SIZE) {
+        const firstKey = mermaidSvgCache.keys().next().value;
+        if (firstKey) mermaidSvgCache.delete(firstKey);
+      }
       // Clear text content first, then inject SVG
       diagram.textContent = "";
       diagram.innerHTML = svg;

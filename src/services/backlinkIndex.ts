@@ -149,7 +149,23 @@ export function convertUnlinkedMentionInText(
   const line = lines[targetLineIdx];
   const escaped = mentionText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const regex = new RegExp(`(?<!\\[\\[|#|\\w)(${escaped})(?!\\]\\]|\\w)`, "i");
-  lines[targetLineIdx] = line.replace(regex, "[[$1]]");
+
+  // Mask out existing wikilinks, markdown links, and inline code with spaces of identical length
+  // so we locate the exact character offset of the unlinked mention in plain text
+  const masked = line
+    .replace(/\[\[[^\]]+\]\]/g, (m) => " ".repeat(m.length))
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, (m) => " ".repeat(m.length))
+    .replace(/`[^`]+`/g, (m) => " ".repeat(m.length));
+
+  const match = regex.exec(masked);
+  if (!match) return sourceContent;
+
+  const startIdx = match.index;
+  const matchLen = match[0].length;
+  const matchedText = line.slice(startIdx, startIdx + matchLen);
+
+  lines[targetLineIdx] =
+    line.slice(0, startIdx) + `[[${matchedText}]]` + line.slice(startIdx + matchLen);
   return lines.join("\n");
 }
 

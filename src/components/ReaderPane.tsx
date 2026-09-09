@@ -67,12 +67,17 @@ export const ReaderPane = memo(function ReaderPane({
       if (hoverTimerRef.current) window.clearTimeout(hoverTimerRef.current);
       const rect = el.getBoundingClientRect();
 
-      const cleanTarget = target.trim().replace(/\.md$/i, "").toLowerCase();
-      const found = wikiLinkTargets?.find((t) => {
-        const tTitle = t.title.trim().toLowerCase();
-        const tFile = (t.relativePath?.split("/").pop() ?? "").replace(/\.md$/i, "").toLowerCase();
-        return tTitle === cleanTarget || tFile === cleanTarget;
-      });
+      const baseDoc = target.split("#")[0].trim();
+      const cleanTarget = baseDoc.replace(/\.(md|markdown|canvas)$/i, "").toLowerCase();
+      const isAnchorOnly = !cleanTarget && target.includes("#");
+      const foundTarget = isAnchorOnly
+        ? undefined
+        : wikiLinkTargets?.find((t) => {
+            const tTitle = t.title.trim().toLowerCase();
+            const tFile = (t.relativePath?.split("/").pop() ?? "").replace(/\.(md|markdown|canvas)$/i, "").toLowerCase();
+            return tTitle === cleanTarget || tFile === cleanTarget;
+          });
+      const exists = isAnchorOnly || Boolean(foundTarget);
 
       hoverTimerRef.current = window.setTimeout(() => {
         setHoverPopover({
@@ -80,8 +85,8 @@ export const ReaderPane = memo(function ReaderPane({
           label: label || target,
           x: Math.min(window.innerWidth - 280, Math.max(12, rect.left)),
           y: rect.bottom + 6,
-          exists: Boolean(found),
-          path: found?.relativePath,
+          exists,
+          path: foundTarget?.relativePath,
         });
       }, 240);
     },
@@ -252,10 +257,10 @@ export const ReaderPane = memo(function ReaderPane({
     }
     node.dataset.mermaidRenderToken = renderToken;
     node.dataset.mermaidRenderStatus = "scheduled";
-    window.setTimeout(() => {
+    const timerId = window.setTimeout(() => {
       if (node.dataset.mermaidRenderToken !== renderToken) return;
       node.dataset.mermaidRenderStatus = "running";
-      renderMermaid(node, { theme: mermaidTheme, force: true })
+      renderMermaid(node, { theme: mermaidTheme })
         .then(() => {
           if (node.dataset.mermaidRenderToken === renderToken) node.dataset.mermaidRenderStatus = "done";
         })
@@ -266,7 +271,9 @@ export const ReaderPane = memo(function ReaderPane({
           }
         });
     }, 0);
-    return undefined;
+    return () => {
+      window.clearTimeout(timerId);
+    };
   }, [chapter?.checksum, mermaidTheme, onMermaidError]);
 
   return (

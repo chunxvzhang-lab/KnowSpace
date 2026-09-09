@@ -126,4 +126,16 @@ KnowSpace line 3`;
     expect(mentions[1].line).toBe(2);
     expect(mentions[2].line).toBe(3);
   });
+
+  it("converts unlinked mention safely without corrupting existing wikilinks, aliases, or code blocks", () => {
+    const content = `Line 1
+Line 2 with [[OtherDoc|快速开始]] and another 快速开始 mention
+Line 3 with [快速开始](https://example.com) and \`快速开始\` and actual 快速开始 here`;
+    const updated = convertUnlinkedMentionInText(content, 2, "快速开始");
+    expect(updated).toContain("Line 2 with [[OtherDoc|快速开始]] and another [[快速开始]] mention");
+    expect(updated).not.toContain("[[OtherDoc|[[快速开始]]]]");
+
+    const updated2 = convertUnlinkedMentionInText(content, 3, "快速开始");
+    expect(updated2).toContain("Line 3 with [快速开始](https://example.com) and `快速开始` and actual [[快速开始]] here");
+  });
 });

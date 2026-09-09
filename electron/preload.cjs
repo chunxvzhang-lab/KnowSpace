@@ -28,6 +28,12 @@ const desktopApi = {
   printToPdf: (options) => ipcRenderer.invoke("bookmd:print-to-pdf", options),
   printDocument: () => ipcRenderer.invoke("bookmd:print-document"),
 
+  // Version Snapshots & Time Travel
+  listSnapshots: (params) => ipcRenderer.invoke("bookmd:list-snapshots", params),
+  readSnapshot: (params) => ipcRenderer.invoke("bookmd:read-snapshot", params),
+  revertSnapshot: (params) => ipcRenderer.invoke("bookmd:revert-snapshot", params),
+  createManualSnapshot: (params) => ipcRenderer.invoke("bookmd:create-manual-snapshot", params),
+
   // Flash Capsule APIs
   openFlashCapsule: () => ipcRenderer.invoke("bookmd:open-flash-capsule"),
   hideFlashCapsule: () => ipcRenderer.invoke("bookmd:hide-flash-capsule"),

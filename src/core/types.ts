@@ -1,6 +1,6 @@
 export type SidebarTab = "toc" | "bookmarks" | "search" | "space" | "backlinks";
 export type ThemeMode = "system" | "light" | "twitter" | "eink";
-export type EditorViewMode = "read" | "split" | "source" | "mindmap";
+export type EditorViewMode = "read" | "split" | "source" | "mindmap" | "canvas";
 
 export type MindmapNodeShape = "rounded" | "capsule" | "rect" | "underline";
 export type MindmapLineStyle = "bezier" | "step" | "straight";
@@ -107,6 +107,13 @@ export type SearchResult = {
   query?: string;
   matchedText?: string;
   matchCountInBlock?: number;
+  chapterId?: string;
+  chapterTitle?: string;
+  chapterPath?: string;
+  category?: "tag" | "link" | "text" | "phrase";
+  tags?: string[];
+  links?: string[];
+  score?: number;
 };
 
 export type ChapterSource = {

@@ -153,11 +153,22 @@ export function GlobalGraphDialog({
     };
   }, [isOpen, onClose]);
 
-  // Stable refs for callbacks so parent re-renders don't trigger Cytoscape recreation
+  // Stable refs for callbacks and dynamic states so they don't trigger Cytoscape recreation
   const onSelectNodeRef = useRef(onSelectNode);
   onSelectNodeRef.current = onSelectNode;
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+  const isSpacePanningRef = useRef(isSpacePanning);
+  isSpacePanningRef.current = isSpacePanning;
+  const currentDocIdRef = useRef(currentDocId);
+  currentDocIdRef.current = currentDocId;
+
+  // Sync cursor mode without re-initializing Cytoscape
+  useEffect(() => {
+    if (containerRef.current) {
+      containerRef.current.style.cursor = isSpacePanning ? "grab" : "default";
+    }
+  }, [isSpacePanning]);
 
   // Cytoscape initialization & re-render
   useEffect(() => {
@@ -286,7 +297,7 @@ export function GlobalGraphDialog({
 
     cy.on("mouseout", "node", () => {
       if (containerRef.current) {
-        containerRef.current.style.cursor = isSpacePanning ? "grab" : "default";
+        containerRef.current.style.cursor = isSpacePanningRef.current ? "grab" : "default";
       }
     });
 
@@ -378,7 +389,7 @@ export function GlobalGraphDialog({
 
     // Default to 100% zoom and center on active document or canvas center
     cy.zoom(1.0);
-    const initialTarget = findCurrentNode(cy, currentDocId);
+    const initialTarget = findCurrentNode(cy, currentDocIdRef.current);
     if (initialTarget && initialTarget.length > 0) {
       cy.center(initialTarget);
       setSelectedNode({
@@ -407,7 +418,7 @@ export function GlobalGraphDialog({
       if (cyRef.current) {
         cyRef.current.resize();
         cyRef.current.zoom(1.0);
-        const cur = findCurrentNode(cyRef.current, currentDocId);
+        const cur = findCurrentNode(cyRef.current, currentDocIdRef.current);
         if (cur && cur.length > 0) {
           cyRef.current.center(cur);
         } else {
@@ -441,7 +452,7 @@ export function GlobalGraphDialog({
       cy.destroy();
       cyRef.current = null;
     };
-  }, [isOpen, filteredData, theme, currentDocId, isSpacePanning]);
+  }, [isOpen, filteredData, theme]);
 
   if (!isOpen) return null;
 

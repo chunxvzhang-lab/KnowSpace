@@ -122,7 +122,7 @@ function buildCustomTheme(theme: ThemeMode, fontScale: number, typewriterMode = 
   const activeLineIndicator = isDarkMode ? "#1d9bf0" : isEink ? "#9c9586" : "#d97706";
   const bgColor = isDarkMode ? "#000000" : isEink ? "#f8f6f0" : "#ffffff";
   const textColor = isDarkMode ? "#f1f5f9" : isEink ? "#1a1a1a" : "#1f2328";
-  const gutterBg = isDarkMode ? "#0a0d12" : isEink ? "#ede8df" : "#f8fafc";
+  const gutterBg = isDarkMode ? "#0a0d12" : isEink ? "#ede8df" : "#ffffff";
   const gutterColor = isDarkMode ? "#71767b" : isEink ? "#7c776e" : "#64748b";
   const gutterBorder = isDarkMode ? "1px solid rgba(255, 255, 255, 0.08)" : isEink ? "1px solid #d5cfc0" : "1px solid #e2e8f0";
   const activeLineBg = isDarkMode
@@ -352,6 +352,82 @@ export function EditorPane({
 
     const customBaseTheme = buildCustomTheme(theme, fontScale, typewriterMode);
 
+    // Helper: toggle an inline markdown marker (e.g. ** for bold, * for italic)
+    const toggleInlineFormat = (view: EditorView, marker: string): boolean => {
+      const state = view.state;
+      const sel = state.selection.main;
+      const doc = state.doc;
+
+      if (!sel.empty) {
+        const selectedText = state.sliceDoc(sel.from, sel.to);
+        // Case 1: selection itself starts/ends with marker → unwrap
+        if (
+          selectedText.startsWith(marker) &&
+          selectedText.endsWith(marker) &&
+          selectedText.length >= marker.length * 2
+        ) {
+          const inner = selectedText.slice(marker.length, selectedText.length - marker.length);
+          view.dispatch({
+            changes: { from: sel.from, to: sel.to, insert: inner },
+            selection: { anchor: sel.from, head: sel.from + inner.length },
+          });
+          return true;
+        }
+        // Case 2: markers sit just outside the selection → unwrap outer markers
+        const preFrom = Math.max(0, sel.from - marker.length);
+        const postTo = Math.min(doc.length, sel.to + marker.length);
+        if (doc.sliceString(preFrom, sel.from) === marker && doc.sliceString(sel.to, postTo) === marker) {
+          view.dispatch({
+            changes: [
+              { from: preFrom, to: sel.from, insert: "" },
+              { from: sel.to, to: postTo, insert: "" },
+            ],
+            selection: { anchor: preFrom, head: preFrom + selectedText.length },
+          });
+          return true;
+        }
+        // Case 3: wrap selection
+        const wrapped = `${marker}${selectedText}${marker}`;
+        view.dispatch({
+          changes: { from: sel.from, to: sel.to, insert: wrapped },
+          selection: { anchor: sel.from + marker.length, head: sel.from + marker.length + selectedText.length },
+        });
+        return true;
+      }
+
+      // No selection: check if cursor is inside existing markers on this line
+      const line = doc.lineAt(sel.from);
+      const lineText = line.text;
+      const colOffset = sel.from - line.from;
+      const esc = marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const re = new RegExp(`${esc}([\\s\\S]*?)${esc}`, "g");
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(lineText)) !== null) {
+        const mStart = m.index;
+        const mEnd = m.index + m[0].length;
+        if (colOffset >= mStart && colOffset <= mEnd) {
+          // Cursor is inside → unwrap
+          const absStart = line.from + mStart;
+          const absEnd = line.from + mEnd;
+          const inner = m[1];
+          view.dispatch({
+            changes: { from: absStart, to: absEnd, insert: inner },
+            selection: { anchor: absStart, head: absStart + inner.length },
+          });
+          return true;
+        }
+      }
+
+      // Insert placeholder wrapped with markers
+      const placeholder = "文字";
+      const insert = `${marker}${placeholder}${marker}`;
+      view.dispatch({
+        changes: { from: sel.from, to: sel.to, insert },
+        selection: { anchor: sel.from + marker.length, head: sel.from + marker.length + placeholder.length },
+      });
+      return true;
+    };
+
     const saveKeyBinding = keymap.of([
       {
         key: "Mod-s",
@@ -362,6 +438,14 @@ export function EditorPane({
           }
           return false;
         },
+      },
+      {
+        key: "Mod-b",
+        run: (view) => toggleInlineFormat(view, "**"),
+      },
+      {
+        key: "Mod-i",
+        run: (view) => toggleInlineFormat(view, "*"),
       },
     ]);
 

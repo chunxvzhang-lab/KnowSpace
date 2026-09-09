@@ -10,6 +10,11 @@ const {
   registerPath,
   isValidMarkdownPath,
 } = require("./markdown-files.cjs");
+const {
+  recordSnapshot,
+  listSnapshots,
+  readSnapshot,
+} = require("./snapshots.cjs");
 
 const devServerUrl = process.env.BOOKMD_DEV_SERVER_URL;
 const isLaunchHidden = process.argv.includes("--hidden");
@@ -1450,19 +1455,89 @@ ipcMain.handle("bookmd:save-markdown-file", async (_event, request) => {
   });
 });
 
+// Local Version History & Snapshot APIs
+ipcMain.handle("bookmd:list-snapshots", async (_event, params = {}) => {
+  if (!params || !params.filePath) return [];
+  return await listSnapshots({
+    filePath: params.filePath,
+    rootPath: params.rootPath,
+  });
+});
+
+ipcMain.handle("bookmd:read-snapshot", async (_event, params = {}) => {
+  if (!params || !params.filePath || !params.snapshotId) return null;
+  return await readSnapshot({
+    filePath: params.filePath,
+    rootPath: params.rootPath,
+    snapshotId: params.snapshotId,
+  });
+});
+
+ipcMain.handle("bookmd:revert-snapshot", async (_event, params = {}) => {
+  if (!params || !params.filePath || !params.snapshotId) {
+    return { success: false, message: "参数无效" };
+  }
+  const snap = await readSnapshot({
+    filePath: params.filePath,
+    rootPath: params.rootPath,
+    snapshotId: params.snapshotId,
+  });
+  if (!snap || typeof snap.content !== "string") {
+    return { success: false, message: "无法读取目标快照内容" };
+  }
+
+  const saveRes = await saveMarkdownFile({
+    absolutePath: params.filePath,
+    content: snap.content,
+    force: true,
+  });
+
+  if (saveRes.success) {
+    await recordSnapshot({
+      filePath: params.filePath,
+      rootPath: params.rootPath,
+      content: snap.content,
+      reason: `revert (${params.snapshotId})`,
+    });
+  }
+
+  return saveRes;
+});
+
+ipcMain.handle("bookmd:create-manual-snapshot", async (_event, params = {}) => {
+  if (!params || !params.filePath || typeof params.content !== "string") {
+    return { success: false, message: "参数无效" };
+  }
+  return await recordSnapshot({
+    filePath: params.filePath,
+    rootPath: params.rootPath,
+    content: params.content,
+    reason: "manual",
+  });
+});
+
 ipcMain.handle("bookmd:create-markdown-file", async (event, options = {}) => {
   let defaultDir = options.rootPath || app.getPath("documents");
   let defaultName = options.defaultName || "未命名.md";
   const defaultPath = path.join(defaultDir, defaultName);
   const targetWin = getWindowFromEvent(event);
 
+  const isCanvas = defaultName.endsWith(".canvas");
+  const defaultTitle = isCanvas ? "新建空间白板文件" : "新建 Markdown 文件";
+  const filters = isCanvas
+    ? [
+        { name: "JSON Canvas", extensions: ["canvas"] },
+        { name: "所有文件", extensions: ["*"] },
+      ]
+    : [
+        { name: "Markdown / Canvas", extensions: ["md", "markdown", "canvas"] },
+        { name: "所有文件", extensions: ["*"] },
+      ];
+
   const result = await dialog.showSaveDialog(targetWin || undefined, {
-    title: "新建 Markdown 文件",
+    title: defaultTitle,
     defaultPath,
-    filters: [
-      { name: "Markdown", extensions: ["md", "markdown"] },
-      { name: "所有文件", extensions: ["*"] },
-    ],
+    filters,
   });
 
   if (result.canceled || !result.filePath) {
@@ -1472,7 +1547,7 @@ ipcMain.handle("bookmd:create-markdown-file", async (event, options = {}) => {
   const targetPath = result.filePath;
   const saveRes = await saveMarkdownFile({
     absolutePath: targetPath,
-    content: options.initialContent ?? "# 未命名\n\n",
+    content: options.initialContent ?? (isCanvas ? '{\n  "nodes": [],\n  "edges": []\n}' : "# 未命名\n\n"),
     force: true,
   });
 
@@ -1489,7 +1564,7 @@ ipcMain.handle("bookmd:create-markdown-file", async (event, options = {}) => {
     source,
     chapter: {
       id: `chapter:path:${encodeURIComponent(path.basename(targetPath).toLowerCase())}`,
-      title: path.basename(targetPath).replace(/\.(md|markdown)$/i, ""),
+      title: path.basename(targetPath).replace(/\.(md|markdown|canvas)$/i, ""),
       src: path.basename(targetPath),
       absolutePath: targetPath,
       baseUrl: pathToFileURL(path.dirname(targetPath) + path.sep).toString(),
@@ -1504,12 +1579,13 @@ ipcMain.handle("bookmd:rename-markdown-file", async (event, params = {}) => {
   }
 
   try {
-    const cleanTitle = newTitle.trim().replace(/\.(md|markdown)$/i, "");
+    const ext = path.extname(oldPath).toLowerCase() || ".md";
+    const cleanTitle = newTitle.trim().replace(/\.(md|markdown|canvas)$/i, "");
     if (!cleanTitle) {
       return { success: false, error: "新文件名不能为空" };
     }
     const dir = path.dirname(oldPath);
-    const newFileName = `${cleanTitle}.md`;
+    const newFileName = `${cleanTitle}${ext}`;
     const newPath = path.join(dir, newFileName);
 
     if (newPath.toLowerCase() !== oldPath.toLowerCase()) {

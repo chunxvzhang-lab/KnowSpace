@@ -1,4 +1,4 @@
-import { BookOpen, Columns, Code2, ListTree } from "lucide-react";
+import { BookOpen, Columns, Code2, ListTree, Boxes } from "lucide-react";
 import type { EditorViewMode } from "../core/types";
 
 type ViewModeControlProps = {
@@ -53,6 +53,17 @@ export function ViewModeControl({ mode, onChange, disabled = false }: ViewModeCo
       >
         <ListTree size={15} />
         <span>脑图</span>
+      </button>
+      <button
+        type="button"
+        className={`view-mode-btn ${mode === "canvas" ? "active text-emerald" : ""}`}
+        onClick={() => onChange("canvas")}
+        disabled={disabled}
+        title="无限空间白板模式"
+        aria-pressed={mode === "canvas"}
+      >
+        <Boxes size={15} />
+        <span>白板</span>
       </button>
     </div>
   );

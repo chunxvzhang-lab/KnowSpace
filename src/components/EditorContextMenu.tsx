@@ -104,23 +104,86 @@ export const EditorContextMenu = memo(function EditorContextMenu({
     };
   }, [onClose]);
 
-  // Helper: Wrap selection with prefix/suffix
+  // Helper: Toggle wrapping — wraps with prefix/suffix if not already wrapped, or removes markers if already present.
   const wrapSelection = useCallback(
     (prefix: string, suffix: string = prefix, defaultContent = "文字") => {
       const from = selection.from;
       const to = selection.to;
+      const doc = view.state.doc;
+
       if (hasSelection) {
+        // Case 1: selection itself already has the markers at its edges → unwrap
+        if (
+          selectedText.startsWith(prefix) &&
+          selectedText.endsWith(suffix) &&
+          selectedText.length >= prefix.length + suffix.length
+        ) {
+          const inner = selectedText.slice(prefix.length, selectedText.length - suffix.length);
+          view.dispatch({
+            changes: { from, to, insert: inner },
+            selection: { anchor: from, head: from + inner.length },
+          });
+          view.focus();
+          onClose();
+          return;
+        }
+        // Case 2: markers sit just outside the selection in the document → unwrap those
+        const preFrom = Math.max(0, from - prefix.length);
+        const postTo = Math.min(doc.length, to + suffix.length);
+        const textBefore = doc.sliceString(preFrom, from);
+        const textAfter = doc.sliceString(to, postTo);
+        if (textBefore === prefix && textAfter === suffix) {
+          view.dispatch({
+            changes: [
+              { from: preFrom, to: from, insert: "" },
+              { from: to, to: postTo, insert: "" },
+            ],
+            selection: { anchor: preFrom, head: preFrom + selectedText.length },
+          });
+          view.focus();
+          onClose();
+          return;
+        }
+        // Case 3: not yet wrapped → wrap
         const replacement = `${prefix}${selectedText}${suffix}`;
         view.dispatch({
           changes: { from, to, insert: replacement },
           selection: { anchor: from + prefix.length, head: from + prefix.length + selectedText.length },
         });
       } else {
-        const replacement = `${prefix}${defaultContent}${suffix}`;
-        view.dispatch({
-          changes: { from, to, insert: replacement },
-          selection: { anchor: from + prefix.length, head: from + prefix.length + defaultContent.length },
-        });
+        // No selection: detect whether cursor is currently inside markers on this line
+        const line = doc.lineAt(from);
+        const lineText = line.text;
+        const colOffset = from - line.from;
+        const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const markerRe = new RegExp(`${escapeRe(prefix)}([\\s\\S]*?)${escapeRe(suffix)}`, "g");
+        let match: RegExpExecArray | null;
+        let foundMatch: RegExpExecArray | null = null;
+        while ((match = markerRe.exec(lineText)) !== null) {
+          const matchStart = match.index;
+          const matchEnd = match.index + match[0].length;
+          if (colOffset >= matchStart && colOffset <= matchEnd) {
+            foundMatch = match;
+            break;
+          }
+        }
+        if (foundMatch) {
+          // Cursor inside existing markers → remove them
+          const absStart = line.from + foundMatch.index;
+          const absEnd = line.from + foundMatch.index + foundMatch[0].length;
+          const inner = foundMatch[1];
+          view.dispatch({
+            changes: { from: absStart, to: absEnd, insert: inner },
+            selection: { anchor: absStart, head: absStart + inner.length },
+          });
+        } else {
+          // Not inside markers → insert placeholder with markers and select placeholder
+          const replacement = `${prefix}${defaultContent}${suffix}`;
+          view.dispatch({
+            changes: { from, to, insert: replacement },
+            selection: { anchor: from + prefix.length, head: from + prefix.length + defaultContent.length },
+          });
+        }
       }
       view.focus();
       onClose();

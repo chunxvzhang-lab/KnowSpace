@@ -113,6 +113,8 @@ export function DocumentWorkspace({
   useEffect(() => {
     if (!isDragging) return;
 
+    const currentRatioRef = { current: splitRatio };
+
     const handleMouseMove = (e: MouseEvent) => {
       if (!workspaceRef.current) return;
       const rect = workspaceRef.current.getBoundingClientRect();
@@ -127,17 +129,18 @@ export function DocumentWorkspace({
         newRatio = (e.clientX - rect.left) / rect.width;
       }
       const clamped = Math.min(Math.max(newRatio, 0.15), 0.85);
+      currentRatioRef.current = clamped;
       setSplitRatio(clamped);
-      try {
-        localStorage.setItem(SPLIT_RATIO_KEY, clamped.toString());
-      } catch {
-        // ignore
-      }
     };
 
     const handleMouseUp = () => {
       setIsDragging(false);
       document.body.classList.remove("is-resizing-col");
+      try {
+        localStorage.setItem(SPLIT_RATIO_KEY, currentRatioRef.current.toString());
+      } catch {
+        // ignore
+      }
     };
 
     document.body.classList.add("is-resizing-col");

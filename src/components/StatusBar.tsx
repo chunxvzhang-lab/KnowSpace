@@ -31,6 +31,7 @@ export function StatusBar({
     split: "分屏协作",
     source: "源码编辑",
     mindmap: "思维导图",
+    canvas: "空间白板",
   };
 
   return (

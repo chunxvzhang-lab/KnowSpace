@@ -38,6 +38,8 @@ export type GraphData = {
   edges: GraphEdgeData[];
 };
 
+const stripDocExt = (str: string): string => str.replace(/\.(md|markdown|canvas)$/i, "");
+
 export function buildGraphDataFromIndex(
   manifest: BookManifest | null,
   index: BacklinkIndexData,
@@ -61,8 +63,8 @@ export function buildGraphDataFromIndex(
       if (p === cur || cur.endsWith(p) || p.endsWith(cur) || cur.includes(p)) return true;
     }
     if (title) {
-      const t = title.trim().toLowerCase().replace(/\.md$/i, "");
-      const curTitle = cur.split(/[\\/]/).pop()?.replace(/\.md$/i, "") || cur;
+      const t = stripDocExt(title.trim().toLowerCase());
+      const curTitle = stripDocExt(cur.split(/[\\/]/).pop() || "") || cur;
       if (t === curTitle || cur.includes(t)) return true;
     }
     return false;
@@ -71,13 +73,13 @@ export function buildGraphDataFromIndex(
   // 节点去重与别名映射：根据 id、规范化标题或路径定位已存在的规范节点
   const getExistingCanonicalId = (id: string, path?: string, title?: string): string | null => {
     if (nodesMap.has(id)) return id;
-    const norm = (title || "").trim().toLowerCase().replace(/\.md$/i, "");
+    const norm = stripDocExt((title || "").trim().toLowerCase());
     if (norm && normTitleToId.has(norm)) {
       return normTitleToId.get(norm)!;
     }
     if (path) {
       const p = path.trim().toLowerCase().replace(/\\/g, "/");
-      const filename = p.split("/").pop()?.replace(/\.md$/i, "");
+      const filename = stripDocExt(p.split("/").pop() || "");
       if (filename && normTitleToId.has(filename)) {
         return normTitleToId.get(filename)!;
       }
@@ -101,7 +103,7 @@ export function buildGraphDataFromIndex(
         continue;
       }
 
-      const norm = ch.title.trim().toLowerCase().replace(/\.md$/i, "");
+      const norm = stripDocExt(ch.title.trim().toLowerCase());
       const isSpace = Boolean(
         (ch.src && (ch.src.toLowerCase().startsWith("space/") || ch.src.toLowerCase().startsWith("space\\"))) ||
         ch.id.startsWith("space-")
@@ -119,7 +121,7 @@ export function buildGraphDataFromIndex(
       nodesMap.set(ch.id, node);
       normTitleToId.set(ch.id, ch.id);
       normTitleToId.set(norm, ch.id);
-      const filenameNorm = (ch.src?.split(/[\\/]/).pop() || "").toLowerCase().replace(/\.md$/i, "");
+      const filenameNorm = stripDocExt((ch.src?.split(/[\\/]/).pop() || "").toLowerCase());
       if (filenameNorm) {
         normTitleToId.set(filenameNorm, ch.id);
       }
@@ -131,7 +133,7 @@ export function buildGraphDataFromIndex(
     if (existingId) {
       // 文档已存在，将 docId 与标题别名指向已有规范节点，避免生成重复节点
       normTitleToId.set(docId, existingId);
-      const norm = doc.title.trim().toLowerCase().replace(/\.md$/i, "");
+      const norm = stripDocExt(doc.title.trim().toLowerCase());
       if (norm) normTitleToId.set(norm, existingId);
       if (isMatchCurrent(docId, doc.path, doc.title)) {
         const existingNode = nodesMap.get(existingId);
@@ -145,7 +147,7 @@ export function buildGraphDataFromIndex(
       doc.path?.includes(".space") ||
       docId.startsWith("space-")
     );
-    const norm = doc.title.trim().toLowerCase().replace(/\.md$/i, "");
+    const norm = stripDocExt(doc.title.trim().toLowerCase());
     const node: GraphNodeData = {
       id: docId,
       label: doc.title,

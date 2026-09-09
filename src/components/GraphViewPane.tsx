@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import cytoscape, { type Core } from "cytoscape";
 import {
+  Columns,
   Crosshair,
   Filter,
   Maximize2,
   Minimize2,
   Network,
   RotateCcw,
+  Rows,
   Search,
   X,
   ZoomIn,
@@ -29,6 +31,8 @@ export type GraphViewPaneProps = {
   onClose?: () => void;
   isMaximized?: boolean;
   onToggleMaximize?: () => void;
+  splitOrientation?: "row" | "column";
+  onToggleOrientation?: () => void;
 };
 
 /**
@@ -76,6 +80,8 @@ export function GraphViewPane({
   onClose,
   isMaximized = false,
   onToggleMaximize,
+  splitOrientation = "row",
+  onToggleOrientation,
 }: GraphViewPaneProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const cyRef = useRef<Core | null>(null);
@@ -685,6 +691,18 @@ export function GraphViewPane({
               <RotateCcw size={13} />
             </button>
           </div>
+
+          {/* Split Orientation Toggle */}
+          {onToggleOrientation && !isMaximized && (
+            <button
+              type="button"
+              className="graph-action-btn"
+              onClick={onToggleOrientation}
+              title={splitOrientation === "row" ? "切换为上下分栏 (推荐思维导图/白板)" : "切换为左右并排分栏"}
+            >
+              {splitOrientation === "row" ? <Rows size={13} /> : <Columns size={13} />}
+            </button>
+          )}
 
           {/* Maximize / Restore Toggle */}
           {onToggleMaximize && (

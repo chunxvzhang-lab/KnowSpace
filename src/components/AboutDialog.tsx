@@ -121,7 +121,7 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
             <div>
               <div className="about-header-title-row">
                 <span className="about-app-name">KnowSpace</span>
-                <span className="about-version-badge">v1.10.0</span>
+                <span className="about-version-badge">v2.0.0</span>
               </div>
               <p className="about-tagline">Personal Knowledge Workspace · 个人知识工作台</p>
             </div>
@@ -138,7 +138,7 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
             <div className="about-slogan-title">Write. Read. Connect. Know.</div>
             <div className="about-slogan-sub">记录 · 阅读 · 连接 · 认知</div>
             <p className="about-description" style={{ marginTop: 6 }}>
-              <strong>KnowSpace</strong> 是一款本地优先（Local-First）、现代化高颜值的个人知识工作台。以私密、高效、纯粹为核心，融汇交互式思维导图、全景知识图谱与块级双向链接，助你构建立体多维的结构化思维空间。
+              <strong>KnowSpace</strong> 是一款本地优先（Local-First）、现代化高颜值的个人知识工作台。以私密、高效、纯粹为核心，融汇无限可视化白板、时间旅行版本快照、毫秒混合检索、交互式思维导图、全景知识图谱与块级双向链接，助你构建立体多维的结构化思维空间。
             </p>
           </div>
 
@@ -147,20 +147,33 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
             <div className="about-card-title">
               <History size={16} className="about-icon text-blue" />
               <span>版本更新日志 · What&apos;s New</span>
-              <span className="about-changelog-version-badge">v1.10.0</span>
+              <span className="about-changelog-version-badge">v2.0.0</span>
             </div>
             <div className="about-changelog-list">
-              {/* v1.10.0 */}
+              {/* v2.0.0 */}
               <div className="about-changelog-group">
                 <div className="about-changelog-group-label">
                   <Sparkles size={12} className="text-cyan" />
+                  <span>v2.0.0 无限空间白板、时间旅行版本快照与全库混合检索</span>
+                </div>
+                <ul className="about-changelog-items">
+                  <li>🎨 <strong>无限空间可视化白板 (Infinite Canvas · JSON Canvas 1.0)</strong>：多模态卡片（Markdown 文本、内嵌文档卡片、分组容器）、贝塞尔/折线连线与磁吸锚点、小地图视口导航，支持将白板拓扑因果关系一键逆向萃取为结构化 Markdown 专著。</li>
+                  <li>⏳ <strong>本地时间旅行与版本快照历史 (Local Version History)</strong>：<code>.knowspace/snapshots/</code> 静默差异快照捕获引擎、时间轴版本面板、左右双栏 Side-by-Side 逐行与行内对比、一键无损安全还原与手动快照 (<code>Ctrl+Shift+H</code>)。</li>
+                  <li>🔍 <strong>全库毫秒级混合检索引擎 (Hybrid Vault Search)</strong>：全新倒排索引与高级结构化语法（<code>tag:#架构</code>、<code>link:[[双链]]</code>、<code>&quot;严格短语&quot;</code>、<code>-排除词</code>、时间过滤），支持当前章节与全库知识库一键秒级切换。</li>
+                </ul>
+              </div>
+
+              {/* v1.10.0 */}
+              <div className="about-changelog-group" style={{ marginTop: 10, opacity: 0.85 }}>
+                <div className="about-changelog-group-label">
+                  <Sparkles size={12} className="text-blue" />
                   <span>v1.10.0 斜杠命令、右键上下文感知、专业PDF打印与导图重排</span>
                 </div>
                 <ul className="about-changelog-items">
-                  <li>⌨️ <strong>全键盘斜杠命令菜单 (`/`)</strong>：行首或空格后输入 <code>/</code> 极速呼出补全菜单，支持 20+ 项原生排版、GFM 智能表格、代码块、LaTeX 公式、Mermaid 图表与 Callout 模版，支持拼音与模糊匹配。</li>
-                  <li>📑 <strong>Obsidian 级情境感知右键菜单</strong>：划词提取为新独立笔记（原地双链链接）、生成段落块引用（<code>^block-id</code>）、存入闪念收集箱、行样式与富文本格式化转换，并附带选区与文档字数统计卡片。</li>
-                  <li>🖨️ <strong>高保真专业 PDF 矢量打印与导出</strong>：集成 Chromium 原生打印引擎，支持 <code>Ctrl+P</code> 全局快捷键与工具栏一键打印，配套 <code>@media print</code> 跨页防截断规则（标题、表格、代码块与 Mermaid 图表不腰斩）。</li>
-                  <li>🧠 <strong>思维导图跨层级拖拽重排与画布搜索</strong>：支持分支拖拽改变父子层级与同级重排（带自闭环防环保护与目标吸附光晕），顶部悬浮搜索条支持节点内容实时匹配高亮与平滑运镜聚焦。</li>
+                  <li>⌨️ <strong>全键盘斜杠命令菜单 (`/`)</strong>：行首或空格后输入 <code>/</code> 极速呼出补全菜单，支持 20+ 项原生排版、GFM 智能表格、代码块、LaTeX 公式、Mermaid 图表与 Callout 模版。</li>
+                  <li>📑 <strong>Obsidian 级情境感知右键菜单</strong>：划词提取为新独立笔记、生成段落块引用（<code>^block-id</code>）、存入闪念收集箱与字数统计。</li>
+                  <li>🖨️ <strong>高保真专业 PDF 矢量打印与导出</strong>：集成 Chromium 原生打印引擎 (<code>Ctrl+P</code>)，印刷级跨页防截断规则。</li>
+                  <li>🧠 <strong>思维导图跨层级拖拽重排与画布搜索</strong>：支持分支拖拽改变父子层级与同级重排，悬浮搜索实时匹配聚焦。</li>
                 </ul>
               </div>
             </div>

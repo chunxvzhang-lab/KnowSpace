@@ -35,8 +35,8 @@ def main():
     
     owner = "chunxvzhang-lab"
     repo = "KnowSpace"
-    tag = "v1.11.0"
-    title = "KnowSpace v1.11.0 - 全局命令中枢(Ctrl+K)、知识图谱深度与聚类分析、思维导图多格式生态互通"
+    tag = "v2.0.0"
+    title = "KnowSpace v2.0.0 - 无限空间可视化白板(JSON Canvas)、本地时间旅行与全库混合检索"
     
     # 1. Create and push git tag
     print("1. Ensuring git tag exists and is pushed...")
@@ -75,44 +75,58 @@ def main():
             time.sleep(2)
 
     # 3. Create Release Body
-    body_md = """# 🚀 KnowSpace v1.11.0
+    body_md = r"""# 🚀 KnowSpace v2.0.0
 
 **KnowSpace · Personal Knowledge Workspace (现代化个人知识工作台)**  
 > **Write. Read. Connect. Know.（记录 · 阅读 · 连接 · 认知）**
 
-本次 **v1.11.0** 带来三大核心架构升维与深度体验优化——**「全局命令中枢 (Command Palette / Quick Switcher · `Ctrl+K`)、知识图谱 1-Hop/2-Hop 关联深度与目录色彩聚类、思维导图 OPML/FreeMind 多格式生态互通 (Mind Map Ecosystem Export)」**！
+经过深度打磨，**KnowSpace v2.0.0 重磅里程碑版本正式发布！**
+本次 v2.0.0 带来三大重磅核心子系统——**「🎨 无限空间可视化白板 (Infinite Canvas · JSON Canvas 1.0)」、「⏳ 本地时间旅行与版本快照历史 (Local Version History · Ctrl+Shift+H)」、「🔍 全库毫秒级混合检索引擎与结构化语法 (Hybrid Vault Search · Ctrl+F)」**，并针对空间连线流向、关系说明几何形状与专业右键清单进行了全维度交互升级！
 
 ---
 
-### ✨ v1.11.0 核心更新亮点
+### ✨ v2.0.0 核心更新亮点
 
-1. **⌨️ 全能全局命令中枢 (Command Palette & Quick Switcher · `Ctrl + K`)**：
-   - **三模自适应调度引擎**：
-     - **默认模式（快速切换器 Quick Switcher）**：空输入自动展示最近访问历史（MRU）与 `⏱️ 最近` / `📌 当前` 标识，输入文字毫秒级拼音首字母模糊匹配全库文档；
-     - **`>` 动作执行模式 (Commands)**：输入 `>` 呼出 17+ 项核心功能全键盘调度（主题切换、排版模式、思维导图、全景图谱、打字机滚动锁定、PDF 导出、新建文档等），自带快捷键提示徽章；
-     - **`#` 标题大纲直达模式 (Headings)**：输入 `#` 秒级解析当前文档 H1~H6 标题树，列出层级徽章与行号，回车平滑滚动直达目标小节。
-   - **全局键盘免失焦穿透**：即使光标在 CodeMirror 6 编辑器内部打字，直接按 `Ctrl + K` 亦可穿透呼出，`Esc` 关闭后光标焦点智能恢复至原打字位置。
+#### 1. 🎨 无限空间可视化白板 (Infinite Canvas · JSON Canvas 1.0 兼容 · `Ctrl + Shift + C`)
+- **标准开放与跨生态互通**：遵循开放标准 **JSON Canvas 1.0**（`.canvas` 格式），与 **Obsidian Canvas** 等外部空间工具 100% 双向互通；在文件树中以专属翠绿 Boxes 图标区分，支持新建、重命名、移动与双击秒开。
+- **多模态卡片自由挂载**：
+  - **文本卡片 (Text Node)**：双击行内 Markdown 编辑，失焦自适应渲染（支持 LaTeX、代码高亮、Checklist）；
+  - **文档卡片 (File Node)**：挂载库内文档，内嵌实时滚动预览，双击穿梭直达原笔记；
+  - **分组容器 (Group Node)**：半透明分类容器，带标题指示，支持框选和批量移动；
+  - **网页链接卡片 (Link Node)**：直观内嵌外部参考网站与标签。
+- **🔀 快捷反转连线流向 (`R`) 与精美矢量形状**：
+  - **连线反向 (`R`)**：连线选中时按 `R` 键秒级翻转两端节点与箭头流向；悬浮工具栏配备浅蓝高亮按钮，右键菜单明示起止卡片名称与快捷键，伴随即时 Toast 反馈；
+  - **精美关系说明形状**：胶囊形（Pill）、规整矩形（Rect）、真·几何菱形（Diamond），矢量等比自适应文本宽度，阴影立体自然。
+- **📑 媲美 Figma / Miro 的 4 大深度右键上下文菜单**：
+  - **空白画布**：新建各类卡片、**从剪贴板一键粘贴卡片 (`Ctrl+V`)**（自动读取剪贴板纯文本生成卡片）、适应画布 (`Shift+1`)、重置缩放 100% (`Ctrl+0`)、对齐网格（吸附至 20px 网格）、小地图与网格形态切换；
+  - **单张卡片**：Markdown 编辑、复制文本、**复制双链引用 (`[[标题]]`)**、**提取为独立笔记**、**重置为默认尺寸**、图层调整、6 色雅致背景调色板；
+  - **多选节点**：**一键打包为分组容器 (`Ctrl+G`)**（智能计算边界包围盒）、智能对齐（左对齐、居中对齐、顶端对齐）与**水平等距分布**；
+  - **分组容器**：重命名容器、**一键全选内部所有卡片**、**自适应紧凑包围内容**（智能收缩留白 24px）、**解散分组**（仅删容器保留内部卡片）。
+- **🔭 缩略雷达小地图 (Minimap)**：右下角常驻全局缩略雷达，实时反馈当前视口位置，点击极速导航。
+- **📝 画布逆向拓扑萃取长文算法 (Canvas-to-Article)**：独创拓扑萃取算法，根据卡片空间坐标与有向箭头依赖关系，一键萃取生成章节完备、引用严谨的独立 Markdown 专著！
 
-2. **🕸️ 知识图谱深度控制、目录色彩聚类与知识库治理**：
-   - **关联深度步进控制 (Hop Depth)**：支持 `1-Hop 邻近`（聚焦当前笔记直系引用，消除视觉过载）、`2-Hop 扩展`（两层可达网络）与 `全局` 星座拓扑，支持点击任意节点动态重置为新中心；
-   - **🎨 顶级目录调和色彩聚类**：采用 HSL 色相环自适应算法，自动为不同根目录的笔记分配和谐柔和的主题色彩，知识体系板块一目了然；
-   - **MOC 核心枢纽与未链接孤岛挖掘**：一键过滤连接度 $\ge 3$ 的骨干核心枢纽 (MOC) 文档，或一键扫描度数 $=0$ 的未链接孤立碎片笔记，助力知识库体检与双链重构闭环。
+#### 2. ⏳ 本地时间旅行与版本快照历史 (Local Version History · `Ctrl + Shift + H`)
+- **纯本地静默快照引擎**：在知识库根目录下维护 `.knowspace/snapshots/` 隐藏存储，每个快照打上绝对时间戳与 SHA-256 哈希校验码，杜绝冗余重复；
+- **30 秒去抖与自动配额修剪**：智能识别实质性变更，在频繁保存中聚合 30 秒去抖窗口；单个文档滚动维护最新 50 个优质快照点；
+- **Side-by-Side 双栏与 Unified 单栏对比视图**：
+  - Myers LCS 差异引擎：毫秒级行级与行内字符微粒度差异对比，高对比度绿底红底清晰直观；
+  - 自由切换对比模式，实时统计修改行数（如 `+18 -5`）。
+- **一键无损安全还原与手动里程碑**：一键回退到任一历史节点（带防误触确认与还原保护记录），支持随时手动打下自定义里程碑快照。
 
-3. **🧠 思维导图多格式生态互通导出 (Mind Map Multi-Format Export)**：
-   - **顶栏下拉多生态导出面板**：
-     - **📷 高清 PNG 图片**：Canvas 2× 视网膜级超采样抗锯齿、透明背景、动态 Bounding Box 计算（无视口边缘裁切）；
-     - **📑 OPML 2.0 国际大纲标准协议**：通用大纲交换，无缝打通 **MindNode**、**OmniOutliner**、**Logseq**、**XMind**、**Dynalist**；
-     - **🧠 FreeMind 1.0.1 工业级标准 (`.mm`)**：保留节点层级与定制 8 色调和色彩，可被 **XMind**、**Freeplane**、**FreeMind**、**MindManager** 原生双击打开；
-     - **📝 Markdown 分级大纲**：标准缩进无序列表，保真保留行内样式注释，适合提纲沉淀或直接作为 Prompt 喂给 LLM 扩写。
+#### 3. 🔍 全库毫秒级混合检索引擎与结构化语法 (Hybrid Vault Search · `Ctrl + F`)
+- **毫秒级倒排索引引擎 (Inverted Index Engine)**：建立内存级 `tagIndex`、`linkIndex` 与 `termIndex`，万篇笔记键入即出（< 15ms）；
+- **强大的结构化检索语法**：
+  - `tag:#架构` 或 `tag:架构`：精准筛选标签；
+  - `link:[[分布式协议]]` 或 `link:分布式协议`：追踪双向引用关系；
+  - `"严格短语"`：连续字词精确匹配；
+  - `-排除词`：过滤无关分支；
+  - `after:` / `before:`：按时间范围过滤。
+- **双模式切换与语法辅助芯片**：顶栏一键切换 `[当前章节]` 与 `[全库检索]`，快捷插入语法芯片，点击跨文档秒级跳转并激活 1.8 秒柔和电光蓝脉冲高亮。
 
-4. **⚡ 编辑器全局快捷键穿透优化 (Zero-Friction Flow)**：
-   - 全面打通 CodeMirror 6 内部与全局调度之间的按键链路，打字过程中无需摸鼠标失焦，直接敲击 `Ctrl+K`（命令中枢）、`Ctrl+G`（全景图谱）、`Ctrl+M`（导图切换）、`Ctrl+\`（折叠侧栏）、`Ctrl+P`（矢量打印）瞬间响应。
-
-5. **📖 官方用户操作手册全面升级**：
-   - 官方操作手册 `docs/USER_MANUAL.md` 与 `docs/操作手册.md` 深度更新，涵盖全功能特性解析与 10+ 真实场景实操案例，内置 31 张高保真图解。
-
-6. **🛡️ 质量防护与自动化测试**：
-   - 27 个自动化测试套件、142 项单元测试 100% 全部通过，生产构建打包零报错。
+#### 4. 🛡️ 质量保障与自动化测试
+- **34 个自动化测试套件、223 项单元与集成测试 100% 全部通过**；
+- TypeScript 严格类型检查 0 错误；
+- 生产构建与 Windows 桌面打包全流程无缝通过。
 
 ---
 
@@ -120,8 +134,8 @@ def main():
 
 | 文件名 | 类型 | 说明 |
 | :--- | :--- | :--- |
-| **`KnowSpace-1.11.0.msi`** | Windows 标准安装包 | Windows Installer 官方安装格式，自动创建桌面与开始菜单快捷方式（推荐） |
-| **`KnowSpace-win-x64-portable.zip`** | Windows 便携绿色版 | 免安装解压即用，解压后双击 `KnowSpace.exe` 即可运行 |
+| **`KnowSpace-2.0.0.msi`** | Windows 标准安装包 | Windows Installer 官方安装格式，自动创建桌面与开始菜单快捷方式（推荐） |
+| **`KnowSpace-win-x64-portable.zip`** | Windows 便携绿色版 | 免安装解压即用，解压后双击 `KnowSpace.exe` 即可直接运行 |
 
 ---
 
@@ -173,9 +187,9 @@ def main():
     # 4. Upload Assets
     msi_path = None
     msi_candidates = [
-        r"C:\Users\chunxvzhang\Desktop\codex\release\KnowSpace-1.11.0.msi",
-        r"C:\Users\chunxvzhang\Desktop\codex\release\KnowSpace 1.11.0.msi",
-        r"C:\Users\chunxvzhang\Desktop\codex\release\KnowSpace-win-x64\release\KnowSpace-1.11.0.msi",
+        r"C:\Users\chunxvzhang\Desktop\codex\release\KnowSpace-2.0.0.msi",
+        r"C:\Users\chunxvzhang\Desktop\codex\release\KnowSpace 2.0.0.msi",
+        r"C:\Users\chunxvzhang\Desktop\codex\release\KnowSpace-win-x64\release\KnowSpace-2.0.0.msi",
     ]
     for p in msi_candidates:
         if os.path.exists(p):
@@ -187,7 +201,7 @@ def main():
     assets_to_upload = [
         (
             msi_path,
-            "KnowSpace-1.11.0.msi",
+            "KnowSpace-2.0.0.msi",
             "application/x-msi"
         ),
         (
