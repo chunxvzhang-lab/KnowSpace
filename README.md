@@ -176,6 +176,10 @@
 ### 7. 🔍 知识大纲导航与全文段落卡片检索 (Search & Navigation)
 *结构化组织与秒级定位你的所有文档。*
 
+<p align="center">
+  <img src="docs/manual-images/12-fulltext-search.png" alt="知识大纲导航与全文段落卡片检索" width="90%" style="border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);" />
+</p>
+
 - **📁 目录树多级子目录折叠展开**：支持任意层级 Markdown 知识库树状结构，顶部提供「全部展开 / 全部折叠」，折叠状态本地持久化记忆。
 - **📑 动态大纲随动追踪 (TOC)**：动态提取文档各级标题，随阅读位置实时高亮当前小节，点击平滑滚动定位。
 - **⭐ 精选书签系统 (`Ctrl + B`)**：随手将重要小节或段落加入书签，自动记录精准滚动比例与摘录，随时一键重访。
@@ -185,6 +189,10 @@
 
 ### 8. 🛡️ 工业级数据安全体系与系统深度集成 (Desktop System & Security)
 *本地优先，保护你的每一份心血不被丢失。*
+
+<p align="center">
+  <img src="docs/manual-images/17-dialog-unsaved.png" alt="工业级数据安全与未保存拦截保护" width="90%" style="border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);" />
+</p>
 
 - **🗔 Windows 系统托盘后台驻留**：关闭主窗口可常驻右下角系统托盘，全局热键与闪念胶囊随时待命，托盘菜单一键唤起。
 - **🚀 开机自启动与后台静默就绪 (`--hidden`)**：随 Windows 开机自动启动并在后台静默就绪，开机不弹出窗口打扰，随叫随到。
@@ -272,6 +280,10 @@
 ### 11. 🎨 无限空间可视化白板 (Infinite Canvas · JSON Canvas 1.0 兼容 · `Ctrl + Shift + C`)
 *标准开放的二维空间思维白板，打通从零散卡片、拓扑因果连线到结构化专著的完整心智飞跃。*
 
+<p align="center">
+  <img src="docs/manual-images/32-infinite-canvas.png" alt="无限空间可视化白板与多模态卡片" width="90%" style="border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);" />
+</p>
+
 - **🌐 标准开放与跨生态流转 (JSON Canvas 1.0)**：原生采用社区通用规范存储为 `.canvas` 文件，与 **Obsidian Canvas** 等外部空间工具 100% 双向互通；在文件树中以专属翠绿 Boxes 图标区分，支持新建、重命名、移动与双击秒开。
 - **📦 多模态节点自由挂载**：
   - **文本卡片 (Text Node)**：双击卡片进入行内编辑，失焦即刻渲染为标准 Markdown（完整支持公式、代码高亮与清单）；
@@ -297,6 +309,9 @@
   - 选中连线按 `R` 键秒级对调起止端点与箭头；
   - 胶囊（Pill）、矩形（Rect）、真·几何对称菱形（Diamond）三种徽章形态，矢量等比自适应文本宽度，阴影自然立体。
 - **📑 媲美 Figma / Miro 的 4 大右键上下文菜单**：
+  <p align="center">
+    <img src="docs/manual-images/33-canvas-card-creation.png" alt="白板卡片定制与上下文右键操作" width="90%" style="border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);" />
+  </p>
   - **空白画布**：新建各类卡片、**从剪贴板一键粘贴卡片 (`Ctrl+V`)**（自动读取剪贴板纯文本在光标处生成卡片）、适应画布 (`Shift+1`)、重置缩放 100% (`Ctrl+0`)、对齐网格（吸附至 20px 网格）、小地图与网格形态切换；
   - **单张卡片**：Markdown 编辑、复制文本、**复制双链引用 (`[[标题]]`)**、**提取为独立知识库笔记**、**重置为默认尺寸**、图层上下移与 6 色调色板；
   - **多选节点**：**一键断开所选卡片间连线**、**一键打包为分组容器 (`Ctrl+G`)**（智能计算边界包围盒）、智能对齐（左对齐、居中对齐、顶端对齐）与**水平等距分布**；
@@ -310,6 +325,10 @@
 ### 12. ⏳ 本地时间旅行与版本快照历史 (Local Version History · `Ctrl + Shift + H`)
 *每一次知识创作的修改都应被忠实记录。完全运行在用户本地、安全防丢的本地时间旅行系统。*
 
+<p align="center">
+  <img src="docs/manual-images/34-version-history.png" alt="本地版本快照历史与双栏差异对比" width="90%" style="border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);" />
+</p>
+
 - **🛡️ 纯本地静默快照引擎**：在知识库根目录下维护 `.knowspace/snapshots/` 隐藏存储，每个快照打上绝对微秒时间戳与 SHA-256 哈希校验码，杜绝冗余重复写入。
 - **⏱️ 30 秒静默去抖与自动配额修剪**：智能识别实质性变更，在频繁保存中聚合 30 秒去抖窗口；单个文档自动滚动维护最新的 50 个优质快照点，空间轻量环保。
 - **⚖️ Side-by-Side 双栏与 Unified 单栏对比视图**：
@@ -321,6 +340,10 @@
 
 ### 13. 🔍 全库毫秒级混合检索引擎与结构化语法 (Hybrid Vault Search · `Ctrl + F`)
 *全新文档级与段落级高性能倒排索引，十万字知识库键入即出（< 15ms）。*
+
+<p align="center">
+  <img src="docs/manual-images/35-hybrid-vault-search.png" alt="全库毫秒级混合检索与语法芯片" width="90%" style="border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);" />
+</p>
 
 - **⚡ 毫秒级倒排索引引擎 (Inverted Index Engine)**：建立内存级 `tagIndex`、`linkIndex` 与 `termIndex`，告别单文档暴力线性扫描。
 - **🎯 强大的结构化检索语法**：

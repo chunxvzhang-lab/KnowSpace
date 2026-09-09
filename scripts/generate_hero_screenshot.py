@@ -68,17 +68,17 @@ def main():
     )
     # Glow dot
     draw.ellipse([pill_x + 22, pill_y + 18, pill_x + 34, pill_y + 30], fill=(29, 155, 240, 255))
-    draw.text((pill_x + 46, pill_y + 10), "KnowSpace v1.11.0", fill=(231, 233, 234), font=font_pill_title)
-    draw.text((pill_x + 305, pill_y + 12), "•  Personal Knowledge Workspace · 现代化知识工作台  •  摸鱼Lab", fill=(113, 118, 123), font=font_pill_sub)
+    draw.text((pill_x + 46, pill_y + 10), "KnowSpace v2.0.0", fill=(231, 233, 234), font=font_pill_title)
+    draw.text((pill_x + 300, pill_y + 12), "•  Personal Knowledge Workspace · 空间知识工作台  •  摸鱼Lab", fill=(113, 118, 123), font=font_pill_sub)
 
     # Left & Right Top Badges
-    draw_rounded_rect(draw, [120, 40, 420, 86], radius=23, fill=(15, 20, 25, 220), outline=(47, 51, 54, 255), width=1)
+    draw_rounded_rect(draw, [120, 40, 430, 86], radius=23, fill=(15, 20, 25, 220), outline=(47, 51, 54, 255), width=1)
     draw.ellipse([140, 58, 150, 68], fill=(29, 155, 240, 255))
-    draw.text((160, 50), "★ Ctrl+K 全局命令中枢", fill=(29, 155, 240), font=font_badge)
+    draw.text((160, 50), "★ Ctrl+K 全能命令中枢", fill=(29, 155, 240), font=font_badge)
 
-    draw_rounded_rect(draw, [W - 420, 40, W - 120, 86], radius=23, fill=(15, 20, 25, 220), outline=(47, 51, 54, 255), width=1)
-    draw.ellipse([W - 400, 58, W - 390, 68], fill=(74, 222, 128, 255))
-    draw.text((W - 380, 50), "★ / 指令与导图多格式生态", fill=(74, 222, 128), font=font_badge)
+    draw_rounded_rect(draw, [W - 440, 40, W - 120, 86], radius=23, fill=(15, 20, 25, 220), outline=(47, 51, 54, 255), width=1)
+    draw.ellipse([W - 420, 58, W - 410, 68], fill=(16, 185, 129, 255))
+    draw.text((W - 400, 50), "★ JSON Canvas 1.0 无限白板", fill=(16, 185, 129), font=font_badge)
 
     # 3. Main Showcase Window Mockup (Twitter Lights Out #000000 + Surface #0f1419 + Border #2f3336)
     win_x = 120
@@ -131,10 +131,10 @@ def main():
     font_subtab = get_font(13, bold=False)
 
     tabs = [
-        ("01-架构与设计.md", False, False),
+        ("01-架构设计与核心技术.md", False, False),
         ("02-AST双向零延迟同步.md", True, False),
-        ("03-Mermaid图表导出.md", False, True),  # Dirty indicator
-        ("04-对比分屏模式.md", False, False),
+        ("03-无限空间白板.canvas", False, False),
+        ("04-本地版本历史.md", False, True),  # Dirty indicator
     ]
 
     tab_start_x = win_x + 110
@@ -158,7 +158,7 @@ def main():
         tab_cur_x += t_width + 8
 
     # Right Window Control Buttons (View Switcher Pills + Hash line number button)
-    v_pill_x = win_x + win_w - 320
+    v_pill_x = win_x + win_w - 410
     # Line number toggle button in titlebar
     draw_rounded_rect(
         draw,
@@ -170,25 +170,27 @@ def main():
     )
     draw.text((v_pill_x + 13, win_y + 14), "#", fill=(29, 155, 240), font=get_font(17, bold=True))
 
-    v_switch_x = v_pill_x + 50
+    v_switch_x = v_pill_x + 48
     draw_rounded_rect(
         draw,
-        [v_switch_x, win_y + 10, v_switch_x + 230, win_y + title_h - 10],
+        [v_switch_x, win_y + 10, v_switch_x + 342, win_y + title_h - 10],
         radius=18,
         fill=(22, 24, 28, 255),
         outline=(47, 51, 54, 255),
         width=1
     )
-    draw.text((v_switch_x + 20, win_y + 16), "阅读", fill=(113, 118, 123), font=font_subtab)
+    draw.text((v_switch_x + 16, win_y + 16), "阅读", fill=(113, 118, 123), font=font_subtab)
     # Active Split pill
     draw_rounded_rect(
         draw,
-        [v_switch_x + 72, win_y + 12, v_switch_x + 154, win_y + title_h - 12],
+        [v_switch_x + 58, win_y + 12, v_switch_x + 126, win_y + title_h - 12],
         radius=14,
         fill=(29, 155, 240, 255)
     )
-    draw.text((v_switch_x + 90, win_y + 16), "分屏", fill=(255, 255, 255), font=font_tab)
-    draw.text((v_switch_x + 175, win_y + 16), "源码", fill=(113, 118, 123), font=font_subtab)
+    draw.text((v_switch_x + 72, win_y + 16), "分屏", fill=(255, 255, 255), font=font_tab)
+    draw.text((v_switch_x + 138, win_y + 16), "源码", fill=(113, 118, 123), font=font_subtab)
+    draw.text((v_switch_x + 195, win_y + 16), "脑图", fill=(6, 182, 212), font=font_subtab)
+    draw.text((v_switch_x + 252, win_y + 16), "白板", fill=(16, 185, 129), font=font_tab)
 
     # 3.2 Activity Bar (Leftmost Column, 68px)
     act_w = 68
@@ -476,7 +478,7 @@ def main():
     font_dock_bold = get_font(13, bold=True)
     draw.text((win_x + 20, dock_y + 10), "● 已安全保存 (原子落盘)", fill=(74, 222, 128), font=font_dock_bold)
     draw.text((win_x + 210, dock_y + 10), "2,840 字符  •  约 6 分钟阅读", fill=(160, 166, 172), font=font_dock)
-    draw.text((win_x + win_w - 470, dock_y + 10), "LF  •  UTF-8  •  KnowSpace Engine v1.11.0  •  极客暗黑", fill=(113, 118, 123), font=font_dock)
+    draw.text((win_x + win_w - 530, dock_y + 10), "LF  •  UTF-8  •  KnowSpace Engine v2.0.0 · JSON Canvas 1.0  •  极客暗黑", fill=(113, 118, 123), font=font_dock)
 
     # 4. Floating Feature Showcase Cards around the main window
     # Left Floating Badge Card
@@ -493,9 +495,9 @@ def main():
     fc2_y = 580
     fc2_w = 260
     fc2_h = 160
-    draw_rounded_rect(draw, [fc2_x, fc2_y, fc2_x + fc2_w, fc2_y + fc2_h], radius=16, fill=(15, 20, 25, 240), outline=(29, 155, 240, 160), width=2)
-    draw.text((fc2_x + 20, fc2_y + 18), "★ 图谱聚类与导图生态", fill=(29, 155, 240), font=get_font(17, bold=True))
-    draw.text((fc2_x + 20, fc2_y + 50), "• 1-Hop / 2-Hop 关联探索\n• 文件夹多色社区聚类光环\n• 脑图多格式 OPML / FreeMind\n• 3x Retina 矢量超清导出", fill=(200, 205, 210), font=get_font(13))
+    draw_rounded_rect(draw, [fc2_x, fc2_y, fc2_x + fc2_w, fc2_y + fc2_h], radius=16, fill=(15, 20, 25, 240), outline=(16, 185, 129, 160), width=2)
+    draw.text((fc2_x + 20, fc2_y + 18), "★ 空间白板与版本旅行", fill=(16, 185, 129), font=get_font(17, bold=True))
+    draw.text((fc2_x + 20, fc2_y + 50), "• JSON Canvas 1.0 开放标准\n• 4 锚点磁吸与逆向萃取长文\n• 本地版本旅行与字符级 Diff\n• 倒排索引全库毫秒混合检索", fill=(200, 205, 210), font=get_font(13))
 
     # 5. Save image to all required target paths
     target_paths = [

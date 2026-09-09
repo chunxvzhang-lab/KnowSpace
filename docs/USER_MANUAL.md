@@ -10,14 +10,14 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-v1.11.0-1D9BF0?style=flat-square" alt="Version 1.11.0" />
+  <img src="https://img.shields.io/badge/Version-v2.0.0-1D9BF0?style=flat-square" alt="Version 2.0.0" />
   <img src="https://img.shields.io/badge/Platform-Windows%20x64-blue?style=flat-square" alt="Platform" />
   <img src="https://img.shields.io/badge/Team-%E6%91%B8%E9%B1%BCLab-orange?style=flat-square" alt="摸鱼Lab" />
   <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License" />
 </p>
 
 > [!TIP]
-> 🖼️ **画册级视觉体验**：想要以图片为核心进行直观实操？欢迎参阅专为视觉学习打造的 **[全功能高清图片手册 (Picture Manual)](全功能高清图片手册.md)**，包含全部 28 大功能模块的高清原图、界面透视与快捷键图谱。
+> 🖼️ **画册级视觉体验**：想要以图片为核心进行直观实操？欢迎参阅专为视觉学习打造的 **[全功能高清图片手册 (Picture Manual)](全功能高清图片手册.md)**，包含全部 32 大功能模块（35 张 1080P/Retina 高清原图）、界面透视与快捷键图谱。
 
 ---
 
