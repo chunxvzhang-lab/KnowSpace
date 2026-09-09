@@ -667,14 +667,12 @@ export const CANVAS_RELATION_PRESETS = [
 ] as const;
 
 /**
- * Automatically computes best attachment sides and creates an edge between two nodes
- */
-/**
  * Automatically computes best attachment sides between two nodes based on relative coordinates.
- * Handles:
- * 1. Clear Left-Right layout (horizontal span dominant): connects cleanly right -> left or left -> right.
- * 2. Clear Top-Bottom layout (vertical span dominant): connects cleanly bottom -> top or top -> bottom.
- * 3. Diagonal / Corner relationships: smoothly routes around the quadrant corner without self-intersection.
+ * Priority rules:
+ * 1. Horizontal band (overlap in Y + horizontal gap): right/left routing.
+ * 2. Vertical band (overlap in X + vertical gap): top/bottom routing.
+ * 3. Both-axis gap: vertical routing when gapY >= gapX (top-bottom layouts win over diagonal).
+ * 4. Overlapping: fall back to center-delta direction.
  */
 export function getOptimalAnchorSides(
   fromNode: CanvasNode,
@@ -699,48 +697,36 @@ export function getOptimalAnchorSides(
   const overlapX = Math.max(0, Math.min(fromRight, toRight) - Math.max(fromNode.x, toNode.x));
   const overlapY = Math.max(0, Math.min(fromBottom, toBottom) - Math.max(fromNode.y, toNode.y));
 
-  // 1. Explicit Horizontal tier detection (左右排版):
-  // If nodes overlap vertically OR horizontal gap is clearly dominant
-  if (gapX > 0 && (overlapY > 0 || gapX > gapY * 1.3 || (gapX > 80 && gapX > gapY))) {
+  // 1. Nodes share a horizontal band (overlap in Y) and horizontal gap dominates: use left/right routing
+  if (overlapY > 0 && gapX > 0 && gapX > gapY) {
     return dx >= 0
       ? { fromSide: "right", toSide: "left" }
       : { fromSide: "left", toSide: "right" };
   }
 
-  // 2. Explicit Vertical tier detection (上下排版):
-  // If nodes overlap horizontally OR vertical gap is clearly dominant
-  if (gapY > 0 && (overlapX > 0 || gapY >= gapX * 1.3 || (gapY > 80 && gapY >= gapX))) {
+  // 2. Nodes share a vertical band (overlap in X) and have vertical gap: use top/bottom routing
+  if (overlapX > 0 && gapY > 0) {
     return dy >= 0
       ? { fromSide: "bottom", toSide: "top" }
       : { fromSide: "top", toSide: "bottom" };
   }
 
-  // 3. Diagonal / Corner quadrant routing
-  if (Math.abs(dx) > 20 && Math.abs(dy) > 20) {
-    if (dx > 0 && dy < 0) {
-      // Moving up-right: exit top or right, enter left or bottom
-      return gapX >= gapY
-        ? { fromSide: "right", toSide: "bottom" }
-        : { fromSide: "top", toSide: "left" };
-    } else if (dx > 0 && dy > 0) {
-      // Moving down-right: exit right or bottom, enter top or left
-      return gapX >= gapY
-        ? { fromSide: "right", toSide: "top" }
-        : { fromSide: "bottom", toSide: "left" };
-    } else if (dx < 0 && dy > 0) {
-      // Moving down-left: exit left or bottom, enter top or right
-      return gapX >= gapY
-        ? { fromSide: "left", toSide: "top" }
-        : { fromSide: "bottom", toSide: "right" };
-    } else if (dx < 0 && dy < 0) {
-      // Moving up-left: exit left or top, enter bottom or right
-      return gapX >= gapY
-        ? { fromSide: "left", toSide: "bottom" }
-        : { fromSide: "top", toSide: "right" };
+  // 3. Clear separation in one or both axes:
+  //    Vertical routing when gapY >= gapX (top-bottom layouts win, including diagonals where vertical is ≥ horizontal).
+  //    Horizontal only when gapX strictly dominates.
+  if (gapX > 0 || gapY > 0) {
+    if (gapY >= gapX) {
+      return dy >= 0
+        ? { fromSide: "bottom", toSide: "top" }
+        : { fromSide: "top", toSide: "bottom" };
+    } else {
+      return dx >= 0
+        ? { fromSide: "right", toSide: "left" }
+        : { fromSide: "left", toSide: "right" };
     }
   }
 
-  // Fallback: compare center deltas
+  // 4. Overlapping nodes (no gap in either direction) → use center-delta direction
   if (Math.abs(dx) >= Math.abs(dy)) {
     return dx >= 0
       ? { fromSide: "right", toSide: "left" }
@@ -750,6 +736,20 @@ export function getOptimalAnchorSides(
       ? { fromSide: "bottom", toSide: "top" }
       : { fromSide: "top", toSide: "bottom" };
   }
+}
+
+/**
+ * Returns the next auto-cycling color key for new edges from a given source node.
+ * Cycles through CANVAS_COLOR_PALETTES keys ("1"..."6") based on how many outgoing
+ * edges the source already has, so each successive connection gets a distinct color.
+ */
+export function getNextEdgeColorForSource(
+  sourceNodeId: string,
+  existingEdges: CanvasEdge[]
+): string {
+  const paletteKeys = Object.keys(CANVAS_COLOR_PALETTES);
+  const outgoingCount = existingEdges.filter((e) => e.fromNode === sourceNodeId).length;
+  return paletteKeys[outgoingCount % paletteKeys.length];
 }
 
 /**
@@ -828,6 +828,7 @@ export function connectOneToMany(
   existingEdges: CanvasEdge[],
   style: CanvasEdgeLineStyle = "bezier"
 ): CanvasEdge[] {
+  const paletteKeys = Object.keys(CANVAS_COLOR_PALETTES);
   const newEdges: CanvasEdge[] = [];
   for (const target of targetNodes) {
     if (target.id === rootNode.id) continue;
@@ -843,7 +844,12 @@ export function connectOneToMany(
           (e.fromNode === target.id && e.toNode === rootNode.id)
       );
     if (!exists) {
-      newEdges.push(createEdgeBetweenNodes(rootNode, target, undefined, style));
+      // Auto-cycle color: count existing + already-queued outgoing edges from rootNode
+      const outgoingCount =
+        existingEdges.filter((e) => e.fromNode === rootNode.id).length + newEdges.length;
+      const color = paletteKeys[outgoingCount % paletteKeys.length];
+      const edge = createEdgeBetweenNodes(rootNode, target, undefined, style);
+      newEdges.push({ ...edge, color });
     }
   }
   return newEdges;

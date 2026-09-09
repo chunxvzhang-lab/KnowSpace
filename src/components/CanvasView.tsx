@@ -82,6 +82,7 @@ import {
   reverseEdgeDirection,
   getOptimalAnchorSides,
   getStepBendHandleInfo,
+  getNextEdgeColorForSource,
   downloadCanvasAsImage,
   copyCanvasImageToClipboard,
 } from "../services/canvasService";
@@ -2164,6 +2165,7 @@ export const CanvasView = memo(function CanvasView({
       );
 
       if (!exists) {
+        const autoColor = getNextEdgeColorForSource(fromNode.id, currentData.edges);
         const newEdge: CanvasEdge = {
           id: `edge-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
           fromNode: fromNode.id,
@@ -2172,7 +2174,7 @@ export const CanvasView = memo(function CanvasView({
           toNode: targetNode.id,
           toSide,
           toEnd: "arrow",
-          color: fromNode.color || "5",
+          color: autoColor,
           style: "bezier",
         };
         pushHistory({
