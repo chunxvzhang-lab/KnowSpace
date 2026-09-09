@@ -9,6 +9,7 @@ import {
   extractCanvasToMarkdown,
   getOptimalAnchorSides,
   getNextEdgeColorForSource,
+  getSourceNodeEdgeColor,
   exportCanvasToSvg,
   exportCanvasToPng,
   downloadCanvasAsImage,
@@ -661,50 +662,49 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
     expect(mid.y).toBe(150);
   });
 
-  it("prefers vertical routing over diagonal when gapY >= gapX (top-bottom layout wins)", () => {
-    // Source card in bottom container, target card in top container, slight horizontal offset
-    const bottomCard: CanvasTextNode = { id: "src", type: "text", text: "A", x: 100, y: 350, width: 200, height: 130 };
-    const topCard: CanvasTextNode = { id: "tgt", type: "text", text: "B", x: 300, y: 60, width: 200, height: 130 };
+  it("prefers vertical routing for tiered layouts even when connecting to outermost cards across wide horizontal distance", () => {
+    // Lower card in bottom tier connecting to outermost card on the far left of upper tier
+    // gapX is wide (800 - 360 = 440px), gapY is 360px
+    const bottomCard: CanvasTextNode = { id: "bot-3", type: "text", text: "Bottom Card 3", x: 800, y: 600, width: 260, height: 140 };
+    const topOutermostCard: CanvasTextNode = { id: "top-1", type: "text", text: "Top Card 1", x: 100, y: 100, width: 260, height: 140 };
 
-    // gapX = 300 - 300 = 0 (they actually share X boundary), gapY = 350 - 190 = 160
-    // Should use top→bottom routing (source exits top since dy < 0)
-    const sides = getOptimalAnchorSides(bottomCard, topCard);
-    expect(sides.fromSide).toBe("top");
-    expect(sides.toSide).toBe("bottom");
+    // Lower card must start from its top, and upper card must end at its bottom
+    const sides = getOptimalAnchorSides(bottomCard, topOutermostCard);
+    expect(sides).toEqual({ fromSide: "top", toSide: "bottom" });
 
-    // Also when gapX < gapY (diagonal with vertical dominance):
-    const bottomLeft: CanvasTextNode = { id: "bl", type: "text", text: "A", x: 50, y: 350, width: 200, height: 130 };
-    const topRight: CanvasTextNode = { id: "tr", type: "text", text: "B", x: 300, y: 60, width: 200, height: 130 };
-    // gapX = 300-250 = 50, gapY = 350-190 = 160. gapY >= gapX → vertical routing
-    const diag = getOptimalAnchorSides(bottomLeft, topRight);
-    expect(diag.fromSide).toBe("top");
-    expect(diag.toSide).toBe("bottom");
+    // Reverse: from top outermost card to lower card must start from bottom and end at top
+    const reverseSides = getOptimalAnchorSides(topOutermostCard, bottomCard);
+    expect(reverseSides).toEqual({ fromSide: "bottom", toSide: "top" });
   });
 
-  it("auto-cycles edge colors for successive outgoing edges from the same source node", () => {
-    const node1: CanvasTextNode = { id: "n1", type: "text", text: "Src", x: 0, y: 0, width: 200, height: 120 };
-    const node2: CanvasTextNode = { id: "n2", type: "text", text: "A", x: 300, y: 0, width: 200, height: 120 };
-    const node3: CanvasTextNode = { id: "n3", type: "text", text: "B", x: 300, y: 150, width: 200, height: 120 };
-    const node4: CanvasTextNode = { id: "n4", type: "text", text: "C", x: 300, y: 300, width: 200, height: 120 };
+  it("ensures all edges from the same card/starting point share identical color, while different cards get distinct colors", () => {
+    const cardA: CanvasTextNode = { id: "card-a", type: "text", text: "Card A", x: 0, y: 0, width: 200, height: 120 };
+    const cardB: CanvasTextNode = { id: "card-b", type: "text", text: "Card B", x: 300, y: 0, width: 200, height: 120 };
+    const target1: CanvasTextNode = { id: "t1", type: "text", text: "T1", x: 0, y: 300, width: 200, height: 120 };
+    const target2: CanvasTextNode = { id: "t2", type: "text", text: "T2", x: 300, y: 300, width: 200, height: 120 };
+    const target3: CanvasTextNode = { id: "t3", type: "text", text: "T3", x: 600, y: 300, width: 200, height: 120 };
 
-    // No existing edges: first connection gets palette key "1"
-    expect(getNextEdgeColorForSource("n1", [])).toBe("1");
+    // Card A connects to multiple targets (1-to-many): all lines from Card A must be IDENTICAL in color
+    const edgesFromA = connectOneToMany(cardA, [target1, target2, target3], []);
+    expect(edgesFromA).toHaveLength(3);
+    const colorA = edgesFromA[0].color;
+    expect(edgesFromA.every((e) => e.color === colorA)).toBe(true);
 
-    // With one existing edge from n1: second gets "2"
-    const existingEdge = { id: "e0", fromNode: "n1", fromSide: "right" as const, fromEnd: "none" as const,
-      toNode: "n2", toSide: "left" as const, toEnd: "arrow" as const };
-    expect(getNextEdgeColorForSource("n1", [existingEdge])).toBe("2");
+    // Card A connects again: must still reuse that same color
+    const nextColorA = getSourceNodeEdgeColor(cardA, edgesFromA);
+    expect(nextColorA).toBe(colorA);
 
-    // connectOneToMany auto-cycles colors for each new edge
-    const edges = connectOneToMany(node1, [node2, node3, node4], []);
-    expect(edges).toHaveLength(3);
-    // Each edge should have a distinct palette color
-    const colors = edges.map((e) => e.color);
-    expect(colors[0]).toBe("1");
-    expect(colors[1]).toBe("2");
-    expect(colors[2]).toBe("3");
-    // All colors distinct
-    expect(new Set(colors).size).toBe(3);
+    // Card B (different card) connects: must automatically get a distinct color
+    const edgesFromB = connectOneToMany(cardB, [target1, target2], edgesFromA);
+    expect(edgesFromB).toHaveLength(2);
+    const colorB = edgesFromB[0].color;
+    expect(edgesFromB.every((e) => e.color === colorB)).toBe(true);
+    expect(colorB).not.toBe(colorA);
+
+    // If card has an explicit user-assigned color, all lines from it strictly use that color
+    const coloredCard: CanvasTextNode = { id: "c-col", type: "text", text: "Colored", x: 0, y: 0, width: 200, height: 120, color: "2" };
+    const edgesFromColored = connectOneToMany(coloredCard, [target1, target2], []);
+    expect(edgesFromColored.every((e) => e.color === "2")).toBe(true);
   });
 });
 

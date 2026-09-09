@@ -669,10 +669,14 @@ export const CANVAS_RELATION_PRESETS = [
 /**
  * Automatically computes best attachment sides between two nodes based on relative coordinates.
  * Priority rules:
- * 1. Horizontal band (overlap in Y + horizontal gap): right/left routing.
- * 2. Vertical band (overlap in X + vertical gap): top/bottom routing.
- * 3. Both-axis gap: vertical routing when gapY >= gapX (top-bottom layouts win over diagonal).
- * 4. Overlapping: fall back to center-delta direction.
+ * 1. Horizontal band (overlap in Y + horizontal gap): clearly side-by-side -> right/left routing.
+ * 2. Vertical band (overlap in X + vertical gap): clearly stacked -> bottom/top routing.
+ * 3. Clear vertical separation (gapY > 0):
+ *    In multi-tier / multi-row layouts, architectures, and trees, connections between tiers
+ *    must always route bottom -> top or top -> bottom, even for outermost cards where horizontal
+ *    span (gapX) across the canvas is wide.
+ * 4. Horizontal gap (gapX > 0, gapY <= 0): left/right routing.
+ * 5. Overlapping nodes: fall back to center-delta direction.
  */
 export function getOptimalAnchorSides(
   fromNode: CanvasNode,
@@ -697,36 +701,46 @@ export function getOptimalAnchorSides(
   const overlapX = Math.max(0, Math.min(fromRight, toRight) - Math.max(fromNode.x, toNode.x));
   const overlapY = Math.max(0, Math.min(fromBottom, toBottom) - Math.max(fromNode.y, toNode.y));
 
-  // 1. Nodes share a horizontal band (overlap in Y) and horizontal gap dominates: use left/right routing
-  if (overlapY > 0 && gapX > 0 && gapX > gapY) {
+  // 1. Nodes share a horizontal band (overlap in Y) and horizontal gap exists:
+  //    Cards in the same row/container connecting side-by-side.
+  if (overlapY > 0 && gapX > 0) {
     return dx >= 0
       ? { fromSide: "right", toSide: "left" }
       : { fromSide: "left", toSide: "right" };
   }
 
-  // 2. Nodes share a vertical band (overlap in X) and have vertical gap: use top/bottom routing
+  // 2. Nodes share a vertical band (overlap in X) and vertical gap exists:
+  //    Cards in the same column connecting vertically.
   if (overlapX > 0 && gapY > 0) {
     return dy >= 0
       ? { fromSide: "bottom", toSide: "top" }
       : { fromSide: "top", toSide: "bottom" };
   }
 
-  // 3. Clear separation in one or both axes:
-  //    Vertical routing when gapY >= gapX (top-bottom layouts win, including diagonals where vertical is ≥ horizontal).
-  //    Horizontal only when gapX strictly dominates.
-  if (gapX > 0 || gapY > 0) {
-    if (gapY >= gapX) {
-      return dy >= 0
-        ? { fromSide: "bottom", toSide: "top" }
-        : { fromSide: "top", toSide: "bottom" };
-    } else {
+  // 3. Clear vertical separation (one node is above the other, gapY > 0):
+  //    In top-down / bottom-up architectures, multi-row layouts, and tree structures,
+  //    connections between tiers must always route bottom -> top or top -> bottom,
+  //    even for outermost cards where horizontal distance is wide.
+  if (gapY > 0) {
+    // Only if vertical gap is negligible (< 40px) AND horizontal gap is overwhelmingly dominant (> 3x):
+    if (gapY < 40 && gapX > gapY * 3) {
       return dx >= 0
         ? { fromSide: "right", toSide: "left" }
         : { fromSide: "left", toSide: "right" };
     }
+    return dy >= 0
+      ? { fromSide: "bottom", toSide: "top" }
+      : { fromSide: "top", toSide: "bottom" };
   }
 
-  // 4. Overlapping nodes (no gap in either direction) → use center-delta direction
+  // 4. Nodes have horizontal gap (no vertical gap):
+  if (gapX > 0) {
+    return dx >= 0
+      ? { fromSide: "right", toSide: "left" }
+      : { fromSide: "left", toSide: "right" };
+  }
+
+  // 5. Overlapping nodes (no gap in either direction) → use center-delta direction
   if (Math.abs(dx) >= Math.abs(dy)) {
     return dx >= 0
       ? { fromSide: "right", toSide: "left" }
@@ -739,17 +753,52 @@ export function getOptimalAnchorSides(
 }
 
 /**
- * Returns the next auto-cycling color key for new edges from a given source node.
- * Cycles through CANVAS_COLOR_PALETTES keys ("1"..."6") based on how many outgoing
- * edges the source already has, so each successive connection gets a distinct color.
+ * Determines the consistent edge color for a given source node.
+ * Rules:
+ * 1. If the node has an explicit color assigned (node.color), use it.
+ * 2. If the node already has existing outgoing edges, reuse that edge's color
+ *    so all lines from the same card / anchor stay strictly identical in color.
+ * 3. If it is a new source node, automatically assign the next palette color
+ *    based on the number of distinct source nodes already connected, so different
+ *    cards in the same container/canvas are clearly distinguished.
+ */
+export function getSourceNodeEdgeColor(
+  source: CanvasNode | string,
+  existingEdges: CanvasEdge[]
+): string {
+  const sourceId = typeof source === "string" ? source : source.id;
+  const explicitColor = typeof source !== "string" ? source.color : undefined;
+
+  // 1. Explicit node color
+  if (explicitColor && CANVAS_COLOR_PALETTES[explicitColor]) {
+    return explicitColor;
+  }
+
+  // 2. Existing outgoing edge from same source node -> maintain identical color
+  const existingEdge = existingEdges.find(
+    (e) => e.fromNode === sourceId && e.color && CANVAS_COLOR_PALETTES[e.color]
+  );
+  if (existingEdge && existingEdge.color) {
+    return existingEdge.color;
+  }
+
+  // 3. New source node -> pick a distinct color based on other source nodes
+  const paletteKeys = Object.keys(CANVAS_COLOR_PALETTES);
+  const otherSources = Array.from(
+    new Set(existingEdges.map((e) => e.fromNode).filter((id) => id && id !== sourceId))
+  );
+  return paletteKeys[otherSources.length % paletteKeys.length];
+}
+
+/**
+ * Returns the next edge color for a source node, ensuring all outgoing lines from
+ * the same card share the same color while different source cards get different colors.
  */
 export function getNextEdgeColorForSource(
   sourceNodeId: string,
   existingEdges: CanvasEdge[]
 ): string {
-  const paletteKeys = Object.keys(CANVAS_COLOR_PALETTES);
-  const outgoingCount = existingEdges.filter((e) => e.fromNode === sourceNodeId).length;
-  return paletteKeys[outgoingCount % paletteKeys.length];
+  return getSourceNodeEdgeColor(sourceNodeId, existingEdges);
 }
 
 /**
@@ -828,7 +877,8 @@ export function connectOneToMany(
   existingEdges: CanvasEdge[],
   style: CanvasEdgeLineStyle = "bezier"
 ): CanvasEdge[] {
-  const paletteKeys = Object.keys(CANVAS_COLOR_PALETTES);
+  // All lines originating from the same card share the identical color
+  const edgeColor = getSourceNodeEdgeColor(rootNode, existingEdges);
   const newEdges: CanvasEdge[] = [];
   for (const target of targetNodes) {
     if (target.id === rootNode.id) continue;
@@ -844,12 +894,8 @@ export function connectOneToMany(
           (e.fromNode === target.id && e.toNode === rootNode.id)
       );
     if (!exists) {
-      // Auto-cycle color: count existing + already-queued outgoing edges from rootNode
-      const outgoingCount =
-        existingEdges.filter((e) => e.fromNode === rootNode.id).length + newEdges.length;
-      const color = paletteKeys[outgoingCount % paletteKeys.length];
       const edge = createEdgeBetweenNodes(rootNode, target, undefined, style);
-      newEdges.push({ ...edge, color });
+      newEdges.push({ ...edge, color: edgeColor });
     }
   }
   return newEdges;
