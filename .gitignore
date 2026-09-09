@@ -3,6 +3,8 @@
 
 # Build and release outputs
 /dist
+/web/dist
+/web/node_modules
 /release/*
 !/release/KnowSpace-win-x64
 /release/KnowSpace-win-x64/*

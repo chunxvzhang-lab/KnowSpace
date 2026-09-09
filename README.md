@@ -50,7 +50,7 @@
 
 ## 🏛️ 核心能力体系
 
-- **🎨 Infinite Canvas（无限空间可视化白板 · 兼容 JSON Canvas 1.0）**：标准开放的二维空间思维白板（`Ctrl+Shift+C`），**多模态卡片自由挂载**（富文本 Markdown、嵌入文档预览、逻辑分组容器），**高精度 4 锚点几何中心对齐与贝塞尔/正交折线/直线矢量连线**，支持**折线手柄平移拖拽**、**防冲天平滑曲线**、**上下分层垂直优先路由**、**单卡片连线颜色一致与集群自动调色**、**连线多选与底部批量工具栏**、**多选卡片一键断开连线**；配备右下角缩略雷达小地图与全景聚焦控制；**独创画布逆向拓扑萃取长文算法**，一键将白板因果关系逆向萃取为逻辑严密的 Markdown 专著。
+- **🎨 Infinite Canvas（无限空间可视化白板 · 兼容 JSON Canvas 1.0）**：标准开放的二维空间思维白板（`Ctrl+Shift+C`），**多模态卡片自由挂载**（富文本 Markdown、嵌入文档预览、逻辑分组容器），**高精度 4 锚点几何中心对齐与贝塞尔/正交折线/直线矢量连线**，支持**折线手柄平移拖拽**、**防冲天平滑曲线**、**上下分层垂直优先路由**、**同卡片连线颜色一致与容器内多卡片自动智能调色**、**连线多选与底部批量工具栏**、**多选卡片一键断开连线**、**批量水平/垂直对齐与等距分布**；配备右下角缩略雷达小地图与全景聚焦控制；**独创画布逆向拓扑萃取长文算法**，一键将白板因果关系逆向萃取为逻辑严密的 Markdown 专著。
 - **⏳ Local Version History（本地时间旅行与版本快照历史）**：运行在本地知识库根目录隐藏空间（`.knowspace/snapshots/`）的无感版本防丢卫士（`Ctrl+Shift+H`），**30秒去抖静默捕获与 SHA-256 哈希去重**，配备直观版本时间轴；**左右双栏 Side-by-Side 与统一 Unified 视图**，Myers LCS 逐行与行内字符微粒度高亮，**一键无损安全还原与手动里程碑快照**。
 - **🔍 Hybrid Vault Search（全库毫秒级混合检索引擎）**：全新文档级与段落级倒排索引（Inverted Index），万篇笔记键盘键入即刻（< 15ms）出结果。**深度支持结构化检索语法**：`tag:#架构`、`link:[[分布式协议]]`、`"严格短语"`、`-排除词`、时间范围过滤，提供「当前章节」与「全库检索」一键无缝切换、语法快捷辅助芯片与物理行微光脉冲联动。
 - **🎯 Command Palette & Quick Switcher（全能全局命令中枢）**：全局随时按下 `Ctrl+K`（或编辑区直接穿透触发），支持三模合一：**默认快速切换（MRU 访问历史、标题/路径/别名智能模糊过滤）**、**动作执行模式（`>` 前缀检索并执行系统功能，如主题切换、新建笔记、导出等）**、**大纲直达模式（`#` 前缀实时大纲小节检索，Enter 秒级跳入目标段落）**。
@@ -297,9 +297,9 @@
   - **防冲天平滑贝塞尔曲线 (`bezier`)**：自适应动态约束控制点伸展幅度（$\le \text{gap} \times 0.55$），彻底根治微距或对角线连接时的曲线上突“冲天”或超大倒扣；
   - **正交折线拐点手柄拖拽 (`step`)**：单选直角折线时在弯折段正中渲染专属调整手柄（`.canvas-step-bend-handle`），按住鼠标拖拽即可沿法向实时平移弯折位置（`stepOffset`），双击手柄快速复位至几何中位线；
   - **笔直直线 (`straight`)**：简洁有力的最短路径直连。
-- **🎨 同一卡片同一起点线条颜色一致与多卡片自动智能调色**：
+- **🎨 同一卡片同一起点线条颜色一致与容器内多卡片自动智能调色**：
   - **同卡同色**：同一卡片/同一起点发出的所有连线自动保持完全一致的色彩；若卡片设置了专属颜色（`node.color`），其所有出向连线自动继承卡片主题色；
-  - **自动多色轮换**：容器内或画布上不同卡片发起连线时，系统自动循环分配不同的调色板颜色（红、橙、黄、绿、青、紫），多集群连线清晰鲜明、主次分明。
+  - **容器智能互斥多色**：当同一分组容器内有两个或两个以上卡片发起连接线时，系统自动识别同容器兄弟卡片，自动将连线变为互不相同的调色板色彩（红、橙、黄、绿、青、紫），多集群连线清晰鲜明、容器内外主次分明。
 - **🔲 连线批量多选与底部批量操作工具栏 (Multi-Edge Selection & Batch Toolbar)**：
   - 支持按住 `Shift` / `Ctrl` 多选连线、画布鼠标框选批量选定连线；
   - 底部弹出专属浮动批量修改工具栏（`.canvas-edge-batch-toolbar`），支持一键批量修改 6 种色彩、箭头端点（单向/双向/无箭头）、线型（贝塞尔/折线/直线）、描边虚实形态（实线/虚线/点线）、反转流向与一键批量删除。
@@ -314,7 +314,7 @@
   </p>
   - **空白画布**：新建各类卡片、**从剪贴板一键粘贴卡片 (`Ctrl+V`)**（自动读取剪贴板纯文本在光标处生成卡片）、适应画布 (`Shift+1`)、重置缩放 100% (`Ctrl+0`)、对齐网格（吸附至 20px 网格）、小地图与网格形态切换；
   - **单张卡片**：Markdown 编辑、复制文本、**复制双链引用 (`[[标题]]`)**、**提取为独立知识库笔记**、**重置为默认尺寸**、图层上下移与 6 色调色板；
-  - **多选节点**：**一键断开所选卡片间连线**、**一键打包为分组容器 (`Ctrl+G`)**（智能计算边界包围盒）、智能对齐（左对齐、居中对齐、顶端对齐）与**水平等距分布**；
+  - **多选节点**：**一键断开所选卡片间连线**、**一键打包为分组容器 (`Ctrl+G`)**（智能计算边界包围盒）、**批量水平对齐与垂直对齐**、**左对齐、水平居中、右对齐、顶端对齐、底端对齐**与**水平/垂直等距分布**；
   - **分组容器**：重命名容器、**一键全选内部所有卡片**、**自适应紧凑包围内容**（智能收缩留白 24px）、**解散分组**（仅删容器保留内部卡片）。
 - **🔭 缩略雷达小地图 (Minimap)**：右下角常驻全局缩略雷达，实时呈现微缩卡片分布与高亮视口框，支持点击视框极速导航。
 - **📝 画布逆向拓扑萃取长文算法 (Canvas-to-Article)**：独创拓扑因果萃取算法，根据卡片空间坐标与有向箭头依赖关系智能构建因果链路，一键萃取生成章节完备、引用严谨的独立 Markdown 专著。
@@ -447,9 +447,9 @@
   - *Multimodal Cards & Geometric Alignment*: Markdown text nodes, embedded document nodes with live scrolling, and grouping containers. 4-side anchors align strictly to the exact geometric midpoints of card borders.
   - *Vertical Tier Routing Dominance*: Smart routing algorithm prioritizes top/bottom vertical alignment for multi-tier and cross-container layouts even when connecting to outermost cards across wide horizontal spans.
   - *Advanced Curve Dynamics & Orthogonal Dragging*: Anti-skyrocketing cubic bezier curves (bounded to $\le \text{gap} \times 0.55$) eliminate extreme arches; orthogonal step lines feature an interactive midpoint bend handle (`stepOffset`) with double-click reset.
-  - *Consistent Edge Colors & Auto-Cycling*: All outgoing lines from the same card/starting point share an identical color (inheriting node color if set), while different cards automatically cycle through distinct palette colors.
+  - *Consistent Edge Colors & Container Multi-Card Auto-Differentiation*: All outgoing lines from the same card/starting point share an identical color (inheriting node color if set); when two or more cards within the same container initiate outgoing connection lines, distinct palette colors are automatically assigned to each card.
   - *Multi-Edge Selection & Batch Operations*: Marquee select or Shift/Ctrl-click edges to reveal a floating batch toolbar for changing colors, markers, line styles, stroke patterns (solid/dashed/dotted), and bulk deletion.
-  - *Disconnect Selected Cards*: Context menu option to disconnect internal edges among selected cards while preserving external links.
+  - *Disconnect Selected Cards & Alignment Tools*: Context menu options to disconnect internal edges among selected cards while preserving external links, and comprehensive alignment tools including Horizontal Alignment, Vertical Alignment, Left/Center/Right, Top/Bottom, and Equal Distribution.
   - *Minimap Radar & Reverse Longform Extraction*: Persistent minimap navigation with viewport indicator; one-click algorithmic reverse extraction transforms canvas spatial causality topology into a structured Markdown article!
 - **⏳ Local Version History & Side-by-Side Diff (`Ctrl + Shift + H`)**:
   - *Silent Snapshot Engine*: Maintains local version history in `.knowspace/snapshots/` with 30s debounce, SHA-256 deduplication, and automatic pruning (latest 50 versions).

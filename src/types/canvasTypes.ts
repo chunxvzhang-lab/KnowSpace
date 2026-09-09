@@ -47,6 +47,8 @@ export interface CanvasGroupNode extends CanvasNodeBase {
 
 export type CanvasNode = CanvasTextNode | CanvasFileNode | CanvasLinkNode | CanvasGroupNode;
 
+export type CanvasEdgeStrokePattern = "solid" | "dashed" | "dotted";
+
 export interface CanvasEdge {
   id: string;
   fromNode: string;
@@ -59,7 +61,7 @@ export interface CanvasEdge {
   label?: string;
   style?: CanvasEdgeLineStyle;
   labelShape?: CanvasEdgeLabelShape;
-  strokePattern?: "solid" | "dashed" | "dotted";
+  strokePattern?: CanvasEdgeStrokePattern;
   stepOffset?: number;
 }
 

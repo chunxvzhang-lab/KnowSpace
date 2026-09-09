@@ -637,6 +637,21 @@ export function getNodesInsideGroup(nodes: CanvasNode[], group: CanvasGroupNode)
 }
 
 /**
+ * Finds the immediate parent container (group) for a given node.
+ * If nested in multiple groups, returns the innermost (smallest area) container.
+ */
+export function findContainerForNode(
+  node: CanvasNode,
+  allNodes: CanvasNode[]
+): CanvasGroupNode | undefined {
+  if (node.type === "group") return undefined;
+  const groups = allNodes.filter((n): n is CanvasGroupNode => n.type === "group");
+  const containing = groups.filter((g) => isNodeInsideGroup(node, g));
+  if (containing.length === 0) return undefined;
+  return containing.sort((a, b) => a.width * a.height - b.width * b.height)[0];
+}
+
+/**
  * Toggles a checkbox (- [ ] <-> - [x]) at a given match index in a markdown string
  */
 export function toggleChecklistInMarkdown(text: string, checkboxIndex: number): string {
@@ -764,11 +779,66 @@ export function getOptimalAnchorSides(
  */
 export function getSourceNodeEdgeColor(
   source: CanvasNode | string,
-  existingEdges: CanvasEdge[]
+  existingEdges: CanvasEdge[],
+  allNodes?: CanvasNode[]
 ): string {
   const sourceId = typeof source === "string" ? source : source.id;
-  const explicitColor = typeof source !== "string" ? source.color : undefined;
+  const sourceNode =
+    typeof source !== "string"
+      ? source
+      : allNodes?.find((n) => n.id === sourceId);
+  const explicitColor = sourceNode?.color;
+  const paletteKeys = Object.keys(CANVAS_COLOR_PALETTES);
 
+  // When allNodes is available and source belongs to a container (group):
+  // Ensure that 2 or more cards within the same container initiating edges automatically get distinct colors!
+  if (sourceNode && allNodes && allNodes.length > 0) {
+    const container = findContainerForNode(sourceNode, allNodes);
+    if (container) {
+      const siblingCards = allNodes.filter(
+        (n) => n.id !== container.id && n.type !== "group" && isNodeInsideGroup(n, container)
+      );
+      const otherSiblings = siblingCards.filter((s) => s.id !== sourceId);
+
+      // Collect all colors used by outgoing edges from other sibling cards in this container
+      const usedSiblingColors = new Set<string>();
+      for (const sib of otherSiblings) {
+        const outgoingEdges = existingEdges.filter(
+          (e) => e.fromNode === sib.id && e.color && CANVAS_COLOR_PALETTES[e.color]
+        );
+        for (const edge of outgoingEdges) {
+          if (edge.color) usedSiblingColors.add(edge.color);
+        }
+      }
+
+      // 1. If this card already has an outgoing edge and its color is distinct from other siblings, maintain it
+      const existingEdge = existingEdges.find(
+        (e) => e.fromNode === sourceId && e.color && CANVAS_COLOR_PALETTES[e.color]
+      );
+      if (existingEdge && existingEdge.color && !usedSiblingColors.has(existingEdge.color)) {
+        return existingEdge.color;
+      }
+
+      // 2. If this card has an explicit color and it is not already taken by another sibling, use it
+      if (explicitColor && CANVAS_COLOR_PALETTES[explicitColor] && !usedSiblingColors.has(explicitColor)) {
+        return explicitColor;
+      }
+
+      // 3. Automatically assign the first palette color not used by any other sibling card in this container
+      const availableColor = paletteKeys.find((k) => !usedSiblingColors.has(k));
+      if (availableColor) {
+        return availableColor;
+      }
+
+      // 4. Fallback if palette colors (>6) are exhausted: cycle among siblings with outgoing edges
+      const otherActiveSiblings = otherSiblings.filter((s) =>
+        existingEdges.some((e) => e.fromNode === s.id)
+      );
+      return paletteKeys[otherActiveSiblings.length % paletteKeys.length];
+    }
+  }
+
+  // Non-container / standard source coloring:
   // 1. Explicit node color
   if (explicitColor && CANVAS_COLOR_PALETTES[explicitColor]) {
     return explicitColor;
@@ -783,7 +853,6 @@ export function getSourceNodeEdgeColor(
   }
 
   // 3. New source node -> pick a distinct color based on other source nodes
-  const paletteKeys = Object.keys(CANVAS_COLOR_PALETTES);
   const otherSources = Array.from(
     new Set(existingEdges.map((e) => e.fromNode).filter((id) => id && id !== sourceId))
   );
@@ -796,9 +865,10 @@ export function getSourceNodeEdgeColor(
  */
 export function getNextEdgeColorForSource(
   sourceNodeId: string,
-  existingEdges: CanvasEdge[]
+  existingEdges: CanvasEdge[],
+  allNodes?: CanvasNode[]
 ): string {
-  return getSourceNodeEdgeColor(sourceNodeId, existingEdges);
+  return getSourceNodeEdgeColor(sourceNodeId, existingEdges, allNodes);
 }
 
 /**
@@ -875,10 +945,11 @@ export function connectOneToMany(
   rootNode: CanvasNode,
   targetNodes: CanvasNode[],
   existingEdges: CanvasEdge[],
-  style: CanvasEdgeLineStyle = "bezier"
+  style: CanvasEdgeLineStyle = "bezier",
+  allNodes?: CanvasNode[]
 ): CanvasEdge[] {
   // All lines originating from the same card share the identical color
-  const edgeColor = getSourceNodeEdgeColor(rootNode, existingEdges);
+  const edgeColor = getSourceNodeEdgeColor(rootNode, existingEdges, allNodes);
   const newEdges: CanvasEdge[] = [];
   for (const target of targetNodes) {
     if (target.id === rootNode.id) continue;
@@ -910,7 +981,8 @@ export function connectChainNodes(
   nodes: CanvasNode[],
   existingEdges: CanvasEdge[],
   style: CanvasEdgeLineStyle = "bezier",
-  spatiallySort: boolean = true
+  spatiallySort: boolean = true,
+  allNodes?: CanvasNode[]
 ): CanvasEdge[] {
   if (nodes.length < 2) return [];
   const orderedNodes = spatiallySort
@@ -938,7 +1010,9 @@ export function connectChainNodes(
           (e.fromNode === to.id && e.toNode === from.id)
       );
     if (!exists) {
-      newEdges.push(createEdgeBetweenNodes(from, to, undefined, style));
+      const edge = createEdgeBetweenNodes(from, to, undefined, style);
+      const edgeColor = getSourceNodeEdgeColor(from, [...existingEdges, ...newEdges], allNodes || nodes);
+      newEdges.push({ ...edge, color: edgeColor });
     }
   }
   return newEdges;
@@ -955,9 +1029,10 @@ export function connectLoopNodes(
   nodes: CanvasNode[],
   existingEdges: CanvasEdge[],
   style: CanvasEdgeLineStyle = "bezier",
-  spatiallySort: boolean = true
+  spatiallySort: boolean = true,
+  allNodes?: CanvasNode[]
 ): CanvasEdge[] {
-  if (nodes.length < 3) return connectChainNodes(nodes, existingEdges, style, spatiallySort);
+  if (nodes.length < 3) return connectChainNodes(nodes, existingEdges, style, spatiallySort, allNodes);
 
   const cx = nodes.reduce((sum, n) => sum + (n.x + n.width / 2), 0) / nodes.length;
   const cy = nodes.reduce((sum, n) => sum + (n.y + n.height / 2), 0) / nodes.length;
@@ -1059,12 +1134,14 @@ export function connectLoopNodes(
 
       usedIncomingSides.set(to.id, toSide);
 
+      const edgeColor = getSourceNodeEdgeColor(from, [...existingEdges, ...newEdges], allNodes || nodes);
       newEdges.push({
         id: `edge-${Date.now()}-${Math.random().toString(36).slice(2, 6)}-${i + 1}`,
         fromNode: from.id,
         fromSide,
         toNode: to.id,
         toSide,
+        color: edgeColor,
         style,
       });
     }
@@ -1586,5 +1663,125 @@ export async function copyCanvasImageToClipboard(
     console.error("复制白板图片至剪贴板失败:", err);
     return false;
   }
+}
+
+/**
+ * Alignment directions for batch-selected canvas cards
+ */
+export type CanvasAlignDirection =
+  | "horizontal" // 水平对齐 (沿水平中线对齐，所有卡片 Y 居中齐平)
+  | "vertical" // 垂直对齐 (沿垂直中线对齐，所有卡片 X 居中齐平)
+  | "left" // 左对齐
+  | "center" // 水平居中
+  | "right" // 右对齐
+  | "top" // 顶端对齐
+  | "middle" // 垂直居中
+  | "bottom" // 底端对齐
+  | "distribute-h" // 水平等距分布
+  | "distribute-v"; // 垂直等距分布
+
+/**
+ * Aligns or distributes selected nodes along the specified direction
+ */
+export function alignNodes(
+  allNodes: CanvasNode[],
+  selectedNodeIds: Set<string> | string[],
+  direction: CanvasAlignDirection
+): CanvasNode[] {
+  const selSet = selectedNodeIds instanceof Set ? selectedNodeIds : new Set(selectedNodeIds);
+  const selNodes = allNodes.filter((n) => selSet.has(n.id));
+  if (selNodes.length < 2) return allNodes;
+
+  if (direction === "horizontal" || direction === "middle") {
+    const minY = Math.min(...selNodes.map((n) => n.y));
+    const maxY = Math.max(...selNodes.map((n) => n.y + n.height));
+    const centerY = minY + (maxY - minY) / 2;
+    return allNodes.map((n) =>
+      selSet.has(n.id) ? { ...n, y: Math.round(centerY - n.height / 2) } : n
+    );
+  }
+
+  if (direction === "vertical" || direction === "center") {
+    const minX = Math.min(...selNodes.map((n) => n.x));
+    const maxX = Math.max(...selNodes.map((n) => n.x + n.width));
+    const centerX = minX + (maxX - minX) / 2;
+    return allNodes.map((n) =>
+      selSet.has(n.id) ? { ...n, x: Math.round(centerX - n.width / 2) } : n
+    );
+  }
+
+  if (direction === "left") {
+    const minX = Math.min(...selNodes.map((n) => n.x));
+    return allNodes.map((n) =>
+      selSet.has(n.id) ? { ...n, x: minX } : n
+    );
+  }
+
+  if (direction === "right") {
+    const maxX = Math.max(...selNodes.map((n) => n.x + n.width));
+    return allNodes.map((n) =>
+      selSet.has(n.id) ? { ...n, x: maxX - n.width } : n
+    );
+  }
+
+  if (direction === "top") {
+    const minY = Math.min(...selNodes.map((n) => n.y));
+    return allNodes.map((n) =>
+      selSet.has(n.id) ? { ...n, y: minY } : n
+    );
+  }
+
+  if (direction === "bottom") {
+    const maxY = Math.max(...selNodes.map((n) => n.y + n.height));
+    return allNodes.map((n) =>
+      selSet.has(n.id) ? { ...n, y: maxY - n.height } : n
+    );
+  }
+
+  if (direction === "distribute-h") {
+    if (selNodes.length < 3) return allNodes;
+    const sorted = [...selNodes].sort((a, b) => a.x - b.x);
+    const first = sorted[0];
+    const last = sorted[sorted.length - 1];
+    const totalCardsWidth = sorted.reduce((sum, n) => sum + n.width, 0);
+    const totalSpan = last.x + last.width - first.x;
+    const availableGap = totalSpan - totalCardsWidth;
+    const gap = Math.max(20, Math.round(availableGap / (sorted.length - 1)));
+
+    const newXMap = new Map<string, number>();
+    let curX = first.x;
+    for (let i = 0; i < sorted.length; i++) {
+      newXMap.set(sorted[i].id, curX);
+      curX += sorted[i].width + gap;
+    }
+
+    return allNodes.map((n) =>
+      newXMap.has(n.id) ? { ...n, x: newXMap.get(n.id)! } : n
+    );
+  }
+
+  if (direction === "distribute-v") {
+    if (selNodes.length < 3) return allNodes;
+    const sorted = [...selNodes].sort((a, b) => a.y - b.y);
+    const first = sorted[0];
+    const last = sorted[sorted.length - 1];
+    const totalCardsHeight = sorted.reduce((sum, n) => sum + n.height, 0);
+    const totalSpan = last.y + last.height - first.y;
+    const availableGap = totalSpan - totalCardsHeight;
+    const gap = Math.max(20, Math.round(availableGap / (sorted.length - 1)));
+
+    const newYMap = new Map<string, number>();
+    let curY = first.y;
+    for (let i = 0; i < sorted.length; i++) {
+      newYMap.set(sorted[i].id, curY);
+      curY += sorted[i].height + gap;
+    }
+
+    return allNodes.map((n) =>
+      newYMap.has(n.id) ? { ...n, y: newYMap.get(n.id)! } : n
+    );
+  }
+
+  return allNodes;
 }
 

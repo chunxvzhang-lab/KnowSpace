@@ -38,6 +38,7 @@ import {
   Minimize2,
   AlignCenter,
   AlignHorizontalJustifyCenter,
+  AlignVerticalJustifyCenter,
   FilePlus,
   Share2,
   Unlink,
@@ -86,6 +87,8 @@ import {
   getSourceNodeEdgeColor,
   downloadCanvasAsImage,
   copyCanvasImageToClipboard,
+  CanvasAlignDirection,
+  alignNodes,
 } from "../services/canvasService";
 import { renderCardMarkdown } from "../services/markdown";
 
@@ -1351,7 +1354,7 @@ export const CanvasView = memo(function CanvasView({
     if (selectedNodes.length < 2) return;
 
     // Use spatially sorted chain connection to prevent criss-crossing dead knots
-    const newEdges = connectChainNodes(selectedNodes, currentData.edges, "bezier", true);
+    const newEdges = connectChainNodes(selectedNodes, currentData.edges, "bezier", true, currentData.nodes);
 
     if (newEdges.length > 0) {
       pushHistory({
@@ -1394,7 +1397,7 @@ export const CanvasView = memo(function CanvasView({
       if (!rootNode) return;
 
       const targetNodes = selectedNodes.filter((n) => n.id !== rootNode!.id);
-      const newEdges = connectOneToMany(rootNode, targetNodes, currentData.edges);
+      const newEdges = connectOneToMany(rootNode, targetNodes, currentData.edges, "bezier", currentData.nodes);
 
       if (newEdges.length > 0) {
         pushHistory({
@@ -1425,7 +1428,7 @@ export const CanvasView = memo(function CanvasView({
       return;
     }
 
-    const newEdges = connectLoopNodes(selectedNodes, currentData.edges, "bezier", true);
+    const newEdges = connectLoopNodes(selectedNodes, currentData.edges, "bezier", true, currentData.nodes);
 
     if (newEdges.length > 0) {
       pushHistory({
@@ -1512,61 +1515,29 @@ export const CanvasView = memo(function CanvasView({
   );
 
   const handleAlignSelected = useCallback(
-    (direction: "left" | "center" | "top" | "distribute-h") => {
+    (direction: CanvasAlignDirection) => {
       if (!editable || selectedNodeIds.size < 2) return;
       const currentData = latestDataRef.current;
       const selNodes = currentData.nodes.filter((n) => selectedNodeIds.has(n.id));
       if (selNodes.length < 2) return;
 
-      let updatedNodes: CanvasNode[] = [];
+      const updatedNodes = alignNodes(currentData.nodes, selectedNodeIds, direction);
 
-      if (direction === "left") {
-        const minX = Math.min(...selNodes.map((n) => n.x));
-        updatedNodes = currentData.nodes.map((n) =>
-          selectedNodeIds.has(n.id) ? { ...n, x: minX } : n
-        );
-        showToast("所选卡片已左对齐");
-      } else if (direction === "center") {
-        const minX = Math.min(...selNodes.map((n) => n.x));
-        const maxX = Math.max(...selNodes.map((n) => n.x + n.width));
-        const centerX = minX + (maxX - minX) / 2;
-        updatedNodes = currentData.nodes.map((n) =>
-          selectedNodeIds.has(n.id) ? { ...n, x: Math.round(centerX - n.width / 2) } : n
-        );
-        showToast("所选卡片已水平居中");
-      } else if (direction === "top") {
-        const minY = Math.min(...selNodes.map((n) => n.y));
-        updatedNodes = currentData.nodes.map((n) =>
-          selectedNodeIds.has(n.id) ? { ...n, y: minY } : n
-        );
-        showToast("所选卡片已顶对齐");
-      } else if (direction === "distribute-h") {
-        if (selNodes.length >= 3) {
-          const sorted = [...selNodes].sort((a, b) => a.x - b.x);
-          const first = sorted[0];
-          const last = sorted[sorted.length - 1];
-          const totalCardsWidth = sorted.reduce((sum, n) => sum + n.width, 0);
-          const totalSpan = last.x + last.width - first.x;
-          const availableGap = totalSpan - totalCardsWidth;
-          const gap = Math.max(20, Math.round(availableGap / (sorted.length - 1)));
-
-          const newXMap = new Map<string, number>();
-          let curX = first.x;
-          for (let i = 0; i < sorted.length; i++) {
-            newXMap.set(sorted[i].id, curX);
-            curX += sorted[i].width + gap;
-          }
-
-          updatedNodes = currentData.nodes.map((n) =>
-            newXMap.has(n.id) ? { ...n, x: newXMap.get(n.id)! } : n
-          );
-          showToast("所选卡片已水平等距分布");
-        } else {
-          return;
-        }
-      }
+      const toastMap: Record<CanvasAlignDirection, string> = {
+        horizontal: "所选卡片已水平对齐",
+        vertical: "所选卡片已垂直对齐",
+        left: "所选卡片已左对齐",
+        center: "所选卡片已水平居中",
+        right: "所选卡片已右对齐",
+        top: "所选卡片已顶端对齐",
+        middle: "所选卡片已垂直居中",
+        bottom: "所选卡片已底端对齐",
+        "distribute-h": "所选卡片已水平等距分布",
+        "distribute-v": "所选卡片已垂直等距分布",
+      };
 
       pushHistory({ ...currentData, nodes: updatedNodes });
+      showToast(toastMap[direction] || "所选卡片已对齐");
       setContextMenu(null);
     },
     [editable, selectedNodeIds, pushHistory, showToast]
@@ -2125,21 +2096,42 @@ export const CanvasView = memo(function CanvasView({
   const handleAnchorMouseUp = (e: React.MouseEvent, targetNodeId: string, targetSide: CanvasNodeSide) => {
     if (!connectingState || connectingState.fromNodeId === targetNodeId) return;
     e.stopPropagation();
-    const newEdge: CanvasEdge = {
-      id: `edge-${Date.now()}`,
-      fromNode: connectingState.fromNodeId,
-      fromSide: connectingState.fromSide,
-      fromEnd: "none",
-      toNode: targetNodeId,
-      toSide: targetSide,
-      toEnd: "arrow",
-      color: "5",
-      style: "bezier",
-    };
-    pushHistory({
-      ...data,
-      edges: [...data.edges, newEdge],
-    });
+
+    const currentData = latestDataRef.current;
+    const fromNode = currentData.nodes.find((n) => n.id === connectingState.fromNodeId);
+    const targetNode = currentData.nodes.find((n) => n.id === targetNodeId);
+    if (!fromNode || !targetNode) {
+      setConnectingState(null);
+      return;
+    }
+
+    const exists = currentData.edges.some(
+      (ed) =>
+        (ed.fromNode === fromNode.id && ed.toNode === targetNode.id) ||
+        (ed.fromNode === targetNode.id && ed.toNode === fromNode.id)
+    );
+
+    if (!exists) {
+      const edgeColor = getSourceNodeEdgeColor(fromNode, currentData.edges, currentData.nodes);
+      const newEdge: CanvasEdge = {
+        id: `edge-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        fromNode: fromNode.id,
+        fromSide: connectingState.fromSide,
+        fromEnd: "none",
+        toNode: targetNode.id,
+        toSide: targetSide,
+        toEnd: "arrow",
+        color: edgeColor,
+        style: "bezier",
+      };
+      pushHistory({
+        ...currentData,
+        edges: [...currentData.edges, newEdge],
+      });
+      showToast("已建立卡片关联");
+    } else {
+      showToast("两张卡片之间已存在关联连线");
+    }
     setConnectingState(null);
   };
 
@@ -2166,7 +2158,7 @@ export const CanvasView = memo(function CanvasView({
       );
 
       if (!exists) {
-        const edgeColor = getSourceNodeEdgeColor(fromNode, currentData.edges);
+        const edgeColor = getSourceNodeEdgeColor(fromNode, currentData.edges, currentData.nodes);
         const newEdge: CanvasEdge = {
           id: `edge-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
           fromNode: fromNode.id,
@@ -2964,6 +2956,36 @@ export const CanvasView = memo(function CanvasView({
                 <span className="canvas-btn-label">环形闭环</span>
               </button>
             )}
+            <button
+              className="canvas-tool-btn"
+              onClick={() => handleAlignSelected("horizontal")}
+              title="将选中的卡片沿水平中线对齐"
+              style={{
+                ...toolBtnStyle(theme, colors),
+                backgroundColor: "rgba(2, 132, 199, 0.12)",
+                color: "#0284c7",
+                border: "1px solid rgba(2, 132, 199, 0.25)",
+                fontWeight: 600,
+              }}
+            >
+              <AlignJustify size={13} />
+              <span className="canvas-btn-label">水平对齐</span>
+            </button>
+            <button
+              className="canvas-tool-btn"
+              onClick={() => handleAlignSelected("vertical")}
+              title="将选中的卡片沿垂直中线对齐"
+              style={{
+                ...toolBtnStyle(theme, colors),
+                backgroundColor: "rgba(2, 132, 199, 0.12)",
+                color: "#0284c7",
+                border: "1px solid rgba(2, 132, 199, 0.25)",
+                fontWeight: 600,
+              }}
+            >
+              <AlignCenter size={13} />
+              <span className="canvas-btn-label">垂直对齐</span>
+            </button>
           </>
         )}
 
@@ -5615,6 +5637,15 @@ export const CanvasView = memo(function CanvasView({
                       <div className="canvas-ctx-divider" />
                       <div className="canvas-ctx-section-label">对齐与分布</div>
 
+                      <div className="canvas-ctx-item" onClick={() => handleAlignSelected("horizontal")}>
+                        <AlignJustify size={13} color="#0284c7" />
+                        <span style={{ fontWeight: 600 }}>水平对齐</span>
+                      </div>
+                      <div className="canvas-ctx-item" onClick={() => handleAlignSelected("vertical")}>
+                        <AlignCenter size={13} color="#0284c7" />
+                        <span style={{ fontWeight: 600 }}>垂直对齐</span>
+                      </div>
+
                       <div className="canvas-ctx-item" onClick={() => handleAlignSelected("left")}>
                         <AlignLeft size={13} />
                         <span>左对齐</span>
@@ -5623,15 +5654,29 @@ export const CanvasView = memo(function CanvasView({
                         <AlignCenter size={13} />
                         <span>水平居中</span>
                       </div>
+                      <div className="canvas-ctx-item" onClick={() => handleAlignSelected("right")}>
+                        <AlignRight size={13} />
+                        <span>右对齐</span>
+                      </div>
                       <div className="canvas-ctx-item" onClick={() => handleAlignSelected("top")}>
                         <ArrowUpToLine size={13} />
                         <span>顶端对齐</span>
                       </div>
+                      <div className="canvas-ctx-item" onClick={() => handleAlignSelected("bottom")}>
+                        <ArrowDownToLine size={13} />
+                        <span>底端对齐</span>
+                      </div>
                       {selectedNodeIds.size >= 3 && (
-                        <div className="canvas-ctx-item" onClick={() => handleAlignSelected("distribute-h")}>
-                          <AlignHorizontalJustifyCenter size={13} />
-                          <span>水平等距分布</span>
-                        </div>
+                        <>
+                          <div className="canvas-ctx-item" onClick={() => handleAlignSelected("distribute-h")}>
+                            <AlignHorizontalJustifyCenter size={13} />
+                            <span>水平等距分布</span>
+                          </div>
+                          <div className="canvas-ctx-item" onClick={() => handleAlignSelected("distribute-v")}>
+                            <AlignVerticalJustifyCenter size={13} />
+                            <span>垂直等距分布</span>
+                          </div>
+                        </>
                       )}
 
                       <div className="canvas-ctx-divider" />

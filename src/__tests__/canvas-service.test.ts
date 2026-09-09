@@ -24,6 +24,7 @@ import {
   getStepBendHandleInfo,
   computeBezierControlPoints,
   computeEdgeMidpoint,
+  alignNodes,
 } from "../services/canvasService";
 import type { CanvasData, CanvasTextNode, CanvasFileNode, CanvasGroupNode } from "../types/canvasTypes";
 
@@ -706,5 +707,114 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
     const edgesFromColored = connectOneToMany(coloredCard, [target1, target2], []);
     expect(edgesFromColored.every((e) => e.color === "2")).toBe(true);
   });
+
+  it("automatically assigns distinct colors to different cards within the same container, while lines from the same card share color", () => {
+    const group: CanvasGroupNode = {
+      id: "group-box",
+      type: "group",
+      x: 0,
+      y: 0,
+      width: 800,
+      height: 600,
+      label: "服务容器",
+    };
+
+    const card1: CanvasTextNode = { id: "c1", type: "text", text: "Card 1", x: 50, y: 50, width: 180, height: 100 };
+    const card2: CanvasTextNode = { id: "c2", type: "text", text: "Card 2", x: 260, y: 50, width: 180, height: 100 };
+    const card3: CanvasTextNode = { id: "c3", type: "text", text: "Card 3", x: 470, y: 50, width: 180, height: 100 };
+    const targetA: CanvasTextNode = { id: "tA", type: "text", text: "Target A", x: 200, y: 800, width: 180, height: 100 };
+    const targetB: CanvasTextNode = { id: "tB", type: "text", text: "Target B", x: 500, y: 800, width: 180, height: 100 };
+
+    const allNodes = [group, card1, card2, card3, targetA, targetB];
+
+    // Card 1 initiates first connection
+    const color1 = getSourceNodeEdgeColor(card1, [], allNodes);
+    expect(color1).toBeDefined();
+
+    // Card 1 initiates multiple connections -> all share the SAME color
+    const edgesCard1 = [
+      { id: "e1", fromNode: card1.id, toNode: targetA.id, color: color1 },
+      { id: "e2", fromNode: card1.id, toNode: targetB.id, color: color1 },
+    ];
+    const color1Again = getSourceNodeEdgeColor(card1, edgesCard1, allNodes);
+    expect(color1Again).toBe(color1);
+
+    // Card 2 in the SAME container initiates connection -> must receive a DIFFERENT color
+    const color2 = getSourceNodeEdgeColor(card2, edgesCard1, allNodes);
+    expect(color2).not.toBe(color1);
+
+    const edgesCard2 = [
+      ...edgesCard1,
+      { id: "e3", fromNode: card2.id, toNode: targetA.id, color: color2 },
+    ];
+
+    // Card 3 in the SAME container initiates connection -> must receive a DIFFERENT color from both Card 1 and Card 2
+    const color3 = getSourceNodeEdgeColor(card3, edgesCard2, allNodes);
+    expect(color3).not.toBe(color1);
+    expect(color3).not.toBe(color2);
+
+    // connectOneToMany with container nodes
+    const autoEdgesCard2 = connectOneToMany(card2, [targetA, targetB], edgesCard1, "bezier", allNodes);
+    expect(autoEdgesCard2.every((e) => e.color === color2)).toBe(true);
+    expect(autoEdgesCard2[0].color).not.toBe(color1);
+  });
+
+  it("aligns nodes along horizontal, vertical, and distributed directions accurately", () => {
+    const nodeA: CanvasTextNode = { id: "a", type: "text", text: "A", x: 100, y: 100, width: 100, height: 100 };
+    const nodeB: CanvasTextNode = { id: "b", type: "text", text: "B", x: 300, y: 200, width: 100, height: 200 };
+    const nodeC: CanvasTextNode = { id: "c", type: "text", text: "C", x: 500, y: 300, width: 100, height: 100 };
+    const untouched: CanvasTextNode = { id: "u", type: "text", text: "U", x: 999, y: 999, width: 50, height: 50 };
+
+    const nodes = [nodeA, nodeB, nodeC, untouched];
+    const selIds = new Set(["a", "b", "c"]);
+
+    // Horizontal Alignment: aligns along the horizontal center line
+    // minY = 100, maxY = 400 (from nodeB y:200 + h:200). centerY = 250.
+    const hAligned = alignNodes(nodes, selIds, "horizontal");
+    const hA = hAligned.find((n) => n.id === "a")!;
+    const hB = hAligned.find((n) => n.id === "b")!;
+    const hC = hAligned.find((n) => n.id === "c")!;
+    expect(hA.y + hA.height / 2).toBe(250);
+    expect(hB.y + hB.height / 2).toBe(250);
+    expect(hC.y + hC.height / 2).toBe(250);
+    expect(hAligned.find((n) => n.id === "u")!.x).toBe(999);
+
+    // Vertical Alignment: aligns along the vertical center line
+    // minX = 100, maxX = 600 (from nodeC x:500 + w:100). centerX = 350.
+    const vAligned = alignNodes(nodes, selIds, "vertical");
+    const vA = vAligned.find((n) => n.id === "a")!;
+    const vB = vAligned.find((n) => n.id === "b")!;
+    const vC = vAligned.find((n) => n.id === "c")!;
+    expect(vA.x + vA.width / 2).toBe(350);
+    expect(vB.x + vB.width / 2).toBe(350);
+    expect(vC.x + vC.width / 2).toBe(350);
+
+    // Left alignment: minX is 100
+    const leftAligned = alignNodes(nodes, selIds, "left");
+    expect(leftAligned.filter((n) => selIds.has(n.id)).every((n) => n.x === 100)).toBe(true);
+
+    // Right alignment: maxX is 600, each node x = 600 - width
+    const rightAligned = alignNodes(nodes, selIds, "right");
+    expect(rightAligned.find((n) => n.id === "a")!.x).toBe(500);
+
+    // Top alignment: minY is 100
+    const topAligned = alignNodes(nodes, selIds, "top");
+    expect(topAligned.filter((n) => selIds.has(n.id)).every((n) => n.y === 100)).toBe(true);
+
+    // Bottom alignment: maxY is 400
+    const bottomAligned = alignNodes(nodes, selIds, "bottom");
+    expect(bottomAligned.find((n) => n.id === "a")!.y).toBe(300);
+    expect(bottomAligned.find((n) => n.id === "b")!.y).toBe(200);
+
+    // Distribute horizontally
+    const distH = alignNodes(nodes, selIds, "distribute-h");
+    const dhA = distH.find((n) => n.id === "a")!;
+    const dhB = distH.find((n) => n.id === "b")!;
+    const dhC = distH.find((n) => n.id === "c")!;
+    const gap1 = dhB.x - (dhA.x + dhA.width);
+    const gap2 = dhC.x - (dhB.x + dhB.width);
+    expect(gap1).toBe(gap2);
+  });
 });
+
 

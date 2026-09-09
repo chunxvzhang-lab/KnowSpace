@@ -1271,6 +1271,8 @@ describe("CanvasView Component", () => {
     // Verify multi-selection actions
     expect(screen.getByText(/批量操作 \(2 项\)/)).toBeDefined();
     expect(screen.getByText("打包为新分组容器")).toBeDefined();
+    expect(screen.getAllByText("水平对齐").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("垂直对齐").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("左对齐")).toBeDefined();
     expect(screen.getByText("水平居中")).toBeDefined();
     expect(screen.getByText("顶端对齐")).toBeDefined();
