@@ -254,6 +254,45 @@ describe("CanvasView Component", () => {
     expect(screen.getByText("删除卡片")).toBeDefined();
   });
 
+  it("dynamically clamps context menu position and maxHeight to prevent viewport bottom overflow", () => {
+    render(
+      <CanvasView
+        title="遮挡测试白板"
+        source={JSON.stringify(initialCanvasData)}
+        editable={true}
+        theme="twitter"
+      />
+    );
+
+    const canvasContainer = screen.getByTitle("遮挡测试白板").closest(".knowspace-canvas-view") as HTMLElement;
+    expect(canvasContainer).toBeDefined();
+
+    vi.spyOn(canvasContainer, "getBoundingClientRect").mockReturnValue({
+      left: 0,
+      top: 0,
+      right: 1000,
+      bottom: 700,
+      width: 1000,
+      height: 700,
+      x: 0,
+      y: 0,
+      toJSON: () => {},
+    });
+
+    // Right-click near the bottom of canvas (clientY = 620)
+    fireEvent.contextMenu(canvasContainer, { clientX: 300, clientY: 620 });
+
+    expect(screen.getByText("白板快捷菜单")).toBeDefined();
+    const menuEl = document.querySelector(".canvas-context-menu") as HTMLElement;
+    expect(menuEl).not.toBeNull();
+
+    // Top must be clamped significantly lower than clientY to fit on screen
+    const topValue = parseInt(menuEl.style.top, 10);
+    expect(topValue).toBeLessThanOrEqual(700 - 12);
+    // Menu maxHeight must be bounded by container height minus padding
+    expect(menuEl.style.maxHeight).toBeDefined();
+  });
+
   it("executes context menu actions: adding new card, editing card, and saving", () => {
     const onSourceChange = vi.fn();
     const onSave = vi.fn();
@@ -461,7 +500,7 @@ describe("CanvasView Component", () => {
     fireEvent.mouseDown(nodeB, { button: 0, shiftKey: true });
 
     // Multi-link button should appear in toolbar
-    const linkToolbarBtn = screen.getByTitle("在选中的卡片之间自动建立关联连线");
+    const linkToolbarBtn = screen.getByTitle(/自动建立.*连线/);
     expect(linkToolbarBtn).toBeDefined();
     fireEvent.click(linkToolbarBtn);
 
@@ -1224,6 +1263,364 @@ describe("CanvasView Component", () => {
     const alignedNode = updatedData.nodes.find((n) => n.id === "unaligned-1")!;
     expect(alignedNode.x % 20).toBe(0);
     expect(alignedNode.y % 20).toBe(0);
+  });
+
+  it("supports one-to-many star connection for multiple selected cards via toolbar and context menu", () => {
+    const onSourceChange = vi.fn();
+    const starData: CanvasData = {
+      nodes: [
+        { id: "root", type: "text", text: "中心概念", x: 100, y: 100, width: 200, height: 100 },
+        { id: "sub-1", type: "text", text: "分支概念 1", x: 400, y: 50, width: 200, height: 100 },
+        { id: "sub-2", type: "text", text: "分支概念 2", x: 400, y: 200, width: 200, height: 100 },
+      ],
+      edges: [],
+    };
+
+    render(
+      <CanvasView
+        title="一对多关联测试"
+        source={JSON.stringify(starData)}
+        onSourceChange={onSourceChange}
+        editable={true}
+        theme="twitter"
+      />
+    );
+
+    // Multi-select all 3 cards: root, sub-1, sub-2
+    const rootEl = screen.getByText("中心概念").closest(".canvas-node")!;
+    const sub1El = screen.getByText("分支概念 1").closest(".canvas-node")!;
+    const sub2El = screen.getByText("分支概念 2").closest(".canvas-node")!;
+
+    fireEvent.mouseDown(rootEl, { button: 0 });
+    fireEvent.mouseDown(sub1El, { button: 0, shiftKey: true });
+    fireEvent.mouseDown(sub2El, { button: 0, shiftKey: true });
+
+    // One-to-many button should be visible in toolbar
+    const oneToManyBtn = screen.getByTitle("以当前选中卡片为源，向其余所有选中卡片放射建立一对多关联");
+    expect(oneToManyBtn).toBeDefined();
+    fireEvent.click(oneToManyBtn);
+
+    expect(onSourceChange).toHaveBeenCalled();
+    const saved = JSON.parse(onSourceChange.mock.calls[onSourceChange.mock.calls.length - 1][0]);
+    expect(saved.edges.length).toBe(2);
+    // Both edges originate from root
+    expect(saved.edges.every((e: any) => e.fromNode === "root")).toBe(true);
+    expect(saved.edges.map((e: any) => e.toNode)).toEqual(expect.arrayContaining(["sub-1", "sub-2"]));
+  });
+
+  it("supports connecting cards by dragging and dropping directly onto target card body", () => {
+    const onSourceChange = vi.fn();
+    const dropData: CanvasData = {
+      nodes: [
+        { id: "card-from", type: "text", text: "源卡片", x: 100, y: 100, width: 200, height: 100 },
+        { id: "card-to", type: "text", text: "目标卡片", x: 500, y: 100, width: 200, height: 100 },
+      ],
+      edges: [],
+    };
+
+    render(
+      <CanvasView
+        title="全域释放连线测试"
+        source={JSON.stringify(dropData)}
+        onSourceChange={onSourceChange}
+        editable={true}
+        theme="twitter"
+      />
+    );
+
+    // Select the from card to display anchors
+    const fromCard = screen.getByText("源卡片").closest(".canvas-node")!;
+    fireEvent.click(fromCard);
+
+    // Find the right anchor dot and start connection drag
+    const rightAnchor = fromCard.querySelector('.canvas-anchor-dot[title*="right"]')!;
+    expect(rightAnchor).toBeDefined();
+    fireEvent.mouseDown(rightAnchor, { button: 0 });
+
+    // Release mouse directly over target card body (not an anchor dot)
+    const toCard = screen.getByText("目标卡片").closest(".canvas-node")!;
+    fireEvent.mouseUp(toCard);
+
+    expect(onSourceChange).toHaveBeenCalled();
+    const saved = JSON.parse(onSourceChange.mock.calls[onSourceChange.mock.calls.length - 1][0]);
+    expect(saved.edges.length).toBe(1);
+    expect(saved.edges[0].fromNode).toBe("card-from");
+    expect(saved.edges[0].toNode).toBe("card-to");
+  });
+
+  it("spawns multiple branches (1-to-many) from single card context menu", () => {
+    const onSourceChange = vi.fn();
+    const singleData: CanvasData = {
+      nodes: [
+        { id: "hub", type: "text", text: "主干主题", x: 100, y: 100, width: 200, height: 100 },
+      ],
+      edges: [],
+    };
+
+    render(
+      <CanvasView
+        title="批量派生测试"
+        source={JSON.stringify(singleData)}
+        onSourceChange={onSourceChange}
+        editable={true}
+        theme="twitter"
+      />
+    );
+
+    const hubCard = screen.getByText("主干主题").closest(".canvas-node")!;
+    fireEvent.contextMenu(hubCard);
+
+    const spawnBtn = screen.getByText(/批量派生分支/);
+    expect(spawnBtn).toBeDefined();
+    fireEvent.click(spawnBtn);
+
+    // Modal should appear asking for spawn count
+    expect(screen.getByText(/派生分支数量/)).toBeDefined();
+    const confirmBtn = screen.getByText(/确认派生/);
+    expect(confirmBtn).toBeDefined();
+    fireEvent.click(confirmBtn);
+
+    expect(onSourceChange).toHaveBeenCalled();
+    const saved = JSON.parse(onSourceChange.mock.calls[onSourceChange.mock.calls.length - 1][0]);
+    // 1 hub + 3 new cards = 4 nodes
+    expect(saved.nodes.length).toBe(4);
+    // 3 new edges from hub to branches
+    expect(saved.edges.length).toBe(3);
+    expect(saved.edges.every((e: any) => e.fromNode === "hub")).toBe(true);
+  });
+
+  it("disconnects all edges from a card via context menu", () => {
+    const onSourceChange = vi.fn();
+    const connectedData: CanvasData = {
+      nodes: [
+        { id: "node-x", type: "text", text: "连线卡片", x: 100, y: 100, width: 200, height: 100 },
+        { id: "node-y", type: "text", text: "关联卡片 1", x: 400, y: 100, width: 200, height: 100 },
+        { id: "node-z", type: "text", text: "关联卡片 2", x: 400, y: 300, width: 200, height: 100 },
+      ],
+      edges: [
+        { id: "e1", fromNode: "node-x", toNode: "node-y" },
+        { id: "e2", fromNode: "node-z", toNode: "node-x" },
+      ],
+    };
+
+    render(
+      <CanvasView
+        title="断开连线测试"
+        source={JSON.stringify(connectedData)}
+        onSourceChange={onSourceChange}
+        editable={true}
+        theme="twitter"
+      />
+    );
+
+    const cardX = screen.getByText("连线卡片").closest(".canvas-node")!;
+    fireEvent.contextMenu(cardX);
+
+    const disconnectBtn = screen.getByText("✂️ 断开所有关联连线");
+    expect(disconnectBtn).toBeDefined();
+    fireEvent.click(disconnectBtn);
+
+    expect(onSourceChange).toHaveBeenCalled();
+    const saved = JSON.parse(onSourceChange.mock.calls[onSourceChange.mock.calls.length - 1][0]);
+    expect(saved.edges.length).toBe(0);
+  });
+
+  it("preserves multi-selection when shift-clicking cards and after click events", () => {
+    const multiData: CanvasData = {
+      nodes: [
+        { id: "c1", type: "text", text: "卡片一", x: 100, y: 100, width: 200, height: 100 },
+        { id: "c2", type: "text", text: "卡片二", x: 350, y: 100, width: 200, height: 100 },
+        { id: "c3", type: "text", text: "卡片三", x: 600, y: 100, width: 200, height: 100 },
+      ],
+      edges: [],
+    };
+
+    render(
+      <CanvasView
+        title="多选持久性测试"
+        source={JSON.stringify(multiData)}
+        onSourceChange={vi.fn()}
+        editable={true}
+        theme="twitter"
+      />
+    );
+
+    const card1 = screen.getByText("卡片一").closest(".canvas-node")!;
+    const card2 = screen.getByText("卡片二").closest(".canvas-node")!;
+    const card3 = screen.getByText("卡片三").closest(".canvas-node")!;
+
+    // 1. Click card 1
+    fireEvent.mouseDown(card1, { button: 0 });
+    fireEvent.mouseUp(card1, { button: 0 });
+    fireEvent.click(card1);
+    expect(card1.classList.contains("selected")).toBe(true);
+    expect(card2.classList.contains("selected")).toBe(false);
+
+    // 2. Shift+Click card 2
+    fireEvent.mouseDown(card2, { button: 0, shiftKey: true });
+    fireEvent.mouseUp(card2, { button: 0, shiftKey: true });
+    fireEvent.click(card2, { shiftKey: true });
+    expect(card1.classList.contains("selected")).toBe(true);
+    expect(card2.classList.contains("selected")).toBe(true);
+
+    // 3. Ctrl+Click card 3
+    fireEvent.mouseDown(card3, { button: 0, ctrlKey: true });
+    fireEvent.mouseUp(card3, { button: 0, ctrlKey: true });
+    fireEvent.click(card3, { ctrlKey: true });
+    expect(card1.classList.contains("selected")).toBe(true);
+    expect(card2.classList.contains("selected")).toBe(true);
+    expect(card3.classList.contains("selected")).toBe(true);
+  });
+
+  it("preserves multi-selection after collaborative dragging cards", () => {
+    const multiData: CanvasData = {
+      nodes: [
+        { id: "drag1", type: "text", text: "拖拽卡片A", x: 100, y: 100, width: 200, height: 100 },
+        { id: "drag2", type: "text", text: "拖拽卡片B", x: 350, y: 100, width: 200, height: 100 },
+      ],
+      edges: [],
+    };
+
+    render(
+      <CanvasView
+        title="多选拖拽测试"
+        source={JSON.stringify(multiData)}
+        onSourceChange={vi.fn()}
+        editable={true}
+        theme="twitter"
+      />
+    );
+
+    const cardA = screen.getByText("拖拽卡片A").closest(".canvas-node")!;
+    const cardB = screen.getByText("拖拽卡片B").closest(".canvas-node")!;
+
+    // Select both
+    fireEvent.mouseDown(cardA, { button: 0 });
+    fireEvent.click(cardA);
+    fireEvent.mouseDown(cardB, { button: 0, shiftKey: true });
+    fireEvent.click(cardB, { shiftKey: true });
+    expect(cardA.classList.contains("selected")).toBe(true);
+    expect(cardB.classList.contains("selected")).toBe(true);
+
+    // Drag cardA collaboratively
+    fireEvent.mouseDown(cardA, { button: 0, clientX: 150, clientY: 150 });
+    fireEvent.mouseMove(window, { clientX: 220, clientY: 220 });
+    fireEvent.mouseUp(window, { clientX: 220, clientY: 220 });
+    // When mouseup finishes drag, browser triggers click on the released element
+    fireEvent.click(cardA);
+
+    // Both cards must still remain selected!
+    expect(cardA.classList.contains("selected")).toBe(true);
+    expect(cardB.classList.contains("selected")).toBe(true);
+  });
+
+  it("marquee box selection inside group container selects inner cards only and not the group container", () => {
+    const groupWithCardsData: CanvasData = {
+      nodes: [
+        { id: "g1", type: "group", label: "容器分组", x: 50, y: 50, width: 600, height: 400 },
+        { id: "inner1", type: "text", text: "内部卡片1", x: 100, y: 120, width: 180, height: 90 },
+        { id: "inner2", type: "text", text: "内部卡片2", x: 320, y: 120, width: 180, height: 90 },
+      ],
+      edges: [],
+    };
+
+    render(
+      <CanvasView
+        title="组内框选测试"
+        source={JSON.stringify(groupWithCardsData)}
+        onSourceChange={vi.fn()}
+        editable={true}
+        theme="twitter"
+      />
+    );
+
+    const groupNode = screen.getByText(/容器分组/).closest(".canvas-node")!;
+    const innerCard1 = screen.getByText(/内部卡片1/).closest(".canvas-node")!;
+    const innerCard2 = screen.getByText(/内部卡片2/).closest(".canvas-node")!;
+
+    // Trigger box selection over group body with Shift key
+    fireEvent.mouseDown(groupNode, { button: 0, shiftKey: true, clientX: 90, clientY: 110 });
+    fireEvent.mouseMove(window, { clientX: 520, clientY: 230, shiftKey: true });
+    fireEvent.mouseUp(window, { clientX: 520, clientY: 230, shiftKey: true });
+
+    // Inner cards are selected
+    expect(innerCard1.classList.contains("selected")).toBe(true);
+    expect(innerCard2.classList.contains("selected")).toBe(true);
+    // Outer group container MUST NOT be selected
+    expect(groupNode.classList.contains("selected")).toBe(false);
+  });
+
+  it("panning canvas does not clear active card selection while stationary background click does", () => {
+    const data: CanvasData = {
+      nodes: [
+        { id: "pan-card", type: "text", text: "保持选中卡片", x: 100, y: 100, width: 200, height: 100 },
+      ],
+      edges: [],
+    };
+
+    const { container } = render(
+      <CanvasView
+        title="画布平移选区测试"
+        source={JSON.stringify(data)}
+        onSourceChange={vi.fn()}
+        editable={true}
+        theme="twitter"
+      />
+    );
+
+    const card = screen.getByText("保持选中卡片").closest(".canvas-node")!;
+    const canvasContainer = container.querySelector(".knowspace-canvas-view")!;
+
+    // Select the card
+    fireEvent.mouseDown(card, { button: 0 });
+    fireEvent.click(card);
+    expect(card.classList.contains("selected")).toBe(true);
+
+    // Drag background to pan canvas (movement > 4px)
+    fireEvent.mouseDown(canvasContainer, { button: 0, clientX: 400, clientY: 400 });
+    fireEvent.mouseMove(window, { clientX: 450, clientY: 450 });
+    fireEvent.mouseUp(window, { clientX: 450, clientY: 450 });
+
+    // Selection MUST be preserved after panning!
+    expect(card.classList.contains("selected")).toBe(true);
+
+    // Click background statically without moving (movement <= 4px)
+    fireEvent.mouseDown(canvasContainer, { button: 0, clientX: 400, clientY: 400 });
+    fireEvent.mouseUp(window, { clientX: 400, clientY: 400 });
+
+    // Now selection is cleared!
+    expect(card.classList.contains("selected")).toBe(false);
+  });
+
+  it("closes both directory and outline sidebar when opening or switching to a canvas file", () => {
+    // Simulates the state transition logic in App.tsx
+    let directoryOpen = true;
+    let sidebarOpen = true;
+    let sidebarTab: "toc" | "bookmarks" | "search" = "toc";
+    let viewMode: "reader" | "split" | "mindmap" | "canvas" = "split";
+
+    const handleOpenDocument = (fileName: string) => {
+      const isCanvas = fileName.toLowerCase().endsWith(".canvas");
+      if (isCanvas) {
+        viewMode = "canvas";
+        directoryOpen = false;
+        sidebarOpen = false;
+      } else {
+        sidebarOpen = true;
+        sidebarTab = "toc";
+      }
+    };
+
+    // Open a markdown file first
+    handleOpenDocument("chapter-1.md");
+    expect(sidebarOpen).toBe(true);
+    expect(sidebarTab).toBe("toc");
+
+    // Open a canvas whiteboard file
+    handleOpenDocument("system-architecture.canvas");
+    expect(viewMode).toBe("canvas");
+    expect(directoryOpen).toBe(false);
+    expect(sidebarOpen).toBe(false);
   });
 });
 

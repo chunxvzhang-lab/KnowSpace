@@ -343,6 +343,17 @@ export function useDocumentSession() {
     setConflict(null);
   }, []);
 
+  const closeSession = useCallback(() => {
+    if (previewTimerRef.current !== null) {
+      window.clearTimeout(previewTimerRef.current);
+      previewTimerRef.current = null;
+    }
+    setSession(null);
+    setRenderedChapter(null);
+    setConflict(null);
+    setIsPreviewPending(false);
+  }, []);
+
   return {
     session,
     renderedChapter,
@@ -354,6 +365,7 @@ export function useDocumentSession() {
     autoPreviewPaused,
     conflict,
     openSession,
+    closeSession,
     updateSource,
     renderPreviewNow,
     setViewMode: handleSetViewMode,

@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ZoomIn,
   ZoomOut,
@@ -39,6 +39,8 @@ import {
   AlignCenter,
   AlignHorizontalJustifyCenter,
   FilePlus,
+  Share2,
+  Unlink,
 } from "lucide-react";
 import type { ThemeMode } from "../core/types";
 import type {
@@ -67,6 +69,11 @@ import {
   toggleChecklistInMarkdown,
   createEdgeBetweenNodes,
   spawnConnectedCard,
+  connectOneToMany,
+  connectChainNodes,
+  connectLoopNodes,
+  disconnectNodeEdges,
+  spawnMultipleBranches,
   computeEdgeMidpoint,
   cycleEdgeArrow,
   cycleEdgeStyle,
@@ -151,6 +158,69 @@ function renderEdgeShapeIcon(shape: CanvasEdgeLabelShape, active: boolean) {
       />
     </svg>
   );
+}
+
+/**
+ * Calculates hit nodes intersecting with a marquee box.
+ * If normal cards are hit inside a group container, returns only the cards,
+ * preventing accidental selection of the background group container.
+ */
+function computeBoxSelectionHits(
+  minX: number,
+  maxX: number,
+  minY: number,
+  maxY: number,
+  nodes: CanvasNode[]
+): Set<string> {
+  const hitCardIds = new Set<string>();
+  const hitGroupIds = new Set<string>();
+
+  for (const node of nodes) {
+    const nodeRight = node.x + node.width;
+    const nodeBottom = node.y + node.height;
+    const intersects = node.x < maxX && nodeRight > minX && node.y < maxY && nodeBottom > minY;
+    if (!intersects) continue;
+
+    if (node.type === "group") {
+      // For groups: only select if the box completely encloses the group or covers its title header
+      const fullyEnclosed =
+        minX <= node.x && maxX >= nodeRight && minY <= node.y && maxY >= nodeBottom;
+      const headerIntersects =
+        node.x < maxX && nodeRight > minX && node.y < maxY && node.y + 40 > minY;
+      if (fullyEnclosed || headerIntersects) {
+        hitGroupIds.add(node.id);
+      }
+    } else {
+      hitCardIds.add(node.id);
+    }
+  }
+
+  if (hitGroupIds.size > 0 && hitCardIds.size > 0) {
+    const hitGroups = nodes.filter(
+      (n): n is CanvasGroupNode => n.type === "group" && hitGroupIds.has(n.id)
+    );
+    const externalCardIds = new Set<string>();
+    for (const cardId of hitCardIds) {
+      const card = nodes.find((n) => n.id === cardId);
+      if (card) {
+        const isInsideHitGroup = hitGroups.some((g) => isNodeInsideGroup(card, g));
+        if (!isInsideHitGroup) {
+          externalCardIds.add(cardId);
+        }
+      }
+    }
+    // If there are cards outside the hit groups, select both the groups and external cards
+    if (externalCardIds.size > 0) {
+      return new Set<string>([...hitGroupIds, ...externalCardIds]);
+    }
+    // Otherwise all hit cards are inside the group: prefer selecting only the inner cards
+    return hitCardIds;
+  }
+
+  if (hitCardIds.size > 0) {
+    return hitCardIds;
+  }
+  return hitGroupIds;
 }
 
 export const CanvasView = memo(function CanvasView({
@@ -259,6 +329,8 @@ export const CanvasView = memo(function CanvasView({
     currentX: number;
     currentY: number;
   } | null>(null);
+  const hasDraggedRef = useRef(false);
+  const baseSelectionBeforeBoxRef = useRef<Set<string>>(new Set());
 
   // Right-click context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -271,6 +343,45 @@ export const CanvasView = memo(function CanvasView({
   } | null>(null);
   const contextMenuRef = useRef<HTMLDivElement | null>(null);
 
+  // Dynamically clamp context menu position and maxHeight to strictly prevent any viewport overflow / occlusion
+  useLayoutEffect(() => {
+    if (!contextMenu || !contextMenuRef.current || !containerRef.current) return;
+    const menuEl = contextMenuRef.current;
+    const containerEl = containerRef.current;
+    const containerRect = containerEl.getBoundingClientRect();
+
+    const padding = 12;
+    // Constrain maximum height so the menu never exceeds the visible canvas container
+    const maxAvailableH = Math.max(160, containerRect.height - padding * 2);
+    menuEl.style.maxHeight = `${maxAvailableH}px`;
+
+    // Measure actual rendered dimensions
+    const menuW = menuEl.offsetWidth || 260;
+    const menuH = menuEl.offsetHeight || 320;
+
+    let clampedX = contextMenu.x;
+    let clampedY = contextMenu.y;
+
+    // Clamp horizontally within container bounds
+    if (clampedX + menuW > containerRect.width - padding) {
+      clampedX = Math.max(padding, containerRect.width - menuW - padding);
+    }
+    if (clampedX < padding) {
+      clampedX = padding;
+    }
+
+    // Clamp vertically within container bounds: if overflowing bottom, shift upwards
+    if (clampedY + menuH > containerRect.height - padding) {
+      clampedY = Math.max(padding, containerRect.height - menuH - padding);
+    }
+    if (clampedY < padding) {
+      clampedY = padding;
+    }
+
+    menuEl.style.left = `${clampedX}px`;
+    menuEl.style.top = `${clampedY}px`;
+  }, [contextMenu]);
+
   useEffect(() => {
     if (!contextMenu) return;
     const handleOutside = (e: MouseEvent) => {
@@ -281,11 +392,14 @@ export const CanvasView = memo(function CanvasView({
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setContextMenu(null);
     };
+    const handleResize = () => setContextMenu(null);
     window.addEventListener("mousedown", handleOutside);
     window.addEventListener("keydown", handleKey);
+    window.addEventListener("resize", handleResize);
     return () => {
       window.removeEventListener("mousedown", handleOutside);
       window.removeEventListener("keydown", handleKey);
+      window.removeEventListener("resize", handleResize);
     };
   }, [contextMenu]);
 
@@ -304,6 +418,11 @@ export const CanvasView = memo(function CanvasView({
   const [exportBg, setExportBg] = useState<"theme" | "white" | "transparent">("theme");
   const [isExporting, setIsExporting] = useState(false);
   const [exportCopyFeedback, setExportCopyFeedback] = useState(false);
+  const [spawnModalState, setSpawnModalState] = useState<{
+    nodeId: string;
+    count: number;
+    direction: "right" | "bottom";
+  } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = useCallback((msg: string) => {
@@ -322,11 +441,18 @@ export const CanvasView = memo(function CanvasView({
   // Dragging card or canvas refs
   const containerRef = useRef<HTMLDivElement | null>(null);
   const isDraggingCanvasRef = useRef(false);
-  const canvasDragStartRef = useRef<{ x: number; y: number; panX: number; panY: number }>({
+  const canvasDragStartRef = useRef<{
+    x: number;
+    y: number;
+    panX: number;
+    panY: number;
+    hasMoved?: boolean;
+  }>({
     x: 0,
     y: 0,
     panX: 0,
     panY: 0,
+    hasMoved: false,
   });
 
   const nodeDragRef = useRef<{
@@ -533,6 +659,32 @@ export const CanvasView = memo(function CanvasView({
     [handleZoom]
   );
 
+  // Marquee box selection starter
+  const handleStartBoxSelection = useCallback(
+    (e: React.MouseEvent | MouseEvent, isModifier: boolean) => {
+      if (!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const currentZoom = viewportRef.current.zoom;
+      const currentPanX = viewportRef.current.panX;
+      const currentPanY = viewportRef.current.panY;
+      const mouseCanvasX = (e.clientX - rect.left - currentPanX) / currentZoom;
+      const mouseCanvasY = (e.clientY - rect.top - currentPanY) / currentZoom;
+      const newBox = {
+        startX: mouseCanvasX,
+        startY: mouseCanvasY,
+        currentX: mouseCanvasX,
+        currentY: mouseCanvasY,
+      };
+      selectionBoxRef.current = newBox;
+      setSelectionBox(newBox);
+      baseSelectionBeforeBoxRef.current = isModifier ? new Set(selectedNodeIds) : new Set();
+      if (!isModifier) {
+        setSelectedNodeIds(new Set());
+      }
+    },
+    [selectedNodeIds]
+  );
+
   // Background drag to pan or start box selection
   const handleMouseDownBackground = (e: React.MouseEvent) => {
     if (e.button !== 0 && e.button !== 1) return; // Left or Middle click
@@ -543,35 +695,21 @@ export const CanvasView = memo(function CanvasView({
       handleSaveNodeEdit();
     }
 
-    // If in box select mode or holding Shift, start marquee box selection
-    if (isBoxSelectMode || e.shiftKey) {
-      if (!containerRef.current) return;
-      const rect = containerRef.current.getBoundingClientRect();
-      const mouseCanvasX = (e.clientX - rect.left - viewport.panX) / viewport.zoom;
-      const mouseCanvasY = (e.clientY - rect.top - viewport.panY) / viewport.zoom;
-      const newBox = {
-        startX: mouseCanvasX,
-        startY: mouseCanvasY,
-        currentX: mouseCanvasX,
-        currentY: mouseCanvasY,
-      };
-      selectionBoxRef.current = newBox;
-      setSelectionBox(newBox);
-      if (!e.shiftKey) {
-        setSelectedNodeIds(new Set());
-      }
+    const isModifier = e.shiftKey || e.ctrlKey || e.metaKey;
+    // If in box select mode or holding Shift/Ctrl/Cmd, start marquee box selection
+    if (isBoxSelectMode || isModifier) {
+      handleStartBoxSelection(e, isModifier);
       return;
     }
 
-    // Normal pan
-    setSelectedNodeIds(new Set());
-    setSelectedEdgeId(null);
+    // Normal pan: do not clear selection immediately; clear only on mouseup if canvas did not move
     isDraggingCanvasRef.current = true;
     canvasDragStartRef.current = {
       x: e.clientX,
       y: e.clientY,
       panX: viewport.panX,
       panY: viewport.panY,
+      hasMoved: false,
     };
   };
 
@@ -898,27 +1036,146 @@ export const CanvasView = memo(function CanvasView({
     const currentData = latestDataRef.current;
     const selectedNodes = currentData.nodes.filter((n) => selectedNodeIds.has(n.id));
     if (selectedNodes.length < 2) return;
-    const newEdges: CanvasEdge[] = [];
-    for (let i = 0; i < selectedNodes.length - 1; i++) {
-      const from = selectedNodes[i];
-      const to = selectedNodes[i + 1];
-      const exists = currentData.edges.some(
-        (e) =>
-          (e.fromNode === from.id && e.toNode === to.id) ||
-          (e.fromNode === to.id && e.toNode === from.id)
-      );
-      if (!exists) {
-        newEdges.push(createEdgeBetweenNodes(from, to));
-      }
-    }
+
+    // Use spatially sorted chain connection to prevent criss-crossing dead knots
+    const newEdges = connectChainNodes(selectedNodes, currentData.edges, "bezier", true);
+
     if (newEdges.length > 0) {
       pushHistory({
         ...currentData,
         edges: [...currentData.edges, ...newEdges],
       });
+      showToast(`已按空间顺序建立 ${newEdges.length} 条链式连线`);
+    } else {
+      showToast("选中的卡片之间已存在关联连线");
     }
     setContextMenu(null);
-  }, [editable, selectedNodeIds, pushHistory]);
+  }, [editable, selectedNodeIds, pushHistory, showToast]);
+
+  const handleConnectOneToMany = useCallback(
+    (specifiedRootId?: string) => {
+      if (!editable || selectedNodeIds.size < 2) return;
+      const currentData = latestDataRef.current;
+      const selectedNodes = currentData.nodes.filter((n) => selectedNodeIds.has(n.id));
+      if (selectedNodes.length < 2) return;
+
+      // Determine the root node (The "One"):
+      // 1. Specified root ID (e.g. from context menu target card)
+      // 2. The first selected node (the user clicks the origin node first, then Shift-selects targets)
+      // 3. Fallback to the geometrically leftmost/topmost node
+      let rootNode: CanvasNode | undefined;
+      if (specifiedRootId) {
+        rootNode = selectedNodes.find((n) => n.id === specifiedRootId);
+      }
+      if (!rootNode) {
+        const firstSelectedId = Array.from(selectedNodeIds)[0];
+        rootNode = selectedNodes.find((n) => n.id === firstSelectedId);
+      }
+      if (!rootNode) {
+        rootNode = [...selectedNodes].sort((a, b) => {
+          const dx = a.x - b.x;
+          if (Math.abs(dx) > 30) return dx;
+          return a.y - b.y;
+        })[0];
+      }
+      if (!rootNode) return;
+
+      const targetNodes = selectedNodes.filter((n) => n.id !== rootNode!.id);
+      const newEdges = connectOneToMany(rootNode, targetNodes, currentData.edges);
+
+      if (newEdges.length > 0) {
+        pushHistory({
+          ...currentData,
+          edges: [...currentData.edges, ...newEdges],
+        });
+        const rootTitle =
+          rootNode.type === "text"
+            ? rootNode.text.split("\n")[0].replace(/^[#\s*->]+/, "").slice(0, 12) || "主卡片"
+            : rootNode.type === "group"
+            ? rootNode.label || "分组"
+            : "主卡片";
+        showToast(`已建立从「${rootTitle}」到其余 ${newEdges.length} 张卡片的一对多关联`);
+      } else {
+        showToast("选中的卡片之间已存在一对多关联");
+      }
+      setContextMenu(null);
+    },
+    [editable, selectedNodeIds, selectedNodeId, pushHistory, showToast]
+  );
+
+  const handleConnectLoopNodes = useCallback(() => {
+    if (!editable) return;
+    const currentData = latestDataRef.current;
+    const selectedNodes = currentData.nodes.filter((n) => selectedNodeIds.has(n.id));
+    if (selectedNodes.length < 3) {
+      showToast("环形闭环连线至少需要选择 3 个节点");
+      return;
+    }
+
+    const newEdges = connectLoopNodes(selectedNodes, currentData.edges, "bezier", true);
+
+    if (newEdges.length > 0) {
+      pushHistory({
+        ...currentData,
+        edges: [...currentData.edges, ...newEdges],
+      });
+      showToast(`已按顺时针空间顺序建立 ${newEdges.length} 条闭合环形连线`);
+    } else {
+      showToast("选中的节点之间已存在闭环关联");
+    }
+    setContextMenu(null);
+  }, [editable, selectedNodeIds, pushHistory, showToast]);
+
+  const handleDisconnectNodeEdges = useCallback(
+    (nodeId: string) => {
+      if (!editable) return;
+      const currentData = latestDataRef.current;
+      const connectedCount = currentData.edges.filter(
+        (e) => e.fromNode === nodeId || e.toNode === nodeId
+      ).length;
+      if (connectedCount === 0) {
+        showToast("该卡片当前没有任何关联连线");
+        setContextMenu(null);
+        return;
+      }
+      const updatedEdges = disconnectNodeEdges(nodeId, currentData.edges);
+      pushHistory({
+        ...currentData,
+        edges: updatedEdges,
+      });
+      showToast(`已断开该卡片的 ${connectedCount} 条关联连线`);
+      setContextMenu(null);
+    },
+    [editable, pushHistory, showToast]
+  );
+
+  const handleSpawnMultipleBranches = useCallback(
+    (sourceNodeId: string, count: number = 3, direction: "right" | "bottom" = "right") => {
+      if (!editable) return;
+      const currentData = latestDataRef.current;
+      const sourceNode = currentData.nodes.find((n) => n.id === sourceNodeId);
+      if (!sourceNode) return;
+
+      const { newNodes, newEdges } = spawnMultipleBranches(sourceNode, count, direction);
+      pushHistory({
+        ...currentData,
+        nodes: [...currentData.nodes, ...newNodes],
+        edges: [...currentData.edges, ...newEdges],
+      });
+      setSelectedNodeIds(new Set(newNodes.map((n) => n.id)));
+      setSelectedEdgeId(null);
+      showToast(`已成功派生 ${newNodes.length} 个分支想法卡片`);
+      setContextMenu(null);
+    },
+    [editable, pushHistory, showToast]
+  );
+
+  const handleConfirmBatchSpawn = useCallback(() => {
+    if (!spawnModalState || !editable) return;
+    const { nodeId, count, direction } = spawnModalState;
+    handleSpawnMultipleBranches(nodeId, Math.max(1, Math.min(20, count)), direction);
+    setSpawnModalState(null);
+  }, [spawnModalState, editable, handleSpawnMultipleBranches]);
 
   const handleSpawnConnectedChild = useCallback(
     (sourceNodeId: string, direction: "right" | "bottom" = "right") => {
@@ -1292,10 +1549,10 @@ export const CanvasView = memo(function CanvasView({
     const canvasX = Math.round((clientX - viewportRef.current.panX) / viewportRef.current.zoom);
     const canvasY = Math.round((clientY - viewportRef.current.panY) / viewportRef.current.zoom);
 
-    const mWidth = 250;
-    const mHeight = 440;
-    const safeX = clientX + mWidth > rect.width ? Math.max(10, rect.width - mWidth - 10) : clientX;
-    const safeY = clientY + mHeight > rect.height ? Math.max(10, rect.height - mHeight - 10) : clientY;
+    const mWidth = 260;
+    const mHeight = Math.min(620, Math.max(160, rect.height - 24));
+    const safeX = clientX + mWidth > rect.width ? Math.max(12, rect.width - mWidth - 12) : Math.max(12, clientX);
+    const safeY = clientY + mHeight > rect.height ? Math.max(12, rect.height - mHeight - 12) : Math.max(12, clientY);
 
     setContextMenu({
       x: safeX,
@@ -1320,9 +1577,9 @@ export const CanvasView = memo(function CanvasView({
     }
 
     const mWidth = 260;
-    const mHeight = 460;
-    const safeX = clientX + mWidth > rect.width ? Math.max(10, rect.width - mWidth - 10) : clientX;
-    const safeY = clientY + mHeight > rect.height ? Math.max(10, rect.height - mHeight - 10) : clientY;
+    const mHeight = Math.min(580, Math.max(160, rect.height - 24));
+    const safeX = clientX + mWidth > rect.width ? Math.max(12, rect.width - mWidth - 12) : Math.max(12, clientX);
+    const safeY = clientY + mHeight > rect.height ? Math.max(12, rect.height - mHeight - 12) : Math.max(12, clientY);
 
     setContextMenu({
       x: safeX,
@@ -1347,9 +1604,9 @@ export const CanvasView = memo(function CanvasView({
     setSelectedNodeIds(new Set());
 
     const mWidth = 260;
-    const mHeight = 440;
-    const safeX = clientX + mWidth > rect.width ? Math.max(10, rect.width - mWidth - 10) : clientX;
-    const safeY = clientY + mHeight > rect.height ? Math.max(10, rect.height - mHeight - 10) : clientY;
+    const mHeight = Math.min(520, Math.max(160, rect.height - 24));
+    const safeX = clientX + mWidth > rect.width ? Math.max(12, rect.width - mWidth - 12) : Math.max(12, clientX);
+    const safeY = clientY + mHeight > rect.height ? Math.max(12, rect.height - mHeight - 12) : Math.max(12, clientY);
 
     setContextMenu({
       x: safeX,
@@ -1405,8 +1662,20 @@ export const CanvasView = memo(function CanvasView({
     // Always fetch latest live node data from latestDataRef to prevent stale closures
     const liveNode = latestDataRef.current.nodes.find((n) => n.id === node.id) || node;
 
-    // If shift key is held, toggle node into/out of selection
-    if (e.shiftKey) {
+    const isModifier = e.shiftKey || e.ctrlKey || e.metaKey;
+    const isGroupBodyClick =
+      liveNode.type === "group" && !target?.closest(".canvas-group-header");
+
+    // If in box select mode, or holding modifier over group background body, start box selection
+    if (isBoxSelectMode || (isModifier && isGroupBodyClick)) {
+      handleStartBoxSelection(e, isModifier);
+      return;
+    }
+
+    hasDraggedRef.current = false;
+
+    // If modifier key is held on a card or group header, toggle node into/out of selection
+    if (isModifier) {
       setSelectedNodeIds((prev) => {
         const next = new Set(prev);
         if (next.has(liveNode.id)) next.delete(liveNode.id);
@@ -1425,17 +1694,30 @@ export const CanvasView = memo(function CanvasView({
     setSelectedEdgeId(null);
 
     // If multiple nodes are selected, drag all of them collaboratively
-    if (currentSelected.size > 1 && liveNode.type !== "group") {
-      const others = latestDataRef.current.nodes
-        .filter((n) => currentSelected.has(n.id) && n.id !== liveNode.id)
-        .map((c) => ({ id: c.id, startX: c.x, startY: c.y }));
+    if (currentSelected.size > 1) {
+      const selectedOthers = latestDataRef.current.nodes
+        .filter((n) => currentSelected.has(n.id) && n.id !== liveNode.id);
+
+      let containedCards: CanvasNode[] = [];
+      if (liveNode.type === "group") {
+        containedCards = latestDataRef.current.nodes.filter(
+          (n) => n.id !== liveNode.id && !currentSelected.has(n.id) && isNodeInsideGroup(n, liveNode as CanvasGroupNode)
+        );
+      }
+
+      const allContained = [...selectedOthers, ...containedCards].map((c) => ({
+        id: c.id,
+        startX: c.x,
+        startY: c.y,
+      }));
+
       nodeDragRef.current = {
         nodeId: liveNode.id,
         startNodeX: liveNode.x,
         startNodeY: liveNode.y,
         mouseStartX: e.clientX,
         mouseStartY: e.clientY,
-        containedNodes: others,
+        containedNodes: allContained,
       };
       return;
     }
@@ -1544,6 +1826,53 @@ export const CanvasView = memo(function CanvasView({
     setConnectingState(null);
   };
 
+  const handleCardMouseUpForConnect = useCallback(
+    (e: React.MouseEvent, targetNode: CanvasNode) => {
+      if (!connectingState || connectingState.fromNodeId === targetNode.id) return;
+      e.stopPropagation();
+
+      const currentData = latestDataRef.current;
+      const fromNode = currentData.nodes.find((n) => n.id === connectingState.fromNodeId);
+      if (!fromNode) {
+        setConnectingState(null);
+        return;
+      }
+
+      const optimal = getOptimalAnchorSides(fromNode, targetNode);
+      const fromSide = connectingState.fromSide || optimal.fromSide;
+      const toSide = optimal.toSide;
+
+      const exists = currentData.edges.some(
+        (ed) =>
+          (ed.fromNode === fromNode.id && ed.toNode === targetNode.id) ||
+          (ed.fromNode === targetNode.id && ed.toNode === fromNode.id)
+      );
+
+      if (!exists) {
+        const newEdge: CanvasEdge = {
+          id: `edge-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          fromNode: fromNode.id,
+          fromSide,
+          fromEnd: "none",
+          toNode: targetNode.id,
+          toSide,
+          toEnd: "arrow",
+          color: fromNode.color || "5",
+          style: "bezier",
+        };
+        pushHistory({
+          ...currentData,
+          edges: [...currentData.edges, newEdge],
+        });
+        showToast("已建立卡片关联");
+      } else {
+        showToast("两张卡片之间已存在关联连线");
+      }
+      setConnectingState(null);
+    },
+    [connectingState, pushHistory, showToast]
+  );
+
   // Interactive checklist toggle in Markdown card
   const handleCardClick = (e: React.MouseEvent, node: CanvasNode) => {
     const target = e.target as HTMLElement;
@@ -1587,6 +1916,28 @@ export const CanvasView = memo(function CanvasView({
         };
         selectionBoxRef.current = updated;
         setSelectionBox(updated);
+
+        // Real-time selection calculation for live visual feedback
+        const minX = Math.min(updated.startX, updated.currentX);
+        const maxX = Math.max(updated.startX, updated.currentX);
+        const minY = Math.min(updated.startY, updated.currentY);
+        const maxY = Math.max(updated.startY, updated.currentY);
+        const isModifier = e.shiftKey || e.ctrlKey || e.metaKey;
+
+        if (maxX - minX > 4 || maxY - minY > 4) {
+          const hitIds = computeBoxSelectionHits(
+            minX,
+            maxX,
+            minY,
+            maxY,
+            latestDataRef.current.nodes
+          );
+          setSelectedNodeIds(
+            isModifier ? new Set([...baseSelectionBeforeBoxRef.current, ...hitIds]) : hitIds
+          );
+        } else {
+          setSelectedNodeIds(baseSelectionBeforeBoxRef.current);
+        }
         return;
       }
 
@@ -1594,6 +1945,9 @@ export const CanvasView = memo(function CanvasView({
       if (isDraggingCanvasRef.current) {
         const dx = e.clientX - canvasDragStartRef.current.x;
         const dy = e.clientY - canvasDragStartRef.current.y;
+        if (Math.hypot(dx, dy) > 4) {
+          canvasDragStartRef.current.hasMoved = true;
+        }
         setViewport((prev) => ({
           ...prev,
           panX: canvasDragStartRef.current.panX + dx,
@@ -1605,6 +1959,11 @@ export const CanvasView = memo(function CanvasView({
       // 2. Dragging node (with multi-select collaborative dragging & group coordination)
       if (nodeDragRef.current) {
         const dragInfo = nodeDragRef.current;
+        if (
+          Math.hypot(e.clientX - dragInfo.mouseStartX, e.clientY - dragInfo.mouseStartY) > 3
+        ) {
+          hasDraggedRef.current = true;
+        }
         const currentZoom = viewportRef.current.zoom;
         const dx = (e.clientX - dragInfo.mouseStartX) / currentZoom;
         const dy = (e.clientY - dragInfo.mouseStartY) / currentZoom;
@@ -1726,21 +2085,29 @@ export const CanvasView = memo(function CanvasView({
         const maxX = Math.max(box.startX, box.currentX);
         const minY = Math.min(box.startY, box.currentY);
         const maxY = Math.max(box.startY, box.currentY);
-        if (maxX - minX > 5 || maxY - minY > 5) {
-          const hitIds = new Set<string>();
-          for (const node of latestDataRef.current.nodes) {
-            const nodeRight = node.x + node.width;
-            const nodeBottom = node.y + node.height;
-            if (node.x < maxX && nodeRight > minX && node.y < maxY && nodeBottom > minY) {
-              hitIds.add(node.id);
-            }
-          }
-          setSelectedNodeIds((prev) => (e.shiftKey ? new Set([...prev, ...hitIds]) : hitIds));
+        const isModifier = e.shiftKey || e.ctrlKey || e.metaKey;
+        if (maxX - minX > 4 || maxY - minY > 4) {
+          const hitIds = computeBoxSelectionHits(
+            minX,
+            maxX,
+            minY,
+            maxY,
+            latestDataRef.current.nodes
+          );
+          setSelectedNodeIds(
+            isModifier ? new Set([...baseSelectionBeforeBoxRef.current, ...hitIds]) : hitIds
+          );
+        } else {
+          setSelectedNodeIds(baseSelectionBeforeBoxRef.current);
         }
       }
 
       if (isDraggingCanvasRef.current) {
         isDraggingCanvasRef.current = false;
+        if (!canvasDragStartRef.current.hasMoved) {
+          setSelectedNodeIds(new Set());
+          setSelectedEdgeId(null);
+        }
       }
       if (nodeDragRef.current) {
         const dragInfo = nodeDragRef.current;
@@ -1891,6 +2258,11 @@ export const CanvasView = memo(function CanvasView({
         setSelectedNodeIds(new Set());
         setSelectedEdgeId(null);
         setContextMenu(null);
+        setIsBoxSelectMode(false);
+        if (selectionBoxRef.current) {
+          selectionBoxRef.current = null;
+          setSelectionBox(null);
+        }
       }
     };
 
@@ -2172,39 +2544,93 @@ export const CanvasView = memo(function CanvasView({
         )}
 
         {selectedNodeIds.size >= 2 && editable && (
-          <button
-            className="canvas-tool-btn"
-            onClick={handleConnectSelectedNodes}
-            title="在选中的卡片之间自动建立关联连线"
-            style={{
-              ...toolBtnStyle(theme, colors),
-              backgroundColor: "rgba(2, 132, 199, 0.15)",
-              color: "#0284c7",
-              border: "1px solid rgba(2, 132, 199, 0.3)",
-              fontWeight: 600,
-            }}
-          >
-            <Link size={13} />
-            <span className="canvas-btn-label">关联连线</span>
-          </button>
+          <>
+            <button
+              className="canvas-tool-btn"
+              onClick={() => handleConnectOneToMany()}
+              title="以当前选中卡片为源，向其余所有选中卡片放射建立一对多关联"
+              style={{
+                ...toolBtnStyle(theme, colors),
+                backgroundColor: "rgba(16, 185, 129, 0.15)",
+                color: "#10b981",
+                border: "1px solid rgba(16, 185, 129, 0.35)",
+                fontWeight: 600,
+              }}
+            >
+              <Share2 size={13} />
+              <span className="canvas-btn-label">一对多关联</span>
+            </button>
+            <button
+              className="canvas-tool-btn"
+              onClick={handleConnectSelectedNodes}
+              title="在选中的卡片/分组之间自动建立顺序链式连线"
+              style={{
+                ...toolBtnStyle(theme, colors),
+                backgroundColor: "rgba(2, 132, 199, 0.15)",
+                color: "#0284c7",
+                border: "1px solid rgba(2, 132, 199, 0.3)",
+                fontWeight: 600,
+              }}
+            >
+              <Link size={13} />
+              <span className="canvas-btn-label">链式串联</span>
+            </button>
+            {selectedNodeIds.size >= 3 && (
+              <button
+                className="canvas-tool-btn"
+                onClick={handleConnectLoopNodes}
+                title="在选中的卡片/分组之间建立闭合环形连线 (A -> B -> C -> A)"
+                style={{
+                  ...toolBtnStyle(theme, colors),
+                  backgroundColor: "rgba(168, 85, 247, 0.15)",
+                  color: "#a855f7",
+                  border: "1px solid rgba(168, 85, 247, 0.3)",
+                  fontWeight: 600,
+                }}
+              >
+                <RotateCw size={13} />
+                <span className="canvas-btn-label">环形闭环</span>
+              </button>
+            )}
+          </>
         )}
 
         {selectedNodeIds.size === 1 && editable && (
-          <button
-            className="canvas-tool-btn"
-            onClick={() => handleSpawnConnectedChild(Array.from(selectedNodeIds)[0], "right")}
-            title="从当前卡片派生子想法 (快捷键: Tab)"
-            style={{
-              ...toolBtnStyle(theme, colors),
-              backgroundColor: "rgba(16, 185, 129, 0.12)",
-              color: "#10b981",
-              border: "1px solid rgba(16, 185, 129, 0.3)",
-              fontWeight: 500,
-            }}
-          >
-            <GitBranch size={13} />
-            <span className="canvas-btn-label">派生想法</span>
-          </button>
+          <>
+            <button
+              className="canvas-tool-btn"
+              onClick={() => handleSpawnConnectedChild(Array.from(selectedNodeIds)[0], "right")}
+              title="从当前卡片派生子想法 (快捷键: Tab)"
+              style={{
+                ...toolBtnStyle(theme, colors),
+                backgroundColor: "rgba(16, 185, 129, 0.12)",
+                color: "#10b981",
+                border: "1px solid rgba(16, 185, 129, 0.3)",
+                fontWeight: 500,
+              }}
+            >
+              <GitBranch size={13} />
+              <span className="canvas-btn-label">派生想法</span>
+            </button>
+            <button
+              className="canvas-tool-btn"
+              onClick={() => {
+                const id = Array.from(selectedNodeIds)[0];
+                setSpawnModalState({ nodeId: id, count: 3, direction: "right" });
+              }}
+              title="从当前卡片批量派生多个分支 (弹窗设置数量与方向)"
+              style={{
+                ...toolBtnStyle(theme, colors),
+                backgroundColor: "rgba(139, 92, 246, 0.12)",
+                color: "#8b5cf6",
+                border: "1px solid rgba(139, 92, 246, 0.3)",
+                fontWeight: 500,
+              }}
+            >
+              <Share2 size={13} />
+              <span className="canvas-btn-label">批量派生...</span>
+            </button>
+          </>
         )}
 
         <div style={{ width: 1, height: 18, background: colors.cardBorder }} />
@@ -2728,10 +3154,12 @@ export const CanvasView = memo(function CanvasView({
 
           // Render Group Container (z-index: 2)
           if (node.type === "group") {
+            const isGroupConnectingTarget =
+              connectingState !== null && connectingState.fromNodeId !== node.id;
             return (
               <div
                 key={node.id}
-                className={`canvas-node canvas-group ${isSelected ? "selected" : ""}`}
+                className={`canvas-node canvas-group ${isSelected ? "selected" : ""} ${isGroupConnectingTarget ? "connecting-target" : ""}`}
                 style={{
                   position: "absolute",
                   left: node.x,
@@ -2742,25 +3170,66 @@ export const CanvasView = memo(function CanvasView({
                   borderRadius: 16,
                   border: isSelected
                     ? "2px solid #f59e0b"
+                    : isGroupConnectingTarget && isHovered
+                    ? "2px solid #0284c7"
+                    : isGroupConnectingTarget
+                    ? "2px dashed rgba(2, 132, 199, 0.7)"
                     : palette
                     ? `2px dashed ${palette.stroke}`
                     : `2px dashed ${colors.groupBorder}`,
                   backgroundColor: palette ? palette.bg : colors.groupBg,
-                  boxShadow: isSelected ? "0 0 16px rgba(245,158,11,0.3)" : undefined,
+                  boxShadow: isSelected
+                    ? "0 0 16px rgba(245,158,11,0.3)"
+                    : isGroupConnectingTarget && isHovered
+                    ? "0 0 0 3px rgba(2, 132, 199, 0.4), 0 0 16px rgba(2, 132, 199, 0.3)"
+                    : undefined,
                   display: "flex",
                   flexDirection: "column",
-                  cursor: "move",
+                  cursor: isGroupConnectingTarget ? "crosshair" : "move",
                 }}
+                onMouseEnter={() => setHoveredNodeId(node.id)}
+                onMouseLeave={() => setHoveredNodeId((prev) => (prev === node.id ? null : prev))}
                 onMouseDown={(e) => handleNodeDragStart(e, node)}
+                onMouseUp={(e) => {
+                  if (connectingState && connectingState.fromNodeId !== node.id) {
+                    handleCardMouseUpForConnect(e, node);
+                  }
+                }}
                 onContextMenu={(e) => handleContextMenuNode(e, node)}
                 onClick={(e) => {
                   e.stopPropagation();
+                  if (e.shiftKey || e.ctrlKey || e.metaKey || hasDraggedRef.current) return;
                   setSelectedNodeId(node.id);
                   setSelectedEdgeId(null);
                 }}
               >
+                {/* Drop-to-connect visual badge on group */}
+                {isGroupConnectingTarget && isHovered && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: -24,
+                      left: "50%",
+                      transform: "translateX(-50%)",
+                      backgroundColor: "#0284c7",
+                      color: "#ffffff",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      padding: "2px 8px",
+                      borderRadius: 10,
+                      pointerEvents: "none",
+                      whiteSpace: "nowrap",
+                      boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+                      zIndex: 100,
+                    }}
+                  >
+                    松开以建立与此分组的关联
+                  </div>
+                )}
+
                 {/* Group Title Badge */}
                 <div
+                  className="canvas-group-header"
                   style={{
                     padding: "6px 14px",
                     display: "flex",
@@ -2828,6 +3297,26 @@ export const CanvasView = memo(function CanvasView({
                   )}
                 </div>
 
+                {/* 4 Connection Anchors on Group Container */}
+                {editable &&
+                  (isSelected || isHovered || connectingState !== null) &&
+                  SIDES.map((side) => {
+                    const dotStyle = getAnchorDotStyle(side, colors);
+                    return (
+                      <div
+                        key={side}
+                        className="canvas-anchor-dot"
+                        style={{
+                          ...dotStyle,
+                          zIndex: 30,
+                        }}
+                        onMouseDown={(e) => handleAnchorMouseDown(e, node.id, side)}
+                        onMouseUp={(e) => handleAnchorMouseUp(e, node.id, side)}
+                        title={`从分组 ${side} 边缘拉出连线`}
+                      />
+                    );
+                  })}
+
                 {/* Resize Handle */}
                 {isSelected && editable && (
                   <div
@@ -2841,10 +3330,11 @@ export const CanvasView = memo(function CanvasView({
           }
 
           // Render Normal Cards (Text, File, Link) (z-index: 10)
+          const isConnectingTarget = connectingState !== null && connectingState.fromNodeId !== node.id;
           return (
             <div
               key={node.id}
-              className={`canvas-node card-${node.type} ${isSelected ? "selected" : ""}`}
+              className={`canvas-node card-${node.type} ${isSelected ? "selected" : ""} ${isConnectingTarget ? "connecting-target" : ""}`}
               style={{
                 position: "absolute",
                 left: node.x,
@@ -2856,24 +3346,36 @@ export const CanvasView = memo(function CanvasView({
                 backgroundColor: colors.cardBg,
                 border: isSelected
                   ? "2px solid #f59e0b"
+                  : isConnectingTarget && isHovered
+                  ? "2px solid #0284c7"
+                  : isConnectingTarget
+                  ? "2px dashed rgba(2, 132, 199, 0.6)"
                   : palette
                   ? `2px solid ${palette.stroke}`
                   : `1px solid ${colors.cardBorder}`,
                 boxShadow: isSelected
                   ? "0 12px 36px rgba(245,158,11,0.35)"
+                  : isConnectingTarget && isHovered
+                  ? "0 0 0 3px rgba(2, 132, 199, 0.4), 0 12px 36px rgba(2, 132, 199, 0.35)"
                   : colors.cardShadow,
                 display: "flex",
                 flexDirection: "column",
                 color: colors.cardText,
-                cursor: isEditing ? "text" : "move",
+                cursor: isConnectingTarget ? "crosshair" : isEditing ? "text" : "move",
                 transition: "border-color 0.15s ease, box-shadow 0.15s ease",
               }}
               onMouseEnter={() => setHoveredNodeId(node.id)}
               onMouseLeave={() => setHoveredNodeId((prev) => (prev === node.id ? null : prev))}
               onMouseDown={(e) => handleNodeDragStart(e, node)}
+              onMouseUp={(e) => {
+                if (connectingState && connectingState.fromNodeId !== node.id) {
+                  handleCardMouseUpForConnect(e, node);
+                }
+              }}
               onContextMenu={(e) => handleContextMenuNode(e, node)}
               onClick={(e) => {
                 e.stopPropagation();
+                if (e.shiftKey || e.ctrlKey || e.metaKey || hasDraggedRef.current) return;
                 setSelectedNodeId(node.id);
                 setSelectedEdgeId(null);
               }}
@@ -2885,6 +3387,29 @@ export const CanvasView = memo(function CanvasView({
                 }
               }}
             >
+              {/* Drop-to-connect visual badge */}
+              {isConnectingTarget && isHovered && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: -24,
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    backgroundColor: "#0284c7",
+                    color: "#ffffff",
+                    fontSize: 11,
+                    fontWeight: 600,
+                    padding: "2px 8px",
+                    borderRadius: 10,
+                    pointerEvents: "none",
+                    whiteSpace: "nowrap",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+                    zIndex: 100,
+                  }}
+                >
+                  松开以建立关联
+                </div>
+              )}
               {/* Floating Action Menu for Selected Card */}
               {isSelected && editable && selectedNodeIds.size === 1 && (
                 <div
@@ -3824,6 +4349,178 @@ export const CanvasView = memo(function CanvasView({
         </div>
       )}
 
+      {/* 6.6. MODAL: BATCH SPAWN BRANCHES */}
+      {spawnModalState && (
+        <div
+          style={modalOverlayStyle}
+          onClick={() => setSpawnModalState(null)}
+          onWheel={(e) => e.stopPropagation()}
+        >
+          <div
+            style={{ ...modalContentStyle(theme, colors), width: 440, maxWidth: "90vw" }}
+            onClick={(e) => e.stopPropagation()}
+            onWheel={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: 16,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Share2 size={16} color="#8b5cf6" />
+                <span style={{ fontSize: 15, fontWeight: 600 }}>批量派生分支 (一对多)</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSpawnModalState(null)}
+                style={{ background: "none", border: "none", cursor: "pointer", color: colors.cardText, opacity: 0.6 }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Branch Count Input */}
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: "block", fontSize: 12.5, fontWeight: 600, marginBottom: 6 }}>
+                派生分支数量 (1 ~ 20)
+              </label>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={spawnModalState.count}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value, 10);
+                    setSpawnModalState((prev) =>
+                      prev ? { ...prev, count: isNaN(val) ? 1 : Math.max(1, Math.min(20, val)) } : null
+                    );
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleConfirmBatchSpawn();
+                    if (e.key === "Escape") setSpawnModalState(null);
+                  }}
+                  autoFocus
+                  style={{
+                    flex: 1,
+                    padding: "8px 12px",
+                    borderRadius: 6,
+                    border: `1px solid ${colors.cardBorder}`,
+                    backgroundColor: colors.cardBg,
+                    color: colors.cardText,
+                    fontSize: 14,
+                    outline: "none",
+                  }}
+                />
+              </div>
+
+              {/* Quick count pills */}
+              <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                {[2, 3, 4, 5, 6].map((num) => (
+                  <button
+                    key={num}
+                    type="button"
+                    onClick={() => setSpawnModalState((prev) => (prev ? { ...prev, count: num } : null))}
+                    style={{
+                      padding: "4px 10px",
+                      borderRadius: 14,
+                      fontSize: 11.5,
+                      fontWeight: spawnModalState.count === num ? 600 : 400,
+                      backgroundColor: spawnModalState.count === num ? "rgba(139, 92, 246, 0.2)" : "transparent",
+                      color: spawnModalState.count === num ? "#8b5cf6" : colors.cardText,
+                      border: spawnModalState.count === num ? "1px solid #8b5cf6" : `1px solid ${colors.cardBorder}`,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {num} 个分支
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Direction Selection */}
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ display: "block", fontSize: 12.5, fontWeight: 600, marginBottom: 6 }}>
+                展开方向
+              </label>
+              <div style={{ display: "flex", gap: 10 }}>
+                {[
+                  { dir: "right", label: "向右横向展开" },
+                  { dir: "bottom", label: "向下纵向展开" },
+                ].map((d) => (
+                  <button
+                    key={d.dir}
+                    type="button"
+                    onClick={() =>
+                      setSpawnModalState((prev) =>
+                        prev ? { ...prev, direction: d.dir as "right" | "bottom" } : null
+                      )
+                    }
+                    style={{
+                      flex: 1,
+                      padding: "8px 12px",
+                      borderRadius: 6,
+                      fontSize: 12.5,
+                      border:
+                        spawnModalState.direction === d.dir
+                          ? "1.5px solid #8b5cf6"
+                          : `1px solid ${colors.cardBorder}`,
+                      background:
+                        spawnModalState.direction === d.dir ? "rgba(139, 92, 246, 0.12)" : "transparent",
+                      color: spawnModalState.direction === d.dir ? "#8b5cf6" : colors.cardText,
+                      fontWeight: spawnModalState.direction === d.dir ? 600 : 400,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {d.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => setSpawnModalState(null)}
+                style={{
+                  ...toolBtnStyle(theme, colors),
+                  padding: "7px 14px",
+                  borderRadius: 6,
+                  border: `1px solid ${colors.cardBorder}`,
+                  cursor: "pointer",
+                }}
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmBatchSpawn}
+                style={{
+                  ...toolBtnStyle(theme, colors),
+                  backgroundColor: "#8b5cf6",
+                  color: "#ffffff",
+                  padding: "7px 18px",
+                  borderRadius: 6,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                <Share2 size={13} />
+                <span>确认派生 ({spawnModalState.count} 个)</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 7. MARQUEE SELECTION BOX */}
       {selectionBox && (
         <div
@@ -3858,7 +4555,7 @@ export const CanvasView = memo(function CanvasView({
             padding: "6px 0",
             minWidth: 230,
             maxWidth: 300,
-            maxHeight: "82vh",
+            maxHeight: "calc(100% - 24px)",
             overflowY: "auto",
             fontSize: 12.5,
             userSelect: "none",
@@ -4329,6 +5026,19 @@ export const CanvasView = memo(function CanvasView({
                         <span>解散分组 (保留内部卡片)</span>
                       </div>
 
+                      {/* Disconnect edges for this group */}
+                      {data.edges.some(
+                        (e) => e.fromNode === targetNode.id || e.toNode === targetNode.id
+                      ) && (
+                        <div
+                          className="canvas-ctx-item danger"
+                          onClick={() => handleDisconnectNodeEdges(targetNode.id)}
+                        >
+                          <Unlink size={13} />
+                          <span>✂️ 断开分组所有关联连线</span>
+                        </div>
+                      )}
+
                       <div className="canvas-ctx-divider" />
                       <div className="canvas-ctx-section-label">删除</div>
 
@@ -4363,11 +5073,44 @@ export const CanvasView = memo(function CanvasView({
                         <span>打包为新分组容器</span>
                       </div>
 
-                      {/* Connect selected nodes */}
+                      {/* Connect One to Many (Star) */}
+                      <div
+                        className="canvas-ctx-item"
+                        onClick={() => handleConnectOneToMany(contextMenu.targetNodeId)}
+                      >
+                        <Share2 size={13} color="#10b981" />
+                        <span>🌱 以此{targetNode?.type === "group" ? "分组" : "卡片"}建立一对多关联 (连接其余 {selectedNodeIds.size - 1} 项)</span>
+                      </div>
+
+                      {/* Connect selected nodes (Chain) */}
                       <div className="canvas-ctx-item" onClick={handleConnectSelectedNodes}>
                         <Link size={13} color="#0284c7" />
-                        <span>🔗 建立关联连线 ({selectedNodeIds.size} 项)</span>
+                        <span>🔗 建立顺序链式连线 ({selectedNodeIds.size} 项)</span>
                       </div>
+
+                      {/* Connect loop nodes (Loop / Ring) */}
+                      {selectedNodeIds.size >= 3 && (
+                        <div className="canvas-ctx-item" onClick={handleConnectLoopNodes}>
+                          <RotateCw size={13} color="#a855f7" />
+                          <span>🔄 建立闭环环形连线 ({selectedNodeIds.size} 项)</span>
+                        </div>
+                      )}
+
+                      {/* Disconnect edges for this node */}
+                      {contextMenu.targetNodeId &&
+                        data.edges.some(
+                          (e) =>
+                            e.fromNode === contextMenu.targetNodeId ||
+                            e.toNode === contextMenu.targetNodeId
+                        ) && (
+                          <div
+                            className="canvas-ctx-item danger"
+                            onClick={() => handleDisconnectNodeEdges(contextMenu.targetNodeId!)}
+                          >
+                            <Unlink size={13} />
+                            <span>✂️ 断开此{targetNode?.type === "group" ? "分组" : "卡片"}的所有关联连线</span>
+                          </div>
+                        )}
 
                       <div className="canvas-ctx-divider" />
                       <div className="canvas-ctx-section-label">对齐与分布</div>
@@ -4462,6 +5205,31 @@ export const CanvasView = memo(function CanvasView({
                             <GitBranch size={13} color="#06b6d4" />
                             <span>🌿 派生下方子想法</span>
                           </div>
+                          <div
+                            className="canvas-ctx-item"
+                            onClick={() => {
+                              setSpawnModalState({
+                                nodeId: targetNode.id,
+                                count: 3,
+                                direction: "right",
+                              });
+                              setContextMenu(null);
+                            }}
+                          >
+                            <Share2 size={13} color="#8b5cf6" />
+                            <span>🔱 批量派生分支 (自定义数量)...</span>
+                          </div>
+                          {data.edges.some(
+                            (e) => e.fromNode === targetNode.id || e.toNode === targetNode.id
+                          ) && (
+                            <div
+                              className="canvas-ctx-item danger"
+                              onClick={() => handleDisconnectNodeEdges(targetNode.id)}
+                            >
+                              <Unlink size={13} />
+                              <span>✂️ 断开所有关联连线</span>
+                            </div>
+                          )}
                           <div className="canvas-ctx-divider" />
                         </>
                       )}

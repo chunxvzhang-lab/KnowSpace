@@ -9819,6 +9819,24 @@ body:has(.flash-capsule-overlay) {
   animation: canvasCtxFadeIn 0.12s ease-out;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
+  scrollbar-width: thin;
+}
+
+.canvas-context-menu::-webkit-scrollbar {
+  width: 4px;
+}
+
+.canvas-context-menu::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.canvas-context-menu::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 4px;
+}
+
+.canvas-context-menu::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.6);
 }
 
 @keyframes canvasCtxFadeIn {

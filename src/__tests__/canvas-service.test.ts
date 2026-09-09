@@ -13,6 +13,11 @@ import {
   downloadCanvasAsImage,
   copyCanvasImageToClipboard,
   reverseEdgeDirection,
+  connectOneToMany,
+  connectChainNodes,
+  connectLoopNodes,
+  disconnectNodeEdges,
+  spawnMultipleBranches,
 } from "../services/canvasService";
 import type { CanvasData, CanvasTextNode, CanvasFileNode, CanvasGroupNode } from "../types/canvasTypes";
 
@@ -304,6 +309,218 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
     expect(rev4.toNode).toBe("nodeA");
     expect(rev4.fromEnd).toBe("none");
     expect(rev4.toEnd).toBe("none");
+  });
+
+  it("connects one root node to multiple target nodes (1-to-Many / Star)", () => {
+    const rootNode: CanvasTextNode = {
+      id: "root-1",
+      type: "text",
+      text: "# 核心假说",
+      x: 100,
+      y: 200,
+      width: 260,
+      height: 140,
+    };
+    const target1: CanvasTextNode = {
+      id: "child-1",
+      type: "text",
+      text: "子观点 1",
+      x: 450,
+      y: 100,
+      width: 260,
+      height: 140,
+    };
+    const target2: CanvasTextNode = {
+      id: "child-2",
+      type: "text",
+      text: "子观点 2",
+      x: 450,
+      y: 300,
+      width: 260,
+      height: 140,
+    };
+    const target3: CanvasTextNode = {
+      id: "child-3",
+      type: "text",
+      text: "子观点 3",
+      x: 450,
+      y: 500,
+      width: 260,
+      height: 140,
+    };
+
+    const edges = connectOneToMany(rootNode, [rootNode, target1, target2, target3], []);
+    // Should skip self (rootNode) and create exactly 3 edges
+    expect(edges).toHaveLength(3);
+    expect(edges[0].fromNode).toBe("root-1");
+    expect(edges[0].toNode).toBe("child-1");
+    expect(edges[1].fromNode).toBe("root-1");
+    expect(edges[1].toNode).toBe("child-2");
+    expect(edges[2].fromNode).toBe("root-1");
+    expect(edges[2].toNode).toBe("child-3");
+
+    // Calling again with existing edges should not create duplicates
+    const edgesDup = connectOneToMany(rootNode, [target1, target2, target3], edges);
+    expect(edgesDup).toHaveLength(0);
+  });
+
+  it("connects nodes in a chain with spatial sorting to prevent criss-crossing dead knots", () => {
+    const nodeA: CanvasTextNode = { id: "a", type: "text", text: "A", x: 100, y: 100, width: 100, height: 100 };
+    const nodeB: CanvasTextNode = { id: "b", type: "text", text: "B", x: 300, y: 100, width: 100, height: 100 };
+    const nodeC: CanvasTextNode = { id: "c", type: "text", text: "C", x: 500, y: 100, width: 100, height: 100 };
+
+    // Pass in unordered array: [C, A, B]
+    const chainEdges = connectChainNodes([nodeC, nodeA, nodeB], [], "bezier", true);
+    expect(chainEdges).toHaveLength(2);
+    // Spatially sorted: A -> B -> C
+    expect(chainEdges[0].fromNode).toBe("a");
+    expect(chainEdges[0].toNode).toBe("b");
+    expect(chainEdges[1].fromNode).toBe("b");
+    expect(chainEdges[1].toNode).toBe("c");
+  });
+
+  it("disconnects all incoming and outgoing edges for a specific node", () => {
+    const edges = [
+      { id: "e1", fromNode: "node-1", toNode: "node-2" },
+      { id: "e2", fromNode: "node-3", toNode: "node-1" },
+      { id: "e3", fromNode: "node-2", toNode: "node-3" },
+    ] as any;
+
+    const remaining = disconnectNodeEdges("node-1", edges);
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0].id).toBe("e3");
+  });
+
+  it("spawns multiple branches (1-to-Many) neatly arranged and connected", () => {
+    const sourceNode: CanvasTextNode = {
+      id: "source-1",
+      type: "text",
+      text: "# 中心主题",
+      x: 100,
+      y: 200,
+      width: 260,
+      height: 150,
+      color: "4",
+    };
+
+    const result = spawnMultipleBranches(sourceNode, 3, "right");
+    expect(result.newNodes).toHaveLength(3);
+    expect(result.newEdges).toHaveLength(3);
+
+    // All edges point from source to the new nodes
+    expect(result.newEdges.every((e) => e.fromNode === "source-1")).toBe(true);
+    expect(result.newEdges[0].toNode).toBe(result.newNodes[0].id);
+    expect(result.newEdges[1].toNode).toBe(result.newNodes[1].id);
+    expect(result.newEdges[2].toNode).toBe(result.newNodes[2].id);
+
+    // Nodes are arranged to the right of source and stacked vertically
+    expect(result.newNodes[0].x).toBeGreaterThan(sourceNode.x + sourceNode.width);
+    expect(result.newNodes[1].y).toBeGreaterThan(result.newNodes[0].y);
+    expect(result.newNodes[2].y).toBeGreaterThan(result.newNodes[1].y);
+  });
+
+  it("prevents occlusion in vertical tiers by picking top/bottom anchors even when dx is wide", () => {
+    // Lower card connecting to upper-right card:
+    // fromNode is at bottom (y: 600..740), toNode is at upper-tier (y: 100..240, x: 700..960)
+    // Horizontal distance (dx = 500) exceeds dy = 500, but vertical tiering must strictly pick top -> bottom
+    const lowerCard: CanvasTextNode = {
+      id: "lower",
+      type: "text",
+      text: "底部聚合卡片",
+      x: 200,
+      y: 600,
+      width: 260,
+      height: 140,
+    };
+    const upperRightCard: CanvasTextNode = {
+      id: "upper-right",
+      type: "text",
+      text: "右上目标卡片",
+      x: 700,
+      y: 100,
+      width: 260,
+      height: 140,
+    };
+
+    const sides = getOptimalAnchorSides(lowerCard, upperRightCard);
+    expect(sides).toEqual({ fromSide: "top", toSide: "bottom" });
+
+    // Reverse: from upper-tier to lower card should be bottom -> top
+    const reverseSides = getOptimalAnchorSides(upperRightCard, lowerCard);
+    expect(reverseSides).toEqual({ fromSide: "bottom", toSide: "top" });
+  });
+
+  it("connects nodes in a closed loop (Ring) in centroid angular order without crossing", () => {
+    const node1: CanvasTextNode = { id: "n1", type: "text", text: "1", x: 200, y: 100, width: 100, height: 100 };
+    const node2: CanvasTextNode = { id: "n2", type: "text", text: "2", x: 400, y: 100, width: 100, height: 100 };
+    const node3: CanvasTextNode = { id: "n3", type: "text", text: "3", x: 400, y: 300, width: 100, height: 100 };
+    const node4: CanvasTextNode = { id: "n4", type: "text", text: "4", x: 200, y: 300, width: 100, height: 100 };
+
+    // Pass in scrambled order
+    const loopEdges = connectLoopNodes([node3, node1, node4, node2], [], "bezier", true);
+    // Closed ring of 4 nodes must produce 4 edges
+    expect(loopEdges).toHaveLength(4);
+
+    // Verify all 4 nodes are connected in a single cycle
+    const fromIds = loopEdges.map((e) => e.fromNode);
+    const toIds = loopEdges.map((e) => e.toNode);
+    expect(new Set(fromIds).size).toBe(4);
+    expect(new Set(toIds).size).toBe(4);
+
+    // Every fromNode is visited exactly once, and loop is closed (A -> B -> C -> D -> A)
+    const nextMap = new Map(loopEdges.map((e) => [e.fromNode, e.toNode]));
+    let current = fromIds[0];
+    const visited = [current];
+    for (let i = 0; i < 3; i++) {
+      current = nextMap.get(current)!;
+      visited.push(current);
+    }
+    expect(nextMap.get(current)).toBe(fromIds[0]); // Closes loop
+    expect(new Set(visited).size).toBe(4);
+  });
+
+  it("supports connecting group containers with cards and other groups", () => {
+    const groupA: CanvasGroupNode = {
+      id: "grp-a",
+      type: "group",
+      label: "分组 A",
+      x: 100,
+      y: 100,
+      width: 400,
+      height: 300,
+    };
+    const groupB: CanvasGroupNode = {
+      id: "grp-b",
+      type: "group",
+      label: "分组 B",
+      x: 600,
+      y: 100,
+      width: 400,
+      height: 300,
+    };
+    const cardOutside: CanvasTextNode = {
+      id: "ext-card",
+      type: "text",
+      text: "外部卡片",
+      x: 350,
+      y: 500,
+      width: 200,
+      height: 100,
+    };
+
+    // 1. Connect groupA to cardOutside (1-to-many)
+    const edges1 = connectOneToMany(groupA, [cardOutside], []);
+    expect(edges1).toHaveLength(1);
+    expect(edges1[0].fromNode).toBe("grp-a");
+    expect(edges1[0].toNode).toBe("ext-card");
+
+    // 2. Connect groupA to groupB
+    const edges2 = connectOneToMany(groupA, [groupB], []);
+    expect(edges2).toHaveLength(1);
+    expect(edges2[0].fromNode).toBe("grp-a");
+    expect(edges2[0].toNode).toBe("grp-b");
+    expect(edges2[0].fromSide).toBe("right");
+    expect(edges2[0].toSide).toBe("left");
   });
 });
 

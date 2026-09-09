@@ -97,6 +97,8 @@ export function App() {
 
   const [chapterId, setChapterId] = useState<string>("");
   const [tabs, setTabs] = useState<TabItem[]>([]);
+  const tabsRef = useRef<TabItem[]>(tabs);
+  tabsRef.current = tabs;
   const [dualSplitTabId, setDualSplitTabId] = useState<string | null>(null);
   const [secondaryRenderedChapter, setSecondaryRenderedChapter] = useState<RenderedChapter | null>(null);
   const secondaryReaderRef = useRef<HTMLElement | null>(null);
@@ -198,9 +200,23 @@ export function App() {
     reloadFromDisk,
     discardChanges,
     clearConflict,
+    closeSession,
   } = useDocumentSession();
 
-  const activeChapter = manifest?.chapters.find((item) => item.id === chapterId);
+  const activeTab = useMemo(() => tabs.find((item) => item.id === chapterId), [tabs, chapterId]);
+  const activeChapter = useMemo(() => {
+    const fromManifest = manifest?.chapters.find((item) => item.id === chapterId);
+    if (fromManifest) return fromManifest;
+    if (activeTab) {
+      return {
+        id: activeTab.id,
+        title: activeTab.title,
+        src: activeTab.relativePath || activeTab.title,
+        absolutePath: activeTab.absolutePath,
+      };
+    }
+    return undefined;
+  }, [manifest?.chapters, chapterId, activeTab]);
   const activeHeading = renderedChapter?.headings.find((heading) => heading.id === activeHeadingId);
   const activeIndex = manifest?.chapters.findIndex((item) => item.id === chapterId) ?? -1;
 
@@ -659,8 +675,17 @@ export function App() {
         case "select-chapter": {
           setChapterId(action.chapterId);
           setSearchQuery("");
-          setSidebarTab("toc");
           const targetChap = manifestRef.current?.chapters.find((c) => c.id === action.chapterId);
+          const targetTab = tabsRef.current?.find((t) => t.id === action.chapterId);
+          const targetSrc = targetChap?.src || targetTab?.relativePath || targetChap?.title || targetTab?.title || "";
+          const isTargetCanvas = targetSrc.toLowerCase().endsWith(".canvas");
+          if (isTargetCanvas) {
+            setViewMode("canvas");
+            setDirectoryOpen(false);
+            setSidebarOpen(false);
+          } else {
+            setSidebarTab("toc");
+          }
           if (targetChap) {
             setTabs((prev) => {
               const exists = prev.some(
@@ -773,6 +798,15 @@ export function App() {
 
   const selectChapter = useCallback(
     (nextChapterId: string) => {
+      const targetChap = manifestRef.current?.chapters.find((c) => c.id === nextChapterId);
+      const targetTab = tabsRef.current?.find((t) => t.id === nextChapterId);
+      const targetSrc = targetChap?.src || targetTab?.relativePath || targetChap?.title || targetTab?.title || "";
+      const isCanvas = targetSrc.toLowerCase().endsWith(".canvas");
+      if (isCanvas) {
+        setDirectoryOpen(false);
+        setSidebarOpen(false);
+        setViewMode("canvas");
+      }
       if (nextChapterId === chapterId) return;
       guardAction({ type: "select-chapter", chapterId: nextChapterId });
     },
@@ -794,6 +828,17 @@ export function App() {
           (t.title === activeChapter.title && (!t.absolutePath || !activeChapter.absolutePath))
       );
       if (matchIndex !== -1) {
+        const existing = prev[matchIndex];
+        const nextDirty = Boolean(isDirty && activeChapter.id === chapterId);
+        if (
+          existing.id === activeChapter.id &&
+          existing.title === activeChapter.title &&
+          existing.relativePath === activeChapter.src &&
+          existing.absolutePath === activeChapter.absolutePath &&
+          Boolean(existing.isDirty) === nextDirty
+        ) {
+          return prev;
+        }
         return prev.map((t, idx) =>
           idx === matchIndex
             ? {
@@ -802,7 +847,7 @@ export function App() {
                 title: activeChapter.title,
                 relativePath: activeChapter.src,
                 absolutePath: activeChapter.absolutePath,
-                isDirty: Boolean(isDirty && activeChapter.id === chapterId),
+                isDirty: nextDirty,
               }
             : t
         );
@@ -838,22 +883,24 @@ export function App() {
       if (tabId === dualSplitTabId) {
         setDualSplitTabId(null);
       }
-      setTabs((prev) => {
-        const next = prev.filter((t) => t.id !== tabId);
-        if (next.length === 0) {
-          setChapterId("");
-          return next;
-        }
-        if (tabId === chapterId) {
-          const closedIndex = prev.findIndex((t) => t.id === tabId);
-          const newActiveIndex = Math.min(closedIndex, next.length - 1);
-          const targetId = next[newActiveIndex].id;
-          selectChapter(targetId);
-        }
-        return next;
-      });
+      const closedIndex = tabs.findIndex((t) => t.id === tabId);
+      const next = tabs.filter((t) => t.id !== tabId);
+      setTabs(next);
+
+      if (next.length === 0) {
+        setChapterId("");
+        activeLoadedChapterIdRef.current = "";
+        closeSession();
+        return;
+      }
+
+      if (tabId === chapterId) {
+        const newActiveIndex = Math.min(Math.max(0, closedIndex), next.length - 1);
+        const targetId = next[newActiveIndex].id;
+        selectChapter(targetId);
+      }
     },
-    [chapterId, dualSplitTabId, selectChapter]
+    [tabs, chapterId, dualSplitTabId, selectChapter, closeSession]
   );
 
   const handleDetachTab = useCallback(
@@ -953,11 +1000,13 @@ export function App() {
       setBookmarks(loadBookmarks(localId, localManifest.chapters));
       setChapterId("uploaded");
       setTabs([{ id: "uploaded", title: baseName, relativePath: file.name, absolutePath: undefined, isDirty: false }]);
-      setSearchQuery("");
-      setSidebarOpen(true);
-      setSidebarTab("toc");
       if (file.name.toLowerCase().endsWith(".canvas")) {
         setViewMode("canvas");
+        setDirectoryOpen(false);
+        setSidebarOpen(false);
+      } else {
+        setSidebarOpen(true);
+        setSidebarTab("toc");
       }
       activeLoadedChapterIdRef.current = "uploaded";
 
@@ -997,48 +1046,89 @@ export function App() {
 
       const fileName = absolutePath.split(/[\\/]/).pop() ?? "Markdown.md";
       const baseName = fileName.replace(/\.(md|markdown|canvas)$/i, "") || "本地文档";
-      const singleChapterId = `file:${encodeURIComponent(absolutePath.toLowerCase())}`;
+      const normPath = absolutePath.replace(/\\/g, "/").toLowerCase();
+      const isSpaceFile = normPath.includes("/space/") || /^\d{4}-\d{2}-\d{2}_\d{4}\.md$/i.test(fileName);
 
-      const singleChapter: ChapterManifest = {
-        id: singleChapterId,
-        title: baseName,
-        src: fileName,
-        absolutePath,
-        baseUrl: source.baseUrl,
-      };
+      // Check if file belongs to currently active manifest
+      const existingChap = manifestRef.current?.chapters.find(
+        (c) => c.absolutePath && c.absolutePath.toLowerCase() === absolutePath.toLowerCase()
+      );
 
-      const singleManifest: BookManifest = {
-        id: `file:${absolutePath.toLowerCase()}`,
-        title: baseName,
-        description: "本地文档",
-        rootPath: absolutePath.substring(0, Math.max(absolutePath.lastIndexOf("\\"), absolutePath.lastIndexOf("/"))),
-        chapters: [singleChapter],
-      };
+      const targetChapterId = existingChap ? existingChap.id : `file:${encodeURIComponent(absolutePath.toLowerCase())}`;
 
-      pendingBookmarkRef.current = null;
-      setManifest(singleManifest);
-      setBookmarks(loadBookmarks(singleManifest.id, singleManifest.chapters));
-      setChapterId(singleChapterId);
-      if (fileName.toLowerCase().endsWith(".canvas")) {
-        setViewMode("canvas");
+      // Check if user already has an active workspace
+      const hasActiveWorkspace = Boolean(
+        manifestRef.current &&
+        manifestRef.current.chapters.length > 0 &&
+        (manifestRef.current.rootPath || manifestRef.current.chapters.length > 1) &&
+        !manifestRef.current.rootPath?.toLowerCase().includes("space")
+      );
+
+      // Only set single file manifest if user had NO workspace and it is NOT a Space note
+      if (!hasActiveWorkspace && !isSpaceFile) {
+        const singleChapter: ChapterManifest = {
+          id: targetChapterId,
+          title: baseName,
+          src: fileName,
+          absolutePath,
+          baseUrl: source.baseUrl,
+        };
+
+        const singleManifest: BookManifest = {
+          id: `file:${absolutePath.toLowerCase()}`,
+          title: baseName,
+          description: "本地文档",
+          rootPath: absolutePath.substring(0, Math.max(absolutePath.lastIndexOf("\\"), absolutePath.lastIndexOf("/"))),
+          chapters: [singleChapter],
+        };
+
+        pendingBookmarkRef.current = null;
+        setManifest(singleManifest);
+        setBookmarks(loadBookmarks(singleManifest.id, singleManifest.chapters));
+      } else if (!manifestRef.current && isSpaceFile) {
+        const singleChapter: ChapterManifest = {
+          id: targetChapterId,
+          title: baseName,
+          src: fileName,
+          absolutePath,
+          baseUrl: source.baseUrl,
+        };
+        const singleManifest: BookManifest = {
+          id: `file:${absolutePath.toLowerCase()}`,
+          title: baseName,
+          description: "闪念笔记",
+          chapters: [singleChapter],
+        };
+        setManifest(singleManifest);
       }
+
+      setChapterId(targetChapterId);
+      const isCanvas = fileName.toLowerCase().endsWith(".canvas");
+      if (isCanvas) {
+        setViewMode("canvas");
+        setDirectoryOpen(false);
+        setSidebarOpen(false);
+      } else if (fileName.toLowerCase().endsWith(".mindmap.md")) {
+        setViewMode("mindmap");
+      }
+
       setTabs((prev) => {
         const matchIdx = prev.findIndex(
           (t) =>
-            t.id === singleChapterId ||
+            t.id === targetChapterId ||
             (t.absolutePath && t.absolutePath.toLowerCase() === absolutePath.toLowerCase())
         );
         if (matchIdx !== -1) {
           return prev.map((t, idx) =>
             idx === matchIdx
-              ? { ...t, id: singleChapterId, title: baseName, relativePath: fileName, absolutePath }
+              ? { ...t, id: targetChapterId, title: baseName, relativePath: fileName, absolutePath }
               : t
           );
         }
         return [
           ...prev,
           {
-            id: singleChapterId,
+            id: targetChapterId,
             title: baseName,
             relativePath: fileName,
             absolutePath,
@@ -1046,13 +1136,19 @@ export function App() {
           },
         ];
       });
+
       setSearchQuery("");
-      setSidebarOpen(true);
-      setSidebarTab("toc");
-      activeLoadedChapterIdRef.current = singleChapterId;
+      if (isCanvas) {
+        setDirectoryOpen(false);
+        setSidebarOpen(false);
+      } else {
+        setSidebarOpen(true);
+        setSidebarTab("toc");
+      }
+      activeLoadedChapterIdRef.current = targetChapterId;
 
       openSession({
-        chapterId: singleChapterId,
+        chapterId: targetChapterId,
         absolutePath,
         fileName,
         baseUrl: source.baseUrl,
@@ -1065,8 +1161,8 @@ export function App() {
 
       setNotice(`已打开：${fileName}`);
 
-      // 2. In background, asynchronously index directory without blocking UI
-      if (window.bookMDDesktop.getDirectoryForFile) {
+      // 2. Only asynchronously index directory if opening a non-Space file and NO workspace was already active
+      if (!hasActiveWorkspace && !isSpaceFile && window.bookMDDesktop.getDirectoryForFile) {
         window.bookMDDesktop
           .getDirectoryForFile(absolutePath)
           .then((dirResult) => {
@@ -1078,9 +1174,10 @@ export function App() {
               setManifest(dirResult.directory);
               setBookmarks(loadBookmarks(dirResult.directory.id, dirResult.directory.chapters));
               setChapterId(activeChap.id);
+              activeLoadedChapterIdRef.current = activeChap.id;
               setTabs((prev) =>
                 prev.map((t) =>
-                  t.id === singleChapterId ||
+                  t.id === targetChapterId ||
                   (t.absolutePath && t.absolutePath.toLowerCase() === absolutePath.toLowerCase())
                     ? {
                         ...t,
@@ -1145,8 +1242,15 @@ export function App() {
         ];
       });
       setSearchQuery("");
-      setSidebarOpen(true);
-      setSidebarTab("toc");
+      const isCanvas = targetChapter.src.toLowerCase().endsWith(".canvas");
+      if (isCanvas) {
+        setViewMode("canvas");
+        setDirectoryOpen(false);
+        setSidebarOpen(false);
+      } else {
+        setSidebarOpen(true);
+        setSidebarTab("toc");
+      }
       setNotice(`已打开目录：${result.directory.title}`);
 
       if (targetChapter.absolutePath) {
@@ -1385,8 +1489,8 @@ export function App() {
           },
         ];
       });
-      setSidebarOpen(true);
-      setSidebarTab("toc");
+      setDirectoryOpen(false);
+      setSidebarOpen(false);
       setViewMode("canvas");
       activeLoadedChapterIdRef.current = activeChap.id;
 
@@ -1716,7 +1820,26 @@ export function App() {
 
   // Load chapter content when chapterId changes
   useEffect(() => {
-    if (!manifest || !chapterId) return;
+    if (!chapterId) return;
+
+    const targetChapter = manifest?.chapters.find((item) => item.id === chapterId);
+    const targetTab = tabs.find((item) => item.id === chapterId);
+    if (!targetChapter && !targetTab) return;
+
+    const targetTitle = targetChapter?.title || targetTab?.title || "文档";
+    const targetSrc = targetChapter?.src || targetTab?.relativePath || targetTitle;
+    const fileName = targetSrc.split(/[\\/]/).pop() ?? targetTitle;
+    const isCanvas = fileName.toLowerCase().endsWith(".canvas");
+    const isMindmap = fileName.toLowerCase().endsWith(".mindmap.md");
+
+    if (isCanvas) {
+      setViewMode("canvas");
+      setDirectoryOpen(false);
+      setSidebarOpen(false);
+    } else if (isMindmap) {
+      setViewMode("mindmap");
+    }
+
     // If this chapter is already the actively loaded session, skip redundant re-fetching
     if (activeLoadedChapterIdRef.current === chapterId) return;
     if (session?.chapterId === chapterId) {
@@ -1725,13 +1848,12 @@ export function App() {
     }
 
     let cancelled = false;
-    const targetChapter = manifest.chapters.find((item) => item.id === chapterId);
-    if (!targetChapter) return;
+    const targetAbsPath = targetChapter?.absolutePath || targetTab?.absolutePath;
 
     if (
       session?.absolutePath &&
-      targetChapter.absolutePath &&
-      session.absolutePath.toLowerCase() === targetChapter.absolutePath.toLowerCase()
+      targetAbsPath &&
+      session.absolutePath.toLowerCase() === targetAbsPath.toLowerCase()
     ) {
       activeLoadedChapterIdRef.current = chapterId;
       return;
@@ -1740,18 +1862,19 @@ export function App() {
     activeLoadedChapterIdRef.current = chapterId;
 
     const loadPromise =
-      targetChapter.absolutePath && window.bookMDDesktop
-        ? window.bookMDDesktop.readMarkdownFile(targetChapter.absolutePath)
-        : loadChapterMarkdown(manifest, chapterId);
+      targetAbsPath && window.bookMDDesktop
+        ? window.bookMDDesktop.readMarkdownFile(targetAbsPath)
+        : manifest
+        ? loadChapterMarkdown(manifest, chapterId)
+        : Promise.reject(new Error("无法加载章节内容。"));
 
     loadPromise
       .then((source) => {
         if (cancelled) return;
-        const fileName = targetChapter.src.split("/").pop() ?? targetChapter.title;
-        const isCanvas = fileName.toLowerCase().endsWith(".canvas");
-        const isMindmap = fileName.toLowerCase().endsWith(".mindmap.md");
         if (isCanvas) {
           setViewMode("canvas");
+          setDirectoryOpen(false);
+          setSidebarOpen(false);
         } else if (isMindmap) {
           setViewMode("mindmap");
         } else {
@@ -1760,12 +1883,12 @@ export function App() {
 
         openSession({
           chapterId,
-          absolutePath: targetChapter.absolutePath ?? null,
+          absolutePath: targetAbsPath ?? null,
           fileName,
           baseUrl: source.baseUrl,
           source: source.markdown,
           diskVersion: source.diskVersion ?? null,
-          writable: Boolean(targetChapter.absolutePath && window.bookMDDesktop),
+          writable: Boolean(targetAbsPath && window.bookMDDesktop),
           hasBom: source.hasBom,
           lineEnding: source.lineEnding,
         });
@@ -1779,7 +1902,15 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [chapterId, manifest, openSession, session?.chapterId, session?.absolutePath]);
+  }, [chapterId, manifest, tabs, openSession, session?.chapterId, session?.absolutePath]);
+
+  // Close directory and outline whenever a canvas file/mode is active
+  useEffect(() => {
+    if (viewMode === "canvas" || session?.fileName?.toLowerCase().endsWith(".canvas")) {
+      setDirectoryOpen(false);
+      setSidebarOpen(false);
+    }
+  }, [viewMode, session?.fileName]);
 
   // Load secondary chapter for dual split mode
   useEffect(() => {
@@ -2032,7 +2163,15 @@ export function App() {
         title: "切换视图: 空间白板",
         description: "进入无限多模态可视化白板工作区",
         category: "视图与排版",
-        run: () => setViewMode((m) => (m === "canvas" ? "split" : "canvas")),
+        run: () =>
+          setViewMode((m) => {
+            const next = m === "canvas" ? "split" : "canvas";
+            if (next === "canvas") {
+              setDirectoryOpen(false);
+              setSidebarOpen(false);
+            }
+            return next;
+          }),
       },
       {
         id: "cmd-toggle-graph",

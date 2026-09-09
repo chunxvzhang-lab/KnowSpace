@@ -994,7 +994,20 @@ ipcMain.handle("bookmd:get-directory-for-file", async (_event, absolutePath) => 
     throw new Error("只能读取 Markdown 文件。");
   }
   const rootPath = path.dirname(path.resolve(absolutePath));
-  lastActiveWorkspaceDir = rootPath;
+  let isSpaceDir = false;
+  try {
+    const spaceDirInfo = resolveFlashSpaceDir();
+    if (
+      path.resolve(rootPath).toLowerCase() === path.resolve(spaceDirInfo.dir).toLowerCase() ||
+      path.basename(rootPath).toLowerCase() === "space"
+    ) {
+      isSpaceDir = true;
+    }
+  } catch {}
+
+  if (!isSpaceDir) {
+    lastActiveWorkspaceDir = rootPath;
+  }
   const directory = await buildDirectoryManifest(rootPath);
 
   const activeChapter = directory.chapters.find(

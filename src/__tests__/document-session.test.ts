@@ -41,5 +41,13 @@ describe("src/hooks/useDocumentSession.ts", () => {
 
     expect(result.current.isDirty).toBe(false);
     expect(result.current.session?.source).toBe("# Hello World");
+
+    // Close session
+    act(() => {
+      result.current.closeSession();
+    });
+
+    expect(result.current.session).toBeNull();
+    expect(result.current.isDirty).toBe(false);
   });
 });

@@ -558,12 +558,19 @@ export const CANVAS_RELATION_PRESETS = [
  * Automatically computes best attachment sides and creates an edge between two nodes
  */
 /**
- * Automatically computes best attachment sides between two nodes based on relative coordinates
+ * Automatically computes best attachment sides between two nodes based on relative coordinates.
+ * When nodes are arranged vertically (e.g. upper row and lower row), connections cleanly
+ * use top/bottom anchors without horizontally crossing or occluding cards.
  */
 export function getOptimalAnchorSides(
   fromNode: CanvasNode,
   toNode: CanvasNode
 ): { fromSide: CanvasNodeSide; toSide: CanvasNodeSide } {
+  const fromRight = fromNode.x + fromNode.width;
+  const fromBottom = fromNode.y + fromNode.height;
+  const toRight = toNode.x + toNode.width;
+  const toBottom = toNode.y + toNode.height;
+
   const fromCenterX = fromNode.x + fromNode.width / 2;
   const fromCenterY = fromNode.y + fromNode.height / 2;
   const toCenterX = toNode.x + toNode.width / 2;
@@ -572,6 +579,27 @@ export function getOptimalAnchorSides(
   const dx = toCenterX - fromCenterX;
   const dy = toCenterY - fromCenterY;
 
+  // 1. Explicit vertical tier detection (上下排版):
+  // If toNode is clearly situated above fromNode (allowing 30px overlap tolerance)
+  if (toBottom <= fromNode.y + 30) {
+    return { fromSide: "top", toSide: "bottom" };
+  }
+  // If toNode is clearly situated below fromNode
+  if (toNode.y >= fromBottom - 30) {
+    return { fromSide: "bottom", toSide: "top" };
+  }
+
+  // 2. Explicit horizontal tier detection (左右排版):
+  // If toNode is clearly to the right of fromNode
+  if (toNode.x >= fromRight - 30) {
+    return { fromSide: "right", toSide: "left" };
+  }
+  // If toNode is clearly to the left of fromNode
+  if (toRight <= fromNode.x + 30) {
+    return { fromSide: "left", toSide: "right" };
+  }
+
+  // 3. Fallback: if bounding boxes overlap or sit in overlapping bands, compare center-to-center deltas
   if (Math.abs(dx) >= Math.abs(dy)) {
     return dx >= 0
       ? { fromSide: "right", toSide: "left" }
@@ -647,6 +675,191 @@ export function spawnConnectedCard(
   };
 
   return { newNode, newEdge };
+}
+
+/**
+ * Creates edges connecting a single root node to multiple target nodes (1-to-Many / Star).
+ * Automatically computes optimal anchor sides for each connection and avoids duplicate edges.
+ */
+export function connectOneToMany(
+  rootNode: CanvasNode,
+  targetNodes: CanvasNode[],
+  existingEdges: CanvasEdge[],
+  style: CanvasEdgeLineStyle = "bezier"
+): CanvasEdge[] {
+  const newEdges: CanvasEdge[] = [];
+  for (const target of targetNodes) {
+    if (target.id === rootNode.id) continue;
+    const exists =
+      existingEdges.some(
+        (e) =>
+          (e.fromNode === rootNode.id && e.toNode === target.id) ||
+          (e.fromNode === target.id && e.toNode === rootNode.id)
+      ) ||
+      newEdges.some(
+        (e) =>
+          (e.fromNode === rootNode.id && e.toNode === target.id) ||
+          (e.fromNode === target.id && e.toNode === rootNode.id)
+      );
+    if (!exists) {
+      newEdges.push(createEdgeBetweenNodes(rootNode, target, undefined, style));
+    }
+  }
+  return newEdges;
+}
+
+/**
+ * Creates sequential chain edges connecting a sequence of nodes: A -> B -> C -> ...
+ * By default, sorts nodes spatially (left to right, top to bottom) to prevent criss-crossing dead knots.
+ * Skips duplicate edges.
+ */
+export function connectChainNodes(
+  nodes: CanvasNode[],
+  existingEdges: CanvasEdge[],
+  style: CanvasEdgeLineStyle = "bezier",
+  spatiallySort: boolean = true
+): CanvasEdge[] {
+  if (nodes.length < 2) return [];
+  const orderedNodes = spatiallySort
+    ? [...nodes].sort((a, b) => {
+        const dx = a.x - b.x;
+        const dy = a.y - b.y;
+        if (Math.abs(dx) > 40) return dx;
+        return dy;
+      })
+    : [...nodes];
+
+  const newEdges: CanvasEdge[] = [];
+  for (let i = 0; i < orderedNodes.length - 1; i++) {
+    const from = orderedNodes[i];
+    const to = orderedNodes[i + 1];
+    const exists =
+      existingEdges.some(
+        (e) =>
+          (e.fromNode === from.id && e.toNode === to.id) ||
+          (e.fromNode === to.id && e.toNode === from.id)
+      ) ||
+      newEdges.some(
+        (e) =>
+          (e.fromNode === from.id && e.toNode === to.id) ||
+          (e.fromNode === to.id && e.toNode === from.id)
+      );
+    if (!exists) {
+      newEdges.push(createEdgeBetweenNodes(from, to, undefined, style));
+    }
+  }
+  return newEdges;
+}
+
+/**
+ * Creates closed loop / ring edges connecting a sequence of nodes:
+ * A -> B -> C -> ... -> A
+ * Useful for circular workflows, iterative thinking loops, and cyclic systems.
+ * Slices nodes in angular order around the group's centroid to produce a clean loop without self-intersection.
+ */
+export function connectLoopNodes(
+  nodes: CanvasNode[],
+  existingEdges: CanvasEdge[],
+  style: CanvasEdgeLineStyle = "bezier",
+  spatiallySort: boolean = true
+): CanvasEdge[] {
+  if (nodes.length < 3) return connectChainNodes(nodes, existingEdges, style, spatiallySort);
+
+  const orderedNodes = spatiallySort
+    ? (() => {
+        const cx = nodes.reduce((sum, n) => sum + (n.x + n.width / 2), 0) / nodes.length;
+        const cy = nodes.reduce((sum, n) => sum + (n.y + n.height / 2), 0) / nodes.length;
+        return [...nodes].sort((a, b) => {
+          const angleA = Math.atan2(a.y + a.height / 2 - cy, a.x + a.width / 2 - cx);
+          const angleB = Math.atan2(b.y + b.height / 2 - cy, b.x + b.width / 2 - cx);
+          return angleA - angleB;
+        });
+      })()
+    : [...nodes];
+
+  const newEdges: CanvasEdge[] = [];
+  const count = orderedNodes.length;
+
+  for (let i = 0; i < count; i++) {
+    const from = orderedNodes[i];
+    const to = orderedNodes[(i + 1) % count];
+    const exists =
+      existingEdges.some(
+        (e) =>
+          (e.fromNode === from.id && e.toNode === to.id) ||
+          (e.fromNode === to.id && e.toNode === from.id)
+      ) ||
+      newEdges.some(
+        (e) =>
+          (e.fromNode === from.id && e.toNode === to.id) ||
+          (e.fromNode === to.id && e.toNode === from.id)
+      );
+    if (!exists) {
+      newEdges.push(createEdgeBetweenNodes(from, to, undefined, style));
+    }
+  }
+  return newEdges;
+}
+
+/**
+ * Removes all edges connected to the specified node (both incoming and outgoing).
+ */
+export function disconnectNodeEdges(nodeId: string, edges: CanvasEdge[]): CanvasEdge[] {
+  return edges.filter((e) => e.fromNode !== nodeId && e.toNode !== nodeId);
+}
+
+/**
+ * Spawns multiple connected child cards (1-to-Many) from a source node for rapid brainstorming.
+ * Neatly spaces the spawned cards vertically (when branching right) or horizontally (when branching bottom).
+ */
+export function spawnMultipleBranches(
+  sourceNode: CanvasNode,
+  count: number = 3,
+  direction: "right" | "bottom" = "right"
+): { newNodes: CanvasTextNode[]; newEdges: CanvasEdge[] } {
+  const newNodes: CanvasTextNode[] = [];
+  const newEdges: CanvasEdge[] = [];
+  const gap = 120;
+  const cardWidth = Math.min(320, Math.max(260, sourceNode.width));
+  const cardHeight = 150;
+  const spacing = 20;
+
+  const totalHeight = count * cardHeight + (count - 1) * spacing;
+  const totalWidth = count * cardWidth + (count - 1) * spacing;
+
+  const startY =
+    direction === "right"
+      ? sourceNode.y + sourceNode.height / 2 - totalHeight / 2
+      : sourceNode.y + sourceNode.height + gap;
+
+  const startX =
+    direction === "right"
+      ? sourceNode.x + sourceNode.width + gap
+      : sourceNode.x + sourceNode.width / 2 - totalWidth / 2;
+
+  for (let i = 0; i < count; i++) {
+    const newId = `text-${Date.now()}-${Math.random().toString(36).slice(2, 6)}-${i + 1}`;
+    const x = direction === "right" ? startX : startX + i * (cardWidth + spacing);
+    const y = direction === "right" ? startY + i * (cardHeight + spacing) : startY;
+
+    const newNode: CanvasTextNode = {
+      id: newId,
+      type: "text",
+      text: `### 分支思考 ${i + 1}\n输入关联论述与子观点...`,
+      x: Math.round(x),
+      y: Math.round(y),
+      width: cardWidth,
+      height: cardHeight,
+      color: sourceNode.color || "5",
+    };
+
+    const newEdge = createEdgeBetweenNodes(sourceNode, newNode);
+
+    newNodes.push(newNode);
+    newEdges.push(newEdge);
+  }
+
+  return { newNodes, newEdges };
 }
 
 /**
