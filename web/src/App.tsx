@@ -12,6 +12,7 @@ import { DocsViewer } from './components/DocsViewer';
 import { FaqSection } from './components/FaqSection';
 import { Footer } from './components/Footer';
 import { CommandPaletteModal } from './components/CommandPaletteModal';
+import { CyberBackground } from './components/CyberBackground';
 
 export const App: React.FC = () => {
   const [currentTheme, setCurrentTheme] = useState<'dark' | 'light' | 'eink'>('dark');
@@ -37,8 +38,9 @@ export const App: React.FC = () => {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {/* Background Mesh Atmosphere */}
+      {/* Background Mesh & Interactive Cyber Constellation */}
       <div className="ambient-mesh" />
+      <CyberBackground theme={currentTheme} />
 
       {/* Sticky Top Navigation */}
       <Navbar

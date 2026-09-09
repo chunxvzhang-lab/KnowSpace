@@ -25,12 +25,12 @@ export const BentoGrid: React.FC<BentoGridProps> = () => {
 
       {/* Bento Grid Container */}
       <div className="bento-grid">
-        {BENTO_FEATURES.map((item) => {
+        {BENTO_FEATURES.map((item, index) => {
           const colClass = `bento-${item.colSpan}`;
           return (
             <div
               key={item.id}
-              className={`glass-panel glass-interactive ${colClass}`}
+              className={`glass-panel glass-interactive cyber-card-tilt cyber-bracket-container ${colClass}`}
               style={{
                 padding: '30px',
                 display: 'flex',
@@ -50,6 +50,10 @@ export const BentoGrid: React.FC<BentoGridProps> = () => {
                     borderColor: 'currentColor'
                   }}>
                     {item.badge}
+                  </span>
+
+                  <span style={{ fontSize: '0.75rem', fontFamily: 'monospace', color: 'var(--text-muted)', letterSpacing: '0.05em' }}>
+                    // 0{index + 1}_SPEC
                   </span>
                 </div>
 

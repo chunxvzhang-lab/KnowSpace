@@ -72,13 +72,18 @@ export const Workspace5D: React.FC = () => {
       </div>
 
       {/* Mode Showcase Stage */}
-      <div className="glass-panel" style={{ padding: '36px', overflow: 'hidden' }}>
+      <div className="glass-panel cyber-bracket-container" style={{ padding: '36px', overflow: 'hidden' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 36, alignItems: 'center' }}>
           {/* Mode Description & Highlights */}
           <div>
-            <span className="badge-pill" style={{ marginBottom: 14, color: 'var(--accent-cyan)' }}>
-              维度模式 {WORKSPACE_MODES.findIndex(m => m.id === activeTab) + 1} / 5
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+              <span className="badge-pill" style={{ color: 'var(--accent-cyan)', borderColor: 'currentColor' }}>
+                DIMENSION_0{WORKSPACE_MODES.findIndex(m => m.id === activeTab) + 1}
+              </span>
+              <span style={{ fontSize: '0.75rem', fontFamily: 'monospace', color: 'var(--text-muted)' }}>
+                // MODE_FLOW_ACTIVE
+              </span>
+            </div>
             <h3 style={{ fontSize: '1.75rem', fontWeight: 800, marginBottom: 14, color: 'var(--text-primary)' }}>
               {currentMode.title}
             </h3>

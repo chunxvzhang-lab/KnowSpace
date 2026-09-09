@@ -124,7 +124,7 @@ export const InteractiveStage: React.FC = () => {
       </div>
 
       {/* Sandbox Body Container */}
-      <div className="glass-panel" style={{ padding: '36px', minHeight: 460, position: 'relative' }}>
+      <div className="glass-panel cyber-bracket-container" style={{ padding: '36px', minHeight: 460, position: 'relative' }}>
         {/* Sandbox 1: Canvas */}
         {activeSandbox === 'canvas' && (
           <div>
