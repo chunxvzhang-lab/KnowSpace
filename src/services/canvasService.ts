@@ -239,12 +239,35 @@ export function computeBoundingBox(nodes: CanvasNode[]): {
 }
 
 /**
- * Calculates anchor coordinate for a node on a specific side
+ * Calculates anchor coordinate for a node on a specific side.
+ * If targetPoint is provided and the node is wide or tall (e.g. group container or large card),
+ * dynamically shifts the anchor along the edge towards targetPoint to distribute connections
+ * and produce straight, parallel lines rather than pinching into a single point.
  */
 export function getNodeAnchorPoint(
   node: CanvasNode,
-  side: CanvasNodeSide = "right"
+  side: CanvasNodeSide = "right",
+  targetPoint?: { x: number; y: number }
 ): { x: number; y: number } {
+  if (targetPoint) {
+    if (side === "top") {
+      const clampedX = Math.max(node.x + 24, Math.min(node.x + node.width - 24, targetPoint.x));
+      return { x: clampedX, y: node.y };
+    }
+    if (side === "bottom") {
+      const clampedX = Math.max(node.x + 24, Math.min(node.x + node.width - 24, targetPoint.x));
+      return { x: clampedX, y: node.y + node.height };
+    }
+    if (side === "left") {
+      const clampedY = Math.max(node.y + 24, Math.min(node.y + node.height - 24, targetPoint.y));
+      return { x: node.x, y: clampedY };
+    }
+    if (side === "right") {
+      const clampedY = Math.max(node.y + 24, Math.min(node.y + node.height - 24, targetPoint.y));
+      return { x: node.x + node.width, y: clampedY };
+    }
+  }
+
   switch (side) {
     case "top":
       return { x: node.x + node.width / 2, y: node.y };
@@ -259,14 +282,157 @@ export function getNodeAnchorPoint(
 }
 
 /**
- * Generates an SVG path for connecting edges
+/**
+ * Calculates cubic Bezier control points with strict bounding envelope
+ * to guarantee that the curve never balloons or overshoots out of the cards' bounding box.
+ */
+export function computeBezierControlPoints(
+  p1: { x: number; y: number },
+  side1: CanvasNodeSide = "right",
+  p2: { x: number; y: number },
+  side2: CanvasNodeSide = "left"
+): { cp1: { x: number; y: number }; cp2: { x: number; y: number } } {
+  const dx = p2.x - p1.x;
+  const dy = p2.y - p1.y;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+
+  let cp1 = { ...p1 };
+  let cp2 = { ...p2 };
+
+  const isHoriz1 = side1 === "left" || side1 === "right";
+  const isHoriz2 = side2 === "left" || side2 === "right";
+
+  // Case 1: Both Horizontal (e.g. right -> left or left -> right)
+  if (isHoriz1 && isHoriz2) {
+    const isForward =
+      (side1 === "right" && side2 === "left" && dx > 0) ||
+      (side1 === "left" && side2 === "right" && dx < 0);
+    if (isForward) {
+      const tangentDist = Math.max(20, Math.min(140, Math.abs(dx) * 0.5));
+      cp1.x += side1 === "right" ? tangentDist : -tangentDist;
+      cp2.x += side2 === "right" ? tangentDist : -tangentDist;
+    } else {
+      const loopDist = Math.max(25, Math.min(60, dist * 0.25));
+      cp1.x += side1 === "right" ? loopDist : -loopDist;
+      cp2.x += side2 === "right" ? loopDist : -loopDist;
+    }
+    return { cp1, cp2 };
+  }
+
+  // Case 2: Both Vertical (e.g. bottom -> top or top -> bottom)
+  if (!isHoriz1 && !isHoriz2) {
+    const isForward =
+      (side1 === "bottom" && side2 === "top" && dy > 0) ||
+      (side1 === "top" && side2 === "bottom" && dy < 0);
+    if (isForward) {
+      const tangentDist = Math.max(20, Math.min(140, Math.abs(dy) * 0.5));
+      cp1.y += side1 === "bottom" ? tangentDist : -tangentDist;
+      cp2.y += side2 === "bottom" ? tangentDist : -tangentDist;
+    } else {
+      const loopDist = Math.max(25, Math.min(60, dist * 0.25));
+      cp1.y += side1 === "bottom" ? loopDist : -loopDist;
+      cp2.y += side2 === "bottom" ? loopDist : -loopDist;
+    }
+    return { cp1, cp2 };
+  }
+
+  // Case 3: Perpendicular L-turn (one Horizontal, one Vertical)
+  // Bound control point tangents strictly inside the gap so it NEVER arches high above endpoints
+  if (isHoriz1) {
+    // p1 leaves horizontally, p2 enters vertically
+    const isTargetAheadInX = (side1 === "right" && dx > 0) || (side1 === "left" && dx < 0);
+    const extentX = isTargetAheadInX
+      ? Math.max(15, Math.min(110, Math.abs(dx) * 0.55))
+      : Math.max(20, Math.min(50, dist * 0.2));
+    cp1.x += side1 === "right" ? extentX : -extentX;
+
+    const isAheadInY = (side2 === "top" && dy > 0) || (side2 === "bottom" && dy < 0);
+    const extentY = isAheadInY
+      ? Math.max(15, Math.min(110, Math.abs(dy) * 0.55))
+      : Math.max(20, Math.min(50, dist * 0.2));
+    cp2.y += side2 === "bottom" ? extentY : -extentY;
+  } else {
+    // p1 leaves vertically, p2 enters horizontally
+    const isTargetAheadInY = (side1 === "bottom" && dy > 0) || (side1 === "top" && dy < 0);
+    const extentY = isTargetAheadInY
+      ? Math.max(15, Math.min(110, Math.abs(dy) * 0.55))
+      : Math.max(20, Math.min(50, dist * 0.2));
+    cp1.y += side1 === "bottom" ? extentY : -extentY;
+
+    const isAheadInX = (side2 === "left" && dx > 0) || (side2 === "right" && dx < 0);
+    const extentX = isAheadInX
+      ? Math.max(15, Math.min(110, Math.abs(dx) * 0.55))
+      : Math.max(20, Math.min(50, dist * 0.2));
+    cp2.x += side2 === "right" ? extentX : -extentX;
+  }
+
+  return { cp1, cp2 };
+}
+
+/**
+ * Information about the draggable bend handle on an orthogonal (step) edge
+ */
+export interface StepBendHandleInfo {
+  x: number;
+  y: number;
+  orientation: "horizontal" | "vertical";
+}
+
+export function getStepBendHandleInfo(
+  p1: { x: number; y: number },
+  side1: CanvasNodeSide = "right",
+  p2: { x: number; y: number },
+  side2: CanvasNodeSide = "left",
+  stepOffset?: number
+): StepBendHandleInfo {
+  const dx = p2.x - p1.x;
+  const dy = p2.y - p1.y;
+
+  if ((side1 === "left" || side1 === "right") && (side2 === "left" || side2 === "right")) {
+    const midX = p1.x + dx / 2 + (stepOffset || 0);
+    return {
+      x: midX,
+      y: (p1.y + p2.y) / 2,
+      orientation: "horizontal",
+    };
+  }
+
+  if ((side1 === "top" || side1 === "bottom") && (side2 === "top" || side2 === "bottom")) {
+    const midY = p1.y + dy / 2 + (stepOffset || 0);
+    return {
+      x: (p1.x + p2.x) / 2,
+      y: midY,
+      orientation: "vertical",
+    };
+  }
+
+  if (side1 === "left" || side1 === "right") {
+    const turnX = p2.x + (stepOffset || 0);
+    return {
+      x: turnX,
+      y: (p1.y + p2.y) / 2,
+      orientation: "horizontal",
+    };
+  }
+
+  const turnY = p2.y + (stepOffset || 0);
+  return {
+    x: (p1.x + p2.x) / 2,
+    y: turnY,
+    orientation: "vertical",
+  };
+}
+
+/**
+ * Generates an SVG path for connecting edges with refined curvature and orthogonal routing
  */
 export function computeEdgePath(
   p1: { x: number; y: number },
   side1: CanvasNodeSide = "right",
   p2: { x: number; y: number },
   side2: CanvasNodeSide = "left",
-  style: CanvasEdgeLineStyle = "bezier"
+  style: CanvasEdgeLineStyle = "bezier",
+  stepOffset?: number
 ): string {
   const dx = p2.x - p1.x;
   const dy = p2.y - p1.y;
@@ -276,45 +442,33 @@ export function computeEdgePath(
   }
 
   if (style === "step") {
-    const midX = p1.x + dx / 2;
+    // Orthogonal step routing tailored to anchor orientations and optional draggable offset:
+    // Case 1: Horizontal start to Horizontal end (e.g. right -> left)
+    if ((side1 === "left" || side1 === "right") && (side2 === "left" || side2 === "right")) {
+      const midX = p1.x + dx / 2 + (stepOffset || 0);
+      return `M ${p1.x} ${p1.y} L ${midX} ${p1.y} L ${midX} ${p2.y} L ${p2.x} ${p2.y}`;
+    }
+    // Case 2: Vertical start to Vertical end (e.g. bottom -> top)
+    if ((side1 === "top" || side1 === "bottom") && (side2 === "top" || side2 === "bottom")) {
+      const midY = p1.y + dy / 2 + (stepOffset || 0);
+      return `M ${p1.x} ${p1.y} L ${p1.x} ${midY} L ${p2.x} ${midY} L ${p2.x} ${p2.y}`;
+    }
+    // Case 3: Horizontal start to Vertical end (Corner 90deg turn or with offset)
+    if ((side1 === "left" || side1 === "right") && (side2 === "top" || side2 === "bottom")) {
+      const turnX = p2.x + (stepOffset || 0);
+      return `M ${p1.x} ${p1.y} L ${turnX} ${p1.y} L ${turnX} ${p2.y} L ${p2.x} ${p2.y}`;
+    }
+    // Case 4: Vertical start to Horizontal end (Corner 90deg turn or with offset)
+    if ((side1 === "top" || side1 === "bottom") && (side2 === "left" || side2 === "right")) {
+      const turnY = p2.y + (stepOffset || 0);
+      return `M ${p1.x} ${p1.y} L ${p1.x} ${turnY} L ${p2.x} ${turnY} L ${p2.x} ${p2.y}`;
+    }
+    const midX = p1.x + dx / 2 + (stepOffset || 0);
     return `M ${p1.x} ${p1.y} L ${midX} ${p1.y} L ${midX} ${p2.y} L ${p2.x} ${p2.y}`;
   }
 
-  // Smooth cubic Bezier curve
-  const curvature = Math.max(40, Math.min(240, Math.sqrt(dx * dx + dy * dy) * 0.45));
-  let cp1 = { ...p1 };
-  let cp2 = { ...p2 };
-
-  switch (side1) {
-    case "right":
-      cp1.x += curvature;
-      break;
-    case "left":
-      cp1.x -= curvature;
-      break;
-    case "top":
-      cp1.y -= curvature;
-      break;
-    case "bottom":
-      cp1.y += curvature;
-      break;
-  }
-
-  switch (side2) {
-    case "right":
-      cp2.x += curvature;
-      break;
-    case "left":
-      cp2.x -= curvature;
-      break;
-    case "top":
-      cp2.y -= curvature;
-      break;
-    case "bottom":
-      cp2.y += curvature;
-      break;
-  }
-
+  // Smooth cubic Bezier curve with bounded non-overshooting envelope
+  const { cp1, cp2 } = computeBezierControlPoints(p1, side1, p2, side2);
   return `M ${p1.x} ${p1.y} C ${cp1.x} ${cp1.y}, ${cp2.x} ${cp2.y}, ${p2.x} ${p2.y}`;
 }
 
@@ -326,7 +480,8 @@ export function computeEdgeMidpoint(
   side1: CanvasNodeSide = "right",
   p2: { x: number; y: number },
   side2: CanvasNodeSide = "left",
-  style: CanvasEdgeLineStyle = "bezier"
+  style: CanvasEdgeLineStyle = "bezier",
+  stepOffset?: number
 ): { x: number; y: number } {
   const dx = p2.x - p1.x;
   const dy = p2.y - p1.y;
@@ -336,48 +491,25 @@ export function computeEdgeMidpoint(
   }
 
   if (style === "step") {
-    return { x: p1.x + dx / 2, y: (p1.y + p2.y) / 2 };
+    if ((side1 === "left" || side1 === "right") && (side2 === "left" || side2 === "right")) {
+      return { x: p1.x + dx / 2 + (stepOffset || 0), y: (p1.y + p2.y) / 2 };
+    }
+    if ((side1 === "top" || side1 === "bottom") && (side2 === "top" || side2 === "bottom")) {
+      return { x: (p1.x + p2.x) / 2, y: p1.y + dy / 2 + (stepOffset || 0) };
+    }
+    if (side1 === "left" || side1 === "right") {
+      return { x: p2.x + (stepOffset || 0), y: (p1.y + p2.y) / 2 };
+    }
+    return { x: (p1.x + p2.x) / 2, y: p2.y + (stepOffset || 0) };
   }
 
   // Smooth cubic Bezier curve midpoint at t = 0.5:
   // B(0.5) = 0.125 * p1 + 0.375 * cp1 + 0.375 * cp2 + 0.125 * p2
-  const curvature = Math.max(40, Math.min(240, Math.sqrt(dx * dx + dy * dy) * 0.45));
-  let cp1 = { ...p1 };
-  let cp2 = { ...p2 };
-
-  switch (side1) {
-    case "right":
-      cp1.x += curvature;
-      break;
-    case "left":
-      cp1.x -= curvature;
-      break;
-    case "top":
-      cp1.y -= curvature;
-      break;
-    case "bottom":
-      cp1.y += curvature;
-      break;
-  }
-
-  switch (side2) {
-    case "right":
-      cp2.x += curvature;
-      break;
-    case "left":
-      cp2.x -= curvature;
-      break;
-    case "top":
-      cp2.y -= curvature;
-      break;
-    case "bottom":
-      cp2.y += curvature;
-      break;
-  }
+  const { cp1, cp2 } = computeBezierControlPoints(p1, side1, p2, side2);
 
   return {
-    x: 0.125 * p1.x + 0.375 * cp1.x + 0.375 * cp2.x + 0.125 * p2.x,
-    y: 0.125 * p1.y + 0.375 * cp1.y + 0.375 * cp2.y + 0.125 * p2.y,
+    x: Math.round(0.125 * p1.x + 0.375 * cp1.x + 0.375 * cp2.x + 0.125 * p2.x),
+    y: Math.round(0.125 * p1.y + 0.375 * cp1.y + 0.375 * cp2.y + 0.125 * p2.y),
   };
 }
 
@@ -559,8 +691,10 @@ export const CANVAS_RELATION_PRESETS = [
  */
 /**
  * Automatically computes best attachment sides between two nodes based on relative coordinates.
- * When nodes are arranged vertically (e.g. upper row and lower row), connections cleanly
- * use top/bottom anchors without horizontally crossing or occluding cards.
+ * Handles:
+ * 1. Clear Left-Right layout (horizontal span dominant): connects cleanly right -> left or left -> right.
+ * 2. Clear Top-Bottom layout (vertical span dominant): connects cleanly bottom -> top or top -> bottom.
+ * 3. Diagonal / Corner relationships: smoothly routes around the quadrant corner without self-intersection.
  */
 export function getOptimalAnchorSides(
   fromNode: CanvasNode,
@@ -579,27 +713,54 @@ export function getOptimalAnchorSides(
   const dx = toCenterX - fromCenterX;
   const dy = toCenterY - fromCenterY;
 
-  // 1. Explicit vertical tier detection (上下排版):
-  // If toNode is clearly situated above fromNode (allowing 30px overlap tolerance)
-  if (toBottom <= fromNode.y + 30) {
-    return { fromSide: "top", toSide: "bottom" };
-  }
-  // If toNode is clearly situated below fromNode
-  if (toNode.y >= fromBottom - 30) {
-    return { fromSide: "bottom", toSide: "top" };
+  const gapX = toNode.x >= fromRight ? toNode.x - fromRight : fromNode.x >= toRight ? fromNode.x - toRight : 0;
+  const gapY = toNode.y >= fromBottom ? toNode.y - fromBottom : fromNode.y >= toBottom ? fromNode.y - toBottom : 0;
+
+  const overlapX = Math.max(0, Math.min(fromRight, toRight) - Math.max(fromNode.x, toNode.x));
+  const overlapY = Math.max(0, Math.min(fromBottom, toBottom) - Math.max(fromNode.y, toNode.y));
+
+  // 1. Explicit Horizontal tier detection (左右排版):
+  // If nodes overlap vertically OR horizontal gap is clearly dominant
+  if (gapX > 0 && (overlapY > 0 || gapX > gapY * 1.3 || (gapX > 80 && gapX > gapY))) {
+    return dx >= 0
+      ? { fromSide: "right", toSide: "left" }
+      : { fromSide: "left", toSide: "right" };
   }
 
-  // 2. Explicit horizontal tier detection (左右排版):
-  // If toNode is clearly to the right of fromNode
-  if (toNode.x >= fromRight - 30) {
-    return { fromSide: "right", toSide: "left" };
-  }
-  // If toNode is clearly to the left of fromNode
-  if (toRight <= fromNode.x + 30) {
-    return { fromSide: "left", toSide: "right" };
+  // 2. Explicit Vertical tier detection (上下排版):
+  // If nodes overlap horizontally OR vertical gap is clearly dominant
+  if (gapY > 0 && (overlapX > 0 || gapY >= gapX * 1.3 || (gapY > 80 && gapY >= gapX))) {
+    return dy >= 0
+      ? { fromSide: "bottom", toSide: "top" }
+      : { fromSide: "top", toSide: "bottom" };
   }
 
-  // 3. Fallback: if bounding boxes overlap or sit in overlapping bands, compare center-to-center deltas
+  // 3. Diagonal / Corner quadrant routing
+  if (Math.abs(dx) > 20 && Math.abs(dy) > 20) {
+    if (dx > 0 && dy < 0) {
+      // Moving up-right: exit top or right, enter left or bottom
+      return gapX >= gapY
+        ? { fromSide: "right", toSide: "bottom" }
+        : { fromSide: "top", toSide: "left" };
+    } else if (dx > 0 && dy > 0) {
+      // Moving down-right: exit right or bottom, enter top or left
+      return gapX >= gapY
+        ? { fromSide: "right", toSide: "top" }
+        : { fromSide: "bottom", toSide: "left" };
+    } else if (dx < 0 && dy > 0) {
+      // Moving down-left: exit left or bottom, enter top or right
+      return gapX >= gapY
+        ? { fromSide: "left", toSide: "top" }
+        : { fromSide: "bottom", toSide: "right" };
+    } else if (dx < 0 && dy < 0) {
+      // Moving up-left: exit left or top, enter bottom or right
+      return gapX >= gapY
+        ? { fromSide: "left", toSide: "bottom" }
+        : { fromSide: "top", toSide: "right" };
+    }
+  }
+
+  // Fallback: compare center deltas
   if (Math.abs(dx) >= Math.abs(dy)) {
     return dx >= 0
       ? { fromSide: "right", toSide: "left" }
@@ -755,7 +916,8 @@ export function connectChainNodes(
  * Creates closed loop / ring edges connecting a sequence of nodes:
  * A -> B -> C -> ... -> A
  * Useful for circular workflows, iterative thinking loops, and cyclic systems.
- * Slices nodes in angular order around the group's centroid to produce a clean loop without self-intersection.
+ * Slices nodes in angular order around the group's centroid, and binds edges
+ * with tangential perimeter flow to produce clean, rounded circular loops without reverse buckles.
  */
 export function connectLoopNodes(
   nodes: CanvasNode[],
@@ -765,10 +927,11 @@ export function connectLoopNodes(
 ): CanvasEdge[] {
   if (nodes.length < 3) return connectChainNodes(nodes, existingEdges, style, spatiallySort);
 
+  const cx = nodes.reduce((sum, n) => sum + (n.x + n.width / 2), 0) / nodes.length;
+  const cy = nodes.reduce((sum, n) => sum + (n.y + n.height / 2), 0) / nodes.length;
+
   const orderedNodes = spatiallySort
     ? (() => {
-        const cx = nodes.reduce((sum, n) => sum + (n.x + n.width / 2), 0) / nodes.length;
-        const cy = nodes.reduce((sum, n) => sum + (n.y + n.height / 2), 0) / nodes.length;
         return [...nodes].sort((a, b) => {
           const angleA = Math.atan2(a.y + a.height / 2 - cy, a.x + a.width / 2 - cx);
           const angleB = Math.atan2(b.y + b.height / 2 - cy, b.x + b.width / 2 - cx);
@@ -779,6 +942,21 @@ export function connectLoopNodes(
 
   const newEdges: CanvasEdge[] = [];
   const count = orderedNodes.length;
+  const usedIncomingSides = new Map<string, CanvasNodeSide>();
+
+  const nextClockwiseSide = (s: CanvasNodeSide): CanvasNodeSide => {
+    switch (s) {
+      case "top":
+        return "right";
+      case "right":
+        return "bottom";
+      case "bottom":
+        return "left";
+      case "left":
+      default:
+        return "top";
+    }
+  };
 
   for (let i = 0; i < count; i++) {
     const from = orderedNodes[i];
@@ -795,7 +973,68 @@ export function connectLoopNodes(
           (e.fromNode === to.id && e.toNode === from.id)
       );
     if (!exists) {
-      newEdges.push(createEdgeBetweenNodes(from, to, undefined, style));
+      // Relative movement vector between consecutive nodes in the ring:
+      const dx = to.x + to.width / 2 - (from.x + from.width / 2);
+      const dy = to.y + to.height / 2 - (from.y + from.height / 2);
+
+      let fromSide: CanvasNodeSide = "right";
+      let toSide: CanvasNodeSide = "left";
+
+      if (Math.abs(dx) >= Math.abs(dy) * 1.3) {
+        // Predominantly horizontal movement
+        if (dx > 0) {
+          fromSide = "right";
+          toSide = "left";
+        } else {
+          fromSide = "left";
+          toSide = "right";
+        }
+      } else if (Math.abs(dy) >= Math.abs(dx) * 1.3) {
+        // Predominantly vertical movement
+        if (dy > 0) {
+          fromSide = "bottom";
+          toSide = "top";
+        } else {
+          fromSide = "top";
+          toSide = "bottom";
+        }
+      } else {
+        // Diagonal quadrants along the clockwise perimeter:
+        if (dx > 0 && dy > 0) {
+          // Down-Right
+          fromSide = "right";
+          toSide = "top";
+        } else if (dx < 0 && dy > 0) {
+          // Down-Left
+          fromSide = "bottom";
+          toSide = "right";
+        } else if (dx < 0 && dy < 0) {
+          // Up-Left
+          fromSide = "left";
+          toSide = "bottom";
+        } else {
+          // Up-Right
+          fromSide = "top";
+          toSide = "left";
+        }
+      }
+
+      // Ensure that a node's outgoing side does NOT overlap with its incoming side:
+      const incomingSide = usedIncomingSides.get(from.id);
+      if (incomingSide && fromSide === incomingSide) {
+        fromSide = nextClockwiseSide(fromSide);
+      }
+
+      usedIncomingSides.set(to.id, toSide);
+
+      newEdges.push({
+        id: `edge-${Date.now()}-${Math.random().toString(36).slice(2, 6)}-${i + 1}`,
+        fromNode: from.id,
+        fromSide,
+        toNode: to.id,
+        toSide,
+        style,
+      });
     }
   }
   return newEdges;
@@ -885,6 +1124,15 @@ export function cycleEdgeStyle(edge: CanvasEdge): CanvasEdge {
   const nextStyle: CanvasEdgeLineStyle =
     edge.style === "straight" ? "step" : edge.style === "step" ? "bezier" : "straight";
   return { ...edge, style: nextStyle };
+}
+
+/**
+ * Cycles stroke pattern: solid -> dashed -> dotted -> solid
+ */
+export function cycleEdgeStrokePattern(edge: CanvasEdge): CanvasEdge {
+  const current = edge.strokePattern || "solid";
+  const next = current === "solid" ? "dashed" : current === "dashed" ? "dotted" : "solid";
+  return { ...edge, strokePattern: next };
 }
 
 /**

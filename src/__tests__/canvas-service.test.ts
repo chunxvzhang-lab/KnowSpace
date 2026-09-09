@@ -18,6 +18,10 @@ import {
   connectLoopNodes,
   disconnectNodeEdges,
   spawnMultipleBranches,
+  cycleEdgeStrokePattern,
+  getStepBendHandleInfo,
+  computeBezierControlPoints,
+  computeEdgeMidpoint,
 } from "../services/canvasService";
 import type { CanvasData, CanvasTextNode, CanvasFileNode, CanvasGroupNode } from "../types/canvasTypes";
 
@@ -521,6 +525,132 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
     expect(edges2[0].toNode).toBe("grp-b");
     expect(edges2[0].fromSide).toBe("right");
     expect(edges2[0].toSide).toBe("left");
+  });
+
+  it("supports adaptive sliding anchor points for wide/tall nodes to prevent bottlenecking", () => {
+    const wideContainer: CanvasGroupNode = {
+      id: "big-group",
+      type: "group",
+      x: 100,
+      y: 100,
+      width: 600,
+      height: 400,
+    };
+
+    // Card 1 aligned with the left part of the container
+    const p1 = getNodeAnchorPoint(wideContainer, "bottom", { x: 180, y: 600 });
+    expect(p1.x).toBe(180);
+    expect(p1.y).toBe(500);
+
+    // Card 2 aligned with the right part of the container
+    const p2 = getNodeAnchorPoint(wideContainer, "bottom", { x: 550, y: 600 });
+    expect(p2.x).toBe(550);
+    expect(p2.y).toBe(500);
+
+    // Card 3 beyond container boundary should be clamped within margin
+    const p3 = getNodeAnchorPoint(wideContainer, "bottom", { x: 800, y: 600 });
+    expect(p3.x).toBe(100 + 600 - 24);
+  });
+
+  it("prioritizes horizontal dominance in left-right structured layouts", () => {
+    // Left node and right node with slight vertical offset
+    const leftNode: CanvasTextNode = {
+      id: "left-n",
+      type: "text",
+      text: "Left",
+      x: 100,
+      y: 100,
+      width: 200,
+      height: 120,
+    };
+    const rightNode: CanvasTextNode = {
+      id: "right-n",
+      type: "text",
+      text: "Right",
+      x: 500,
+      y: 160,
+      width: 200,
+      height: 120,
+    };
+
+    // Horizontal distance (200px gap) strongly dominates vertical distance (0px gap due to overlap)
+    const sides = getOptimalAnchorSides(leftNode, rightNode);
+    expect(sides).toEqual({ fromSide: "right", toSide: "left" });
+
+    // Reverse
+    const revSides = getOptimalAnchorSides(rightNode, leftNode);
+    expect(revSides).toEqual({ fromSide: "left", toSide: "right" });
+  });
+
+  it("assigns smooth tangent-aligned sides in circular loop without overlapping entry/exit", () => {
+    // 5 nodes arranged roughly in a circle (12, 2, 5, 7, 10 o'clock)
+    const topNode: CanvasTextNode = { id: "top", type: "text", text: "12", x: 300, y: 50, width: 120, height: 80 };
+    const rightTopNode: CanvasTextNode = { id: "rt", type: "text", text: "2", x: 500, y: 180, width: 120, height: 80 };
+    const rightBotNode: CanvasTextNode = { id: "rb", type: "text", text: "5", x: 450, y: 380, width: 120, height: 80 };
+    const leftBotNode: CanvasTextNode = { id: "lb", type: "text", text: "7", x: 150, y: 380, width: 120, height: 80 };
+    const leftTopNode: CanvasTextNode = { id: "lt", type: "text", text: "10", x: 100, y: 180, width: 120, height: 80 };
+
+    const ringEdges = connectLoopNodes([topNode, rightTopNode, rightBotNode, leftBotNode, leftTopNode], [], "bezier", true);
+    expect(ringEdges).toHaveLength(5);
+
+    // Check top node's incoming and outgoing edges:
+    // Outgoing from top should be "right" side towards 2 o'clock
+    const outFromTop = ringEdges.find((e) => e.fromNode === "top");
+    expect(outFromTop).toBeDefined();
+    expect(outFromTop!.fromSide).toBe("right");
+
+    // Incoming to top should be "left" side from 10 o'clock
+    const inToTop = ringEdges.find((e) => e.toNode === "top");
+    expect(inToTop).toBeDefined();
+    expect(inToTop!.toSide).toBe("left");
+
+    // Entry and exit sides on top node must NEVER be both "bottom" (fixing the screenshot 1 bug)
+    expect(outFromTop!.fromSide).not.toBe(inToTop!.toSide);
+  });
+
+  it("cycles edge stroke patterns through solid, dashed, and dotted", () => {
+    const edge = { id: "e1", fromNode: "a", toNode: "b" };
+    const p1 = cycleEdgeStrokePattern(edge);
+    expect(p1.strokePattern).toBe("dashed");
+
+    const p2 = cycleEdgeStrokePattern(p1);
+    expect(p2.strokePattern).toBe("dotted");
+
+    const p3 = cycleEdgeStrokePattern(p2);
+    expect(p3.strokePattern).toBe("solid");
+  });
+
+  it("computes strict bounding envelope for bezier curves without overshooting arch", () => {
+    // 9 o'clock node (left) to 12 o'clock node (top), dy is small (50px), dx is 200px
+    const p1 = { x: 100, y: 150 }; // side: top
+    const p2 = { x: 300, y: 100 }; // side: left
+    const cps = computeBezierControlPoints(p1, "top", p2, "left");
+    // p1 goes upwards. dy is 50. Max upward extent must not overshoot (cp1.y should not shoot hundreds of pixels into sky)
+    expect(cps.cp1.y).toBeGreaterThanOrEqual(150 - 50 * 0.55 - 10);
+    expect(cps.cp2.x).toBeLessThanOrEqual(300);
+  });
+
+  it("calculates step bend handle position and supports stepOffset translation", () => {
+    const p1 = { x: 100, y: 100 };
+    const p2 = { x: 300, y: 200 };
+    // Horizontal start/end
+    const handleNoOffset = getStepBendHandleInfo(p1, "right", p2, "left");
+    expect(handleNoOffset.orientation).toBe("horizontal");
+    expect(handleNoOffset.x).toBe(200); // halfway between 100 and 300
+    expect(handleNoOffset.y).toBe(150);
+
+    // With stepOffset = 30
+    const handleWithOffset = getStepBendHandleInfo(p1, "right", p2, "left", 30);
+    expect(handleWithOffset.x).toBe(230);
+
+    // Compute path with stepOffset
+    const pathWithOffset = computeEdgePath(p1, "right", p2, "left", "step", 30);
+    expect(pathWithOffset).toBe("M 100 100 L 230 100 L 230 200 L 300 200");
+
+    // Geometric midpoint aligns with step bend
+    const mid = computeEdgeMidpoint(p1, "right", p2, "left", "step", 30);
+    expect(mid.x).toBe(230);
+    expect(mid.y).toBe(150);
   });
 });
 

@@ -511,7 +511,7 @@ describe("CanvasView Component", () => {
     expect(lastSaved.edges[0].toNode).toBe("b");
   });
 
-  it("displays floating relationship toolbar on edge selection and allows editing style, arrow, and presets", () => {
+  it("selects edge on click without floating toolbar and allows anchor handle cycling", () => {
     const onSourceChange = vi.fn();
 
     render(
@@ -529,38 +529,148 @@ describe("CanvasView Component", () => {
     expect(edgeHitArea).toBeDefined();
     fireEvent.click(edgeHitArea);
 
-    // Floating edge toolbar should appear
+    // Floating edge toolbar should NOT appear on click (user requirement: 取消点击连线出现的菜单)
     const edgeToolbar = document.querySelector(".canvas-edge-toolbar");
-    expect(edgeToolbar).toBeDefined();
+    expect(edgeToolbar).toBeNull();
 
-    // Click a preset chip (e.g., "前置")
-    const presetBtn = screen.getByTitle("设为「前置」关系");
-    expect(presetBtn).toBeDefined();
-    fireEvent.click(presetBtn);
+    // Visual anchor handle handles in SVG ARE displayed when edge is selected
+    const anchorHandles = document.querySelectorAll(".canvas-edge-anchor-handles circle");
+    expect(anchorHandles.length).toBe(2);
 
+    // Click destination handle to cycle toSide (左 -> 自适应 undefined)
+    fireEvent.click(anchorHandles[1]);
+    const lastSaved = JSON.parse(onSourceChange.mock.calls[onSourceChange.mock.calls.length - 1][0]);
+    expect(lastSaved.edges[0].toSide).toBeUndefined();
+  });
+
+  it("disconnects edges between selected cards via right click multi-selection context menu", () => {
+    const onSourceChange = vi.fn();
+    const triangleData: CanvasData = {
+      nodes: [
+        { id: "c1", type: "text", text: "Card 1", x: 100, y: 100, width: 200, height: 100 },
+        { id: "c2", type: "text", text: "Card 2", x: 400, y: 100, width: 200, height: 100 },
+        { id: "c3", type: "text", text: "Card 3", x: 250, y: 350, width: 200, height: 100 },
+        { id: "external", type: "text", text: "External", x: 600, y: 400, width: 200, height: 100 },
+      ],
+      edges: [
+        { id: "e12", fromNode: "c1", toNode: "c2" },
+        { id: "e23", fromNode: "c2", toNode: "c3" },
+        { id: "e31", fromNode: "c3", toNode: "c1" },
+        { id: "e-ext", fromNode: "c2", toNode: "external" },
+      ],
+    };
+
+    render(
+      <CanvasView
+        title="断开内部连线测试"
+        source={JSON.stringify(triangleData)}
+        onSourceChange={onSourceChange}
+        editable={true}
+        theme="twitter"
+      />
+    );
+
+    const c1 = screen.getByText("Card 1").closest(".canvas-node")!;
+    const c2 = screen.getByText("Card 2").closest(".canvas-node")!;
+    const c3 = screen.getByText("Card 3").closest(".canvas-node")!;
+
+    fireEvent.mouseDown(c1);
+    fireEvent.mouseDown(c2, { shiftKey: true });
+    fireEvent.mouseDown(c3, { shiftKey: true });
+
+    fireEvent.contextMenu(c1);
+
+    const disconnectBtn = screen.getByText(/断开所选卡片间的连线 \(3 条\)/);
+    expect(disconnectBtn).toBeDefined();
+    fireEvent.click(disconnectBtn);
+
+    const lastSaved = JSON.parse(onSourceChange.mock.calls[onSourceChange.mock.calls.length - 1][0]);
+    expect(lastSaved.edges).toHaveLength(1);
+    expect(lastSaved.edges[0].id).toBe("e-ext");
+  });
+
+  it("displays batch toolbar when multiple edges are selected and allows batch style and reverse", () => {
+    const onSourceChange = vi.fn();
+    const dataWithTwoEdges: CanvasData = {
+      nodes: [
+        { id: "n1", type: "text", text: "N1", x: 100, y: 100, width: 150, height: 80 },
+        { id: "n2", type: "text", text: "N2", x: 350, y: 100, width: 150, height: 80 },
+        { id: "n3", type: "text", text: "N3", x: 600, y: 100, width: 150, height: 80 },
+      ],
+      edges: [
+        { id: "e1", fromNode: "n1", toNode: "n2", style: "straight" },
+        { id: "e2", fromNode: "n2", toNode: "n3", style: "straight" },
+      ],
+    };
+
+    render(
+      <CanvasView
+        title="批量连线测试"
+        source={JSON.stringify(dataWithTwoEdges)}
+        onSourceChange={onSourceChange}
+        editable={true}
+        theme="twitter"
+      />
+    );
+
+    const hitAreas = document.querySelectorAll("svg path[stroke='transparent']");
+    expect(hitAreas.length).toBe(2);
+
+    fireEvent.click(hitAreas[0]);
+    expect(document.querySelector(".canvas-edge-batch-toolbar")).toBeNull();
+
+    fireEvent.click(hitAreas[1], { shiftKey: true });
+    const batchToolbar = document.querySelector(".canvas-edge-batch-toolbar");
+    expect(batchToolbar).toBeDefined();
+    expect(screen.getByText(/已选中 2 条连线/)).toBeDefined();
+
+    const bezierBtn = screen.getByTitle("批量设为: 贝塞尔曲线");
+    fireEvent.click(bezierBtn);
     let lastSaved = JSON.parse(onSourceChange.mock.calls[onSourceChange.mock.calls.length - 1][0]);
-    expect(lastSaved.edges[0].label).toBe("前置");
+    expect(lastSaved.edges[0].style).toBe("bezier");
+    expect(lastSaved.edges[1].style).toBe("bezier");
 
-    // Toggle arrow mode
-    const arrowToggleBtn = screen.getByTitle(/切换箭头/);
-    fireEvent.click(arrowToggleBtn);
-    lastSaved = JSON.parse(onSourceChange.mock.calls[onSourceChange.mock.calls.length - 1][0]);
-    // Cycle from forward to bidirectional
-    expect(lastSaved.edges[0].fromEnd).toBe("arrow");
-    expect(lastSaved.edges[0].toEnd).toBe("arrow");
-
-    // Toggle line style
-    const styleToggleBtn = screen.getByTitle(/切换线型/);
-    fireEvent.click(styleToggleBtn);
-    lastSaved = JSON.parse(onSourceChange.mock.calls[onSourceChange.mock.calls.length - 1][0]);
-    expect(lastSaved.edges[0].style).toBeDefined();
-
-    // Reverse flow
-    const reverseBtn = screen.getByTitle("反转连线流向");
+    const reverseBtn = screen.getByTitle("批量反转连线流向 (R)");
     fireEvent.click(reverseBtn);
     lastSaved = JSON.parse(onSourceChange.mock.calls[onSourceChange.mock.calls.length - 1][0]);
-    expect(lastSaved.edges[0].fromNode).toBe("node-2");
-    expect(lastSaved.edges[0].toNode).toBe("node-1");
+    expect(lastSaved.edges[0].fromNode).toBe("n2");
+    expect(lastSaved.edges[0].toNode).toBe("n1");
+  });
+
+  it("displays step bend handle on selected step edge and allows dragging", () => {
+    const onSourceChange = vi.fn();
+    const dataWithStep: CanvasData = {
+      nodes: [
+        { id: "n1", type: "text", text: "N1", x: 100, y: 100, width: 150, height: 80 },
+        { id: "n2", type: "text", text: "N2", x: 400, y: 250, width: 150, height: 80 },
+      ],
+      edges: [
+        { id: "e1", fromNode: "n1", toNode: "n2", style: "step", fromSide: "right", toSide: "left" },
+      ],
+    };
+
+    render(
+      <CanvasView
+        title="折线拖拽测试"
+        source={JSON.stringify(dataWithStep)}
+        onSourceChange={onSourceChange}
+        editable={true}
+        theme="twitter"
+      />
+    );
+
+    const hitArea = document.querySelector("svg path[stroke='transparent']")!;
+    fireEvent.click(hitArea);
+
+    const bendHandle = document.querySelector(".canvas-step-bend-handle");
+    expect(bendHandle).toBeDefined();
+
+    fireEvent.mouseDown(bendHandle!, { clientX: 200, clientY: 100, button: 0 });
+    fireEvent.mouseMove(window, { clientX: 240, clientY: 100 });
+    fireEvent.mouseUp(window);
+
+    const lastSaved = JSON.parse(onSourceChange.mock.calls[onSourceChange.mock.calls.length - 1][0]);
+    expect(lastSaved.edges[0].stepOffset).toBe(40);
   });
 
   it("opens edge context menu on right click with rich relationship controls", () => {
@@ -585,13 +695,21 @@ describe("CanvasView Component", () => {
     expect(screen.getByText("🔗 关系连线")).toBeDefined();
     expect(screen.getByText("快捷关系预设:")).toBeDefined();
     expect(screen.getByText("反转连线流向")).toBeDefined();
+    expect(screen.getByText("连线端点锚点")).toBeDefined();
 
     // Click "反驳" preset
     const refutePreset = screen.getByText("反驳");
     fireEvent.click(refutePreset);
 
-    const lastSaved = JSON.parse(onSourceChange.mock.calls[onSourceChange.mock.calls.length - 1][0]);
+    let lastSaved = JSON.parse(onSourceChange.mock.calls[onSourceChange.mock.calls.length - 1][0]);
     expect(lastSaved.edges[0].label).toBe("反驳");
+
+    // Reopen menu and click stroke pattern toggle in context menu
+    fireEvent.contextMenu(edgeGroup);
+    const strokeCtxItem = screen.getByText(/虚实:/);
+    fireEvent.click(strokeCtxItem);
+    lastSaved = JSON.parse(onSourceChange.mock.calls[onSourceChange.mock.calls.length - 1][0]);
+    expect(lastSaved.edges[0].strokePattern).toBe("dashed");
   });
 
   it("ensures overlapping groups do not stick together when dragged", () => {

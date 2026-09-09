@@ -9911,14 +9911,29 @@ body:has(.flash-capsule-overlay) {
   transform: scale(1.2);
 }
 
-.canvas-edge-toolbar {
+.canvas-edge-toolbar,
+.canvas-edge-batch-toolbar {
   animation: canvasCtxFadeIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
 
-.canvas-edge-toolbar button:hover {
+.canvas-edge-toolbar button:hover,
+.canvas-edge-batch-toolbar button:hover {
   filter: brightness(1.1);
+}
+
+.canvas-step-bend-handle {
+  transition: transform 0.1s ease;
+}
+
+.canvas-step-bend-handle:hover rect {
+  fill: #f59e0b;
+  stroke: #ffffff;
+}
+
+.canvas-step-bend-handle:hover circle {
+  fill: #ffffff;
 }
 
 .canvas-ctx-header button:hover {

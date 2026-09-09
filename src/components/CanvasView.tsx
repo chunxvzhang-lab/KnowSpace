@@ -54,6 +54,7 @@ import type {
   CanvasGroupNode,
   CanvasViewport,
   CanvasEdgeLabelShape,
+  CanvasEdgeLineStyle,
 } from "../types/canvasTypes";
 import {
   parseCanvasData,
@@ -77,8 +78,10 @@ import {
   computeEdgeMidpoint,
   cycleEdgeArrow,
   cycleEdgeStyle,
+  cycleEdgeStrokePattern,
   reverseEdgeDirection,
   getOptimalAnchorSides,
+  getStepBendHandleInfo,
   downloadCanvasAsImage,
   copyCanvasImageToClipboard,
 } from "../services/canvasService";
@@ -223,6 +226,37 @@ function computeBoxSelectionHits(
   return hitGroupIds;
 }
 
+/**
+ * Calculates which edges are enclosed or intersected by the selection marquee box
+ */
+function computeBoxSelectionEdgeHits(
+  minX: number,
+  maxX: number,
+  minY: number,
+  maxY: number,
+  edges: CanvasEdge[],
+  nodeMap: Map<string, CanvasNode>
+): Set<string> {
+  const hitEdgeIds = new Set<string>();
+  for (const edge of edges) {
+    const fromNode = nodeMap.get(edge.fromNode);
+    const toNode = nodeMap.get(edge.toNode);
+    if (!fromNode || !toNode) continue;
+    const optSides = getOptimalAnchorSides(fromNode, toNode);
+    const fromSide = edge.fromSide || optSides.fromSide;
+    const toSide = edge.toSide || optSides.toSide;
+    const toCenter = { x: toNode.x + toNode.width / 2, y: toNode.y + toNode.height / 2 };
+    const fromCenter = { x: fromNode.x + fromNode.width / 2, y: fromNode.y + fromNode.height / 2 };
+    const p1 = getNodeAnchorPoint(fromNode, fromSide, toCenter);
+    const p2 = getNodeAnchorPoint(toNode, toSide, fromCenter);
+    const mid = computeEdgeMidpoint(p1, fromSide, p2, toSide, edge.style, edge.stepOffset);
+    if (mid.x >= minX && mid.x <= maxX && mid.y >= minY && mid.y <= maxY) {
+      hitEdgeIds.add(edge.id);
+    }
+  }
+  return hitEdgeIds;
+}
+
 export const CanvasView = memo(function CanvasView({
   title,
   source = "",
@@ -306,7 +340,21 @@ export const CanvasView = memo(function CanvasView({
     setSelectedNodeIds(id ? new Set([id]) : new Set());
   }, []);
 
-  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
+  const [selectedEdgeIds, setSelectedEdgeIds] = useState<Set<string>>(new Set());
+  const selectedEdgeId = useMemo(() => {
+    const arr = Array.from(selectedEdgeIds);
+    return arr.length === 1 ? arr[0] : null;
+  }, [selectedEdgeIds]);
+  const setSelectedEdgeId = useCallback((id: string | null) => {
+    setSelectedEdgeIds(id ? new Set([id]) : new Set());
+  }, []);
+
+  const connectedInternalEdges = useMemo(() => {
+    if (selectedNodeIds.size < 2) return [];
+    return data.edges.filter(
+      (e) => selectedNodeIds.has(e.fromNode) && selectedNodeIds.has(e.toNode)
+    );
+  }, [data.edges, selectedNodeIds]);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
@@ -331,6 +379,16 @@ export const CanvasView = memo(function CanvasView({
   } | null>(null);
   const hasDraggedRef = useRef(false);
   const baseSelectionBeforeBoxRef = useRef<Set<string>>(new Set());
+  const baseEdgeSelectionBeforeBoxRef = useRef<Set<string>>(new Set());
+
+  // Step bend drag state
+  const stepBendDragRef = useRef<{
+    edgeId: string;
+    startX: number;
+    startY: number;
+    initialOffset: number;
+    orientation: "horizontal" | "vertical";
+  } | null>(null);
 
   // Right-click context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -678,11 +736,13 @@ export const CanvasView = memo(function CanvasView({
       selectionBoxRef.current = newBox;
       setSelectionBox(newBox);
       baseSelectionBeforeBoxRef.current = isModifier ? new Set(selectedNodeIds) : new Set();
+      baseEdgeSelectionBeforeBoxRef.current = isModifier ? new Set(selectedEdgeIds) : new Set();
       if (!isModifier) {
         setSelectedNodeIds(new Set());
+        setSelectedEdgeIds(new Set());
       }
     },
-    [selectedNodeIds]
+    [selectedNodeIds, selectedEdgeIds]
   );
 
   // Background drag to pan or start box selection
@@ -925,11 +985,207 @@ export const CanvasView = memo(function CanvasView({
         ...currentData,
         edges: currentData.edges.filter((e) => e.id !== edgeId),
       });
-      if (selectedEdgeId === edgeId) setSelectedEdgeId(null);
+      setSelectedEdgeIds((prev) => {
+        if (!prev.has(edgeId)) return prev;
+        const next = new Set(prev);
+        next.delete(edgeId);
+        return next;
+      });
       if (editingEdgeId === edgeId) setEditingEdgeId(null);
       setContextMenu(null);
     },
-    [editable, selectedEdgeId, editingEdgeId, pushHistory]
+    [editable, editingEdgeId, pushHistory]
+  );
+
+  const handleBatchDeleteEdges = useCallback(() => {
+    if (!editable || selectedEdgeIds.size === 0) return;
+    const currentData = latestDataRef.current;
+    const count = selectedEdgeIds.size;
+    pushHistory({
+      ...currentData,
+      edges: currentData.edges.filter((e) => !selectedEdgeIds.has(e.id)),
+    });
+    setSelectedEdgeIds(new Set());
+    if (editingEdgeId && selectedEdgeIds.has(editingEdgeId)) setEditingEdgeId(null);
+    setContextMenu(null);
+    showToast(`已删除 ${count} 条连线`);
+  }, [editable, selectedEdgeIds, editingEdgeId, pushHistory, showToast]);
+
+  const handleBatchSetEdgeStyle = useCallback(
+    (style: CanvasEdgeLineStyle) => {
+      if (!editable || selectedEdgeIds.size === 0) return;
+      const currentData = latestDataRef.current;
+      pushHistory({
+        ...currentData,
+        edges: currentData.edges.map((e) =>
+          selectedEdgeIds.has(e.id) ? { ...e, style } : e
+        ),
+      });
+      const styleName = style === "bezier" ? "贝塞尔曲线" : style === "step" ? "直角折线" : "直线";
+      showToast(`已将 ${selectedEdgeIds.size} 条连线设为${styleName}`);
+    },
+    [editable, selectedEdgeIds, pushHistory, showToast]
+  );
+
+  const handleBatchSetEdgeStrokePattern = useCallback(
+    (pattern: "solid" | "dashed" | "dotted") => {
+      if (!editable || selectedEdgeIds.size === 0) return;
+      const currentData = latestDataRef.current;
+      pushHistory({
+        ...currentData,
+        edges: currentData.edges.map((e) =>
+          selectedEdgeIds.has(e.id) ? { ...e, strokePattern: pattern } : e
+        ),
+      });
+      const patName = pattern === "dashed" ? "虚线" : pattern === "dotted" ? "点线" : "实线";
+      showToast(`已将 ${selectedEdgeIds.size} 条连线设为${patName}`);
+    },
+    [editable, selectedEdgeIds, pushHistory, showToast]
+  );
+
+  const handleBatchCycleStrokePattern = useCallback(() => {
+    if (!editable || selectedEdgeIds.size === 0) return;
+    const currentData = latestDataRef.current;
+    const first = currentData.edges.find((e) => selectedEdgeIds.has(e.id));
+    const nextPattern: "solid" | "dashed" | "dotted" =
+      first?.strokePattern === "dashed"
+        ? "dotted"
+        : first?.strokePattern === "dotted"
+        ? "solid"
+        : "dashed";
+    pushHistory({
+      ...currentData,
+      edges: currentData.edges.map((e) =>
+        selectedEdgeIds.has(e.id) ? { ...e, strokePattern: nextPattern } : e
+      ),
+    });
+    const patName = nextPattern === "dashed" ? "虚线" : nextPattern === "dotted" ? "点线" : "实线";
+    showToast(`已将 ${selectedEdgeIds.size} 条连线切换为${patName}`);
+  }, [editable, selectedEdgeIds, pushHistory, showToast]);
+
+  const handleBatchToggleArrow = useCallback(() => {
+    if (!editable || selectedEdgeIds.size === 0) return;
+    const currentData = latestDataRef.current;
+    const first = currentData.edges.find((e) => selectedEdgeIds.has(e.id));
+    let nextFromEnd: "arrow" | undefined = undefined;
+    let nextToEnd: "arrow" | undefined = "arrow";
+    let desc = "单向箭头";
+
+    if (first?.toEnd === "arrow" && first?.fromEnd !== "arrow") {
+      nextFromEnd = "arrow";
+      nextToEnd = "arrow";
+      desc = "双向箭头";
+    } else if (first?.toEnd === "arrow" && first?.fromEnd === "arrow") {
+      nextFromEnd = undefined;
+      nextToEnd = undefined;
+      desc = "无箭头";
+    } else {
+      nextFromEnd = undefined;
+      nextToEnd = "arrow";
+      desc = "单向箭头";
+    }
+
+    pushHistory({
+      ...currentData,
+      edges: currentData.edges.map((e) =>
+        selectedEdgeIds.has(e.id) ? { ...e, fromEnd: nextFromEnd, toEnd: nextToEnd } : e
+      ),
+    });
+    showToast(`已将 ${selectedEdgeIds.size} 条连线切换为${desc}`);
+  }, [editable, selectedEdgeIds, pushHistory, showToast]);
+
+  const handleBatchSetEdgeColor = useCallback(
+    (colorKey: string) => {
+      if (!editable || selectedEdgeIds.size === 0) return;
+      const currentData = latestDataRef.current;
+      pushHistory({
+        ...currentData,
+        edges: currentData.edges.map((e) =>
+          selectedEdgeIds.has(e.id) ? { ...e, color: colorKey } : e
+        ),
+      });
+      showToast(`已修改 ${selectedEdgeIds.size} 条连线的颜色`);
+    },
+    [editable, selectedEdgeIds, pushHistory, showToast]
+  );
+
+  const handleBatchReverseEdges = useCallback(() => {
+    if (!editable || selectedEdgeIds.size === 0) return;
+    const currentData = latestDataRef.current;
+    const count = selectedEdgeIds.size;
+    pushHistory({
+      ...currentData,
+      edges: currentData.edges.map((e) =>
+        selectedEdgeIds.has(e.id) ? reverseEdgeDirection(e) : e
+      ),
+    });
+    showToast(`已反转 ${count} 条连线的流向`);
+  }, [editable, selectedEdgeIds, pushHistory, showToast]);
+
+  const handleSelectAllEdges = useCallback(() => {
+    if (data.edges.length === 0) return;
+    setSelectedEdgeIds(new Set(data.edges.map((e) => e.id)));
+    setSelectedNodeIds(new Set());
+    setContextMenu(null);
+    showToast(`已全选 ${data.edges.length} 条连线`);
+  }, [data.edges, showToast]);
+
+  const handleDisconnectSelectedNodesEdges = useCallback(() => {
+    if (!editable || selectedNodeIds.size < 2) return;
+    const currentData = latestDataRef.current;
+    const beforeCount = currentData.edges.length;
+    const remainingEdges = currentData.edges.filter(
+      (e) => !(selectedNodeIds.has(e.fromNode) && selectedNodeIds.has(e.toNode))
+    );
+    const removedCount = beforeCount - remainingEdges.length;
+    if (removedCount === 0) {
+      showToast("所选卡片之间无内部连线");
+      setContextMenu(null);
+      return;
+    }
+    pushHistory({
+      ...currentData,
+      edges: remainingEdges,
+    });
+    setSelectedEdgeIds(new Set());
+    setContextMenu(null);
+    showToast(`已断开所选卡片间的 ${removedCount} 条内部连线`);
+  }, [editable, selectedNodeIds, pushHistory, showToast]);
+
+  const handleStepBendMouseDown = useCallback(
+    (
+      e: React.MouseEvent,
+      edgeId: string,
+      orientation: "horizontal" | "vertical",
+      currentOffset: number
+    ) => {
+      if (e.button !== 0 || !editable) return;
+      e.preventDefault();
+      e.stopPropagation();
+      stepBendDragRef.current = {
+        edgeId,
+        startX: e.clientX,
+        startY: e.clientY,
+        initialOffset: currentOffset || 0,
+        orientation,
+      };
+    },
+    [editable]
+  );
+
+  const handleResetEdgeStepOffset = useCallback(
+    (edgeId: string) => {
+      if (!editable) return;
+      const currentData = latestDataRef.current;
+      pushHistory({
+        ...currentData,
+        edges: currentData.edges.map((e) =>
+          e.id === edgeId ? { ...e, stepOffset: undefined } : e
+        ),
+      });
+      showToast("已重置折线转折位置");
+    },
+    [editable, pushHistory, showToast]
   );
 
   const handleNodeColorChange = useCallback(
@@ -1025,6 +1281,63 @@ export const CanvasView = memo(function CanvasView({
         ...currentData,
         edges: currentData.edges.map((e) =>
           e.id === edgeId ? { ...e, labelShape: shape } : e
+        ),
+      });
+    },
+    [editable, pushHistory]
+  );
+
+  const handleSetEdgeAnchorSide = useCallback(
+    (edgeId: string, sideKey: "fromSide" | "toSide", side: CanvasNodeSide | undefined) => {
+      if (!editable) return;
+      const currentData = latestDataRef.current;
+      pushHistory({
+        ...currentData,
+        edges: currentData.edges.map((e) =>
+          e.id === edgeId ? { ...e, [sideKey]: side } : e
+        ),
+      });
+    },
+    [editable, pushHistory]
+  );
+
+  const handleCycleEdgeAnchor = useCallback(
+    (edgeId: string, sideKey: "fromSide" | "toSide") => {
+      if (!editable) return;
+      const currentEdge = latestDataRef.current.edges.find((e) => e.id === edgeId);
+      if (!currentEdge) return;
+      const current = currentEdge[sideKey];
+      const sequence: (CanvasNodeSide | undefined)[] = [undefined, "top", "right", "bottom", "left"];
+      const currIdx = sequence.indexOf(current);
+      const nextSide = sequence[(currIdx + 1) % sequence.length];
+      handleSetEdgeAnchorSide(edgeId, sideKey, nextSide);
+    },
+    [editable, handleSetEdgeAnchorSide]
+  );
+
+  const handleToggleEdgeStrokePattern = useCallback(
+    (edgeId: string) => {
+      if (!editable) return;
+      const currentData = latestDataRef.current;
+      const targetEdge = currentData.edges.find((e) => e.id === edgeId);
+      if (!targetEdge) return;
+      const updated = cycleEdgeStrokePattern(targetEdge);
+      pushHistory({
+        ...currentData,
+        edges: currentData.edges.map((e) => (e.id === edgeId ? updated : e)),
+      });
+    },
+    [editable, pushHistory]
+  );
+
+  const handleSetEdgeStyle = useCallback(
+    (edgeId: string, style: CanvasEdgeLineStyle) => {
+      if (!editable) return;
+      const currentData = latestDataRef.current;
+      pushHistory({
+        ...currentData,
+        edges: currentData.edges.map((e) =>
+          e.id === edgeId ? { ...e, style } : e
         ),
       });
     },
@@ -1600,7 +1913,11 @@ export const CanvasView = memo(function CanvasView({
     const canvasX = Math.round((clientX - viewportRef.current.panX) / viewportRef.current.zoom);
     const canvasY = Math.round((clientY - viewportRef.current.panY) / viewportRef.current.zoom);
 
-    setSelectedEdgeId(edge.id);
+    if (selectedEdgeIds.has(edge.id) && selectedEdgeIds.size > 1) {
+      // keep multiple selection
+    } else {
+      setSelectedEdgeIds(new Set([edge.id]));
+    }
     setSelectedNodeIds(new Set());
 
     const mWidth = 260;
@@ -1615,7 +1932,7 @@ export const CanvasView = memo(function CanvasView({
       canvasY,
       targetEdgeId: edge.id,
     });
-  }, []);
+  }, [selectedEdgeIds]);
 
   const handleSaveEdgeLabel = () => {
     if (!editingEdgeId) return;
@@ -1901,6 +2218,21 @@ export const CanvasView = memo(function CanvasView({
   // Global mouse move and up listeners
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
+      // Dragging step bend handle
+      if (stepBendDragRef.current) {
+        const { edgeId, startX, startY, initialOffset, orientation } = stepBendDragRef.current;
+        const zoom = viewportRef.current.zoom;
+        const delta = orientation === "horizontal" ? (e.clientX - startX) / zoom : (e.clientY - startY) / zoom;
+        const newOffset = Math.round(initialOffset + delta);
+        setData((prev) => ({
+          ...prev,
+          edges: prev.edges.map((edge) =>
+            edge.id === edgeId ? { ...edge, stepOffset: newOffset } : edge
+          ),
+        }));
+        return;
+      }
+
       // 0. Marquee Box Selection
       if (selectionBoxRef.current && containerRef.current) {
         const rect = containerRef.current.getBoundingClientRect();
@@ -1935,8 +2267,21 @@ export const CanvasView = memo(function CanvasView({
           setSelectedNodeIds(
             isModifier ? new Set([...baseSelectionBeforeBoxRef.current, ...hitIds]) : hitIds
           );
+          const currentNodesMap = new Map(latestDataRef.current.nodes.map((n) => [n.id, n]));
+          const hitEdgeIds = computeBoxSelectionEdgeHits(
+            minX,
+            maxX,
+            minY,
+            maxY,
+            latestDataRef.current.edges,
+            currentNodesMap
+          );
+          setSelectedEdgeIds(
+            isModifier ? new Set([...baseEdgeSelectionBeforeBoxRef.current, ...hitEdgeIds]) : hitEdgeIds
+          );
         } else {
           setSelectedNodeIds(baseSelectionBeforeBoxRef.current);
+          setSelectedEdgeIds(baseEdgeSelectionBeforeBoxRef.current);
         }
         return;
       }
@@ -2076,6 +2421,16 @@ export const CanvasView = memo(function CanvasView({
       latestDragPosRef.current = null;
       latestResizePosRef.current = null;
 
+      // Complete step bend dragging
+      if (stepBendDragRef.current) {
+        const { edgeId, initialOffset } = stepBendDragRef.current;
+        stepBendDragRef.current = null;
+        const currentEdge = latestDataRef.current.edges.find((e) => e.id === edgeId);
+        if (currentEdge && (currentEdge.stepOffset || 0) !== initialOffset) {
+          pushHistory(latestDataRef.current);
+        }
+      }
+
       // Complete box selection
       if (selectionBoxRef.current) {
         const box = selectionBoxRef.current;
@@ -2097,8 +2452,21 @@ export const CanvasView = memo(function CanvasView({
           setSelectedNodeIds(
             isModifier ? new Set([...baseSelectionBeforeBoxRef.current, ...hitIds]) : hitIds
           );
+          const currentNodesMap = new Map(latestDataRef.current.nodes.map((n) => [n.id, n]));
+          const hitEdgeIds = computeBoxSelectionEdgeHits(
+            minX,
+            maxX,
+            minY,
+            maxY,
+            latestDataRef.current.edges,
+            currentNodesMap
+          );
+          setSelectedEdgeIds(
+            isModifier ? new Set([...baseEdgeSelectionBeforeBoxRef.current, ...hitEdgeIds]) : hitEdgeIds
+          );
         } else {
           setSelectedNodeIds(baseSelectionBeforeBoxRef.current);
+          setSelectedEdgeIds(baseEdgeSelectionBeforeBoxRef.current);
         }
       }
 
@@ -2106,7 +2474,7 @@ export const CanvasView = memo(function CanvasView({
         isDraggingCanvasRef.current = false;
         if (!canvasDragStartRef.current.hasMoved) {
           setSelectedNodeIds(new Set());
-          setSelectedEdgeId(null);
+          setSelectedEdgeIds(new Set());
         }
       }
       if (nodeDragRef.current) {
@@ -2219,18 +2587,18 @@ export const CanvasView = memo(function CanvasView({
       } else if (e.key === "Delete" || e.key === "Backspace") {
         if (selectedNodeIds.size > 0) {
           handleDeleteSelected();
-        } else if (selectedEdgeId) {
-          handleDeleteEdge(selectedEdgeId);
+        } else if (selectedEdgeIds.size > 0) {
+          handleBatchDeleteEdges();
         }
       } else if (
         (e.key === "r" || e.key === "R") &&
-        selectedEdgeId &&
+        selectedEdgeIds.size > 0 &&
         !e.ctrlKey &&
         !e.metaKey &&
         !e.altKey
       ) {
         e.preventDefault();
-        handleReverseEdge(selectedEdgeId);
+        handleBatchReverseEdges();
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "d") {
         if (selectedNodeIds.size > 0) {
           e.preventDefault();
@@ -2256,7 +2624,7 @@ export const CanvasView = memo(function CanvasView({
         handleRedo();
       } else if (e.key === "Escape") {
         setSelectedNodeIds(new Set());
-        setSelectedEdgeId(null);
+        setSelectedEdgeIds(new Set());
         setContextMenu(null);
         setIsBoxSelectMode(false);
         if (selectionBoxRef.current) {
@@ -2274,6 +2642,7 @@ export const CanvasView = memo(function CanvasView({
     selectedNodeId,
     selectedNodeIds,
     selectedEdgeId,
+    selectedEdgeIds,
     data.nodes,
     editable,
     handleSave,
@@ -2281,7 +2650,9 @@ export const CanvasView = memo(function CanvasView({
     handleDeleteSelected,
     handleDuplicateSelected,
     handleDeleteEdge,
+    handleBatchDeleteEdges,
     handleReverseEdge,
+    handleBatchReverseEdges,
     handleSpawnConnectedChild,
     handleUndo,
     handleRedo,
@@ -2773,6 +3144,17 @@ export const CanvasView = memo(function CanvasView({
             >
               <path d="M 0 1 L 10 5 L 0 9 z" fill={colors.edgeColor} />
             </marker>
+            <marker
+              id="canvas-arrow-selected"
+              viewBox="0 0 10 10"
+              refX="8"
+              refY="5"
+              markerWidth="6"
+              markerHeight="6"
+              orient="auto-start-reverse"
+            >
+              <path d="M 0 1 L 10 5 L 0 9 z" fill="#f59e0b" />
+            </marker>
             {Object.entries(CANVAS_COLOR_PALETTES).map(([key, col]) => (
               <marker
                 key={key}
@@ -2815,14 +3197,16 @@ export const CanvasView = memo(function CanvasView({
             const toNode = nodeMap.get(edge.toNode);
             if (!fromNode || !toNode) return null;
 
+            const toCenter = { x: toNode.x + toNode.width / 2, y: toNode.y + toNode.height / 2 };
+            const fromCenter = { x: fromNode.x + fromNode.width / 2, y: fromNode.y + fromNode.height / 2 };
             const optSides = getOptimalAnchorSides(fromNode, toNode);
             const fromSide = edge.fromSide || optSides.fromSide;
             const toSide = edge.toSide || optSides.toSide;
-            const p1 = getNodeAnchorPoint(fromNode, fromSide);
-            const p2 = getNodeAnchorPoint(toNode, toSide);
-            const pathData = computeEdgePath(p1, fromSide, p2, toSide, edge.style);
+            const p1 = getNodeAnchorPoint(fromNode, fromSide, toCenter);
+            const p2 = getNodeAnchorPoint(toNode, toSide, fromCenter);
+            const pathData = computeEdgePath(p1, fromSide, p2, toSide, edge.style, edge.stepOffset);
 
-            const isSelected = selectedEdgeId === edge.id;
+            const isSelected = selectedEdgeIds.has(edge.id);
             const edgeColor =
               edge.color && CANVAS_COLOR_PALETTES[edge.color]
                 ? CANVAS_COLOR_PALETTES[edge.color].stroke
@@ -2830,15 +3214,20 @@ export const CanvasView = memo(function CanvasView({
                 ? edge.color
                 : colors.edgeColor;
 
-            const getMarkerUrl = (col?: string) => {
+            const getMarkerUrl = (col?: string, selected?: boolean) => {
+              if (selected) return "url(#canvas-arrow-selected)";
               if (!col) return "url(#canvas-arrow-default)";
               if (CANVAS_COLOR_PALETTES[col]) return `url(#canvas-arrow-${col})`;
               if (col.startsWith("#")) return `url(#canvas-arrow-${col.replace("#", "hex-")})`;
               return "url(#canvas-arrow-default)";
             };
 
-            const midX = (p1.x + p2.x) / 2;
-            const midY = (p1.y + p2.y) / 2;
+            const strokeDash =
+              edge.strokePattern === "dashed"
+                ? "7 4"
+                : edge.strokePattern === "dotted"
+                ? "2.5 4"
+                : undefined;
 
             return (
               <g
@@ -2855,8 +3244,17 @@ export const CanvasView = memo(function CanvasView({
                   style={{ cursor: "pointer" }}
                   onClick={(e) => {
                     e.stopPropagation();
-                    setSelectedEdgeId(edge.id);
-                    setSelectedNodeIds(new Set());
+                    if (e.shiftKey || e.ctrlKey || e.metaKey) {
+                      setSelectedEdgeIds((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(edge.id)) next.delete(edge.id);
+                        else next.add(edge.id);
+                        return next;
+                      });
+                    } else {
+                      setSelectedEdgeIds(new Set([edge.id]));
+                      setSelectedNodeIds(new Set());
+                    }
                   }}
                   onDoubleClick={(e) => {
                     e.stopPropagation();
@@ -2864,28 +3262,119 @@ export const CanvasView = memo(function CanvasView({
                     setEditingEdgeLabel(edge.label || "");
                   }}
                 />
+                {/* Selection Halo Glow */}
+                {isSelected && (
+                  <path
+                    d={pathData}
+                    fill="none"
+                    stroke="#f59e0b"
+                    strokeWidth={7}
+                    strokeOpacity={0.28}
+                    strokeLinecap="round"
+                    style={{ pointerEvents: "none" }}
+                  />
+                )}
                 {/* Visual stroke */}
                 <path
                   d={pathData}
                   fill="none"
                   stroke={isSelected ? "#f59e0b" : edgeColor}
-                  strokeWidth={isSelected ? 3 : 2}
-                  strokeDasharray={isSelected ? "6 3" : undefined}
+                  strokeWidth={isSelected ? 2.5 : 2}
+                  strokeDasharray={strokeDash}
                   markerStart={
                     edge.fromEnd === "arrow"
-                      ? getMarkerUrl(edge.color)
+                      ? getMarkerUrl(edge.color, isSelected)
                       : undefined
                   }
                   markerEnd={
                     edge.toEnd === "arrow"
-                      ? getMarkerUrl(edge.color)
+                      ? getMarkerUrl(edge.color, isSelected)
                       : undefined
                   }
                   style={{
                     transition: "stroke 0.2s, stroke-width 0.2s",
-                    filter: isSelected ? "drop-shadow(0 0 6px rgba(245,158,11,0.6))" : undefined,
+                    filter: isSelected ? "drop-shadow(0 0 5px rgba(245,158,11,0.5))" : undefined,
                   }}
                 />
+                {/* Interactive Endpoint Anchor Handles when Selected */}
+                {isSelected && editable && (
+                  <g className="canvas-edge-anchor-handles">
+                    <circle
+                      cx={p1.x}
+                      cy={p1.y}
+                      r={5}
+                      fill="#f59e0b"
+                      stroke="#ffffff"
+                      strokeWidth={1.5}
+                      style={{ cursor: "pointer" }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCycleEdgeAnchor(edge.id, "fromSide");
+                      }}
+                    >
+                      <title>{`起点锚点: ${fromSide} (点击切换边)`}</title>
+                    </circle>
+                    <circle
+                      cx={p2.x}
+                      cy={p2.y}
+                      r={5}
+                      fill="#f59e0b"
+                      stroke="#ffffff"
+                      strokeWidth={1.5}
+                      style={{ cursor: "pointer" }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCycleEdgeAnchor(edge.id, "toSide");
+                      }}
+                    >
+                      <title>{`终点锚点: ${toSide} (点击切换边)`}</title>
+                    </circle>
+                  </g>
+                )}
+                {/* Interactive Step Bend Drag Handle when Selected */}
+                {isSelected && edge.style === "step" && editable && (() => {
+                  const bendInfo = getStepBendHandleInfo(p1, fromSide, p2, toSide, edge.stepOffset);
+                  const isHoriz = bendInfo.orientation === "horizontal";
+                  return (
+                    <g
+                      className="canvas-step-bend-handle"
+                      style={{ cursor: isHoriz ? "ew-resize" : "ns-resize" }}
+                      onMouseDown={(e) =>
+                        handleStepBendMouseDown(e, edge.id, bendInfo.orientation, edge.stepOffset || 0)
+                      }
+                      onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        handleResetEdgeStepOffset(edge.id);
+                      }}
+                    >
+                      <title>{`拖拽平移折线转折位置 (双击复位)`}</title>
+                      <circle
+                        cx={bendInfo.x}
+                        cy={bendInfo.y}
+                        r={11}
+                        fill="transparent"
+                      />
+                      <rect
+                        x={bendInfo.x - (isHoriz ? 4 : 8)}
+                        y={bendInfo.y - (isHoriz ? 8 : 4)}
+                        width={isHoriz ? 8 : 16}
+                        height={isHoriz ? 16 : 8}
+                        rx={4}
+                        fill="#ffffff"
+                        stroke="#f59e0b"
+                        strokeWidth={1.5}
+                        style={{ pointerEvents: "none", filter: "drop-shadow(0 1px 4px rgba(0,0,0,0.3))" }}
+                      />
+                      <circle
+                        cx={bendInfo.x}
+                        cy={bendInfo.y}
+                        r={1.5}
+                        fill="#f59e0b"
+                        style={{ pointerEvents: "none" }}
+                      />
+                    </g>
+                  );
+                })()}
               </g>
             );
           })}
@@ -2902,248 +3391,6 @@ export const CanvasView = memo(function CanvasView({
             />
           )}
         </svg>
-
-        {/* FLOATING RELATIONSHIP TOOLBAR ON SELECTED EDGE */}
-        {selectedEdgeId && (() => {
-          const selEdge = data.edges.find((e) => e.id === selectedEdgeId);
-          if (!selEdge) return null;
-          const fromNode = nodeMap.get(selEdge.fromNode);
-          const toNode = nodeMap.get(selEdge.toNode);
-          if (!fromNode || !toNode) return null;
-          const p1 = getNodeAnchorPoint(fromNode, selEdge.fromSide || "right");
-          const p2 = getNodeAnchorPoint(toNode, selEdge.toSide || "left");
-          const edgeMid = computeEdgeMidpoint(p1, selEdge.fromSide, p2, selEdge.toSide, selEdge.style);
-          const midX = edgeMid.x;
-          const midY = edgeMid.y;
-
-          const arrowDesc =
-            selEdge.fromEnd === "arrow" && selEdge.toEnd === "arrow"
-              ? "双向"
-              : selEdge.toEnd === "arrow"
-              ? "单向"
-              : "无箭";
-
-          const styleDesc =
-            selEdge.style === "straight" ? "直线" : selEdge.style === "step" ? "折线" : "曲线";
-
-          return (
-            <div
-              className="canvas-edge-toolbar"
-              style={{
-                position: "absolute",
-                left: midX,
-                top: midY - 26,
-                transform: "translate(-50%, -100%)",
-                zIndex: 60,
-                display: "flex",
-                alignItems: "center",
-                gap: 5,
-                padding: "5px 10px",
-                borderRadius: 20,
-                background: theme === "eink" ? "#f4f1ea" : !isDark ? "#ffffff" : "#1e293b",
-                border: `1px solid ${colors.cardBorder}`,
-                boxShadow: "0 8px 24px rgba(0,0,0,0.22)",
-                pointerEvents: "all",
-                whiteSpace: "nowrap",
-                fontSize: 11.5,
-              }}
-              onClick={(e) => e.stopPropagation()}
-              onMouseDown={(e) => e.stopPropagation()}
-            >
-              {/* Quick Label Input */}
-              <input
-                type="text"
-                value={selEdge.label || ""}
-                onChange={(e) => handleEdgeLabelChange(selEdge.id, e.target.value)}
-                placeholder="关系标签..."
-                style={{
-                  width: 82,
-                  fontSize: 11,
-                  padding: "2px 6px",
-                  borderRadius: 12,
-                  border: `1px solid ${colors.cardBorder}`,
-                  background: "transparent",
-                  color: colors.cardText,
-                  outline: "none",
-                }}
-              />
-
-              {/* Preset Chips */}
-              <div style={{ display: "flex", gap: 3 }}>
-                {CANVAS_RELATION_PRESETS.slice(0, 4).map((preset) => (
-                  <button
-                    key={preset}
-                    onClick={() => handleEdgeLabelChange(selEdge.id, preset)}
-                    style={{
-                      padding: "2px 6px",
-                      fontSize: 10.5,
-                      borderRadius: 10,
-                      border: selEdge.label === preset ? "1px solid #f59e0b" : `1px solid ${colors.cardBorder}`,
-                      background: selEdge.label === preset ? "rgba(245,158,11,0.18)" : "transparent",
-                      color: selEdge.label === preset ? "#f59e0b" : colors.cardText,
-                      cursor: "pointer",
-                      fontWeight: selEdge.label === preset ? 600 : 400,
-                    }}
-                    title={`设为「${preset}」关系`}
-                  >
-                    {preset}
-                  </button>
-                ))}
-              </div>
-
-              <div style={{ width: 1, height: 16, background: colors.cardBorder, margin: "0 2px" }} />
-
-              {/* Style Toggle (Spline / Step / Straight) */}
-              <button
-                onClick={() => handleToggleEdgeStyle(selEdge.id)}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 3,
-                  padding: "2px 6px",
-                  borderRadius: 6,
-                  border: `1px solid ${colors.cardBorder}`,
-                  background: "transparent",
-                  color: colors.cardText,
-                  cursor: "pointer",
-                  fontSize: 11,
-                }}
-                title={`切换线型 (当前: ${styleDesc})`}
-              >
-                <Spline size={12} />
-                <span>{styleDesc}</span>
-              </button>
-
-              {/* Arrow Toggle (None / Single / Double) */}
-              <button
-                onClick={() => handleToggleEdgeArrow(selEdge.id)}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 3,
-                  padding: "2px 6px",
-                  borderRadius: 6,
-                  border: `1px solid ${colors.cardBorder}`,
-                  background: "transparent",
-                  color: colors.cardText,
-                  cursor: "pointer",
-                  fontSize: 11,
-                }}
-                title={`切换箭头 (当前: ${arrowDesc})`}
-              >
-                {selEdge.fromEnd === "arrow" && selEdge.toEnd === "arrow" ? (
-                  <ArrowLeftRight size={12} />
-                ) : selEdge.toEnd === "arrow" ? (
-                  <MoveRight size={12} />
-                ) : (
-                  <Spline size={12} style={{ opacity: 0.4 }} />
-                )}
-                <span>{arrowDesc}</span>
-              </button>
-
-              {/* Reverse direction */}
-              <button
-                onClick={() => handleReverseEdge(selEdge.id)}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 3,
-                  padding: "2px 6px",
-                  borderRadius: 6,
-                  border: `1px solid ${colors.cardBorder}`,
-                  background: "transparent",
-                  color: colors.cardText,
-                  cursor: "pointer",
-                  fontSize: 11,
-                }}
-                title="反转连线流向"
-              >
-                <Shuffle size={12} color="#0284c7" />
-                <span>反向</span>
-              </button>
-
-              {/* Label Shape Toggle */}
-              <div style={{ width: 1, height: 16, background: colors.cardBorder, margin: "0 2px" }} />
-              <div
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 2,
-                  padding: "1px 2px",
-                  borderRadius: 6,
-                  background: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)",
-                }}
-                title="选择关系说明形状 (胶囊 / 矩形 / 菱形)"
-              >
-                {(["pill", "rect", "diamond"] as const).map((s) => {
-                  const isActive = (selEdge.labelShape || "pill") === s;
-                  return (
-                    <button
-                      key={s}
-                      onClick={() => handleEdgeLabelShapeChange(selEdge.id, s)}
-                      onMouseDown={(e) => e.stopPropagation()}
-                      style={{
-                        width: 22,
-                        height: 20,
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        borderRadius: 4,
-                        border: isActive ? "1px solid #f59e0b" : "1px solid transparent",
-                        background: isActive ? "rgba(245,158,11,0.22)" : "transparent",
-                        color: isActive ? "#f59e0b" : colors.cardText,
-                        cursor: "pointer",
-                        transition: "all 0.15s ease",
-                      }}
-                      title={s === "pill" ? "胶囊形状标签" : s === "rect" ? "矩形形状标签" : "菱形形状标签"}
-                    >
-                      {renderEdgeShapeIcon(s, isActive)}
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div style={{ width: 1, height: 16, background: colors.cardBorder, margin: "0 2px" }} />
-
-              {/* Color dots */}
-              <div style={{ display: "flex", gap: 3, alignItems: "center" }}>
-                {Object.entries(CANVAS_COLOR_PALETTES).map(([k, c]) => (
-                  <div
-                    key={k}
-                    onClick={() => handleEdgeColorChange(selEdge.id, k)}
-                    style={{
-                      width: 12,
-                      height: 12,
-                      borderRadius: "50%",
-                      backgroundColor: c.stroke,
-                      cursor: "pointer",
-                      border: selEdge.color === k ? "2px solid #f59e0b" : "1px solid rgba(0,0,0,0.15)",
-                    }}
-                    title={c.label}
-                  />
-                ))}
-              </div>
-
-              {/* Delete Edge */}
-              <button
-                onClick={() => handleDeleteEdge(selEdge.id)}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  padding: "2px 5px",
-                  borderRadius: 6,
-                  border: "none",
-                  background: "none",
-                  color: "#ef4444",
-                  cursor: "pointer",
-                }}
-                title="删除连线"
-              >
-                <Trash2 size={13} />
-              </button>
-            </div>
-          );
-        })()}
 
         {/* 3. MULTIMODAL CARDS LAYER */}
         {data.nodes.map((node) => {
@@ -3700,15 +3947,17 @@ export const CanvasView = memo(function CanvasView({
           const isEditing = editingEdgeId === edge.id;
           if (!hasLabel && !isEditing) return null;
 
+          const toCenter = { x: toNode.x + toNode.width / 2, y: toNode.y + toNode.height / 2 };
+          const fromCenter = { x: fromNode.x + fromNode.width / 2, y: fromNode.y + fromNode.height / 2 };
           const optSides = getOptimalAnchorSides(fromNode, toNode);
           const fromSide = edge.fromSide || optSides.fromSide;
           const toSide = edge.toSide || optSides.toSide;
-          const p1 = getNodeAnchorPoint(fromNode, fromSide);
-          const p2 = getNodeAnchorPoint(toNode, toSide);
+          const p1 = getNodeAnchorPoint(fromNode, fromSide, toCenter);
+          const p2 = getNodeAnchorPoint(toNode, toSide, fromCenter);
           // Place label exactly at geometric midpoint — the connection line passes THROUGH the label center
-          const rawMid = computeEdgeMidpoint(p1, fromSide, p2, toSide, edge.style);
+          const rawMid = computeEdgeMidpoint(p1, fromSide, p2, toSide, edge.style, edge.stepOffset);
 
-          const isSelected = selectedEdgeId === edge.id;
+          const isSelected = selectedEdgeIds.has(edge.id);
           const edgeColor =
             edge.color && CANVAS_COLOR_PALETTES[edge.color]
               ? CANVAS_COLOR_PALETTES[edge.color].stroke
@@ -3736,8 +3985,17 @@ export const CanvasView = memo(function CanvasView({
               }}
               onClick={(e) => {
                 e.stopPropagation();
-                setSelectedEdgeId(edge.id);
-                setSelectedNodeIds(new Set());
+                if (e.shiftKey || e.ctrlKey || e.metaKey) {
+                  setSelectedEdgeIds((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(edge.id)) next.delete(edge.id);
+                    else next.add(edge.id);
+                    return next;
+                  });
+                } else {
+                  setSelectedEdgeIds(new Set([edge.id]));
+                  setSelectedNodeIds(new Set());
+                }
               }}
               onDoubleClick={(e) => {
                 e.stopPropagation();
@@ -4568,8 +4826,159 @@ export const CanvasView = memo(function CanvasView({
           }}
         >
           {contextMenu.targetEdgeId ? (
-            // 1. Edge Context Menu
+            // 1. Edge Context Menu (Batch or Single)
             (() => {
+              const isMultiEdge = selectedEdgeIds.size > 1;
+              if (isMultiEdge) {
+                return (
+                  <>
+                    <div
+                      className="canvas-ctx-header"
+                      style={{
+                        padding: "6px 12px 6px",
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: colors.edgeColor,
+                        borderBottom: `1px solid ${colors.cardHeaderBorder}`,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <span
+                        style={{
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                          maxWidth: 165,
+                        }}
+                      >
+                        🔗 批量连线操作 ({selectedEdgeIds.size} 条)
+                      </span>
+                      <button
+                        onClick={() => setContextMenu(null)}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          padding: 0,
+                          cursor: "pointer",
+                          color: colors.cardText,
+                          opacity: 0.6,
+                          display: "flex",
+                          alignItems: "center",
+                        }}
+                        title="关闭菜单"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+
+                    <div className="canvas-ctx-section-label">连线形态</div>
+                    <div
+                      className="canvas-ctx-item"
+                      onClick={() => {
+                        handleBatchSetEdgeStyle("bezier");
+                        setContextMenu(null);
+                      }}
+                    >
+                      <Spline size={13} />
+                      <span>批量设为: 贝塞尔曲线</span>
+                    </div>
+                    <div
+                      className="canvas-ctx-item"
+                      onClick={() => {
+                        handleBatchSetEdgeStyle("step");
+                        setContextMenu(null);
+                      }}
+                    >
+                      <Spline size={13} />
+                      <span>批量设为: 直角折线</span>
+                    </div>
+                    <div
+                      className="canvas-ctx-item"
+                      onClick={() => {
+                        handleBatchSetEdgeStyle("straight");
+                        setContextMenu(null);
+                      }}
+                    >
+                      <Spline size={13} />
+                      <span>批量设为: 直线</span>
+                    </div>
+
+                    <div className="canvas-ctx-divider" />
+                    <div className="canvas-ctx-section-label">虚实与箭头</div>
+                    <div
+                      className="canvas-ctx-item"
+                      onClick={() => {
+                        handleBatchCycleStrokePattern();
+                        setContextMenu(null);
+                      }}
+                    >
+                      <Spline size={13} />
+                      <span>批量切换虚实 (实线 / 虚线 / 点线)</span>
+                    </div>
+                    <div
+                      className="canvas-ctx-item"
+                      onClick={() => {
+                        handleBatchToggleArrow();
+                        setContextMenu(null);
+                      }}
+                    >
+                      <ArrowLeftRight size={13} />
+                      <span>批量切换箭头 (无 / 单向 / 双向)</span>
+                    </div>
+                    <div
+                      className="canvas-ctx-item"
+                      onClick={() => {
+                        handleBatchReverseEdges();
+                        setContextMenu(null);
+                      }}
+                    >
+                      <Shuffle size={13} color="#0284c7" />
+                      <span>批量反转连线流向</span>
+                      <span className="canvas-ctx-shortcut">R</span>
+                    </div>
+
+                    <div className="canvas-ctx-divider" />
+                    <div className="canvas-ctx-section-label">批量色彩</div>
+                    <div style={{ padding: "4px 12px 6px" }}>
+                      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                        {Object.entries(CANVAS_COLOR_PALETTES).map(([key, col]) => (
+                          <div
+                            key={key}
+                            className="canvas-color-dot"
+                            onClick={() => {
+                              handleBatchSetEdgeColor(key);
+                              setContextMenu(null);
+                            }}
+                            style={{
+                              width: 16,
+                              height: 16,
+                              borderRadius: "50%",
+                              backgroundColor: col.stroke,
+                              cursor: "pointer",
+                              border: "1px solid rgba(0,0,0,0.2)",
+                            }}
+                            title={col.label}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="canvas-ctx-divider" />
+                    <div className="canvas-ctx-section-label">删除</div>
+                    <div
+                      className="canvas-ctx-item danger"
+                      onClick={handleBatchDeleteEdges}
+                    >
+                      <Trash2 size={13} />
+                      <span>批量删除连线 ({selectedEdgeIds.size} 条)</span>
+                      <span className="canvas-ctx-shortcut">Delete</span>
+                    </div>
+                  </>
+                );
+              }
+
               const targetEdge = data.edges.find((e) => e.id === contextMenu.targetEdgeId);
               if (!targetEdge) return null;
               const fromNode = nodeMap.get(targetEdge.fromNode);
@@ -4692,6 +5101,25 @@ export const CanvasView = memo(function CanvasView({
                     <span className="canvas-ctx-shortcut">切换</span>
                   </div>
 
+                  {/* Stroke Pattern Toggle */}
+                  <div
+                    className="canvas-ctx-item"
+                    onClick={() => {
+                      handleToggleEdgeStrokePattern(targetEdge.id);
+                    }}
+                  >
+                    <Spline size={13} />
+                    <span>
+                      虚实:{" "}
+                      {targetEdge.strokePattern === "dashed"
+                        ? "虚线"
+                        : targetEdge.strokePattern === "dotted"
+                        ? "点线"
+                        : "实线"}
+                    </span>
+                    <span className="canvas-ctx-shortcut">切换</span>
+                  </div>
+
                   {/* Arrow Mode Toggle */}
                   <div
                     className="canvas-ctx-item"
@@ -4729,6 +5157,64 @@ export const CanvasView = memo(function CanvasView({
                       </span>
                     </span>
                     <span className="canvas-ctx-shortcut">R</span>
+                  </div>
+
+                  {/* Endpoint Anchors Customization */}
+                  <div className="canvas-ctx-divider" />
+                  <div className="canvas-ctx-section-label">连线端点锚点</div>
+                  <div style={{ padding: "4px 12px 6px", display: "flex", flexDirection: "column", gap: 6 }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 11 }}>
+                      <span style={{ opacity: 0.8 }}>起点锚点:</span>
+                      <div style={{ display: "flex", gap: 3 }}>
+                        {([undefined, "top", "right", "bottom", "left"] as const).map((side) => {
+                          const isActive = targetEdge.fromSide === side;
+                          const label = !side ? "自适应" : side === "top" ? "上" : side === "right" ? "右" : side === "bottom" ? "下" : "左";
+                          return (
+                            <button
+                              key={String(side)}
+                              onClick={() => handleSetEdgeAnchorSide(targetEdge.id, "fromSide", side)}
+                              style={{
+                                padding: "2px 5px",
+                                fontSize: 10.5,
+                                borderRadius: 4,
+                                border: isActive ? "1px solid #f59e0b" : `1px solid ${colors.cardBorder}`,
+                                background: isActive ? "rgba(245,158,11,0.2)" : "transparent",
+                                color: isActive ? "#f59e0b" : colors.cardText,
+                                cursor: "pointer",
+                              }}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 11 }}>
+                      <span style={{ opacity: 0.8 }}>终点锚点:</span>
+                      <div style={{ display: "flex", gap: 3 }}>
+                        {([undefined, "top", "right", "bottom", "left"] as const).map((side) => {
+                          const isActive = targetEdge.toSide === side;
+                          const label = !side ? "自适应" : side === "top" ? "上" : side === "right" ? "右" : side === "bottom" ? "下" : "左";
+                          return (
+                            <button
+                              key={String(side)}
+                              onClick={() => handleSetEdgeAnchorSide(targetEdge.id, "toSide", side)}
+                              style={{
+                                padding: "2px 5px",
+                                fontSize: 10.5,
+                                borderRadius: 4,
+                                border: isActive ? "1px solid #f59e0b" : `1px solid ${colors.cardBorder}`,
+                                background: isActive ? "rgba(245,158,11,0.2)" : "transparent",
+                                color: isActive ? "#f59e0b" : colors.cardText,
+                                cursor: "pointer",
+                              }}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
 
                   <div className="canvas-ctx-divider" />
@@ -5093,6 +5579,17 @@ export const CanvasView = memo(function CanvasView({
                         <div className="canvas-ctx-item" onClick={handleConnectLoopNodes}>
                           <RotateCw size={13} color="#a855f7" />
                           <span>🔄 建立闭环环形连线 ({selectedNodeIds.size} 项)</span>
+                        </div>
+                      )}
+
+                      {/* Disconnect internal edges between selected cards */}
+                      {connectedInternalEdges.length > 0 && (
+                        <div
+                          className="canvas-ctx-item danger"
+                          onClick={handleDisconnectSelectedNodesEdges}
+                        >
+                          <Unlink size={13} />
+                          <span>⚡ 断开所选卡片间的连线 ({connectedInternalEdges.length} 条)</span>
                         </div>
                       )}
 
@@ -5518,6 +6015,13 @@ export const CanvasView = memo(function CanvasView({
                 <span className="canvas-ctx-shortcut">Ctrl+A</span>
               </div>
 
+              {data.edges.length > 0 && (
+                <div className="canvas-ctx-item" onClick={handleSelectAllEdges}>
+                  <Link size={13} color="#0284c7" />
+                  <span>全选所有连线 ({data.edges.length} 条)</span>
+                </div>
+              )}
+
               {editable && (
                 <div className="canvas-ctx-item" onClick={handleAlignToGrid}>
                   <Grid size={13} color="#0284c7" />
@@ -5613,13 +6117,210 @@ export const CanvasView = memo(function CanvasView({
         </div>
       )}
 
+      {/* 8.5 Floating Batch Toolbar for Multiple Selected Edges */}
+      {selectedEdgeIds.size > 1 && (
+        <div
+          className="canvas-edge-batch-toolbar"
+          style={{
+            position: "absolute",
+            bottom: 24,
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 1000,
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "6px 14px",
+            borderRadius: 24,
+            background: theme === "eink" ? "#f4f1ea" : !isDark ? "#ffffff" : "#1e293b",
+            border: `1px solid ${colors.cardBorder}`,
+            boxShadow: "0 10px 30px rgba(0,0,0,0.25)",
+            pointerEvents: "all",
+            whiteSpace: "nowrap",
+            fontSize: 12,
+          }}
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+              fontWeight: 600,
+              color: "#f59e0b",
+              paddingRight: 4,
+            }}
+          >
+            <Link size={14} />
+            <span>已选中 {selectedEdgeIds.size} 条连线</span>
+          </div>
+
+          <div style={{ width: 1, height: 16, background: colors.cardBorder, margin: "0 2px" }} />
+
+          {/* Line Style options */}
+          <div style={{ display: "flex", gap: 3 }}>
+            {(["bezier", "step", "straight"] as const).map((st) => (
+              <button
+                key={st}
+                onClick={() => handleBatchSetEdgeStyle(st)}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 3,
+                  padding: "3px 7px",
+                  borderRadius: 6,
+                  border: `1px solid ${colors.cardBorder}`,
+                  background: "transparent",
+                  color: colors.cardText,
+                  cursor: "pointer",
+                  fontSize: 11,
+                }}
+                title={`批量设为: ${st === "bezier" ? "贝塞尔曲线" : st === "step" ? "直角折线" : "直线"}`}
+              >
+                <Spline size={11} />
+                <span>{st === "bezier" ? "曲线" : st === "step" ? "折线" : "直线"}</span>
+              </button>
+            ))}
+          </div>
+
+          <div style={{ width: 1, height: 16, background: colors.cardBorder, margin: "0 2px" }} />
+
+          {/* Stroke pattern cycle */}
+          <button
+            onClick={handleBatchCycleStrokePattern}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 3,
+              padding: "3px 7px",
+              borderRadius: 6,
+              border: `1px solid ${colors.cardBorder}`,
+              background: "transparent",
+              color: colors.cardText,
+              cursor: "pointer",
+              fontSize: 11,
+            }}
+            title="批量切换虚实 (实线 / 虚线 / 点线)"
+          >
+            <span style={{ fontSize: 10, letterSpacing: 1 }}>- -</span>
+            <span>虚实</span>
+          </button>
+
+          {/* Arrow toggle */}
+          <button
+            onClick={handleBatchToggleArrow}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 3,
+              padding: "3px 7px",
+              borderRadius: 6,
+              border: `1px solid ${colors.cardBorder}`,
+              background: "transparent",
+              color: colors.cardText,
+              cursor: "pointer",
+              fontSize: 11,
+            }}
+            title="批量切换箭头 (无 / 单向 / 双向)"
+          >
+            <ArrowLeftRight size={12} />
+            <span>箭头</span>
+          </button>
+
+          {/* Reverse flow */}
+          <button
+            onClick={handleBatchReverseEdges}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 3,
+              padding: "3px 7px",
+              borderRadius: 6,
+              border: `1px solid ${colors.cardBorder}`,
+              background: "transparent",
+              color: "#0284c7",
+              cursor: "pointer",
+              fontSize: 11,
+            }}
+            title="批量反转连线流向 (R)"
+          >
+            <Shuffle size={12} />
+            <span>反向</span>
+          </button>
+
+          <div style={{ width: 1, height: 16, background: colors.cardBorder, margin: "0 2px" }} />
+
+          {/* Color dots */}
+          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+            {Object.entries(CANVAS_COLOR_PALETTES).map(([k, c]) => (
+              <div
+                key={k}
+                onClick={() => handleBatchSetEdgeColor(k)}
+                style={{
+                  width: 13,
+                  height: 13,
+                  borderRadius: "50%",
+                  backgroundColor: c.stroke,
+                  cursor: "pointer",
+                  border: "1px solid rgba(0,0,0,0.15)",
+                }}
+                title={`批量设为: ${c.label}`}
+              />
+            ))}
+          </div>
+
+          <div style={{ width: 1, height: 16, background: colors.cardBorder, margin: "0 2px" }} />
+
+          {/* Delete edges */}
+          <button
+            onClick={handleBatchDeleteEdges}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 3,
+              padding: "3px 7px",
+              borderRadius: 6,
+              border: "none",
+              background: "none",
+              color: "#ef4444",
+              cursor: "pointer",
+              fontSize: 11,
+            }}
+            title="批量删除所选连线 (Delete)"
+          >
+            <Trash2 size={13} />
+            <span>删除</span>
+          </button>
+
+          {/* Dismiss / clear selection */}
+          <button
+            onClick={() => setSelectedEdgeIds(new Set())}
+            style={{
+              background: "none",
+              border: "none",
+              padding: "2px",
+              cursor: "pointer",
+              color: colors.cardText,
+              opacity: 0.6,
+              display: "flex",
+              alignItems: "center",
+              marginLeft: 2,
+            }}
+            title="取消选择"
+          >
+            <X size={13} />
+          </button>
+        </div>
+      )}
+
       {/* 9. Floating Toast Feedback */}
       {toastMessage && (
         <div
           className="canvas-toast-msg"
           style={{
             position: "absolute",
-            bottom: 24,
+            bottom: selectedEdgeIds.size > 1 ? 76 : 24,
             left: "50%",
             transform: "translateX(-50%)",
             background: isDark ? "rgba(30, 41, 59, 0.95)" : "rgba(15, 23, 42, 0.9)",

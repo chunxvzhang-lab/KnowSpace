@@ -59,6 +59,8 @@ export interface CanvasEdge {
   label?: string;
   style?: CanvasEdgeLineStyle;
   labelShape?: CanvasEdgeLabelShape;
+  strokePattern?: "solid" | "dashed" | "dotted";
+  stepOffset?: number;
 }
 
 export interface CanvasData {
