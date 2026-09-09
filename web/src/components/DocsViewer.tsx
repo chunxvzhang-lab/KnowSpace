@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { DOCS_MODULES, DocModule } from '../data/docsManifest';
+import { DOCS_MODULES } from '../data/docsManifest';
 import { BookOpen, Search, ArrowLeft, Maximize2, Check, X, Tag } from 'lucide-react';
+import { useLanguage } from '../i18n/LanguageContext';
 
 interface DocsViewerProps {
   onBackToLanding: () => void;
 }
 
 export const DocsViewer: React.FC<DocsViewerProps> = ({ onBackToLanding }) => {
+  const { t } = useLanguage();
   const [selectedModuleId, setSelectedModuleId] = useState<string>(DOCS_MODULES[0].id);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [previewImage, setPreviewImage] = useState<{ src: string; caption: string } | null>(null);
@@ -30,13 +32,13 @@ export const DocsViewer: React.FC<DocsViewerProps> = ({ onBackToLanding }) => {
           style={{ padding: '8px 16px', fontSize: '0.88rem' }}
         >
           <ArrowLeft size={16} />
-          <span>返回产品首页</span>
+          <span>{t.docs.backBtn}</span>
         </button>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div className="badge-pill primary">
             <BookOpen size={14} />
-            <span>全功能高清图片手册 (Illustrated Manual) · 32 大模块全景画册</span>
+            <span>{t.docs.badge}</span>
           </div>
         </div>
       </div>
@@ -59,7 +61,7 @@ export const DocsViewer: React.FC<DocsViewerProps> = ({ onBackToLanding }) => {
             <Search size={16} color="var(--text-muted)" />
             <input
               type="text"
-              placeholder="搜索 32 大模块..."
+              placeholder={t.docs.searchPlaceholder}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{
@@ -98,19 +100,22 @@ export const DocsViewer: React.FC<DocsViewerProps> = ({ onBackToLanding }) => {
                   <span style={{
                     fontSize: '0.75rem',
                     fontWeight: 700,
-                    padding: '2px 6px',
-                    borderRadius: 4,
+                    padding: '3px 7px',
+                    borderRadius: 6,
                     background: isSelected ? 'var(--accent-cyan)' : 'var(--bg-surface)',
-                    color: isSelected ? '#fff' : 'var(--text-muted)',
-                    fontFamily: 'monospace'
+                    color: isSelected ? '#ffffff' : 'var(--text-secondary)',
+                    border: isSelected ? '1px solid var(--accent-cyan)' : '1px solid var(--border-subtle)',
+                    fontFamily: 'monospace',
+                    flexShrink: 0,
+                    lineHeight: 1
                   }}>
                     {m.index}
                   </span>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '0.85rem', fontWeight: isSelected ? 700 : 500, color: 'var(--text-primary)', lineHeight: 1.3 }}>
+                    <div style={{ fontSize: '0.88rem', fontWeight: isSelected ? 700 : 600, color: 'var(--text-primary)', lineHeight: 1.3 }}>
                       {m.title}
                     </div>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 2 }}>
                       {m.category} {m.shortcut ? `· ${m.shortcut}` : ''}
                     </div>
                   </div>
@@ -126,26 +131,26 @@ export const DocsViewer: React.FC<DocsViewerProps> = ({ onBackToLanding }) => {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span className="badge-pill primary" style={{ fontSize: '0.85rem' }}>
-                模块 {currentModule.index} / 32
+                {t.docs.moduleLabel} {currentModule.index} / 32
               </span>
               <span className="badge-pill">
-                <Tag size={12} />
+                <Tag size={12} style={{ flexShrink: 0 }} />
                 <span>{currentModule.category}</span>
               </span>
             </div>
 
             {currentModule.shortcut && (
-              <span className="badge-pill" style={{ color: 'var(--accent-amber)', borderColor: 'currentColor' }}>
-                快捷键：{currentModule.shortcut}
+              <span className="badge-pill" style={{ color: 'var(--accent-amber)', borderColor: 'currentColor', fontWeight: 700 }}>
+                {t.docs.shortcutLabel} {currentModule.shortcut}
               </span>
             )}
           </div>
 
-          <h2 style={{ fontSize: '1.85rem', fontWeight: 800, marginBottom: 14, color: 'var(--text-primary)' }}>
+          <h2 style={{ fontSize: '1.85rem', fontWeight: 800, marginBottom: 14, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
             {currentModule.title}
           </h2>
 
-          <p style={{ fontSize: '1rem', color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: 24 }}>
+          <p style={{ fontSize: '1.02rem', color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: 24 }}>
             {currentModule.description}
           </p>
 
@@ -157,13 +162,13 @@ export const DocsViewer: React.FC<DocsViewerProps> = ({ onBackToLanding }) => {
             marginBottom: 32,
             border: '1px solid var(--border-subtle)'
           }}>
-            <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>
-              💡 核心设计与实操要点：
+            <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 10 }}>
+              {t.docs.keyPointsHeader}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '8px 16px' }}>
               {currentModule.keyPoints.map((pt, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                  <Check size={14} color="var(--accent-emerald)" />
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.88rem', color: 'var(--text-primary)' }}>
+                  <Check size={14} color="var(--accent-emerald)" style={{ flexShrink: 0 }} />
                   <span>{pt}</span>
                 </div>
               ))}
@@ -195,7 +200,7 @@ export const DocsViewer: React.FC<DocsViewerProps> = ({ onBackToLanding }) => {
                     backdropFilter: 'blur(6px)'
                   }}>
                     <Maximize2 size={14} />
-                    <span>查看大图</span>
+                    <span>{t.docs.zoomIn}</span>
                   </div>
                 </div>
 

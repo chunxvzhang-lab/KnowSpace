@@ -1428,6 +1428,37 @@ describe("CanvasView Component", () => {
     expect(saved.edges.map((e: any) => e.toNode)).toEqual(expect.arrayContaining(["sub-1", "sub-2"]));
   });
 
+  it("renders origin dot circles on directed edges and displays initiator badge on source card", () => {
+    const dataWithOneToMany: CanvasData = {
+      nodes: [
+        { id: "hub", type: "text", text: "中心枢纽节点", x: 100, y: 100, width: 200, height: 100 },
+        { id: "leaf-1", type: "text", text: "叶子 1", x: 400, y: 50, width: 200, height: 100 },
+        { id: "leaf-2", type: "text", text: "叶子 2", x: 400, y: 200, width: 200, height: 100 },
+      ],
+      edges: [
+        { id: "e1", fromNode: "hub", fromSide: "right", fromEnd: "none", toNode: "leaf-1", toSide: "left", toEnd: "arrow", color: "3" },
+        { id: "e2", fromNode: "hub", fromSide: "right", fromEnd: "none", toNode: "leaf-2", toSide: "left", toEnd: "arrow", color: "3" },
+      ],
+    };
+
+    render(
+      <CanvasView
+        title="发起源视觉指示器测试"
+        source={JSON.stringify(dataWithOneToMany)}
+        editable={true}
+        theme="twitter"
+      />
+    );
+
+    // Initiator card displays badge 🌱 发起源 · 2
+    expect(screen.getByText(/发起源 · 2/)).toBeDefined();
+
+    // Directed edges display origin dot circles at p1
+    const originCircles = document.querySelectorAll("circle");
+    expect(originCircles.length).toBeGreaterThanOrEqual(2);
+  });
+
+
   it("supports connecting cards by dragging and dropping directly onto target card body", () => {
     const onSourceChange = vi.fn();
     const dropData: CanvasData = {

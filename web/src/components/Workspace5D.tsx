@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { WORKSPACE_MODES } from '../data/features';
-import { BookOpen, Columns2, Code2, GitBranch, Palette, ArrowRight } from 'lucide-react';
+import { BookOpen, Columns2, Code2, GitBranch, Palette } from 'lucide-react';
+import { useLanguage } from '../i18n/LanguageContext';
 
 export const Workspace5D: React.FC = () => {
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<string>('canvas');
 
-  const currentMode = WORKSPACE_MODES.find(m => m.id === activeTab) || WORKSPACE_MODES[4];
+  const rawMode = WORKSPACE_MODES.find(m => m.id === activeTab) || WORKSPACE_MODES[4];
+  const translatedMode = t.workspace.modes.find(m => m.id === activeTab) || t.workspace.modes[0];
 
   const getIcon = (id: string) => {
     switch (id) {
@@ -23,13 +26,13 @@ export const Workspace5D: React.FC = () => {
       {/* Header */}
       <div style={{ textAlign: 'center', marginBottom: 44 }}>
         <div className="badge-pill primary" style={{ marginBottom: 14 }}>
-          <span>五维立体工作区</span>
+          <span>{t.workspace.badge}</span>
         </div>
         <h2 style={{ fontSize: 'clamp(2rem, 4vw, 2.8rem)', fontWeight: 800, letterSpacing: '-0.02em', marginBottom: 16 }}>
-          从一维线性文本，到五维空间认知跃迁
+          {t.workspace.title}
         </h2>
         <p style={{ fontSize: '1.05rem', color: 'var(--text-secondary)', maxWidth: 720, margin: '0 auto' }}>
-          思考在不同的阶段需要不同的空间容器。KnowSpace 在一套引擎下无缝承载五种工作形态，随时随需按心流切换。
+          {t.workspace.desc}
         </p>
       </div>
 
@@ -42,7 +45,7 @@ export const Workspace5D: React.FC = () => {
         flexWrap: 'wrap',
         marginBottom: 36
       }}>
-        {WORKSPACE_MODES.map((mode) => {
+        {t.workspace.modes.map((mode) => {
           const isActive = mode.id === activeTab;
           return (
             <button
@@ -72,90 +75,38 @@ export const Workspace5D: React.FC = () => {
       </div>
 
       {/* Mode Showcase Stage */}
-      <div className="glass-panel cyber-bracket-container" style={{ padding: '36px', overflow: 'hidden' }}>
+      <div className="glass-panel" style={{ padding: '36px', overflow: 'hidden' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 36, alignItems: 'center' }}>
           {/* Mode Description & Highlights */}
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
               <span className="badge-pill" style={{ color: 'var(--accent-cyan)', borderColor: 'currentColor' }}>
-                DIMENSION_0{WORKSPACE_MODES.findIndex(m => m.id === activeTab) + 1}
+                DIMENSION_0{t.workspace.modes.findIndex(m => m.id === activeTab) + 1}
               </span>
               <span style={{ fontSize: '0.75rem', fontFamily: 'monospace', color: 'var(--text-muted)' }}>
                 // MODE_FLOW_ACTIVE
               </span>
             </div>
             <h3 style={{ fontSize: '1.75rem', fontWeight: 800, marginBottom: 14, color: 'var(--text-primary)' }}>
-              {currentMode.title}
+              {translatedMode.title}
             </h3>
             <p style={{ fontSize: '1rem', color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: 28 }}>
-              {currentMode.desc}
+              {translatedMode.desc}
             </p>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {activeTab === 'canvas' && (
-                <>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem' }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-cyan)' }} />
-                    <span><strong>JSON Canvas 1.0</strong> 国际开放标准，与全球生态无损互通</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem' }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-emerald)' }} />
-                    <span><strong>拓扑排序算法</strong>：零散白板卡片一键逆向萃取为万字专著</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem' }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-amber)' }} />
-                    <span><strong>Minimap 鹰眼雷达</strong>：全局视口实时穿透跳跃</span>
-                  </div>
-                </>
-              )}
-              {activeTab === 'split' && (
-                <>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem' }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-cyan)' }} />
-                    <span><strong>AST 块级映射</strong>：解决长篇 Markdown 错位滚动的业界难题</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem' }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-emerald)' }} />
-                    <span><strong>实时双向同步</strong>：编辑器与渲染视窗毫秒级对齐</span>
-                  </div>
-                </>
-              )}
-              {activeTab === 'mindmap' && (
-                <>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem' }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-cyan)' }} />
-                    <span><strong>Ctrl+M 一秒切换</strong>：大纲与导图双向无缝转换</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem' }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-amber)' }} />
-                    <span><strong>OPML 2.0 / FreeMind 导出</strong>：无缝流转至专业思维导图工具</span>
-                  </div>
-                </>
-              )}
-              {activeTab === 'read' && (
-                <>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem' }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-emerald)' }} />
-                    <span><strong>960px 黄金阅读视宽</strong>：专为长时间深度阅读优化的护眼排版</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem' }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-cyan)' }} />
-                    <span><strong>打字机垂直锁定</strong>：输入焦点永远居中于舒适视线</span>
-                  </div>
-                </>
-              )}
-              {activeTab === 'source' && (
-                <>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem' }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-cyan)' }} />
-                    <span><strong>CodeMirror 6 现代底座</strong>：代码围栏折叠与极客高亮</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.9rem' }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-emerald)' }} />
-                    <span><strong>YAML Front Matter 管理</strong>：完整呈现文档元数据与标签体系</span>
-                  </div>
-                </>
-              )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {translatedMode.bullets.map((bullet, idx) => (
+                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '0.92rem', color: 'var(--text-secondary)' }}>
+                  <div style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    background: idx === 0 ? 'var(--accent-cyan)' : idx === 1 ? 'var(--accent-emerald)' : 'var(--accent-amber)',
+                    flexShrink: 0
+                  }} />
+                  <span>{bullet}</span>
+                </div>
+              ))}
             </div>
           </div>
 
@@ -168,8 +119,8 @@ export const Workspace5D: React.FC = () => {
             boxShadow: '0 16px 40px rgba(0,0,0,0.3)'
           }}>
             <img
-              src={currentMode.image}
-              alt={currentMode.title}
+              src={rawMode.image}
+              alt={translatedMode.title}
               style={{
                 width: '100%',
                 height: 'auto',

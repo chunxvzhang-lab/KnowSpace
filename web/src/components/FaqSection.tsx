@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { FAQS } from '../data/faq';
 import { HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { useLanguage } from '../i18n/LanguageContext';
 
 export const FaqSection: React.FC = () => {
+  const { t } = useLanguage();
   const [expandedIdx, setExpandedIdx] = useState<number | null>(0);
 
   const toggle = (i: number) => {
@@ -14,18 +15,18 @@ export const FaqSection: React.FC = () => {
       <div style={{ textAlign: 'center', marginBottom: 48 }}>
         <div className="badge-pill primary" style={{ marginBottom: 14 }}>
           <HelpCircle size={14} />
-          <span>常见疑问</span>
+          <span>{t.faq.badge}</span>
         </div>
         <h2 style={{ fontSize: 'clamp(2rem, 4vw, 2.8rem)', fontWeight: 800, letterSpacing: '-0.02em', marginBottom: 16 }}>
-          关于 KnowSpace 的高频解答
+          {t.faq.title}
         </h2>
         <p style={{ fontSize: '1.05rem', color: 'var(--text-secondary)' }}>
-          帮助您快速了解数据安全、格式兼容与技术细节。
+          {t.faq.desc}
         </p>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {FAQS.map((faq, idx) => {
+        {t.faq.items.map((faq, idx) => {
           const isExpanded = expandedIdx === idx;
           return (
             <div

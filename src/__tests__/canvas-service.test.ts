@@ -26,7 +26,7 @@ import {
   computeEdgeMidpoint,
   alignNodes,
 } from "../services/canvasService";
-import type { CanvasData, CanvasTextNode, CanvasFileNode, CanvasGroupNode } from "../types/canvasTypes";
+import type { CanvasData, CanvasTextNode, CanvasFileNode, CanvasGroupNode, CanvasEdge } from "../types/canvasTypes";
 
 describe("canvasService - JSON Canvas 1.0 Specification", () => {
   it("parses empty or invalid input safely", () => {
@@ -815,6 +815,45 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
     const gap2 = dhC.x - (dhB.x + dhB.width);
     expect(gap1).toBe(gap2);
   });
+
+  it("assigns distinct colors when source cards in different containers initiate connections", () => {
+    const containerA: CanvasGroupNode = { id: "contA", type: "group", label: "Group A", x: 0, y: 0, width: 300, height: 400 };
+    const containerB: CanvasGroupNode = { id: "contB", type: "group", label: "Group B", x: 400, y: 0, width: 300, height: 400 };
+    const cardA1: CanvasTextNode = { id: "ca1", type: "text", text: "A1", x: 20, y: 50, width: 200, height: 80 };
+    const cardB1: CanvasTextNode = { id: "cb1", type: "text", text: "B1", x: 420, y: 50, width: 200, height: 80 };
+    const allNodes = [containerA, containerB, cardA1, cardB1];
+
+    const colorA = getSourceNodeEdgeColor(cardA1, [], allNodes);
+    expect(colorA).toBeDefined();
+
+    const edgesA = [
+      { id: "ea1", fromNode: cardA1.id, toNode: cardB1.id, color: colorA },
+    ];
+
+    // Card B in container B initiates connections -> must pick a color unused by Card A on canvas!
+    const colorB = getSourceNodeEdgeColor(cardB1, edgesA, allNodes);
+    expect(colorB).toBeDefined();
+    expect(colorB).not.toBe(colorA);
+  });
+
+  it("renders origin dot circles for directed lines in exportCanvasToSvg", () => {
+    const nodeA: CanvasTextNode = { id: "na", type: "text", text: "Node A", x: 0, y: 0, width: 200, height: 100 };
+    const nodeB: CanvasTextNode = { id: "nb", type: "text", text: "Node B", x: 300, y: 0, width: 200, height: 100 };
+    const directedEdge: CanvasEdge = {
+      id: "e1",
+      fromNode: "na",
+      fromSide: "right",
+      fromEnd: "none",
+      toNode: "nb",
+      toSide: "left",
+      toEnd: "arrow",
+      color: "1",
+    };
+    const svg = exportCanvasToSvg({ nodes: [nodeA, nodeB], edges: [directedEdge] });
+    expect(svg).toContain("<circle cx=");
+    expect(svg).toContain('r="3.5"');
+  });
 });
+
 
 

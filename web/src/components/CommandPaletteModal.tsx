@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Search, FileText, Command, ArrowRight, X, Sparkles, Moon, Sun, Feather } from 'lucide-react';
+import { Search, FileText, Command, ArrowRight, X } from 'lucide-react';
+import { useLanguage } from '../i18n/LanguageContext';
 
 interface CommandPaletteModalProps {
   isOpen: boolean;
@@ -14,6 +15,7 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
   setTheme,
   onGoToDocs
 }) => {
+  const { t, lang } = useLanguage();
   const [query, setQuery] = useState<string>('');
 
   useEffect(() => {
@@ -38,12 +40,42 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
   if (!isOpen) return null;
 
   const mockItems = [
-    { type: 'file', label: '01-分布式系统架构.md', desc: '核心规范 · L45', action: () => { onGoToDocs(); onClose(); } },
-    { type: 'file', label: '03-无限空间白板.canvas', desc: 'JSON Canvas 1.0 架构拓扑', action: () => { onGoToDocs(); onClose(); } },
-    { type: 'cmd', label: '> 切换至日光浅色主题 (Warm Amber)', desc: '主题调度', action: () => { setTheme('light'); onClose(); } },
-    { type: 'cmd', label: '> 切换至仿电子墨水屏主题 (E-ink Paper)', desc: '护眼模式', action: () => { setTheme('eink'); onClose(); } },
-    { type: 'cmd', label: '> 切换至极客暗黑主题 (Geek Dark)', desc: '夜间模式', action: () => { setTheme('dark'); onClose(); } },
-    { type: 'cmd', label: '> 打开 32 大模块高清画册与全景手册', desc: '在线文档', action: () => { onGoToDocs(); onClose(); } }
+    {
+      type: 'file',
+      label: lang === 'en' ? '01-distributed-architecture.md' : '01-分布式系统架构.md',
+      desc: lang === 'en' ? 'Core Spec · L45' : '核心规范 · L45',
+      action: () => { onGoToDocs(); onClose(); }
+    },
+    {
+      type: 'file',
+      label: lang === 'en' ? '03-infinite-canvas.canvas' : '03-无限空间白板.canvas',
+      desc: lang === 'en' ? 'JSON Canvas 1.0 Architecture' : 'JSON Canvas 1.0 架构拓扑',
+      action: () => { onGoToDocs(); onClose(); }
+    },
+    {
+      type: 'cmd',
+      label: t.palette.themeLight,
+      desc: t.palette.catTheme,
+      action: () => { setTheme('light'); onClose(); }
+    },
+    {
+      type: 'cmd',
+      label: t.palette.themeEink,
+      desc: t.palette.catTheme,
+      action: () => { setTheme('eink'); onClose(); }
+    },
+    {
+      type: 'cmd',
+      label: t.palette.themeDark,
+      desc: t.palette.catTheme,
+      action: () => { setTheme('dark'); onClose(); }
+    },
+    {
+      type: 'cmd',
+      label: t.palette.navDocs,
+      desc: t.palette.catNav,
+      action: () => { onGoToDocs(); onClose(); }
+    }
   ];
 
   const filtered = mockItems.filter(item => 
@@ -91,7 +123,7 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
           <input
             autoFocus
             type="text"
-            placeholder="输入文件名、拼音缩写 (如 jg)、或输入 > 执行动作..."
+            placeholder={t.palette.placeholder}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             style={{
@@ -115,7 +147,7 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
         <div style={{ maxHeight: 360, overflowY: 'auto', padding: 8 }}>
           {filtered.length === 0 ? (
             <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-              未搜索到匹配项
+              {lang === 'en' ? 'No matching commands or files found' : '未搜索到匹配项'}
             </div>
           ) : (
             filtered.map((item, idx) => (
@@ -151,7 +183,7 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                  <span>回车执行</span>
+                  <span>{lang === 'en' ? 'Enter to execute' : '回车执行'}</span>
                   <ArrowRight size={13} />
                 </div>
               </div>
@@ -171,11 +203,11 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
           color: 'var(--text-muted)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span>↑↓ 导航</span>
-            <span>↵ 确认</span>
-            <span>Esc 退出</span>
+            <span>{lang === 'en' ? '↑↓ Navigate' : '↑↓ 导航'}</span>
+            <span>{lang === 'en' ? '↵ Select' : '↵ 确认'}</span>
+            <span>{lang === 'en' ? 'Esc Exit' : 'Esc 退出'}</span>
           </div>
-          <span style={{ color: 'var(--accent-cyan)' }}>KnowSpace Command Palette 模拟器</span>
+          <span style={{ color: 'var(--accent-cyan)' }}>KnowSpace Command Palette</span>
         </div>
       </div>
     </div>

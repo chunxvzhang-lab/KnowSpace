@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { Sparkles, Move, FileText, SplitSquareVertical, Search, Check, RefreshCw, Undo2 } from 'lucide-react';
+import { Sparkles, Move, FileText, SplitSquareVertical, Search } from 'lucide-react';
+import { useLanguage } from '../i18n/LanguageContext';
 
 export const InteractiveStage: React.FC = () => {
+  const { t, lang } = useLanguage();
   const [activeSandbox, setActiveSandbox] = useState<'canvas' | 'diff' | 'search'>('canvas');
 
   // Sandbox 1: Micro Canvas State
@@ -9,14 +11,16 @@ export const InteractiveStage: React.FC = () => {
   const [nodeB, setNodeB] = useState({ x: 380, y: 160 });
   const [extractedArticle, setExtractedArticle] = useState<string | null>(null);
 
-  // Sandbox 2: Diff Slider State
-  const [diffSlider, setDiffSlider] = useState<number>(50);
-
   // Sandbox 3: Search Playground State
-  const [searchQuery, setSearchQuery] = useState<string>('tag:#架构 link:[[分布式协议]]');
-  const [selectedChip, setSelectedChip] = useState<string>('tag');
+  const defaultQuery = lang === 'en' ? 'tag:#architecture link:[[consensus]]' : 'tag:#架构 link:[[分布式协议]]';
+  const [searchQuery, setSearchQuery] = useState<string>(defaultQuery);
 
-  const chips = [
+  const chips = lang === 'en' ? [
+    { label: 'tag:#architecture', value: 'tag:#architecture' },
+    { label: 'link:[[consensus]]', value: 'link:[[consensus]]' },
+    { label: '"raft consensus"', value: '"raft consensus"' },
+    { label: '-deprecated', value: '-deprecated' }
+  ] : [
     { label: 'tag:#架构', value: 'tag:#架构' },
     { label: 'link:[[分布式协议]]', value: 'link:[[分布式协议]]' },
     { label: '"raft consensus"', value: '"raft consensus"' },
@@ -73,13 +77,13 @@ export const InteractiveStage: React.FC = () => {
       <div style={{ textAlign: 'center', marginBottom: 40 }}>
         <div className="badge-pill primary" style={{ marginBottom: 14 }}>
           <Sparkles size={14} />
-          <span>动手试玩</span>
+          <span>{t.interactive.badge}</span>
         </div>
         <h2 style={{ fontSize: 'clamp(2rem, 4vw, 2.8rem)', fontWeight: 800, letterSpacing: '-0.02em', marginBottom: 16 }}>
-          在线交互实验室：未下载，先体验
+          {t.interactive.title}
         </h2>
         <p style={{ fontSize: '1.05rem', color: 'var(--text-secondary)', maxWidth: 680, margin: '0 auto' }}>
-          点击下方沙盒，直接在浏览器中体验 KnowSpace v2.0.0 的独创核心逻辑。
+          {t.interactive.desc}
         </p>
       </div>
 
@@ -91,11 +95,12 @@ export const InteractiveStage: React.FC = () => {
           style={{
             borderColor: activeSandbox === 'canvas' ? 'var(--accent-cyan)' : 'var(--border-subtle)',
             background: activeSandbox === 'canvas' ? 'var(--bg-elevated)' : 'var(--bg-card)',
-            color: activeSandbox === 'canvas' ? 'var(--accent-cyan)' : 'var(--text-primary)'
+            color: activeSandbox === 'canvas' ? 'var(--accent-cyan)' : 'var(--text-primary)',
+            fontWeight: activeSandbox === 'canvas' ? 700 : 500
           }}
         >
-          <Move size={16} />
-          <span>① JSON Canvas 拖拽与逆向萃取</span>
+          <Move size={16} style={{ flexShrink: 0 }} />
+          <span>{t.interactive.tabCanvas}</span>
         </button>
         <button
           onClick={() => setActiveSandbox('diff')}
@@ -103,11 +108,12 @@ export const InteractiveStage: React.FC = () => {
           style={{
             borderColor: activeSandbox === 'diff' ? 'var(--accent-emerald)' : 'var(--border-subtle)',
             background: activeSandbox === 'diff' ? 'var(--bg-elevated)' : 'var(--bg-card)',
-            color: activeSandbox === 'diff' ? 'var(--accent-emerald)' : 'var(--text-primary)'
+            color: activeSandbox === 'diff' ? 'var(--accent-emerald)' : 'var(--text-primary)',
+            fontWeight: activeSandbox === 'diff' ? 700 : 500
           }}
         >
-          <SplitSquareVertical size={16} />
-          <span>② Myers LCS 差异对比滑块</span>
+          <SplitSquareVertical size={16} style={{ flexShrink: 0 }} />
+          <span>{t.interactive.tabDiff}</span>
         </button>
         <button
           onClick={() => setActiveSandbox('search')}
@@ -115,31 +121,43 @@ export const InteractiveStage: React.FC = () => {
           style={{
             borderColor: activeSandbox === 'search' ? 'var(--accent-indigo)' : 'var(--border-subtle)',
             background: activeSandbox === 'search' ? 'var(--bg-elevated)' : 'var(--bg-card)',
-            color: activeSandbox === 'search' ? 'var(--accent-indigo)' : 'var(--text-primary)'
+            color: activeSandbox === 'search' ? 'var(--accent-indigo)' : 'var(--text-primary)',
+            fontWeight: activeSandbox === 'search' ? 700 : 500
           }}
         >
-          <Search size={16} />
-          <span>③ 结构化检索引擎演练</span>
+          <Search size={16} style={{ flexShrink: 0 }} />
+          <span>{t.interactive.tabSearch}</span>
         </button>
       </div>
 
       {/* Sandbox Body Container */}
-      <div className="glass-panel cyber-bracket-container" style={{ padding: '36px', minHeight: 460, position: 'relative' }}>
+      <div className="glass-panel" style={{ padding: '36px', minHeight: 460, position: 'relative' }}>
         {/* Sandbox 1: Canvas */}
         {activeSandbox === 'canvas' && (
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
               <div>
                 <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                  拖拽卡片体验连线跟随与拓扑萃取
+                  {t.interactive.canvasTitle}
                 </h3>
                 <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                  试着按住左键拖拽下方卡片，贝塞尔连线将实时自适应跟随；点击「📝 导出为 Markdown」查看逆向生成结果。
+                  {t.interactive.canvasDesc}
                 </p>
               </div>
 
               <button
-                onClick={() => setExtractedArticle(`
+                onClick={() => setExtractedArticle(lang === 'en' ? `
+# Architecture & Local Persistence Specification
+
+## 1. Core Definitions
+Generated by KnowSpace Reverse Topology Engine from Canvas nodes.
+- Hierarchy: Alpha Hub Card (X:${nodeA.x}, Y:${nodeA.y})
+- Core Flow: Definition ➔ Transaction ➔ Disk Flush
+
+## 2. Transactional Atomic Flush
+- Target Receiver: Beta Storage Container (X:${nodeB.x}, Y:${nodeB.y})
+- Zero 0-byte truncation guaranteed.
+                `.trim() : `
 # 知识架构与本地持久化方案
 
 ## 1. 核心业务与概念定义
@@ -155,7 +173,7 @@ export const InteractiveStage: React.FC = () => {
                 style={{ padding: '8px 16px', fontSize: '0.85rem' }}
               >
                 <FileText size={16} />
-                <span>📝 导出为 Markdown</span>
+                <span>{t.interactive.canvasExportBtn}</span>
               </button>
             </div>
 
@@ -212,13 +230,13 @@ export const InteractiveStage: React.FC = () => {
                 }}
               >
                 <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent-cyan)', marginBottom: 4 }}>
-                  卡片 A · 核心定义
+                  {t.interactive.canvasNodeATitle}
                 </div>
                 <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                  分布式知识拓扑
+                  {t.interactive.canvasNodeAName}
                 </div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 4 }}>
-                  (可自由按住拖拽)
+                  {t.interactive.canvasNodeADrag}
                 </div>
               </div>
 
@@ -240,13 +258,13 @@ export const InteractiveStage: React.FC = () => {
                 }}
               >
                 <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent-emerald)', marginBottom: 4 }}>
-                  卡片 B · 目标落盘
+                  {t.interactive.canvasNodeBTitle}
                 </div>
                 <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                  物理事务原子持久化
+                  {t.interactive.canvasNodeBName}
                 </div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 4 }}>
-                  (可自由按住拖拽)
+                  {t.interactive.canvasNodeBDrag}
                 </div>
               </div>
             </div>
@@ -256,10 +274,10 @@ export const InteractiveStage: React.FC = () => {
               <div style={{ marginTop: 20, padding: 18, borderRadius: 10, background: 'var(--code-bg)', border: '1px solid var(--border-subtle)', position: 'relative' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                   <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--accent-cyan)' }}>
-                    ✨ 拓扑排序逆向萃取结果 (Canvas to Markdown):
+                    {t.interactive.canvasExtractedSuccess}
                   </span>
                   <button onClick={() => setExtractedArticle(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.8rem' }}>
-                    关闭预览
+                    {t.interactive.canvasClosePreview}
                   </button>
                 </div>
                 <pre style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-primary)', whiteSpace: 'pre-wrap' }}>
@@ -276,19 +294,19 @@ export const InteractiveStage: React.FC = () => {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
               <div>
                 <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                  Myers LCS 双栏差异对比滑动演示
+                  {t.interactive.diffTitle}
                 </h3>
                 <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                  拖动中间滑动条，体验左侧历史版本与右侧当前版本的逐行微光对比，实时统计变更。
+                  {t.interactive.diffDesc}
                 </p>
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <span className="badge-pill" style={{ color: '#10b981', borderColor: 'currentColor' }}>
-                  +18 增加
+                  {t.interactive.diffAdd}
                 </span>
                 <span className="badge-pill" style={{ color: '#ef4444', borderColor: 'currentColor' }}>
-                  -5 删除
+                  {t.interactive.diffDel}
                 </span>
               </div>
             </div>
@@ -297,27 +315,37 @@ export const InteractiveStage: React.FC = () => {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, background: 'var(--code-bg)', padding: 20, borderRadius: 12, border: '1px solid var(--border-strong)', fontSize: '0.88rem', fontFamily: 'monospace' }}>
               {/* Left Column: Historical Snapshot */}
               <div>
-                <div style={{ paddingBottom: 8, marginBottom: 8, borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                  快照：2026-09-09 21:30 (历史版本)
+                <div style={{ paddingBottom: 8, marginBottom: 8, borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', fontSize: '0.82rem', fontWeight: 600 }}>
+                  {t.interactive.diffSnapshotTime}
                 </div>
-                <div style={{ padding: '3px 6px', color: 'var(--text-secondary)' }}>01: # 系统架构草案</div>
-                <div style={{ padding: '3px 6px', color: 'var(--text-secondary)' }}>02: 采用常规线性内存缓存</div>
-                <div className="diff-del" style={{ padding: '3px 6px', borderRadius: 4 }}>03: - 单点直接写盘，无 Fsync 事务保障</div>
-                <div className="diff-del" style={{ padding: '3px 6px', borderRadius: 4 }}>04: - 不具备历史版本回溯能力</div>
-                <div style={{ padding: '3px 6px', color: 'var(--text-secondary)' }}>05: 依赖外部手动文件备份</div>
+                {t.interactive.diffLinesLeft.map((line, idx) => (
+                  <div
+                    key={idx}
+                    className={line.includes('- ') ? 'diff-del' : ''}
+                    style={{ padding: '3px 6px', borderRadius: 4, color: line.includes('- ') ? undefined : 'var(--text-secondary)' }}
+                  >
+                    {line}
+                  </div>
+                ))}
               </div>
 
               {/* Right Column: Current Version */}
               <div>
-                <div style={{ paddingBottom: 8, marginBottom: 8, borderBottom: '1px solid var(--border-subtle)', color: 'var(--accent-emerald)', fontSize: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span>当前编辑器版本 (最新)</span>
-                  <span style={{ fontSize: '0.75rem', background: 'rgba(16,185,129,0.2)', padding: '2px 6px', borderRadius: 4 }}>可时光倒流还原</span>
+                <div style={{ paddingBottom: 8, marginBottom: 8, borderBottom: '1px solid var(--border-subtle)', color: 'var(--accent-emerald)', fontSize: '0.82rem', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>{t.interactive.diffCurrentVersion}</span>
+                  <span style={{ fontSize: '0.75rem', background: 'rgba(16,185,129,0.18)', color: 'var(--accent-emerald)', padding: '2px 8px', borderRadius: 4, fontWeight: 700 }}>
+                    {t.interactive.diffRestoreBadge}
+                  </span>
                 </div>
-                <div style={{ padding: '3px 6px', color: 'var(--text-secondary)' }}>01: # 系统架构草案</div>
-                <div style={{ padding: '3px 6px', color: 'var(--text-secondary)' }}>02: 采用常规线性内存缓存</div>
-                <div className="diff-ins" style={{ padding: '3px 6px', borderRadius: 4 }}>03: + 引入 Temp + Fsync 物理事务原子写</div>
-                <div className="diff-ins" style={{ padding: '3px 6px', borderRadius: 4 }}>04: + 原生内置 Myers LCS 逐行差异引擎</div>
-                <div className="diff-ins" style={{ padding: '3px 6px', borderRadius: 4 }}>05: + 毫秒级一键安全时光倒流恢复</div>
+                {t.interactive.diffLinesRight.map((line, idx) => (
+                  <div
+                    key={idx}
+                    className={line.includes('+ ') ? 'diff-ins' : ''}
+                    style={{ padding: '3px 6px', borderRadius: 4, color: line.includes('+ ') ? undefined : 'var(--text-secondary)' }}
+                  >
+                    {line}
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -328,10 +356,10 @@ export const InteractiveStage: React.FC = () => {
           <div>
             <div style={{ marginBottom: 20 }}>
               <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                全库混合检索引擎与结构化语法演练
+                {t.interactive.searchTitle}
               </h3>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                点击下方语法芯片，体验毫秒级分词匹配与跨文档穿透定位。
+                {t.interactive.searchDesc}
               </p>
             </div>
 
@@ -347,7 +375,7 @@ export const InteractiveStage: React.FC = () => {
                 padding: '10px 16px',
                 marginBottom: 12
               }}>
-                <Search size={18} color="var(--accent-cyan)" />
+                <Search size={18} color="var(--accent-cyan)" style={{ flexShrink: 0 }} />
                 <input
                   type="text"
                   value={searchQuery}
@@ -360,16 +388,16 @@ export const InteractiveStage: React.FC = () => {
                     fontSize: '0.95rem',
                     outline: 'none'
                   }}
-                  placeholder="尝试输入 tag:# link:[[ 或关键词..."
+                  placeholder={t.interactive.searchPlaceholder}
                 />
-                <span style={{ fontSize: '0.75rem', color: 'var(--accent-emerald)', fontWeight: 600 }}>
-                  ⚡ 8ms
+                <span style={{ fontSize: '0.78rem', color: 'var(--accent-emerald)', fontWeight: 700, flexShrink: 0 }}>
+                  {t.interactive.searchSpeed}
                 </span>
               </div>
 
               {/* Syntax Chips */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>快速语法芯片：</span>
+                <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 600 }}>{t.interactive.searchChipsLabel}</span>
                 {chips.map((c, i) => (
                   <button
                     key={i}
@@ -378,10 +406,12 @@ export const InteractiveStage: React.FC = () => {
                       background: 'var(--bg-card)',
                       border: '1px solid var(--border-subtle)',
                       color: 'var(--accent-cyan)',
-                      fontSize: '0.8rem',
+                      fontSize: '0.82rem',
+                      fontWeight: 600,
                       padding: '4px 10px',
                       borderRadius: 6,
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      lineHeight: 1
                     }}
                   >
                     {c.label}
@@ -392,33 +422,49 @@ export const InteractiveStage: React.FC = () => {
 
             {/* Mock Search Results */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ padding: '14px 18px', borderRadius: 10, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ padding: '14px 18px', borderRadius: 10, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                    <span className="badge-pill primary" style={{ fontSize: '0.72rem', padding: '1px 6px' }}>01-分布式系统架构.md</span>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>L45-48 · # 共识机制与状态机</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                    <span className="badge-pill primary" style={{ fontSize: '0.72rem', padding: '2px 8px' }}>
+                      {lang === 'en' ? '01-distributed-architecture.md' : '01-分布式系统架构.md'}
+                    </span>
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                      {lang === 'en' ? 'L45-48 · # Consensus & State Machine' : 'L45-48 · # 共识机制与状态机'}
+                    </span>
                   </div>
                   <div style={{ fontSize: '0.88rem', color: 'var(--text-primary)' }}>
-                    在节点故障与网络分区下，确保通过 <mark style={{ background: 'rgba(56,189,248,0.25)', color: 'var(--accent-cyan)', padding: '0 4px', borderRadius: 3 }}>[[分布式协议]]</mark> 达成严格法定人数裁决...
+                    {lang === 'en' ? (
+                      <>Ensuring strict quorum adjudication via <mark style={{ background: 'rgba(56,189,248,0.25)', color: 'var(--accent-cyan)', padding: '0 4px', borderRadius: 3 }}>[[consensus]]</mark> under partition scenarios...</>
+                    ) : (
+                      <>在节点故障与网络分区下，确保通过 <mark style={{ background: 'rgba(56,189,248,0.25)', color: 'var(--accent-cyan)', padding: '0 4px', borderRadius: 3 }}>[[分布式协议]]</mark> 达成严格法定人数裁决...</>
+                    )}
                   </div>
                 </div>
-                <button className="btn-secondary" style={{ padding: '6px 12px', fontSize: '0.78rem' }}>
-                  一键定位 ➔
+                <button className="btn-secondary" style={{ padding: '6px 12px', fontSize: '0.78rem', flexShrink: 0 }}>
+                  {t.interactive.searchNavBtn}
                 </button>
               </div>
 
-              <div style={{ padding: '14px 18px', borderRadius: 10, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ padding: '14px 18px', borderRadius: 10, background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                    <span className="badge-pill primary" style={{ fontSize: '0.72rem', padding: '1px 6px' }}>03-无限空间白板.canvas</span>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Card #4 · #架构规范</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                    <span className="badge-pill primary" style={{ fontSize: '0.72rem', padding: '2px 8px' }}>
+                      {lang === 'en' ? '03-infinite-canvas.canvas' : '03-无限空间白板.canvas'}
+                    </span>
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                      {lang === 'en' ? 'Card #4 · #Architecture' : 'Card #4 · #架构规范'}
+                    </span>
                   </div>
                   <div style={{ fontSize: '0.88rem', color: 'var(--text-primary)' }}>
-                    核心数据总线打上 <mark style={{ background: 'rgba(56,189,248,0.25)', color: 'var(--accent-cyan)', padding: '0 4px', borderRadius: 3 }}>#架构</mark> 标签，建立多路流向连线...
+                    {lang === 'en' ? (
+                      <>Tagged core data bus with <mark style={{ background: 'rgba(56,189,248,0.25)', color: 'var(--accent-cyan)', padding: '0 4px', borderRadius: 3 }}>#architecture</mark>, establishing multi-path connections...</>
+                    ) : (
+                      <>核心数据总线打上 <mark style={{ background: 'rgba(56,189,248,0.25)', color: 'var(--accent-cyan)', padding: '0 4px', borderRadius: 3 }}>#架构</mark> 标签，建立多路流向连线...</>
+                    )}
                   </div>
                 </div>
-                <button className="btn-secondary" style={{ padding: '6px 12px', fontSize: '0.78rem' }}>
-                  一键定位 ➔
+                <button className="btn-secondary" style={{ padding: '6px 12px', fontSize: '0.78rem', flexShrink: 0 }}>
+                  {t.interactive.searchNavBtn}
                 </button>
               </div>
             </div>

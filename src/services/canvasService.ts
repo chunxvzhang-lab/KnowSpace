@@ -790,8 +790,23 @@ export function getSourceNodeEdgeColor(
   const explicitColor = sourceNode?.color;
   const paletteKeys = Object.keys(CANVAS_COLOR_PALETTES);
 
-  // When allNodes is available and source belongs to a container (group):
-  // Ensure that 2 or more cards within the same container initiating edges automatically get distinct colors!
+  // 1. Maintain identical color for all outgoing edges from the same card
+  const existingEdge = existingEdges.find(
+    (e) => e.fromNode === sourceId && e.color && CANVAS_COLOR_PALETTES[e.color]
+  );
+  if (existingEdge && existingEdge.color) {
+    return existingEdge.color;
+  }
+
+  // Collect all colors already used by other source cards across the entire canvas
+  const usedAllSourceColors = new Set<string>();
+  for (const edge of existingEdges) {
+    if (edge.fromNode && edge.fromNode !== sourceId && edge.color && CANVAS_COLOR_PALETTES[edge.color]) {
+      usedAllSourceColors.add(edge.color);
+    }
+  }
+
+  // 2. Container-aware source coloring:
   if (sourceNode && allNodes && allNodes.length > 0) {
     const container = findContainerForNode(sourceNode, allNodes);
     if (container) {
@@ -811,26 +826,31 @@ export function getSourceNodeEdgeColor(
         }
       }
 
-      // 1. If this card already has an outgoing edge and its color is distinct from other siblings, maintain it
-      const existingEdge = existingEdges.find(
-        (e) => e.fromNode === sourceId && e.color && CANVAS_COLOR_PALETTES[e.color]
-      );
-      if (existingEdge && existingEdge.color && !usedSiblingColors.has(existingEdge.color)) {
-        return existingEdge.color;
-      }
-
-      // 2. If this card has an explicit color and it is not already taken by another sibling, use it
-      if (explicitColor && CANVAS_COLOR_PALETTES[explicitColor] && !usedSiblingColors.has(explicitColor)) {
+      // If card has an explicit color and it does not collide with siblings or active sources, respect it
+      if (
+        explicitColor &&
+        CANVAS_COLOR_PALETTES[explicitColor] &&
+        !usedSiblingColors.has(explicitColor) &&
+        !usedAllSourceColors.has(explicitColor)
+      ) {
         return explicitColor;
       }
 
-      // 3. Automatically assign the first palette color not used by any other sibling card in this container
-      const availableColor = paletteKeys.find((k) => !usedSiblingColors.has(k));
-      if (availableColor) {
-        return availableColor;
+      // First priority: pick color unused by siblings in container AND unused across canvas
+      const idealColor = paletteKeys.find(
+        (k) => !usedSiblingColors.has(k) && !usedAllSourceColors.has(k)
+      );
+      if (idealColor) {
+        return idealColor;
       }
 
-      // 4. Fallback if palette colors (>6) are exhausted: cycle among siblings with outgoing edges
+      // Second priority: pick color unused by siblings in this container
+      const siblingAvailable = paletteKeys.find((k) => !usedSiblingColors.has(k));
+      if (siblingAvailable) {
+        return siblingAvailable;
+      }
+
+      // Fallback: cycle among container siblings with outgoing edges
       const otherActiveSiblings = otherSiblings.filter((s) =>
         existingEdges.some((e) => e.fromNode === s.id)
       );
@@ -838,21 +858,22 @@ export function getSourceNodeEdgeColor(
     }
   }
 
-  // Non-container / standard source coloring:
-  // 1. Explicit node color
-  if (explicitColor && CANVAS_COLOR_PALETTES[explicitColor]) {
+  // 3. Non-container / global source coloring:
+  if (
+    explicitColor &&
+    CANVAS_COLOR_PALETTES[explicitColor] &&
+    !usedAllSourceColors.has(explicitColor)
+  ) {
     return explicitColor;
   }
 
-  // 2. Existing outgoing edge from same source node -> maintain identical color
-  const existingEdge = existingEdges.find(
-    (e) => e.fromNode === sourceId && e.color && CANVAS_COLOR_PALETTES[e.color]
-  );
-  if (existingEdge && existingEdge.color) {
-    return existingEdge.color;
+  // Pick first palette color not used by any other source card on the canvas
+  const canvasAvailable = paletteKeys.find((k) => !usedAllSourceColors.has(k));
+  if (canvasAvailable) {
+    return canvasAvailable;
   }
 
-  // 3. New source node -> pick a distinct color based on other source nodes
+  // Fallback: cycle across all distinct source cards on the canvas
   const otherSources = Array.from(
     new Set(existingEdges.map((e) => e.fromNode).filter((id) => id && id !== sourceId))
   );
@@ -878,9 +899,12 @@ export function createEdgeBetweenNodes(
   fromNode: CanvasNode,
   toNode: CanvasNode,
   label?: string,
-  style: CanvasEdgeLineStyle = "bezier"
+  style: CanvasEdgeLineStyle = "bezier",
+  existingEdges: CanvasEdge[] = [],
+  allNodes?: CanvasNode[]
 ): CanvasEdge {
   const { fromSide, toSide } = getOptimalAnchorSides(fromNode, toNode);
+  const color = getSourceNodeEdgeColor(fromNode, existingEdges, allNodes);
 
   return {
     id: `edge-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -890,7 +914,7 @@ export function createEdgeBetweenNodes(
     toNode: toNode.id,
     toSide,
     toEnd: "arrow",
-    color: fromNode.color || "5",
+    color,
     label: label || undefined,
     style,
   };
@@ -903,12 +927,15 @@ export function spawnConnectedCard(
   sourceNode: CanvasNode,
   direction: "right" | "bottom" = "right",
   initialText?: string,
-  label?: string
+  label?: string,
+  existingEdges: CanvasEdge[] = [],
+  allNodes?: CanvasNode[]
 ): { newNode: CanvasTextNode; newEdge: CanvasEdge } {
   const newId = `text-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
   const gap = 120;
   const newX = direction === "right" ? sourceNode.x + sourceNode.width + gap : sourceNode.x;
   const newY = direction === "bottom" ? sourceNode.y + sourceNode.height + gap : sourceNode.y;
+  const edgeColor = getSourceNodeEdgeColor(sourceNode, existingEdges, allNodes);
 
   const newNode: CanvasTextNode = {
     id: newId,
@@ -918,7 +945,7 @@ export function spawnConnectedCard(
     y: newY,
     width: Math.min(320, Math.max(260, sourceNode.width)),
     height: 160,
-    color: sourceNode.color || "5",
+    color: sourceNode.color,
   };
 
   const newEdge: CanvasEdge = {
@@ -929,7 +956,7 @@ export function spawnConnectedCard(
     toNode: newId,
     toSide: direction === "right" ? "left" : "top",
     toEnd: "arrow",
-    color: sourceNode.color || "5",
+    color: edgeColor,
     label: label || undefined,
     style: "bezier",
   };
@@ -1413,6 +1440,11 @@ export function exportCanvasToSvg(
     lines.push(
       `    <path d="${pathD}" fill="none" stroke="${edgeColor}" stroke-width="2" stroke-linecap="round" marker-end="${markerEnd}" marker-start="${markerStart}" />`
     );
+    if (edge.fromEnd !== "arrow") {
+      lines.push(
+        `    <circle cx="${p1.x}" cy="${p1.y}" r="3.5" fill="${edgeColor}" stroke="${isDark ? "#0f172a" : "#ffffff"}" stroke-width="1.2" />`
+      );
+    }
 
     // 3. Edge Label Badges
     if (edge.label && edge.label.trim()) {

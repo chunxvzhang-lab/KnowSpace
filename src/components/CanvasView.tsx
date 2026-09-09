@@ -793,7 +793,7 @@ export const CanvasView = memo(function CanvasView({
       y: targetY,
       width: 280,
       height: 160,
-      color: "5",
+      color: undefined,
     };
     const currentData = latestDataRef.current;
     pushHistory({
@@ -1377,7 +1377,7 @@ export const CanvasView = memo(function CanvasView({
 
       // Determine the root node (The "One"):
       // 1. Specified root ID (e.g. from context menu target card)
-      // 2. The first selected node (the user clicks the origin node first, then Shift-selects targets)
+      // 2. The first selected node in sequence (the user clicks the origin node first, then Shift-selects targets)
       // 3. Fallback to the geometrically leftmost/topmost node
       let rootNode: CanvasNode | undefined;
       if (specifiedRootId) {
@@ -1410,7 +1410,7 @@ export const CanvasView = memo(function CanvasView({
             : rootNode.type === "group"
             ? rootNode.label || "分组"
             : "主卡片";
-        showToast(`已建立从「${rootTitle}」到其余 ${newEdges.length} 张卡片的一对多关联`);
+        showToast(`已建立以「${rootTitle}」为发起节点的一对多关联（辐射其余 ${newEdges.length} 张卡片）`);
       } else {
         showToast("选中的卡片之间已存在一对多关联");
       }
@@ -2740,8 +2740,49 @@ export const CanvasView = memo(function CanvasView({
     return { minimapScale: scale, minimapOffsetX: offsetX, minimapOffsetY: offsetY };
   }, [minimapBBox]);
 
-  // Node lookups
+  // Node lookups & relationship maps
   const nodeMap = useMemo(() => new Map(data.nodes.map((n) => [n.id, n])), [data.nodes]);
+
+  const nodeOutgoingMap = useMemo(() => {
+    const map = new Map<string, { count: number; color?: string; targets: string[] }>();
+    for (const e of data.edges) {
+      if (e.fromNode) {
+        const item = map.get(e.fromNode) || { count: 0, color: e.color, targets: [] };
+        item.count++;
+        if (e.color) item.color = e.color;
+        item.targets.push(e.toNode);
+        map.set(e.fromNode, item);
+      }
+    }
+    return map;
+  }, [data.edges]);
+
+  const currentMultiRootNode = useMemo(() => {
+    if (selectedNodeIds.size < 2) return undefined;
+    const selectedNodes = data.nodes.filter((n) => selectedNodeIds.has(n.id));
+    const firstSelectedId = Array.from(selectedNodeIds)[0];
+    return (
+      selectedNodes.find((n) => n.id === firstSelectedId) ||
+      [...selectedNodes].sort((a, b) => (Math.abs(a.x - b.x) > 30 ? a.x - b.x : a.y - b.y))[0]
+    );
+  }, [selectedNodeIds, data.nodes]);
+
+  const currentMultiRootTitle = useMemo(() => {
+    if (!currentMultiRootNode) return "首选卡片";
+    if (currentMultiRootNode.type === "text") {
+      return currentMultiRootNode.text.split("\n")[0].replace(/^[#\s*->]+/, "").slice(0, 8) || "卡片";
+    }
+    if (currentMultiRootNode.type === "group") {
+      return currentMultiRootNode.label || "分组";
+    }
+    if (currentMultiRootNode.type === "file") {
+      return currentMultiRootNode.file || "笔记";
+    }
+    if (currentMultiRootNode.type === "link") {
+      return currentMultiRootNode.url || "链接";
+    }
+    return "卡片";
+  }, [currentMultiRootNode]);
 
   return (
     <div
@@ -2911,18 +2952,18 @@ export const CanvasView = memo(function CanvasView({
           <>
             <button
               className="canvas-tool-btn"
-              onClick={() => handleConnectOneToMany()}
+              onClick={() => handleConnectOneToMany(currentMultiRootNode?.id)}
               title="以当前选中卡片为源，向其余所有选中卡片放射建立一对多关联"
               style={{
                 ...toolBtnStyle(theme, colors),
                 backgroundColor: "rgba(16, 185, 129, 0.15)",
                 color: "#10b981",
-                border: "1px solid rgba(16, 185, 129, 0.35)",
+                border: "1px solid rgba(16, 185, 129, 0.4)",
                 fontWeight: 600,
               }}
             >
               <Share2 size={13} />
-              <span className="canvas-btn-label">一对多关联</span>
+              <span className="canvas-btn-label">一对多关联 (以「{currentMultiRootTitle}」发起源)</span>
             </button>
             <button
               className="canvas-tool-btn"
@@ -3300,7 +3341,7 @@ export const CanvasView = memo(function CanvasView({
                   d={pathData}
                   fill="none"
                   stroke={isSelected ? "#f59e0b" : edgeColor}
-                  strokeWidth={isSelected ? 2.5 : 2}
+                  strokeWidth={isSelected ? 2.5 : hoveredNodeId === edge.fromNode ? 2.8 : 2}
                   strokeDasharray={strokeDash}
                   markerStart={
                     edge.fromEnd === "arrow"
@@ -3313,10 +3354,26 @@ export const CanvasView = memo(function CanvasView({
                       : undefined
                   }
                   style={{
-                    transition: "stroke 0.2s, stroke-width 0.2s",
-                    filter: isSelected ? "drop-shadow(0 0 5px rgba(245,158,11,0.5))" : undefined,
+                    transition: "stroke 0.2s, stroke-width 0.2s, filter 0.2s",
+                    filter: isSelected
+                      ? "drop-shadow(0 0 5px rgba(245,158,11,0.5))"
+                      : hoveredNodeId === edge.fromNode
+                      ? `drop-shadow(0 0 6px ${edgeColor})`
+                      : undefined,
                   }}
                 />
+                {/* Source Origin Anchor Dot (起点端点指示器: 明确发起源) */}
+                {edge.fromEnd !== "arrow" && (
+                  <circle
+                    cx={p1.x}
+                    cy={p1.y}
+                    r={isSelected ? 4.5 : hoveredNodeId === edge.fromNode ? 4.2 : 3.8}
+                    fill={isSelected ? "#f59e0b" : edgeColor}
+                    stroke={isDark ? "#0f172a" : "#ffffff"}
+                    strokeWidth={1.4}
+                    style={{ pointerEvents: "none", transition: "r 0.15s ease" }}
+                  />
+                )}
                 {/* Interactive Endpoint Anchor Handles when Selected */}
                 {isSelected && editable && (
                   <g className="canvas-edge-anchor-handles">
@@ -3430,6 +3487,9 @@ export const CanvasView = memo(function CanvasView({
           if (node.type === "group") {
             const isGroupConnectingTarget =
               connectingState !== null && connectingState.fromNodeId !== node.id;
+            const groupOutgoingInfo = nodeOutgoingMap.get(node.id);
+            const isGroupOneToManySource = !!groupOutgoingInfo && groupOutgoingInfo.count >= 2;
+            const isGroupMultiRoot = selectedNodeIds.size >= 2 && currentMultiRootNode?.id === node.id;
             return (
               <div
                 key={node.id}
@@ -3477,6 +3537,34 @@ export const CanvasView = memo(function CanvasView({
                   setSelectedEdgeId(null);
                 }}
               >
+                {/* Multi-select One-to-Many Root indicator on Group */}
+                {isGroupMultiRoot && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: -28,
+                      left: "50%",
+                      transform: "translateX(-50%)",
+                      backgroundColor: "#10b981",
+                      color: "#ffffff",
+                      fontSize: 11,
+                      fontWeight: 700,
+                      padding: "2px 10px",
+                      borderRadius: 12,
+                      pointerEvents: "none",
+                      whiteSpace: "nowrap",
+                      boxShadow: "0 2px 10px rgba(16, 185, 129, 0.45)",
+                      zIndex: 100,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                  >
+                    <Share2 size={11} />
+                    <span>一对多发起源</span>
+                  </div>
+                )}
+
                 {/* Drop-to-connect visual badge on group */}
                 {isGroupConnectingTarget && isHovered && (
                   <div
@@ -3542,17 +3630,40 @@ export const CanvasView = memo(function CanvasView({
                       }}
                     />
                   ) : (
-                    <span
-                      onDoubleClick={(e) => {
-                        e.stopPropagation();
-                        setEditingNodeId(node.id);
-                        setEditingText(node.label || "");
-                      }}
-                      title="双击重命名 | 拖动移动分组"
-                      style={{ flex: 1 }}
-                    >
-                      📁 {node.label || "未命名分组"}
-                    </span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, overflow: "hidden" }}>
+                      <span
+                        onDoubleClick={(e) => {
+                          e.stopPropagation();
+                          setEditingNodeId(node.id);
+                          setEditingText(node.label || "");
+                        }}
+                        title="双击重命名 | 拖动移动分组"
+                        style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                      >
+                        📁 {node.label || "未命名分组"}
+                      </span>
+                      {isGroupOneToManySource && (
+                        <span
+                          title={`该分组容器是一对多发起源，向外辐射连接了 ${groupOutgoingInfo.count} 项`}
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 3,
+                            fontSize: 10,
+                            fontWeight: 700,
+                            padding: "1px 6px",
+                            borderRadius: 8,
+                            backgroundColor: "rgba(255, 255, 255, 0.25)",
+                            color: "#ffffff",
+                            border: "1px solid rgba(255, 255, 255, 0.5)",
+                            marginLeft: 4,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          🌱 发起源 · {groupOutgoingInfo.count}
+                        </span>
+                      )}
+                    </div>
                   )}
                   {isSelected && editable && (
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -3605,6 +3716,13 @@ export const CanvasView = memo(function CanvasView({
 
           // Render Normal Cards (Text, File, Link) (z-index: 10)
           const isConnectingTarget = connectingState !== null && connectingState.fromNodeId !== node.id;
+          const outgoingInfo = nodeOutgoingMap.get(node.id);
+          const isOneToManySource = !!outgoingInfo && outgoingInfo.count >= 2;
+          const sourceColorPalette =
+            outgoingInfo?.color && CANVAS_COLOR_PALETTES[outgoingInfo.color]
+              ? CANVAS_COLOR_PALETTES[outgoingInfo.color]
+              : undefined;
+          const isMultiRoot = selectedNodeIds.size >= 2 && currentMultiRootNode?.id === node.id;
           return (
             <div
               key={node.id}
@@ -3624,6 +3742,8 @@ export const CanvasView = memo(function CanvasView({
                   ? "2px solid #0284c7"
                   : isConnectingTarget
                   ? "2px dashed rgba(2, 132, 199, 0.6)"
+                  : isOneToManySource && sourceColorPalette
+                  ? `2px solid ${sourceColorPalette.stroke}`
                   : palette
                   ? `2px solid ${palette.stroke}`
                   : `1px solid ${colors.cardBorder}`,
@@ -3631,6 +3751,8 @@ export const CanvasView = memo(function CanvasView({
                   ? "0 12px 36px rgba(245,158,11,0.35)"
                   : isConnectingTarget && isHovered
                   ? "0 0 0 3px rgba(2, 132, 199, 0.4), 0 12px 36px rgba(2, 132, 199, 0.35)"
+                  : isOneToManySource && sourceColorPalette
+                  ? `0 0 0 1px ${sourceColorPalette.stroke}88, 0 8px 24px ${sourceColorPalette.stroke}22`
                   : colors.cardShadow,
                 display: "flex",
                 flexDirection: "column",
@@ -3661,6 +3783,33 @@ export const CanvasView = memo(function CanvasView({
                 }
               }}
             >
+              {/* Multi-select One-to-Many Root indicator on Card */}
+              {isMultiRoot && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: -28,
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    backgroundColor: "#10b981",
+                    color: "#ffffff",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    padding: "2px 10px",
+                    borderRadius: 12,
+                    pointerEvents: "none",
+                    whiteSpace: "nowrap",
+                    boxShadow: "0 2px 10px rgba(16, 185, 129, 0.45)",
+                    zIndex: 100,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                  }}
+                >
+                  <Share2 size={11} />
+                  <span>一对多发起源</span>
+                </div>
+              )}
               {/* Drop-to-connect visual badge */}
               {isConnectingTarget && isHovered && (
                 <div
@@ -3793,6 +3942,27 @@ export const CanvasView = memo(function CanvasView({
                       <span style={{ fontSize: 11, fontWeight: 600, color: colors.cardHeaderText }}>
                         {node.type === "file" ? node.file : node.type === "text" ? "便签卡片" : "外部参考"}
                       </span>
+                      {isOneToManySource && (
+                        <span
+                          title={`该卡片是一对多发起源，向外辐射连接了 ${outgoingInfo.count} 张卡片`}
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 3,
+                            fontSize: 10,
+                            fontWeight: 700,
+                            padding: "1px 6px",
+                            borderRadius: 8,
+                            backgroundColor: sourceColorPalette ? sourceColorPalette.bg : "rgba(16, 185, 129, 0.15)",
+                            color: sourceColorPalette ? sourceColorPalette.stroke : "#10b981",
+                            border: `1px solid ${sourceColorPalette ? sourceColorPalette.stroke : "#10b981"}`,
+                            marginLeft: 4,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          🌱 发起源 · {outgoingInfo.count}
+                        </span>
+                      )}
                     </>
                   )}
                 </div>
@@ -5585,13 +5755,28 @@ export const CanvasView = memo(function CanvasView({
                       </div>
 
                       {/* Connect One to Many (Star) */}
-                      <div
-                        className="canvas-ctx-item"
-                        onClick={() => handleConnectOneToMany(contextMenu.targetNodeId)}
-                      >
-                        <Share2 size={13} color="#10b981" />
-                        <span>🌱 以此{targetNode?.type === "group" ? "分组" : "卡片"}建立一对多关联 (连接其余 {selectedNodeIds.size - 1} 项)</span>
-                      </div>
+                      {(() => {
+                        const targetTitle = targetNode
+                          ? targetNode.type === "text"
+                            ? targetNode.text.split("\n")[0].replace(/^[#\s*->]+/, "").slice(0, 10) || "卡片"
+                            : targetNode.type === "group"
+                            ? targetNode.label || "分组"
+                            : targetNode.type === "file"
+                            ? targetNode.file || "笔记"
+                            : targetNode.type === "link"
+                            ? targetNode.url || "链接"
+                            : "卡片"
+                          : "";
+                        return (
+                          <div
+                            className="canvas-ctx-item"
+                            onClick={() => handleConnectOneToMany(contextMenu.targetNodeId)}
+                          >
+                            <Share2 size={13} color="#10b981" />
+                            <span>🌱 以此{targetNode?.type === "group" ? "分组" : "卡片"}{targetTitle ? `「${targetTitle}」` : ""}为发起节点建立一对多 (连接其余 {selectedNodeIds.size - 1} 项)</span>
+                          </div>
+                        );
+                      })()}
 
                       {/* Connect selected nodes (Chain) */}
                       <div className="canvas-ctx-item" onClick={handleConnectSelectedNodes}>

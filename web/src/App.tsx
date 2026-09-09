@@ -13,8 +13,9 @@ import { FaqSection } from './components/FaqSection';
 import { Footer } from './components/Footer';
 import { CommandPaletteModal } from './components/CommandPaletteModal';
 import { CyberBackground } from './components/CyberBackground';
+import { LanguageProvider } from './i18n/LanguageContext';
 
-export const App: React.FC = () => {
+export const AppContent: React.FC = () => {
   const [currentTheme, setCurrentTheme] = useState<'dark' | 'light' | 'eink'>('dark');
   const [activeView, setActiveView] = useState<'landing' | 'docs'>('landing');
   const [paletteOpen, setPaletteOpen] = useState<boolean>(false);
@@ -103,3 +104,12 @@ export const App: React.FC = () => {
     </div>
   );
 };
+
+export const App: React.FC = () => {
+  return (
+    <LanguageProvider>
+      <AppContent />
+    </LanguageProvider>
+  );
+};
+
