@@ -50,7 +50,7 @@
 
 ## 🏛️ 核心能力体系
 
-- **🎨 Infinite Canvas（无限空间可视化白板 · 兼容 JSON Canvas 1.0）**：标准开放的二维空间思维白板（`Ctrl+Shift+C`），**多模态卡片自由挂载**（富文本 Markdown、嵌入文档预览、逻辑分组容器），**高精度 4 锚点磁吸与贝塞尔/折线动态矢量连线**，配备右下角缩略雷达小地图与全景聚焦控制；**独创画布逆向拓扑萃取长文算法**，一键将白板因果关系逆向萃取为逻辑严密的 Markdown 专著。
+- **🎨 Infinite Canvas（无限空间可视化白板 · 兼容 JSON Canvas 1.0）**：标准开放的二维空间思维白板（`Ctrl+Shift+C`），**多模态卡片自由挂载**（富文本 Markdown、嵌入文档预览、逻辑分组容器），**高精度 4 锚点几何中心对齐与贝塞尔/正交折线/直线矢量连线**，支持**折线手柄平移拖拽**、**防冲天平滑曲线**、**上下分层垂直优先路由**、**同卡片连线颜色一致与跨容器智能调色分配**、**一对多发起源全景识别（起点锚固圆点、发起源徽章、高亮辉光与多选动态标注）**、**连线多选与底部批量工具栏**、**多选卡片一键断开连线**、**批量水平/垂直对齐与等距分布**；配备右下角缩略雷达小地图与全景聚焦控制；**独创画布逆向拓扑萃取长文算法**，一键将白板因果关系逆向萃取为逻辑严密的 Markdown 专著。
 - **⏳ Local Version History（本地时间旅行与版本快照历史）**：运行在本地知识库根目录隐藏空间（`.knowspace/snapshots/`）的无感版本防丢卫士（`Ctrl+Shift+H`），**30秒去抖静默捕获与 SHA-256 哈希去重**，配备直观版本时间轴；**左右双栏 Side-by-Side 与统一 Unified 视图**，Myers LCS 逐行与行内字符微粒度高亮，**一键无损安全还原与手动里程碑快照**。
 - **🔍 Hybrid Vault Search（全库毫秒级混合检索引擎）**：全新文档级与段落级倒排索引（Inverted Index），万篇笔记键盘键入即刻（< 15ms）出结果。**深度支持结构化检索语法**：`tag:#架构`、`link:[[分布式协议]]`、`"严格短语"`、`-排除词`、时间范围过滤，提供「当前章节」与「全库检索」一键无缝切换、语法快捷辅助芯片与物理行微光脉冲联动。
 - **🎯 Command Palette & Quick Switcher（全能全局命令中枢）**：全局随时按下 `Ctrl+K`（或编辑区直接穿透触发），支持三模合一：**默认快速切换（MRU 访问历史、标题/路径/别名智能模糊过滤）**、**动作执行模式（`>` 前缀检索并执行系统功能，如主题切换、新建笔记、导出等）**、**大纲直达模式（`#` 前缀实时大纲小节检索，Enter 秒级跳入目标段落）**。
@@ -176,6 +176,10 @@
 ### 7. 🔍 知识大纲导航与全文段落卡片检索 (Search & Navigation)
 *结构化组织与秒级定位你的所有文档。*
 
+<p align="center">
+  <img src="docs/manual-images/12-fulltext-search.png" alt="知识大纲导航与全文段落卡片检索" width="90%" style="border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);" />
+</p>
+
 - **📁 目录树多级子目录折叠展开**：支持任意层级 Markdown 知识库树状结构，顶部提供「全部展开 / 全部折叠」，折叠状态本地持久化记忆。
 - **📑 动态大纲随动追踪 (TOC)**：动态提取文档各级标题，随阅读位置实时高亮当前小节，点击平滑滚动定位。
 - **⭐ 精选书签系统 (`Ctrl + B`)**：随手将重要小节或段落加入书签，自动记录精准滚动比例与摘录，随时一键重访。
@@ -185,6 +189,10 @@
 
 ### 8. 🛡️ 工业级数据安全体系与系统深度集成 (Desktop System & Security)
 *本地优先，保护你的每一份心血不被丢失。*
+
+<p align="center">
+  <img src="docs/manual-images/17-dialog-unsaved.png" alt="工业级数据安全与未保存拦截保护" width="90%" style="border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);" />
+</p>
 
 - **🗔 Windows 系统托盘后台驻留**：关闭主窗口可常驻右下角系统托盘，全局热键与闪念胶囊随时待命，托盘菜单一键唤起。
 - **🚀 开机自启动与后台静默就绪 (`--hidden`)**：随 Windows 开机自动启动并在后台静默就绪，开机不弹出窗口打扰，随叫随到。
@@ -272,21 +280,45 @@
 ### 11. 🎨 无限空间可视化白板 (Infinite Canvas · JSON Canvas 1.0 兼容 · `Ctrl + Shift + C`)
 *标准开放的二维空间思维白板，打通从零散卡片、拓扑因果连线到结构化专著的完整心智飞跃。*
 
+<p align="center">
+  <img src="docs/manual-images/32-infinite-canvas.png" alt="无限空间可视化白板与多模态卡片" width="90%" style="border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);" />
+</p>
+
 - **🌐 标准开放与跨生态流转 (JSON Canvas 1.0)**：原生采用社区通用规范存储为 `.canvas` 文件，与 **Obsidian Canvas** 等外部空间工具 100% 双向互通；在文件树中以专属翠绿 Boxes 图标区分，支持新建、重命名、移动与双击秒开。
 - **📦 多模态节点自由挂载**：
   - **文本卡片 (Text Node)**：双击卡片进入行内编辑，失焦即刻渲染为标准 Markdown（完整支持公式、代码高亮与清单）；
   - **文档卡片 (File Node)**：直接挂载库内任意笔记，卡片内支持滚动预览，双击即可无缝穿梭直达原笔记；
   - **分组容器 (Group Node)**：半透明分类容器，带标题指示，支持框选和批量拖拽搬运；
   - **网页链接卡片 (Link Node)**：直观内嵌外部参考网站与标签。
-- **⚡ 磁吸锚点、线型定制与反转连线流向 (`R`)**：
-  - **4 锚点高精度磁吸**：卡片上、下、左、右四周配置磁吸锚点，拖拽连线靠近目标边缘时自动对齐贴附；
-  - **丰富线型选择**：支持三次平滑贝塞尔曲线 (`bezier`)、90° 正交折线 (`step`) 与笔直直线 (`straight`)；
-  - **🔀 快捷反转连线流向 (`R`)**：选中任意连线轻按 `R` 键，秒级反转两端节点与箭头流向；悬浮工具栏配备浅蓝高亮按钮，右键菜单明示起止卡片名称与 `R` 快捷键，伴随即时 Toast 反馈；
-  - **💎 精美关系说明形状**：提供胶囊（Pill）、矩形（Rect）、真·几何对称菱形（Diamond）三种徽章形态，矢量等比自适应文本宽度，阴影自然立体。
+- **⚡ 严格几何中心对齐与上下分层垂直路由优先**：
+  - **🎯 严格几何中心起终点锚点对齐**：卡片与分组容器四周锚点（上、下、左、右）**严格对齐各边的几何正中点**（`width / 2`, `height / 2`），连线与锚点圆点完全居中重合，告别偏移与错位；
+  - **📐 上下分层垂直优先路由与最外侧卡片自适应**：上下分层或跨容器排版时，路由算法优先遵循垂直上下逻辑；从下方卡片向最边缘外侧上方卡片连线时，起点严格为下方卡片的**上部（top）**，终点严格在上方卡片的**下部（bottom）**，从上往下连线亦同理（上 bottom -> 下 top），彻底根治横向切入和卡片穿插问题。
+- **〰️ 防冲天平滑曲线与正交折线拐点手柄平移**：
+  - **防冲天平滑贝塞尔曲线 (`bezier`)**：自适应动态约束控制点伸展幅度（$\le \text{gap} \times 0.55$），彻底根治微距或对角线连接时的曲线上突“冲天”或超大倒扣；
+  - **正交折线拐点手柄拖拽 (`step`)**：单选直角折线时在弯折段正中渲染专属调整手柄（`.canvas-step-bend-handle`），按住鼠标拖拽即可沿法向实时平移弯折位置（`stepOffset`），双击手柄快速复位至几何中位线；
+  - **笔直直线 (`straight`)**：简洁有力的最短路径直连。
+- **🎨 同一卡片同一起点线条颜色一致与跨容器全局智能调色分配**：
+  - **同卡同色**：同一卡片/同一起点发出的所有连线自动保持完全一致的色彩；若卡片设置了专属颜色（`node.color`），其所有出向连线自动继承卡片主题色；
+  - **跨容器全局智能互斥调色**：当同一分组容器内有两个或两个以上卡片发起连接线、或不同容器内分别有卡片发起一对多时，系统自动维护全域及容器内颜色池，智能指派互不冲突的调色板色彩（红、橙、黄、绿、青、紫），彻底告别大面积同色乱网。
+- **🌱 一对多发起源全景多维识别 (One-to-Many Origin Clarity)**：
+  - **起点端点锚固圆点 (`● ────> ▶`)**：所有有向连线在发起源卡片外边缘绘制专属原点锚固小圆点（Origin Anchor Dot），连线发射端与终点接收箭头对比鲜明，多线交叉时流向一眼可辨，SVG 导出 1:1 精确呈现；
+  - **发起源徽章与卡片边框高亮 (`🌱 发起源 · N`)**：当卡片或分组容器向外辐射 $\ge 2$ 条出向连线时，卡片顶部边框自动切换为对应连线色彩的实线加粗边框，卡片标题栏常驻「🌱 发起源 · N」彩色胶囊徽章；鼠标悬停发起源卡片时，该卡片发出的所有连线自动激发专属色彩的动态柔和阴影辉光；
+  - **多选发起源动态感知**：多选卡片时，首选卡片上方常驻绿色浮动指示标「🌱 一对多发起源」，顶栏工具按钮动态标注「一对多关联 (以「卡片标题」发起源)」，右键上下文菜单明确提示「🌱 以此卡片「标题」为发起节点建立一对多」，彻底杜绝发起源混淆。
+- **🔲 连线批量多选与底部批量操作工具栏 (Multi-Edge Selection & Batch Toolbar)**：
+  - 支持按住 `Shift` / `Ctrl` 多选连线、画布鼠标框选批量选定连线；
+  - 底部弹出专属浮动批量修改工具栏（`.canvas-edge-batch-toolbar`），支持一键批量修改 6 种色彩、箭头端点（单向/双向/无箭头）、线型（贝塞尔/折线/直线）、描边虚实形态（实线/虚线/点线）、反转流向与一键批量删除。
+- **✂️ 多选卡片右键一键断开内部连线 (Disconnect Selected Nodes)**：
+  - 框选或多选多张卡片后，在右键上下文菜单中新增「断开所选卡片间连线」，仅解除所选卡片内部的相互连接，完整保留与外部其他卡片的既有连线。
+- **🔀 快捷反转连线流向 (`R`) 与精美关系说明形状**：
+  - 选中连线按 `R` 键秒级对调起止端点与箭头；
+  - 胶囊（Pill）、矩形（Rect）、真·几何对称菱形（Diamond）三种徽章形态，矢量等比自适应文本宽度，阴影自然立体。
 - **📑 媲美 Figma / Miro 的 4 大右键上下文菜单**：
+  <p align="center">
+    <img src="docs/manual-images/33-canvas-card-creation.png" alt="白板卡片定制与上下文右键操作" width="90%" style="border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);" />
+  </p>
   - **空白画布**：新建各类卡片、**从剪贴板一键粘贴卡片 (`Ctrl+V`)**（自动读取剪贴板纯文本在光标处生成卡片）、适应画布 (`Shift+1`)、重置缩放 100% (`Ctrl+0`)、对齐网格（吸附至 20px 网格）、小地图与网格形态切换；
   - **单张卡片**：Markdown 编辑、复制文本、**复制双链引用 (`[[标题]]`)**、**提取为独立知识库笔记**、**重置为默认尺寸**、图层上下移与 6 色调色板；
-  - **多选节点**：**一键打包为分组容器 (`Ctrl+G`)**（智能计算边界包围盒）、智能对齐（左对齐、居中对齐、顶端对齐）与**水平等距分布**；
+  - **多选节点**：**一键断开所选卡片间连线**、**一键打包为分组容器 (`Ctrl+G`)**（智能计算边界包围盒）、**批量水平对齐与垂直对齐**、**左对齐、水平居中、右对齐、顶端对齐、底端对齐**与**水平/垂直等距分布**；
   - **分组容器**：重命名容器、**一键全选内部所有卡片**、**自适应紧凑包围内容**（智能收缩留白 24px）、**解散分组**（仅删容器保留内部卡片）。
 - **🔭 缩略雷达小地图 (Minimap)**：右下角常驻全局缩略雷达，实时呈现微缩卡片分布与高亮视口框，支持点击视框极速导航。
 - **📝 画布逆向拓扑萃取长文算法 (Canvas-to-Article)**：独创拓扑因果萃取算法，根据卡片空间坐标与有向箭头依赖关系智能构建因果链路，一键萃取生成章节完备、引用严谨的独立 Markdown 专著。
@@ -296,6 +328,10 @@
 
 ### 12. ⏳ 本地时间旅行与版本快照历史 (Local Version History · `Ctrl + Shift + H`)
 *每一次知识创作的修改都应被忠实记录。完全运行在用户本地、安全防丢的本地时间旅行系统。*
+
+<p align="center">
+  <img src="docs/manual-images/34-version-history.png" alt="本地版本快照历史与双栏差异对比" width="90%" style="border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);" />
+</p>
 
 - **🛡️ 纯本地静默快照引擎**：在知识库根目录下维护 `.knowspace/snapshots/` 隐藏存储，每个快照打上绝对微秒时间戳与 SHA-256 哈希校验码，杜绝冗余重复写入。
 - **⏱️ 30 秒静默去抖与自动配额修剪**：智能识别实质性变更，在频繁保存中聚合 30 秒去抖窗口；单个文档自动滚动维护最新的 50 个优质快照点，空间轻量环保。
@@ -308,6 +344,10 @@
 
 ### 13. 🔍 全库毫秒级混合检索引擎与结构化语法 (Hybrid Vault Search · `Ctrl + F`)
 *全新文档级与段落级高性能倒排索引，十万字知识库键入即出（< 15ms）。*
+
+<p align="center">
+  <img src="docs/manual-images/35-hybrid-vault-search.png" alt="全库毫秒级混合检索与语法芯片" width="90%" style="border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);" />
+</p>
 
 - **⚡ 毫秒级倒排索引引擎 (Inverted Index Engine)**：建立内存级 `tagIndex`、`linkIndex` 与 `termIndex`，告别单文档暴力线性扫描。
 - **🎯 强大的结构化检索语法**：
@@ -335,6 +375,8 @@
 | `Ctrl + Shift + H` | **版本快照历史与双栏对比** | 呼出本地时间旅行面板，支持 Side-by-Side 逐行与行内对比、一键无损还原 |
 | `Ctrl + Shift + C` | **空间可视化白板** | 切换至无限空间白板视图，挂载多模态卡片并进行空间组织与连线 |
 | `R` | **(白板连线选中时) 反转连线流向** | 一键对调连线两端起止卡片与箭头指向，伴有 Toast 反馈 |
+| `Shift + 点击 / 框选` | **(白板中) 连线/卡片批量多选** | 批量多选连线呼出底部批量工具栏（一键批量改色、箭头、线型、虚实形态、反向与删除） |
+| `双击折线拐点手柄` | **(白板折线选中时) 复位折线拐点** | 双击正交折线中心调整手柄，快速将折线弯折位置复位至几何中位线 |
 | `Shift + 1` | **(白板中) 适应画布内容** | 一键平滑缩放平移至最适全景视口 (Zoom to Fit) |
 | `Ctrl + 0` | **(白板中) 重置缩放 100%** | 恢复白板视口为标准 100% 原始比例 |
 | `Ctrl + G` | **(白板多选时) 打包为分组容器** | 一键将多选卡片智能计算包围盒并打包为分组容器 |
@@ -406,7 +448,12 @@
 
 - **🎨 Infinite Canvas (JSON Canvas 1.0 Compatible · `Ctrl + Shift + C`)**:
   - *Open Standard Compatibility*: Full support for JSON Canvas 1.0 (`.canvas`), seamlessly interoperable with Obsidian Canvas and third-party spatial tools.
-  - *Multimodal Cards & Anchors*: Markdown text nodes, embedded document nodes with live scrolling, and draggable grouping containers. 4-anchor magnetic snap with smooth cubic bezier, orthogonal, and straight connector lines.
+  - *Multimodal Cards & Geometric Alignment*: Markdown text nodes, embedded document nodes with live scrolling, and grouping containers. 4-side anchors align strictly to the exact geometric midpoints of card borders.
+  - *Vertical Tier Routing Dominance*: Smart routing algorithm prioritizes top/bottom vertical alignment for multi-tier and cross-container layouts even when connecting to outermost cards across wide horizontal spans.
+  - *Advanced Curve Dynamics & Orthogonal Dragging*: Anti-skyrocketing cubic bezier curves (bounded to $\le \text{gap} \times 0.55$) eliminate extreme arches; orthogonal step lines feature an interactive midpoint bend handle (`stepOffset`) with double-click reset.
+  - *Consistent Edge Colors & Container Multi-Card Auto-Differentiation*: All outgoing lines from the same card/starting point share an identical color (inheriting node color if set); when two or more cards within the same container initiate outgoing connection lines, distinct palette colors are automatically assigned to each card.
+  - *Multi-Edge Selection & Batch Operations*: Marquee select or Shift/Ctrl-click edges to reveal a floating batch toolbar for changing colors, markers, line styles, stroke patterns (solid/dashed/dotted), and bulk deletion.
+  - *Disconnect Selected Cards & Alignment Tools*: Context menu options to disconnect internal edges among selected cards while preserving external links, and comprehensive alignment tools including Horizontal Alignment, Vertical Alignment, Left/Center/Right, Top/Bottom, and Equal Distribution.
   - *Minimap Radar & Reverse Longform Extraction*: Persistent minimap navigation with viewport indicator; one-click algorithmic reverse extraction transforms canvas spatial causality topology into a structured Markdown article!
 - **⏳ Local Version History & Side-by-Side Diff (`Ctrl + Shift + H`)**:
   - *Silent Snapshot Engine*: Maintains local version history in `.knowspace/snapshots/` with 30s debounce, SHA-256 deduplication, and automatic pruning (latest 50 versions).

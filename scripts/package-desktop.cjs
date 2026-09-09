@@ -96,6 +96,15 @@ async function main() {
     await fs.copyFile(path.join(root, "docs", "操作手册.md"), path.join(docsDir, "操作手册.md"));
   } catch (e) {}
   try {
+    await fs.copyFile(path.join(root, "docs", "PICTURE_MANUAL.md"), path.join(docsDir, "PICTURE_MANUAL.md"));
+  } catch (e) {}
+  try {
+    await fs.copyFile(path.join(root, "docs", "全功能高清图片手册.md"), path.join(docsDir, "全功能高清图片手册.md"));
+  } catch (e) {}
+  try {
+    await fs.copyFile(path.join(root, "docs", "PROMOTIONAL_WEBSITE_PLAN.md"), path.join(docsDir, "PROMOTIONAL_WEBSITE_PLAN.md"));
+  } catch (e) {}
+  try {
     await copyDirectory(path.join(root, "docs", "manual-images"), path.join(docsDir, "manual-images"));
   } catch (e) {}
   try {

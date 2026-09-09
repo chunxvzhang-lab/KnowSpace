@@ -68,6 +68,7 @@ import {
   CANVAS_COLOR_PALETTES,
   CANVAS_RELATION_PRESETS,
   isNodeInsideGroup,
+  findContainerForNode,
   toggleChecklistInMarkdown,
   createEdgeBetweenNodes,
   spawnConnectedCard,
@@ -2757,6 +2758,74 @@ export const CanvasView = memo(function CanvasView({
     return map;
   }, [data.edges]);
 
+  // Dynamic source-aware color mapping:
+  // Guarantees that multiple cards initiating connections (especially inside the same container)
+  // are visually distinguished with different colors, even if previously saved with colliding colors.
+  const sourceDisplayColorMap = useMemo(() => {
+    const map = new Map<string, string>();
+    const paletteKeys = Object.keys(CANVAS_COLOR_PALETTES);
+    const usedColors = new Set<string>();
+
+    // 1. Group source nodes by container
+    const containerSourceMap = new Map<string, string[]>();
+    const rootSources: string[] = [];
+
+    for (const [sourceId] of nodeOutgoingMap.entries()) {
+      const node = nodeMap.get(sourceId);
+      if (!node) continue;
+      const container = findContainerForNode(node, data.nodes);
+      if (container) {
+        const list = containerSourceMap.get(container.id) || [];
+        list.push(sourceId);
+        containerSourceMap.set(container.id, list);
+      } else {
+        rootSources.push(sourceId);
+      }
+    }
+
+    // 2. Containers: assign mutually distinct colors to siblings with outgoing edges
+    for (const [_containerId, sourceIds] of containerSourceMap.entries()) {
+      const containerUsed = new Set<string>();
+      for (const sId of sourceIds) {
+        const sNode = nodeMap.get(sId);
+        const existingColor = data.edges.find(
+          (e) => e.fromNode === sId && e.color && CANVAS_COLOR_PALETTES[e.color]
+        )?.color;
+        let preferredColor = existingColor || sNode?.color;
+
+        // If preferred color collides with another sibling in this container, pick an unused one
+        if (!preferredColor || containerUsed.has(preferredColor) || !CANVAS_COLOR_PALETTES[preferredColor]) {
+          preferredColor =
+            paletteKeys.find((k) => !containerUsed.has(k) && !usedColors.has(k)) ||
+            paletteKeys.find((k) => !containerUsed.has(k)) ||
+            paletteKeys[containerUsed.size % paletteKeys.length];
+        }
+
+        containerUsed.add(preferredColor);
+        usedColors.add(preferredColor);
+        map.set(sId, preferredColor);
+      }
+    }
+
+    // 3. Free nodes outside containers
+    for (const sId of rootSources) {
+      const sNode = nodeMap.get(sId);
+      const existingColor = data.edges.find(
+        (e) => e.fromNode === sId && e.color && CANVAS_COLOR_PALETTES[e.color]
+      )?.color;
+      let preferredColor = existingColor || sNode?.color;
+      if (!preferredColor || usedColors.has(preferredColor) || !CANVAS_COLOR_PALETTES[preferredColor]) {
+        preferredColor =
+          paletteKeys.find((k) => !usedColors.has(k)) ||
+          paletteKeys[usedColors.size % paletteKeys.length];
+      }
+      usedColors.add(preferredColor);
+      map.set(sId, preferredColor);
+    }
+
+    return map;
+  }, [nodeOutgoingMap, nodeMap, data.nodes, data.edges]);
+
   const currentMultiRootNode = useMemo(() => {
     if (selectedNodeIds.size < 2) return undefined;
     const selectedNodes = data.nodes.filter((n) => selectedNodeIds.has(n.id));
@@ -3269,18 +3338,21 @@ export const CanvasView = memo(function CanvasView({
             const pathData = computeEdgePath(p1, fromSide, p2, toSide, edge.style, edge.stepOffset);
 
             const isSelected = selectedEdgeIds.has(edge.id);
+            const effectiveColorKey =
+              (edge.fromNode && sourceDisplayColorMap.get(edge.fromNode)) || edge.color;
             const edgeColor =
-              edge.color && CANVAS_COLOR_PALETTES[edge.color]
-                ? CANVAS_COLOR_PALETTES[edge.color].stroke
-                : edge.color?.startsWith("#")
-                ? edge.color
+              effectiveColorKey && CANVAS_COLOR_PALETTES[effectiveColorKey]
+                ? CANVAS_COLOR_PALETTES[effectiveColorKey].stroke
+                : effectiveColorKey?.startsWith("#")
+                ? effectiveColorKey
                 : colors.edgeColor;
 
             const getMarkerUrl = (col?: string, selected?: boolean) => {
               if (selected) return "url(#canvas-arrow-selected)";
-              if (!col) return "url(#canvas-arrow-default)";
-              if (CANVAS_COLOR_PALETTES[col]) return `url(#canvas-arrow-${col})`;
-              if (col.startsWith("#")) return `url(#canvas-arrow-${col.replace("#", "hex-")})`;
+              const activeCol = col || effectiveColorKey;
+              if (!activeCol) return "url(#canvas-arrow-default)";
+              if (CANVAS_COLOR_PALETTES[activeCol]) return `url(#canvas-arrow-${activeCol})`;
+              if (activeCol.startsWith("#")) return `url(#canvas-arrow-${activeCol.replace("#", "hex-")})`;
               return "url(#canvas-arrow-default)";
             };
 
@@ -3345,12 +3417,12 @@ export const CanvasView = memo(function CanvasView({
                   strokeDasharray={strokeDash}
                   markerStart={
                     edge.fromEnd === "arrow"
-                      ? getMarkerUrl(edge.color, isSelected)
+                      ? getMarkerUrl(effectiveColorKey, isSelected)
                       : undefined
                   }
                   markerEnd={
                     edge.toEnd === "arrow"
-                      ? getMarkerUrl(edge.color, isSelected)
+                      ? getMarkerUrl(effectiveColorKey, isSelected)
                       : undefined
                   }
                   style={{
@@ -3718,9 +3790,10 @@ export const CanvasView = memo(function CanvasView({
           const isConnectingTarget = connectingState !== null && connectingState.fromNodeId !== node.id;
           const outgoingInfo = nodeOutgoingMap.get(node.id);
           const isOneToManySource = !!outgoingInfo && outgoingInfo.count >= 2;
+          const effectiveSourceColor = sourceDisplayColorMap.get(node.id) || outgoingInfo?.color;
           const sourceColorPalette =
-            outgoingInfo?.color && CANVAS_COLOR_PALETTES[outgoingInfo.color]
-              ? CANVAS_COLOR_PALETTES[outgoingInfo.color]
+            effectiveSourceColor && CANVAS_COLOR_PALETTES[effectiveSourceColor]
+              ? CANVAS_COLOR_PALETTES[effectiveSourceColor]
               : undefined;
           const isMultiRoot = selectedNodeIds.size >= 2 && currentMultiRootNode?.id === node.id;
           return (
@@ -4153,11 +4226,13 @@ export const CanvasView = memo(function CanvasView({
           const rawMid = computeEdgeMidpoint(p1, fromSide, p2, toSide, edge.style, edge.stepOffset);
 
           const isSelected = selectedEdgeIds.has(edge.id);
+          const effectiveColorKey =
+            (edge.fromNode && sourceDisplayColorMap.get(edge.fromNode)) || edge.color;
           const edgeColor =
-            edge.color && CANVAS_COLOR_PALETTES[edge.color]
-              ? CANVAS_COLOR_PALETTES[edge.color].stroke
-              : edge.color?.startsWith("#")
-              ? edge.color
+            effectiveColorKey && CANVAS_COLOR_PALETTES[effectiveColorKey]
+              ? CANVAS_COLOR_PALETTES[effectiveColorKey].stroke
+              : effectiveColorKey?.startsWith("#")
+              ? effectiveColorKey
               : colors.edgeColor;
 
           const shape = edge.labelShape || "pill";
