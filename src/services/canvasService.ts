@@ -240,34 +240,13 @@ export function computeBoundingBox(nodes: CanvasNode[]): {
 
 /**
  * Calculates anchor coordinate for a node on a specific side.
- * If targetPoint is provided and the node is wide or tall (e.g. group container or large card),
- * dynamically shifts the anchor along the edge towards targetPoint to distribute connections
- * and produce straight, parallel lines rather than pinching into a single point.
+ * Connections strictly start and terminate at the exact geometric midpoint of the edge,
+ * ensuring perfect alignment with the node's visual port handles (anchor dots).
  */
 export function getNodeAnchorPoint(
   node: CanvasNode,
-  side: CanvasNodeSide = "right",
-  targetPoint?: { x: number; y: number }
+  side: CanvasNodeSide = "right"
 ): { x: number; y: number } {
-  if (targetPoint) {
-    if (side === "top") {
-      const clampedX = Math.max(node.x + 24, Math.min(node.x + node.width - 24, targetPoint.x));
-      return { x: clampedX, y: node.y };
-    }
-    if (side === "bottom") {
-      const clampedX = Math.max(node.x + 24, Math.min(node.x + node.width - 24, targetPoint.x));
-      return { x: clampedX, y: node.y + node.height };
-    }
-    if (side === "left") {
-      const clampedY = Math.max(node.y + 24, Math.min(node.y + node.height - 24, targetPoint.y));
-      return { x: node.x, y: clampedY };
-    }
-    if (side === "right") {
-      const clampedY = Math.max(node.y + 24, Math.min(node.y + node.height - 24, targetPoint.y));
-      return { x: node.x + node.width, y: clampedY };
-    }
-  }
-
   switch (side) {
     case "top":
       return { x: node.x + node.width / 2, y: node.y };
@@ -280,6 +259,7 @@ export function getNodeAnchorPoint(
       return { x: node.x + node.width, y: node.y + node.height / 2 };
   }
 }
+
 
 /**
 /**

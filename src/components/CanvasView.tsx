@@ -245,10 +245,8 @@ function computeBoxSelectionEdgeHits(
     const optSides = getOptimalAnchorSides(fromNode, toNode);
     const fromSide = edge.fromSide || optSides.fromSide;
     const toSide = edge.toSide || optSides.toSide;
-    const toCenter = { x: toNode.x + toNode.width / 2, y: toNode.y + toNode.height / 2 };
-    const fromCenter = { x: fromNode.x + fromNode.width / 2, y: fromNode.y + fromNode.height / 2 };
-    const p1 = getNodeAnchorPoint(fromNode, fromSide, toCenter);
-    const p2 = getNodeAnchorPoint(toNode, toSide, fromCenter);
+    const p1 = getNodeAnchorPoint(fromNode, fromSide);
+    const p2 = getNodeAnchorPoint(toNode, toSide);
     const mid = computeEdgeMidpoint(p1, fromSide, p2, toSide, edge.style, edge.stepOffset);
     if (mid.x >= minX && mid.x <= maxX && mid.y >= minY && mid.y <= maxY) {
       hitEdgeIds.add(edge.id);
@@ -3197,13 +3195,11 @@ export const CanvasView = memo(function CanvasView({
             const toNode = nodeMap.get(edge.toNode);
             if (!fromNode || !toNode) return null;
 
-            const toCenter = { x: toNode.x + toNode.width / 2, y: toNode.y + toNode.height / 2 };
-            const fromCenter = { x: fromNode.x + fromNode.width / 2, y: fromNode.y + fromNode.height / 2 };
             const optSides = getOptimalAnchorSides(fromNode, toNode);
             const fromSide = edge.fromSide || optSides.fromSide;
             const toSide = edge.toSide || optSides.toSide;
-            const p1 = getNodeAnchorPoint(fromNode, fromSide, toCenter);
-            const p2 = getNodeAnchorPoint(toNode, toSide, fromCenter);
+            const p1 = getNodeAnchorPoint(fromNode, fromSide);
+            const p2 = getNodeAnchorPoint(toNode, toSide);
             const pathData = computeEdgePath(p1, fromSide, p2, toSide, edge.style, edge.stepOffset);
 
             const isSelected = selectedEdgeIds.has(edge.id);
@@ -3380,16 +3376,22 @@ export const CanvasView = memo(function CanvasView({
           })}
 
           {/* Active Connecting Dragging Line */}
-          {connectingState && (
-            <path
-              d={`M ${connectingState.currentX} ${connectingState.currentY} L ${connectingState.currentX} ${connectingState.currentY}`}
-              fill="none"
-              stroke="#f59e0b"
-              strokeWidth={2}
-              strokeDasharray="5 5"
-              markerEnd="url(#canvas-arrow-default)"
-            />
-          )}
+          {connectingState && (() => {
+            const fromNode = nodeMap.get(connectingState.fromNodeId);
+            const startPt = fromNode
+              ? getNodeAnchorPoint(fromNode, connectingState.fromSide)
+              : { x: connectingState.currentX, y: connectingState.currentY };
+            return (
+              <path
+                d={`M ${startPt.x} ${startPt.y} L ${connectingState.currentX} ${connectingState.currentY}`}
+                fill="none"
+                stroke="#f59e0b"
+                strokeWidth={2}
+                strokeDasharray="5 5"
+                markerEnd="url(#canvas-arrow-default)"
+              />
+            );
+          })()}
         </svg>
 
         {/* 3. MULTIMODAL CARDS LAYER */}
@@ -3947,13 +3949,11 @@ export const CanvasView = memo(function CanvasView({
           const isEditing = editingEdgeId === edge.id;
           if (!hasLabel && !isEditing) return null;
 
-          const toCenter = { x: toNode.x + toNode.width / 2, y: toNode.y + toNode.height / 2 };
-          const fromCenter = { x: fromNode.x + fromNode.width / 2, y: fromNode.y + fromNode.height / 2 };
           const optSides = getOptimalAnchorSides(fromNode, toNode);
           const fromSide = edge.fromSide || optSides.fromSide;
           const toSide = edge.toSide || optSides.toSide;
-          const p1 = getNodeAnchorPoint(fromNode, fromSide, toCenter);
-          const p2 = getNodeAnchorPoint(toNode, toSide, fromCenter);
+          const p1 = getNodeAnchorPoint(fromNode, fromSide);
+          const p2 = getNodeAnchorPoint(toNode, toSide);
           // Place label exactly at geometric midpoint — the connection line passes THROUGH the label center
           const rawMid = computeEdgeMidpoint(p1, fromSide, p2, toSide, edge.style, edge.stepOffset);
 

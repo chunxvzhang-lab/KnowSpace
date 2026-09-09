@@ -527,7 +527,23 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
     expect(edges2[0].toSide).toBe("left");
   });
 
-  it("supports adaptive sliding anchor points for wide/tall nodes to prevent bottlenecking", () => {
+  it("anchors all connections to the exact midpoint of each edge for cards and containers", () => {
+    const card: CanvasTextNode = {
+      id: "card-1",
+      type: "text",
+      text: "Card",
+      x: 100,
+      y: 100,
+      width: 240,
+      height: 160,
+    };
+
+    // Connections strictly start/terminate at edge centers
+    expect(getNodeAnchorPoint(card, "top")).toEqual({ x: 100 + 120, y: 100 });
+    expect(getNodeAnchorPoint(card, "bottom")).toEqual({ x: 100 + 120, y: 100 + 160 });
+    expect(getNodeAnchorPoint(card, "left")).toEqual({ x: 100, y: 100 + 80 });
+    expect(getNodeAnchorPoint(card, "right")).toEqual({ x: 100 + 240, y: 100 + 80 });
+
     const wideContainer: CanvasGroupNode = {
       id: "big-group",
       type: "group",
@@ -536,21 +552,12 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
       width: 600,
       height: 400,
     };
-
-    // Card 1 aligned with the left part of the container
-    const p1 = getNodeAnchorPoint(wideContainer, "bottom", { x: 180, y: 600 });
-    expect(p1.x).toBe(180);
-    expect(p1.y).toBe(500);
-
-    // Card 2 aligned with the right part of the container
-    const p2 = getNodeAnchorPoint(wideContainer, "bottom", { x: 550, y: 600 });
-    expect(p2.x).toBe(550);
-    expect(p2.y).toBe(500);
-
-    // Card 3 beyond container boundary should be clamped within margin
-    const p3 = getNodeAnchorPoint(wideContainer, "bottom", { x: 800, y: 600 });
-    expect(p3.x).toBe(100 + 600 - 24);
+    expect(getNodeAnchorPoint(wideContainer, "top")).toEqual({ x: 100 + 300, y: 100 });
+    expect(getNodeAnchorPoint(wideContainer, "bottom")).toEqual({ x: 100 + 300, y: 100 + 400 });
+    expect(getNodeAnchorPoint(wideContainer, "left")).toEqual({ x: 100, y: 100 + 200 });
+    expect(getNodeAnchorPoint(wideContainer, "right")).toEqual({ x: 100 + 600, y: 100 + 200 });
   });
+
 
   it("prioritizes horizontal dominance in left-right structured layouts", () => {
     // Left node and right node with slight vertical offset
