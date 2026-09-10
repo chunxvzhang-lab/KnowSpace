@@ -408,17 +408,21 @@
 
 ---
 
-## 📦 便携版与 MSI 安装包 (Downloads & Release Assets)
+## 📦 安装程序与便携版下载 (Downloads & Release Assets)
 
-本项目为 Windows 64 位系统深度优化，提供标准安装包与免安装便携版，最新 `v2.0.0` 资产已发布：
+本项目为 Windows 64 位系统深度优化，提供图形化安装程序、标准 MSI 安装包与免安装便携版，最新 `v2.0.0` 资产已发布：
 
 > 🌐 **GitHub 官方发布主页**：[GitHub Releases · v2.0.0](https://github.com/chunxvzhang-lab/KnowSpace/releases/tag/v2.0.0)
 
-### 1. Windows MSI 标准安装包
-- **安装文件**：[`KnowSpace-2.0.0.msi`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.0.0/KnowSpace-2.0.0.msi)
-- **特点**：双击即可全自动安装至 Windows 系统，自动创建桌面快捷方式与开始菜单官方品牌图标，深度集成系统级 `.md` 与 `.canvas` 文件关联，支持标准控制面板卸载与企业级静默安装。
+### 1. Windows 图形化安装程序（推荐）
+- **安装文件**：[`KnowSpace-Setup-2.0.0.exe`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.0.0/KnowSpace-Setup-2.0.0.exe)
+- **特点**：双击即可向导式安装，支持自定义安装目录，自动创建桌面快捷方式与开始菜单官方品牌图标，深度集成系统级 `.md` 与 `.canvas` 文件关联，内置标准卸载程序。
 
-### 2. Windows 绿色免安装便携版
+### 2. Windows MSI 标准安装包
+- **安装文件**：[`KnowSpace-2.0.0.msi`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.0.0/KnowSpace-2.0.0.msi)
+- **特点**：Windows Installer 官方格式，适合企业批量部署、组策略分发与企业级静默安装，支持标准控制面板卸载。
+
+### 3. Windows 绿色免安装便携版
 - **便携文件**：[`KnowSpace-win-x64-portable.zip`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.0.0/KnowSpace-win-x64-portable.zip)
 - **直接运行**：解压后双击 `KnowSpace.exe` 即可直接使用完整功能。
 - **特点**：解压即用、随身携带（支持装入 U 盘或移动硬盘）；完全自包含 Electron 运行时与全套本地依赖，无需配置任何外部开发环境；支持右键「打开方式」关联 Markdown 与白板文档。

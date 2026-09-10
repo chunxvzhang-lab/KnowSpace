@@ -153,8 +153,30 @@ def main():
 
 | 文件名 | 类型 | 说明 |
 | :--- | :--- | :--- |
-| **`KnowSpace-2.0.0.msi`** | Windows 标准安装包 | Windows Installer 官方安装格式，自动创建桌面与开始菜单快捷方式（推荐） |
+| **`KnowSpace-Setup-2.0.0.exe`** | Windows 图形化安装程序（推荐） | 双击即可向导式安装，支持自定义安装目录，自动创建桌面与开始菜单快捷方式 |
+| **`KnowSpace-2.0.0.msi`** | Windows 标准安装包 | Windows Installer 官方格式，适合企业批量部署、组策略分发与静默安装 |
 | **`KnowSpace-win-x64-portable.zip`** | Windows 便携绿色版 | 免安装解压即用，解压后双击 `KnowSpace.exe` 即可直接运行 |
+
+---
+
+### 🛠️ 本次更新明细
+
+#### 🎨 无限白板：环形连线配色体系
+- **同环同色**：同一个闭环内所有连线共享完全一致的颜色，一条环即一条语义流；
+- **异环异色**：系统自动识别画布上已存在的闭环（基于有向图环检测，要求环至少 3 个节点，双向箭头不计入），新建环时自动选取尚未被其他环占用的调色板颜色，多个环路视觉边界一目了然；
+- **连线右键色彩**：右键任意连线即可调出完整关系面板，内含 6 色调色板、起止锚点、线型、标签形状与流向反转。
+
+#### 🖱️ 白板右键菜单遮挡修复
+- 右键菜单改为通过 `createPortal` 渲染至 `document.body` 顶层，并使用 `position: fixed` 定位，彻底杜绝被画布容器 `overflow: hidden` 裁切；
+- 菜单定位基于真实视口尺寸动态夹取与翻转，在窗口底部右键时自动向上展开，窗口内任意位置均可完整查看全部菜单项。
+
+#### 🖼️ 导出与显示一致性
+- 导出 PNG / SVG 时复用与屏幕渲染完全相同的色彩解析管线（同一份 source-aware 配色映射），修正此前"导出图片与文件打开后显示不一致"的问题；
+- 自定义十六进制颜色会预先注册对应的箭头 marker，保证导出图中箭头颜色同样准确。
+
+#### 📦 打包与分发
+- 新增 Windows 图形化安装程序（NSIS），与原有 MSI 安装包并行发布；
+- Windows 便携绿色版同步更新。
 
 ---
 
@@ -217,7 +239,23 @@ def main():
 
     portable_zip_path = r"C:\Users\chunxvzhang\Desktop\codex\release\KnowSpace-win-x64-portable.zip"
 
+    setup_exe_path = None
+    setup_exe_candidates = [
+        r"C:\Users\chunxvzhang\Desktop\codex\release\KnowSpace-Setup-2.0.0.exe",
+        r"C:\Users\chunxvzhang\Desktop\codex\release\KnowSpace-2.0.0.exe",
+        r"C:\Users\chunxvzhang\Desktop\codex\release\KnowSpace 2.0.0.exe",
+    ]
+    for p in setup_exe_candidates:
+        if os.path.exists(p):
+            setup_exe_path = p
+            break
+
     assets_to_upload = [
+        (
+            setup_exe_path,
+            "KnowSpace-Setup-2.0.0.exe",
+            "application/x-msdownload"
+        ),
         (
             msi_path,
             "KnowSpace-2.0.0.msi",
