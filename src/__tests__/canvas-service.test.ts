@@ -22,6 +22,7 @@ import {
   getLoopEdgeIds,
   expandLoopEdgeSelection,
   computeSourceDisplayColorMap,
+  alignNodesInCircle,
   disconnectNodeEdges,
   spawnMultipleBranches,
   cycleEdgeStrokePattern,
@@ -1045,6 +1046,98 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
       expect(svg).toContain(
         `<foreignObject x="${n.x}" y="${n.y}" width="${n.width}" height="${n.height}">`
       );
+    }
+  });
+
+  it("arranges multiple cards evenly on a circle (ring alignment)", () => {
+    // Five cards scattered roughly around a centre at (500, 400)
+    const nodes: CanvasTextNode[] = [
+      { id: "r1", type: "text", text: "1", x: 460, y: 100, width: 80, height: 80 },
+      { id: "r2", type: "text", text: "2", x: 800, y: 360, width: 80, height: 80 },
+      { id: "r3", type: "text", text: "3", x: 700, y: 660, width: 80, height: 80 },
+      { id: "r4", type: "text", text: "4", x: 260, y: 660, width: 80, height: 80 },
+      { id: "r5", type: "text", text: "5", x: 160, y: 360, width: 80, height: 80 },
+    ];
+    const ids = nodes.map((n) => n.id);
+
+    const aligned = alignNodesInCircle(nodes, ids);
+    const placed = ids.map((id) => aligned.find((n) => n.id === id)!);
+
+    // Centre = bounding-box centre of the original selection
+    const minX = Math.min(...nodes.map((n) => n.x));
+    const maxX = Math.max(...nodes.map((n) => n.x + n.width));
+    const minY = Math.min(...nodes.map((n) => n.y));
+    const maxY = Math.max(...nodes.map((n) => n.y + n.height));
+    const cx = minX + (maxX - minX) / 2;
+    const cy = minY + (maxY - minY) / 2;
+
+    // 1. Every card centre sits at the same distance from the ring centre
+    //    (integer coordinate rounding leaves at most a sub-pixel deviation)
+    const radii = placed.map((n) => Math.hypot(n.x + n.width / 2 - cx, n.y + n.height / 2 - cy));
+    radii.forEach((r) => expect(Math.abs(r - radii[0])).toBeLessThan(1.5));
+
+    // 2. Cards are evenly spaced in angle (2π / N apart)
+    const angles = placed
+      .map((n) => Math.atan2(n.y + n.height / 2 - cy, n.x + n.width / 2 - cx))
+      .map((a) => (a + 2 * Math.PI) % (2 * Math.PI))
+      .sort((a, b) => a - b);
+    const expectedStep = (2 * Math.PI) / placed.length;
+    for (let i = 1; i < angles.length; i++) {
+      expect(angles[i] - angles[i - 1]).toBeCloseTo(expectedStep, 1);
+    }
+
+    // 3. The ring must not collapse inward
+    const originalMaxRadius = Math.max(
+      ...nodes.map((n) => Math.hypot(n.x + n.width / 2 - cx, n.y + n.height / 2 - cy))
+    );
+    expect(radii[0]).toBeGreaterThanOrEqual(originalMaxRadius - 1);
+  });
+
+  it("preserves clockwise order when arranging a ring, matching loop edges", () => {
+    const nodes: CanvasTextNode[] = [
+      { id: "t", type: "text", text: "top", x: 460, y: 100, width: 80, height: 80 },
+      { id: "r", type: "text", text: "right", x: 800, y: 360, width: 80, height: 80 },
+      { id: "b", type: "text", text: "bottom", x: 460, y: 620, width: 80, height: 80 },
+      { id: "l", type: "text", text: "left", x: 120, y: 360, width: 80, height: 80 },
+    ];
+
+    const aligned = alignNodesInCircle(nodes, ["t", "r", "b", "l"]);
+    const centreX = 120 + (800 + 80 - 120) / 2;
+    const centreY = 100 + (620 + 80 - 100) / 2;
+
+    const angleOf = (id: string) => {
+      const n = aligned.find((x) => x.id === id)!;
+      return Math.atan2(n.y + n.height / 2 - centreY, n.x + n.width / 2 - centreX);
+    };
+
+    // top(-90°) -> right(0°) -> bottom(90°) -> left(180°) is a clockwise ring
+    const order = ["t", "r", "b", "l"].map(angleOf);
+    expect(order[1]).toBeGreaterThan(order[0]);
+    expect(order[2]).toBeGreaterThan(order[1]);
+    expect(order[3]).toBeGreaterThan(order[2]);
+  });
+
+  it("leaves selections smaller than 3 cards untouched for ring alignment", () => {
+    const a: CanvasTextNode = { id: "a", type: "text", text: "A", x: 0, y: 0, width: 100, height: 80 };
+    const b: CanvasTextNode = { id: "b", type: "text", text: "B", x: 400, y: 260, width: 100, height: 80 };
+    const result = alignNodes([a, b], ["a", "b"], "circle");
+    expect(result.find((n) => n.id === "a")).toMatchObject({ x: 0, y: 0 });
+    expect(result.find((n) => n.id === "b")).toMatchObject({ x: 400, y: 260 });
+  });
+
+  it("honours an explicit radius when ring-aligning", () => {
+    const nodes: CanvasTextNode[] = [
+      { id: "p1", type: "text", text: "1", x: 0, y: 0, width: 60, height: 60 },
+      { id: "p2", type: "text", text: "2", x: 300, y: 0, width: 60, height: 60 },
+      { id: "p3", type: "text", text: "3", x: 150, y: 300, width: 60, height: 60 },
+    ];
+    const cx = 0 + (300 + 60 - 0) / 2;
+    const cy = 0 + (300 + 60 - 0) / 2;
+
+    const aligned = alignNodesInCircle(nodes, ["p1", "p2", "p3"], { radius: 250 });
+    for (const n of aligned) {
+      const r = Math.hypot(n.x + n.width / 2 - cx, n.y + n.height / 2 - cy);
+      expect(r).toBeCloseTo(250, 0);
     }
   });
 

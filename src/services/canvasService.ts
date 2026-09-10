@@ -2124,7 +2124,108 @@ export type CanvasAlignDirection =
   | "middle" // 垂直居中
   | "bottom" // 底端对齐
   | "distribute-h" // 水平等距分布
-  | "distribute-v"; // 垂直等距分布
+  | "distribute-v" // 垂直等距分布
+  | "circle"; // 环形对齐 (多张卡片沿圆周均匀排布，配合环形闭环连线使用)
+
+/**
+ * Options for circular (ring) alignment of multiple cards.
+ */
+export interface CircleAlignOptions {
+  /**
+   * Explicit radius in canvas units. When omitted, the radius is derived so
+   * that the ring is never tighter than the current spread AND neighbouring
+   * cards never overlap.
+   */
+  radius?: number;
+  /**
+   * Angle (in degrees) of the first card, -90 puts it at 12 o'clock.
+   * Defaults to -90 (top).
+   */
+  startAngleDeg?: number;
+}
+
+/**
+ * Arranges the selected cards evenly around a circle — the visual companion of
+ * "建立闭环环形连线".
+ *
+ * Behaviour:
+ * 1. The circle is centred on the current bounding-box centre of the
+ *    selection, so the ring stays where the user already laid it out.
+ * 2. Angular order is preserved from the cards' current positions (the same
+ *    clockwise ordering used by connectLoopNodes), so the resulting ring
+ *    reads in the order the user expects.
+ * 3. Each card is placed by its own centre on the circle, which keeps the ring
+ *    balanced even when card sizes differ.
+ * 4. The radius never shrinks below the current spread, and never below the
+ *    value that would make adjacent cards collide.
+ */
+export function alignNodesInCircle(
+  allNodes: CanvasNode[],
+  selectedNodeIds: Set<string> | string[],
+  options?: CircleAlignOptions
+): CanvasNode[] {
+  const selSet = selectedNodeIds instanceof Set ? selectedNodeIds : new Set(selectedNodeIds);
+  const selNodes = allNodes.filter((n) => selSet.has(n.id));
+  if (selNodes.length < 3) return allNodes;
+
+  const centerOf = (n: CanvasNode) => ({
+    x: n.x + n.width / 2,
+    y: n.y + n.height / 2,
+  });
+
+  // Circle centre = bounding-box centre of the current selection
+  const minX = Math.min(...selNodes.map((n) => n.x));
+  const maxX = Math.max(...selNodes.map((n) => n.x + n.width));
+  const minY = Math.min(...selNodes.map((n) => n.y));
+  const maxY = Math.max(...selNodes.map((n) => n.y + n.height));
+  const cx = minX + (maxX - minX) / 2;
+  const cy = minY + (maxY - minY) / 2;
+
+  // Preserve the existing clockwise ordering around the centre
+  const ordered = [...selNodes].sort((a, b) => {
+    const pa = centerOf(a);
+    const pb = centerOf(b);
+    const angleA = Math.atan2(pa.y - cy, pa.x - cx);
+    const angleB = Math.atan2(pb.y - cy, pb.x - cx);
+    return angleA - angleB;
+  });
+
+  const count = ordered.length;
+
+  // Radius: never collapse inward, never let neighbours overlap
+  let radius = options?.radius;
+  if (!radius || radius <= 0) {
+    const currentSpread = Math.max(
+      ...ordered.map((n) => {
+        const p = centerOf(n);
+        return Math.hypot(p.x - cx, p.y - cy);
+      })
+    );
+    // Minimum radius so that adjacent card centres are at least the average
+    // card diagonal apart: chord = 2R·sin(π/N)  ⇒  R = chord / (2·sin(π/N))
+    const avgDiagonal =
+      ordered.reduce((sum, n) => sum + Math.hypot(n.width, n.height), 0) / count;
+    const requiredChord = avgDiagonal * 0.9;
+    const minRadius = requiredChord / (2 * Math.sin(Math.PI / count));
+    radius = Math.max(currentSpread, minRadius);
+  }
+
+  const startAngle = ((options?.startAngleDeg ?? -90) * Math.PI) / 180;
+
+  const positions = new Map<string, { x: number; y: number }>();
+  ordered.forEach((n, i) => {
+    const angle = startAngle + (i * 2 * Math.PI) / count;
+    positions.set(n.id, {
+      x: Math.round(cx + radius * Math.cos(angle) - n.width / 2),
+      y: Math.round(cy + radius * Math.sin(angle) - n.height / 2),
+    });
+  });
+
+  return allNodes.map((n) => {
+    const pos = positions.get(n.id);
+    return pos ? { ...n, x: pos.x, y: pos.y } : n;
+  });
+}
 
 /**
  * Aligns or distributes selected nodes along the specified direction
@@ -2137,6 +2238,11 @@ export function alignNodes(
   const selSet = selectedNodeIds instanceof Set ? selectedNodeIds : new Set(selectedNodeIds);
   const selNodes = allNodes.filter((n) => selSet.has(n.id));
   if (selNodes.length < 2) return allNodes;
+
+  // Ring layout needs at least 3 cards to form a meaningful circle
+  if (direction === "circle") {
+    return alignNodesInCircle(allNodes, selSet);
+  }
 
   if (direction === "horizontal" || direction === "middle") {
     const minY = Math.min(...selNodes.map((n) => n.y));

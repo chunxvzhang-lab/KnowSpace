@@ -1558,8 +1558,8 @@ export const CanvasView = memo(function CanvasView({
       const updatedNodes = alignNodes(currentData.nodes, selectedNodeIds, direction);
 
       const toastMap: Record<CanvasAlignDirection, string> = {
-        horizontal: "所选卡片已水平对齐",
-        vertical: "所选卡片已垂直对齐",
+        horizontal: "所选卡片已水平中线对齐",
+        vertical: "所选卡片已垂直中线对齐",
         left: "所选卡片已左对齐",
         center: "所选卡片已水平居中",
         right: "所选卡片已右对齐",
@@ -1568,6 +1568,7 @@ export const CanvasView = memo(function CanvasView({
         bottom: "所选卡片已底端对齐",
         "distribute-h": "所选卡片已水平等距分布",
         "distribute-v": "所选卡片已垂直等距分布",
+        circle: `已将 ${selNodes.length} 张卡片均匀排布为环形`,
       };
 
       pushHistory({ ...currentData, nodes: updatedNodes });
@@ -3086,6 +3087,24 @@ export const CanvasView = memo(function CanvasView({
                       <span style={{ fontWeight: 600 }}>{label}</span>
                     </div>
                   ))}
+
+                  {selectedNodeIds.size >= 3 && (
+                    <>
+                      <div className="canvas-ctx-divider" />
+                      <div className="canvas-ctx-section-label">环形排布</div>
+                      <div
+                        className="canvas-ctx-item"
+                        title="将选中卡片沿圆周均匀排布，配合「环形闭环连线」即可得到整齐的闭环"
+                        onClick={() => {
+                          handleAlignSelected("circle");
+                          setShowAlignMenu(false);
+                        }}
+                      >
+                        <RotateCw size={13} color="#a855f7" />
+                        <span style={{ fontWeight: 600 }}>环形对齐 (圆周等分)</span>
+                      </div>
+                    </>
+                  )}
 
                   <div className="canvas-ctx-divider" />
                   <div className="canvas-ctx-section-label">边缘对齐</div>
@@ -5949,6 +5968,17 @@ export const CanvasView = memo(function CanvasView({
                         <AlignCenter size={13} color="#0284c7" />
                         <span style={{ fontWeight: 600 }}>垂直中线对齐 (中心 X 对齐)</span>
                       </div>
+
+                      {selectedNodeIds.size >= 3 && (
+                        <div
+                          className="canvas-ctx-item"
+                          onClick={() => handleAlignSelected("circle")}
+                          title="将选中卡片沿圆周均匀排布"
+                        >
+                          <RotateCw size={13} color="#a855f7" />
+                          <span style={{ fontWeight: 600 }}>🔄 环形对齐 (圆周等分)</span>
+                        </div>
+                      )}
 
                       <div className="canvas-ctx-item" onClick={() => handleAlignSelected("left")}>
                         <AlignLeft size={13} />
