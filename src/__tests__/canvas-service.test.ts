@@ -29,6 +29,7 @@ import {
   projectPointOntoRing,
   computeGridLayout,
   syncGridEdges,
+  syncLoopEdgeGeometry,
   resizeGridSpacing,
   disconnectNodeEdges,
   spawnMultipleBranches,
@@ -1404,6 +1405,104 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
     for (const e of clearedEdges) {
       expect(e.ringCenter).toBeUndefined();
       expect(e.ringRadius).toBeUndefined();
+    }
+  });
+
+  it("prefers a rectangular grid over a circle when both tests match", () => {
+    // A 2x2 square satisfies BOTH tests: its four corners are exactly
+    // equidistant from the centroid (circle) and it is a complete grid. The
+    // grid must win, otherwise the loop would be drawn as an arc.
+    const cards: CanvasTextNode[] = [1, 2, 3, 4].map((i) => ({
+      id: `g${i}`,
+      type: "text" as const,
+      text: `Card ${i}`,
+      x: i * 80,
+      y: i * 60,
+      width: 180,
+      height: 120,
+    }));
+    const ids = cards.map((n) => n.id);
+    const gridNodes = alignNodesInGrid(cards, ids, { columns: 2, gapX: 60, gapY: 60 });
+
+    // Sanity: this layout is genuinely ambiguous
+    expect(computeRingLayout(gridNodes)).not.toBeNull();
+    expect(computeGridLayout(gridNodes)).not.toBeNull();
+
+    const loopEdges = connectLoopNodes(gridNodes, [], "bezier", true);
+    expect(loopEdges).toHaveLength(4);
+    for (const e of loopEdges) {
+      expect(e.gridPath).toBe(true);
+      expect(e.ringCenter).toBeUndefined();
+      expect(e.ringRadius).toBeUndefined();
+    }
+
+    // Even if stale arc metadata sneaks in, the sync clears it in favour of
+    // the rectangular frame.
+    const contaminated = loopEdges.map((e) => ({
+      ...e,
+      ringCenter: { x: 0, y: 0 },
+      ringRadius: 999,
+    }));
+    const cleaned = syncLoopEdgeGeometry(gridNodes, contaminated);
+    for (const e of cleaned) {
+      expect(e.gridPath).toBe(true);
+      expect(e.ringCenter).toBeUndefined();
+    }
+  });
+
+  it("recomputes ring geometry so a closed loop follows its cards", () => {
+    const cards: CanvasTextNode[] = [1, 2, 3, 4, 5, 6].map((i) => ({
+      id: `f${i}`,
+      type: "text" as const,
+      text: `Card ${i}`,
+      x: i * 200,
+      y: 0,
+      width: 160,
+      height: 100,
+    }));
+    const ids = cards.map((n) => n.id);
+
+    const ringNodes = alignNodesInCircle(cards, ids);
+    const loopEdges = connectLoopNodes(ringNodes, [], "bezier", true);
+    const centerBefore = loopEdges[0].ringCenter!;
+    expect(centerBefore).toBeDefined();
+
+    // Translate the whole ring: the stored centre must move with the cards,
+    // otherwise the arc stays behind and visibly detaches.
+    const moved = ringNodes.map((n) => ({ ...n, x: n.x + 250, y: n.y + 130 }));
+    const synced = syncLoopEdgeGeometry(moved, loopEdges);
+    for (const e of synced) {
+      expect(e.ringCenter!.x).toBeCloseTo(centerBefore.x + 250, 3);
+      expect(e.ringCenter!.y).toBeCloseTo(centerBefore.y + 130, 3);
+      expect(e.ringRadius).toBeCloseTo(loopEdges[0].ringRadius!, 3);
+    }
+  });
+
+  it("clears loop metadata once the cards no longer form a ring or a grid", () => {
+    const cards: CanvasTextNode[] = [1, 2, 3, 4, 5, 6].map((i) => ({
+      id: `z${i}`,
+      type: "text" as const,
+      text: `Card ${i}`,
+      x: i * 200,
+      y: 0,
+      width: 160,
+      height: 100,
+    }));
+    const ids = cards.map((n) => n.id);
+    const ringNodes = alignNodesInCircle(cards, ids);
+    const loopEdges = connectLoopNodes(ringNodes, [], "bezier", true);
+
+    // Scatter them into a free-form layout
+    const scattered = ringNodes.map((n, i) => ({
+      ...n,
+      x: n.x + i * 31,
+      y: n.y + i * 47,
+    }));
+    const synced = syncLoopEdgeGeometry(scattered, loopEdges);
+    for (const e of synced) {
+      expect(e.ringCenter).toBeUndefined();
+      expect(e.ringRadius).toBeUndefined();
+      expect(e.gridPath).toBeUndefined();
     }
   });
 

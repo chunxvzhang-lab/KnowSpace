@@ -87,8 +87,7 @@ import {
   getSourceNodeEdgeColor,
   computeSourceDisplayColorMap,
   expandLoopEdgeSelection,
-  syncRingEdges,
-  syncGridEdges,
+  syncLoopEdgeGeometry,
   computeGridLayout,
   resizeGridSpacing,
   projectPointOntoRing,
@@ -1577,12 +1576,11 @@ export const CanvasView = memo(function CanvasView({
       if (selNodes.length < 2) return;
 
       const updatedNodes = alignNodes(currentData.nodes, selectedNodeIds, direction);
-      // Keep ring arcs in sync: circle alignment stamps a circular arc onto the
-      // loop edges, while any other alignment clears stale ring metadata.
-      // Grid alignment additionally marks loop edges as orthogonal straight
-      // segments so a rectangular layout reads as a clean rectangular frame.
-      const ringSynced = syncRingEdges(updatedNodes, currentData.edges, selectedNodeIds);
-      const updatedEdges = syncGridEdges(updatedNodes, ringSynced, selectedNodeIds);
+      // Keep loop geometry in sync with the new positions: circle alignment
+      // stamps a circular arc onto the loop edges, grid alignment marks them as
+      // orthogonal straight segments so a rectangular layout reads as a clean
+      // frame, and any other alignment clears stale metadata.
+      const updatedEdges = syncLoopEdgeGeometry(updatedNodes, currentData.edges);
 
       const toastMap: Record<CanvasAlignDirection, string> = {
         horizontal: "所选卡片已水平中线对齐",
@@ -2443,31 +2441,41 @@ export const CanvasView = memo(function CanvasView({
                   gs.baseGapX,
                   gs.baseGapY
                 );
-                const gridData = { ...prev, nodes: workingNodes };
+                const gridData = {
+                  ...prev,
+                  nodes: workingNodes,
+                  // Keep loop metadata glued to the re-flowed cards
+                  edges: syncLoopEdgeGeometry(workingNodes, prev.edges),
+                };
                 latestDataRef.current = gridData;
                 return gridData;
               }
 
+              const movedNodes = workingNodes.map((n) => {
+                if (n.id === pos.updatedId) {
+                  return {
+                    ...n,
+                    x: Math.round(pos.startX + pos.dx),
+                    y: Math.round(pos.startY + pos.dy),
+                  };
+                }
+                const contained = pos.containedMap.get(n.id);
+                if (contained) {
+                  return {
+                    ...n,
+                    x: Math.round(contained.startX + pos.dx),
+                    y: Math.round(contained.startY + pos.dy),
+                  };
+                }
+                return n;
+              });
+
               const nextData = {
                 ...prev,
-                nodes: workingNodes.map((n) => {
-                  if (n.id === pos.updatedId) {
-                    return {
-                      ...n,
-                      x: Math.round(pos.startX + pos.dx),
-                      y: Math.round(pos.startY + pos.dy),
-                    };
-                  }
-                  const contained = pos.containedMap.get(n.id);
-                  if (contained) {
-                    return {
-                      ...n,
-                      x: Math.round(contained.startX + pos.dx),
-                      y: Math.round(contained.startY + pos.dy),
-                    };
-                  }
-                  return n;
-                }),
+                nodes: movedNodes,
+                // Recompute ring/grid metadata against the new card positions
+                // so a closed loop stays attached to its cards while dragged.
+                edges: syncLoopEdgeGeometry(movedNodes, prev.edges),
               };
               latestDataRef.current = nextData;
               return nextData;
@@ -2656,12 +2664,8 @@ export const CanvasView = memo(function CanvasView({
           }
 
           // Re-sync straight/arc metadata with the settled layout so the
-          // rendered frame matches the grid the user just resized.
-          const settledEdges = syncGridEdges(
-            finalNodes,
-            syncRingEdges(finalNodes, latestDataRef.current.edges, selectedNodeIds),
-            selectedNodeIds
-          );
+          // rendered frame matches where the cards ended up.
+          const settledEdges = syncLoopEdgeGeometry(finalNodes, latestDataRef.current.edges);
 
           const finalData = {
             ...latestDataRef.current,
@@ -3547,9 +3551,10 @@ export const CanvasView = memo(function CanvasView({
             const toSide = edge.toSide || optSides.toSide;
             const p1 = getNodeAnchorPoint(fromNode, fromSide);
             const p2 = getNodeAnchorPoint(toNode, toSide);
-            const ringArc = getEdgeRing(edge);
             // A rectangular grid layout connects its cards with straight
-            // orthogonal segments so the loop reads as a rectangular frame.
+            // orthogonal segments so the loop reads as a rectangular frame;
+            // any leftover arc metadata is ignored in that case.
+            const ringArc = edge.gridPath ? undefined : getEdgeRing(edge);
             const effectiveStyle = edge.gridPath ? "straight" : edge.style;
             const pathData = computeEdgePath(p1, fromSide, p2, toSide, effectiveStyle, edge.stepOffset, ringArc);
             // On a ring the origin dot must sit on the circle, not on the raw

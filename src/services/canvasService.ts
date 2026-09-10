@@ -1471,12 +1471,17 @@ export function connectLoopNodes(
   const count = orderedNodes.length;
   const usedIncomingSides = new Map<string, CanvasNodeSide>();
 
-  // Detect whether these cards are actually arranged on a circle. If they are,
-  // every segment becomes a true arc so the loop is a perfectly round ring.
-  const ringLayout = computeRingLayout(orderedNodes);
-  // Detect a rectangular grid layout: its loop is then drawn with straight
+  // Detect a rectangular grid layout first: its loop is drawn with straight
   // orthogonal segments, producing a clean rectangular frame.
-  const gridLayout = ringLayout ? null : computeGridLayout(orderedNodes);
+  //
+  // Grid must win over ring: the four corners of a 2x2 rectangle are exactly
+  // equidistant from their centroid, so a rectangular arrangement also
+  // satisfies the "all cards on a common circle" test. Checking the grid first
+  // keeps such a layout rectangular instead of turning it into a circle.
+  const gridLayout = computeGridLayout(orderedNodes);
+  // Otherwise, if the cards really do sit on a circle, every segment becomes a
+  // true arc so the loop is a perfectly round ring.
+  const ringLayout = gridLayout ? null : computeRingLayout(orderedNodes);
 
   // Unified color for the whole loop so that all ring segments visually
   // belong to a single semantic flow, regardless of which node is "from".
@@ -1943,8 +1948,10 @@ export function exportCanvasToSvg(
     const toSide = edge.toSide || optSides.toSide;
     const p1 = getNodeAnchorPoint(from, fromSide);
     const p2 = getNodeAnchorPoint(to, toSide);
+    // A grid edge is always a straight orthogonal segment, so stale arc
+    // metadata (if any) is ignored — matching the on-screen renderer exactly.
     const ringArc =
-      edge.ringCenter && edge.ringRadius
+      !edge.gridPath && edge.ringCenter && edge.ringRadius
         ? { center: edge.ringCenter, radius: edge.ringRadius }
         : undefined;
     const exportStyle = edge.gridPath ? "straight" : edge.style;
@@ -2691,7 +2698,12 @@ export function syncRingEdges(
   }
   const loopNodes = nodes.filter((n) => loopNodeIds.has(n.id));
 
-  const layout = computeRingLayout(loopNodes);
+  // A rectangular grid also satisfies the circle test — the four corners of a
+  // 2x2 rectangle are exactly equidistant from their centroid — so the grid
+  // must take precedence here as well. Otherwise a rectangular loop would be
+  // stamped as an arc and stop being a rectangle.
+  const isGrid = computeGridLayout(loopNodes) !== null;
+  const layout = isGrid ? null : computeRingLayout(loopNodes);
 
   let changed = false;
   const next = edges.map((e) => {
@@ -2714,6 +2726,130 @@ export function syncRingEdges(
       return rest as CanvasEdge;
     }
     return e;
+  });
+
+  return changed ? next : edges;
+}
+
+/**
+ * Re-synchronises the geometric metadata (ring arc / grid straight line) of
+ * every loop edge against the current node positions.
+ *
+ * This is what keeps a closed loop glued to its cards while they are dragged:
+ * the ring centre/radius is stored on the edge, so it has to be recomputed
+ * whenever the cards move — otherwise the arc keeps pivoting around a stale
+ * centre and visibly detaches from the cards.
+ *
+ * Loops are grouped into independent connected components first, so two
+ * unrelated rings on the same canvas never average into each other. Within a
+ * component, a rectangular grid takes precedence over a circle (a 2x2
+ * rectangle satisfies both tests); failing both, the metadata is cleared so
+ * the edge falls back to a plain bezier/step/straight path.
+ */
+export function syncLoopEdgeGeometry(
+  nodes: CanvasNode[],
+  edges: CanvasEdge[]
+): CanvasEdge[] {
+  const loopIds = getLoopEdgeIds(edges);
+  if (loopIds.size === 0) return edges;
+
+  const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+  const loopEdges = edges.filter((e) => loopIds.has(e.id));
+
+  // Union-Find to isolate independent loops
+  const parent = new Map<string, string>();
+  const find = (x: string): string => {
+    let root = parent.get(x) ?? x;
+    while (root !== (parent.get(root) ?? root)) {
+      root = parent.get(root) ?? root;
+    }
+    let cur = x;
+    while (cur !== root) {
+      const next = parent.get(cur) ?? cur;
+      parent.set(cur, root);
+      cur = next;
+    }
+    return root;
+  };
+  const union = (a: string, b: string) => {
+    const ra = find(a);
+    const rb = find(b);
+    if (ra !== rb) parent.set(ra, rb);
+  };
+
+  for (const e of loopEdges) {
+    if (!parent.has(e.fromNode)) parent.set(e.fromNode, e.fromNode);
+    if (!parent.has(e.toNode)) parent.set(e.toNode, e.toNode);
+    union(e.fromNode, e.toNode);
+  }
+
+  const groups = new Map<string, CanvasEdge[]>();
+  for (const e of loopEdges) {
+    const root = find(e.fromNode);
+    const list = groups.get(root) || [];
+    list.push(e);
+    groups.set(root, list);
+  }
+
+  type LoopMeta = { grid: boolean; center?: { x: number; y: number }; radius?: number };
+  const meta = new Map<string, LoopMeta>();
+
+  for (const [root, groupEdges] of groups.entries()) {
+    const ids = new Set<string>();
+    for (const e of groupEdges) {
+      ids.add(e.fromNode);
+      ids.add(e.toNode);
+    }
+    const groupNodes = [...ids]
+      .map((id) => nodeMap.get(id))
+      .filter((n): n is CanvasNode => Boolean(n));
+
+    if (computeGridLayout(groupNodes)) {
+      meta.set(root, { grid: true });
+      continue;
+    }
+    const ring = computeRingLayout(groupNodes);
+    if (ring) {
+      meta.set(root, { grid: false, center: ring.center, radius: ring.radius });
+    } else {
+      meta.set(root, { grid: false });
+    }
+  }
+
+  let changed = false;
+  const next = edges.map((e) => {
+    if (!loopIds.has(e.id)) return e;
+    const info = meta.get(find(e.fromNode));
+    if (!info) return e;
+
+    if (info.grid) {
+      // Straight orthogonal segment, no arc metadata
+      if (e.gridPath === true && !e.ringCenter && e.ringRadius === undefined) return e;
+      changed = true;
+      const { ringCenter: _c, ringRadius: _r, ...rest } = e;
+      return { ...rest, gridPath: true } as CanvasEdge;
+    }
+
+    if (info.center) {
+      // True arc, refreshed against the current card positions
+      if (
+        e.gridPath === undefined &&
+        e.ringCenter?.x === info.center.x &&
+        e.ringCenter?.y === info.center.y &&
+        e.ringRadius === info.radius
+      ) {
+        return e;
+      }
+      changed = true;
+      const { gridPath: _g, ...rest } = e;
+      return { ...rest, ringCenter: info.center, ringRadius: info.radius } as CanvasEdge;
+    }
+
+    // Plain curve
+    if (e.gridPath === undefined && !e.ringCenter && e.ringRadius === undefined) return e;
+    changed = true;
+    const { gridPath: _g, ringCenter: _c, ringRadius: _r, ...rest } = e;
+    return rest as CanvasEdge;
   });
 
   return changed ? next : edges;
