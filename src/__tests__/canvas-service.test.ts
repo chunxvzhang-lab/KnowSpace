@@ -406,6 +406,30 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
     expect(out).toContain('type="checkbox"');
   });
 
+  it("routes clipboard copy through the main process when no PNG can be produced", async () => {
+    const data: CanvasData = {
+      nodes: [{ id: "1", type: "text", text: "Clip", x: 0, y: 0, width: 120, height: 80 }],
+      edges: [],
+    };
+
+    // jsdom has no canvas 2D context, so exportCanvasToPngBlob yields an SVG —
+    // exactly the situation where the previous implementation silently
+    // returned false and copying did nothing at all. The main process must
+    // take over via offscreen rendering.
+    const copyCanvasAsImage = vi.fn().mockResolvedValue({ success: true });
+    (window as any).knowSpaceDesktop = { copyCanvasAsImage };
+
+    expect(await copyCanvasImageToClipboard(data)).toBe(true);
+    expect(copyCanvasAsImage).toHaveBeenCalled();
+    const passedSvg = copyCanvasAsImage.mock.calls[0][0].svg as string;
+    expect(passedSvg).toContain("<svg");
+
+    delete (window as any).knowSpaceDesktop;
+
+    // With no bridge available it degrades to a plain false, never a throw
+    expect(await copyCanvasImageToClipboard(data)).toBe(false);
+  });
+
   it("clamps the export scale so oversized boards cannot crash the renderer", () => {
     // Normal board: the requested scale is honoured
     expect(resolveExportScale(1000, 800, 2)).toBeCloseTo(2, 5);

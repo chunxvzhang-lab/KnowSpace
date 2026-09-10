@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, Tray, dialog, ipcMain, nativeTheme, shell, globalShortcut, screen, nativeImage } = require("electron");
+const { app, BrowserWindow, Menu, Tray, dialog, ipcMain, nativeTheme, shell, globalShortcut, screen, nativeImage, clipboard } = require("electron");
 const fs = require("node:fs");
 const path = require("node:path");
 const { fileURLToPath, pathToFileURL } = require("node:url");
@@ -1924,6 +1924,148 @@ ipcMain.handle("bookmd:export-svg-as-png", async (event, request = {}) => {
     if (offscreenWin && !offscreenWin.isDestroyed()) {
       offscreenWin.destroy();
     }
+  }
+});
+
+/**
+ * Renders an SVG document in an offscreen window and returns the PNG bytes.
+ *
+ * This deliberately bypasses the renderer's <canvas> pipeline. `capturePage()`
+ * composites the page inside Chromium itself, so it succeeds even when the SVG
+ * references resources that would "taint" a canvas and make `toBlob()` refuse
+ * to run — which is exactly why exporting a board whose cards embed local or
+ * remote images used to produce an SVG instead of a PNG.
+ */
+async function renderSvgToPngBuffer(svgMarkup, scale = 2) {
+  const viewBoxMatch =
+    /viewBox\s*=\s*"([-\d.eE]+)\s+([-\d.eE]+)\s+([\d.eE]+)\s+([\d.eE]+)"/i.exec(svgMarkup);
+  let naturalWidth = viewBoxMatch ? parseFloat(viewBoxMatch[3]) : 0;
+  let naturalHeight = viewBoxMatch ? parseFloat(viewBoxMatch[4]) : 0;
+
+  if (!(naturalWidth > 0)) {
+    const wm = /\bwidth\s*=\s*"([\d.]+)/i.exec(svgMarkup);
+    naturalWidth = wm ? parseFloat(wm[1]) : 1600;
+  }
+  if (!(naturalHeight > 0)) {
+    const hm = /\bheight\s*=\s*"([\d.]+)/i.exec(svgMarkup);
+    naturalHeight = hm ? parseFloat(hm[1]) : 1200;
+  }
+
+  // Same pixel budget the renderer enforces, so huge boards stay affordable.
+  const maxByPixels = Math.sqrt(24000000 / (naturalWidth * naturalHeight));
+  const safeScale = Math.max(1, Math.min(scale, 3.5, maxByPixels));
+  const targetWidth = Math.max(320, Math.min(Math.round(naturalWidth * safeScale), 4800));
+  const targetHeight = Math.max(240, Math.min(Math.round(naturalHeight * safeScale), 4800));
+
+  const offscreenWin = new BrowserWindow({
+    width: targetWidth,
+    height: targetHeight,
+    show: false,
+    webPreferences: { offscreen: true, contextIsolation: false },
+  });
+
+  try {
+    const pageHtml = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+  html, body { margin: 0; padding: 0; overflow: hidden; background: transparent; }
+  svg { display: block; shape-rendering: geometricPrecision; text-rendering: geometricPrecision; }
+</style></head><body>${svgMarkup}</body></html>`;
+
+    // Written through document.write rather than a data: URL so that very
+    // large boards (inlined base64 images) are not limited by URL length.
+    await offscreenWin.loadURL("about:blank");
+    await offscreenWin.webContents.executeJavaScript(
+      `document.open();document.write(${JSON.stringify(pageHtml)});document.close();true;`
+    );
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    // Pin the drawing to the exact capture resolution
+    await offscreenWin.webContents.executeJavaScript(`
+      (() => {
+        const svg = document.querySelector('svg');
+        if (!svg) return false;
+        svg.setAttribute('width', '${targetWidth}');
+        svg.setAttribute('height', '${targetHeight}');
+        svg.style.width = '${targetWidth}px';
+        svg.style.height = '${targetHeight}px';
+        return true;
+      })()
+    `);
+    await new Promise((resolve) => setTimeout(resolve, 250));
+
+    const image = await offscreenWin.webContents.capturePage({
+      x: 0,
+      y: 0,
+      width: targetWidth,
+      height: targetHeight,
+    });
+    return image.toPNG();
+  } finally {
+    if (offscreenWin && !offscreenWin.isDestroyed()) offscreenWin.destroy();
+  }
+}
+
+ipcMain.handle("bookmd:export-canvas-as-png", async (event, request = {}) => {
+  const targetWin = getWindowFromEvent(event);
+  const { svg, filename = "KnowSpace白板", scale = 2 } = request;
+  if (!svg) return { success: false, message: "缺少白板 SVG 数据" };
+
+  const cleanFilename = (filename || "KnowSpace白板").replace(/\.(svg|png)$/i, "");
+  const defaultPath = path.join(app.getPath("downloads"), `${cleanFilename}.png`);
+
+  const saveResult = await dialog.showSaveDialog(targetWin || undefined, {
+    title: "导出白板为 PNG 高清图片",
+    defaultPath,
+    filters: [
+      { name: "PNG 高清图片 (*.png)", extensions: ["png"] },
+      { name: "所有文件 (*.*)", extensions: ["*"] },
+    ],
+  });
+
+  if (saveResult.canceled || !saveResult.filePath) return { canceled: true };
+
+  try {
+    const pngBuffer = await renderSvgToPngBuffer(svg, scale);
+    await fs.promises.writeFile(saveResult.filePath, pngBuffer);
+    return { success: true, filePath: saveResult.filePath };
+  } catch (err) {
+    console.error("离屏渲染白板 PNG 失败:", err);
+    return { success: false, message: err.message };
+  }
+});
+
+ipcMain.handle("bookmd:copy-canvas-as-image", async (event, request = {}) => {
+  const { svg, scale = 2 } = request;
+  if (!svg) return { success: false, message: "缺少白板 SVG 数据" };
+
+  try {
+    const pngBuffer = await renderSvgToPngBuffer(svg, scale);
+    const image = nativeImage.createFromBuffer(pngBuffer);
+    if (image.isEmpty()) return { success: false, message: "生成的图片为空" };
+    clipboard.writeImage(image);
+    return { success: true };
+  } catch (err) {
+    console.error("离屏渲染并复制白板图片失败:", err);
+    return { success: false, message: err.message };
+  }
+});
+
+ipcMain.handle("bookmd:copy-png-to-clipboard", async (event, request = {}) => {
+  const { buffer } = request;
+  if (!buffer) return { success: false, message: "缺少图片数据" };
+
+  try {
+    // The native clipboard does not need window focus or a user gesture, both
+    // of which make navigator.clipboard.write() unreliable inside Electron.
+    const image = nativeImage.createFromBuffer(
+      Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer)
+    );
+    if (image.isEmpty()) return { success: false, message: "图片数据无效" };
+    clipboard.writeImage(image);
+    return { success: true };
+  } catch (err) {
+    console.error("写入系统剪贴板失败:", err);
+    return { success: false, message: err.message };
   }
 });
 

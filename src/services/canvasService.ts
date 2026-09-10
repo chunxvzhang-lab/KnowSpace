@@ -2623,30 +2623,30 @@ export async function exportCanvasToPngBlob(
   const safeSvg = await sanitizeSvgResources(svgString);
 
   const rasterise = async (svg: string): Promise<Blob> => {
-    const svgBlob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
-    const url = URL.createObjectURL(svgBlob);
+    // A data: URL rather than a blob: URL — this is the form the (working)
+    // mermaid export path has always used, and Chromium treats it as a fully
+    // self-contained document rather than resolving its contents against the
+    // page origin.
+    const dataUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    const img = await loadImageForExport(dataUrl);
+
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(baseWidth * scale));
+    canvas.height = Math.max(1, Math.round(baseHeight * scale));
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("无法创建 Canvas 2D 上下文");
+
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
     try {
-      const img = await loadImageForExport(url);
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.max(1, Math.round(baseWidth * scale));
-      canvas.height = Math.max(1, Math.round(baseHeight * scale));
-
-      const ctx = canvas.getContext("2d");
-      if (!ctx) throw new Error("无法创建 Canvas 2D 上下文");
-
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = "high";
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-      try {
-        return await canvasToPngBlob(canvas);
-      } finally {
-        // Release the backing store right away — a 24 MP canvas pins ~96 MB.
-        canvas.width = 0;
-        canvas.height = 0;
-      }
+      return await canvasToPngBlob(canvas);
     } finally {
-      URL.revokeObjectURL(url);
+      // Release the backing store right away — a 24 MP canvas pins ~96 MB.
+      canvas.width = 0;
+      canvas.height = 0;
     }
   };
 
@@ -2717,23 +2717,43 @@ export async function downloadCanvasAsImage(
     return "svg";
   }
 
-  // PNG export. Rasterisation is the only step that the browser's security
-  // model can veto, so it gets an explicit fallback: rather than dead-ending
-  // the user with an error, hand them the vector file, which has no such
-  // restriction and still contains the whole board.
-  let blob: Blob;
-  try {
-    blob = await exportCanvasToPngBlob(data, options);
-  } catch (err) {
-    console.warn("PNG 栅格化失败，已降级为 SVG 导出:", err);
-    saveSvg();
-    return "svg";
-  }
-
   const desktop =
     typeof window !== "undefined"
       ? window.knowSpaceDesktop ?? window.bookMDDesktop
       : undefined;
+
+  const buildExportSvg = (): string =>
+    serializeSvgForExport(valueBooleanAttributes(exportCanvasToSvg(data, options)));
+
+  // PNG export. Rasterising in the renderer uses a <canvas>, which the
+  // browser's security model can veto outright. If that happens we do NOT
+  // silently hand back an SVG — the board is re-rendered in an offscreen
+  // window in the main process instead, where capturePage() composites inside
+  // Chromium and is not bound by the canvas tainting rules.
+  let blob: Blob | null = null;
+  try {
+    blob = await exportCanvasToPngBlob(data, options);
+  } catch (err) {
+    console.warn("渲染进程栅格化失败，改用主进程离屏渲染:", err);
+  }
+
+  if (!blob && desktop?.exportCanvasAsPng) {
+    const res = await desktop.exportCanvasAsPng({
+      svg: buildExportSvg(),
+      filename: `${cleanName}.png`,
+      scale: 2,
+    });
+    if (res?.canceled) return "canceled";
+    if (res?.success) return "png";
+    console.warn("主进程离屏渲染同样失败:", res?.message);
+  }
+
+  if (!blob) {
+    // Every rasterisation route is exhausted — hand over the vector file
+    // rather than an error dialog, but report it honestly.
+    saveSvg();
+    return "svg";
+  }
 
   // Preferred path: hand the raw bytes to the main process. Passing a base64
   // data URL instead meant the payload was duplicated as a string and then
@@ -2777,25 +2797,60 @@ export async function copyCanvasImageToClipboard(
   data: CanvasData,
   options?: CanvasExportOptions
 ): Promise<boolean> {
+  const desktop =
+    typeof window !== "undefined"
+      ? window.knowSpaceDesktop ?? window.bookMDDesktop
+      : undefined;
+
+  let blob: Blob | null = null;
   try {
-    const blob = await exportCanvasToPngBlob(data, options);
-    if (blob.type !== "image/png") return false;
-    if (typeof navigator === "undefined" || !navigator.clipboard) return false;
-    if (typeof ClipboardItem === "undefined") return false;
-
-    // Clipboards in Chromium require a PNG; the Blob is already one, so there
-    // is no need to round-trip it through a data URL and fetch() first.
-    const pngBlob =
-      blob.type === "image/png"
-        ? blob
-        : new Blob([await blob.arrayBuffer()], { type: "image/png" });
-
-    await navigator.clipboard.write([new ClipboardItem({ "image/png": pngBlob })]);
-    return true;
+    blob = await exportCanvasToPngBlob(data, options);
   } catch (err) {
-    console.error("复制白板图片至剪贴板失败:", err);
-    return false;
+    console.warn("渲染进程栅格化失败，改由主进程离屏渲染后复制:", err);
   }
+
+  if (blob && blob.type === "image/png") {
+    // The native clipboard is preferred: navigator.clipboard.write() needs the
+    // window to be focused and a live user gesture, both of which are easy to
+    // lose inside Electron — which is why copying used to do nothing at all.
+    if (desktop?.copyPngToClipboard) {
+      try {
+        const res = await desktop.copyPngToClipboard({ buffer: await blob.arrayBuffer() });
+        if (res?.success) return true;
+      } catch (err) {
+        console.warn("原生剪贴板写入失败，回退到 Web API:", err);
+      }
+    }
+
+    if (
+      typeof navigator !== "undefined" &&
+      navigator.clipboard &&
+      typeof ClipboardItem !== "undefined"
+    ) {
+      try {
+        await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+        return true;
+      } catch (err) {
+        console.warn("Web 剪贴板写入失败:", err);
+      }
+    }
+  }
+
+  // Last resort: let the main process render the board offscreen and put the
+  // result on the clipboard itself. capturePage() is not subject to the canvas
+  // tainting rules, so this still works when the renderer path was blocked.
+  if (desktop?.copyCanvasAsImage) {
+    try {
+      const svg = serializeSvgForExport(valueBooleanAttributes(exportCanvasToSvg(data, options)));
+      const res = await desktop.copyCanvasAsImage({ svg, scale: 2 });
+      if (res?.success) return true;
+      console.warn("离屏渲染复制失败:", res?.message);
+    } catch (err) {
+      console.warn("离屏渲染复制异常:", err);
+    }
+  }
+
+  return false;
 }
 
 /**

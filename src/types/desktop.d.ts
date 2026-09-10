@@ -134,6 +134,25 @@ export type KnowSpaceDesktopAPI = {
   readFileAsDataUrl?: (params: {
     filePath: string;
   }) => Promise<{ success?: boolean; dataUrl?: string; message?: string }>;
+  /**
+   * Rasterises the board SVG in an offscreen window in the main process.
+   * `capturePage()` composites inside Chromium, so it is not subject to the
+   * canvas tainting rules that can make `toBlob()` fail in the renderer.
+   */
+  exportCanvasAsPng?: (params: {
+    svg: string;
+    filename?: string;
+    scale?: number;
+  }) => Promise<{ success?: boolean; canceled?: boolean; filePath?: string; message?: string }>;
+  /** Same offscreen rendering path, but writes straight to the clipboard. */
+  copyCanvasAsImage?: (params: {
+    svg: string;
+    scale?: number;
+  }) => Promise<{ success?: boolean; message?: string }>;
+  /** Writes already-rasterised PNG bytes to the native clipboard. */
+  copyPngToClipboard?: (params: {
+    buffer: ArrayBuffer | Uint8Array;
+  }) => Promise<{ success?: boolean; message?: string }>;
   openInNewWindow?: (absolutePath: string) => Promise<boolean>;
   printToPdf?: (params?: {
     title?: string;
