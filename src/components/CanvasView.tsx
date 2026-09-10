@@ -67,6 +67,7 @@ import {
   computeEdgePath,
   extractCanvasToMarkdown,
   CANVAS_COLOR_PALETTES,
+  CANVAS_STANDARD_COLOR_IDS,
   CANVAS_RELATION_PRESETS,
   isNodeInsideGroup,
   toggleChecklistInMarkdown,
@@ -93,6 +94,7 @@ import {
   computeRingSpacingLayout,
   resizeRingSpacing,
   computeMinRingRadius,
+  isPointInsideNodeHull,
   alignNodesInCircle,
   projectPointOntoRing,
   downloadCanvasAsImage,
@@ -610,6 +612,19 @@ export const CanvasView = memo(function CanvasView({
     mouseStartY: number;
   } | null>(null);
 
+  /**
+   * Dragging the hollow middle of a multi-selection (the empty centre of a
+   * ring or a grid) moves every selected card together, keeping their relative
+   * spacing intact — the cards neither scatter nor drag the canvas behind them.
+   */
+  const groupDragRef = useRef<{
+    startClientX: number;
+    startClientY: number;
+    startById: Map<string, { id: string; startX: number; startY: number }>;
+  } | null>(null);
+  const rafGroupDragIdRef = useRef<number | null>(null);
+  const latestGroupDragPosRef = useRef<{ dx: number; dy: number } | null>(null);
+
   const latestDataRef = useRef(data);
   latestDataRef.current = data;
   const viewportRef = useRef(viewport);
@@ -858,6 +873,34 @@ export const CanvasView = memo(function CanvasView({
     if (isBoxSelectMode || isModifier) {
       handleStartBoxSelection(e, isModifier);
       return;
+    }
+
+    // Clicking the hollow middle of a multi-selection — the empty centre of a
+    // ring or a grid — grabs the whole group and moves it. Without this the
+    // press would fall through to the pan below, dragging the canvas instead,
+    // which is never what the user means right after arranging and selecting
+    // those cards.
+    if (e.button === 0 && selectedNodeIds.size >= 3 && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const zoom = viewportRef.current.zoom;
+      const canvasX = (e.clientX - rect.left - viewportRef.current.panX) / zoom;
+      const canvasY = (e.clientY - rect.top - viewportRef.current.panY) / zoom;
+      const selected = latestDataRef.current.nodes.filter(
+        (n) => selectedNodeIds.has(n.id) && n.type !== "group"
+      );
+
+      if (isPointInsideNodeHull({ x: canvasX, y: canvasY }, selected)) {
+        groupDragRef.current = {
+          startClientX: e.clientX,
+          startClientY: e.clientY,
+          startById: new Map(
+            selected.map((n) => [n.id, { id: n.id, startX: n.x, startY: n.y }])
+          ),
+        };
+        hasDraggedRef.current = false;
+        e.preventDefault();
+        return;
+      }
     }
 
     // Normal pan: do not clear selection immediately; clear only on mouseup if canvas did not move
@@ -2380,6 +2423,53 @@ export const CanvasView = memo(function CanvasView({
         return;
       }
 
+      // 0. Group drag from the hollow middle of a multi-selection.
+      // Every selected card moves by the same offset, so the arrangement keeps
+      // its exact shape and spacing.
+      if (groupDragRef.current) {
+        const group = groupDragRef.current;
+        const zoom = viewportRef.current.zoom;
+        const dx = (e.clientX - group.startClientX) / zoom;
+        const dy = (e.clientY - group.startClientY) / zoom;
+
+        if (
+          Math.hypot(e.clientX - group.startClientX, e.clientY - group.startClientY) > 3
+        ) {
+          hasDraggedRef.current = true;
+        }
+        latestGroupDragPosRef.current = { dx, dy };
+
+        if (!rafGroupDragIdRef.current) {
+          rafGroupDragIdRef.current = requestAnimationFrame(() => {
+            rafGroupDragIdRef.current = null;
+            const pos = latestGroupDragPosRef.current;
+            const active = groupDragRef.current;
+            if (!pos || !active) return;
+
+            setData((prev) => {
+              const nextNodes = prev.nodes.map((n) => {
+                const s = active.startById.get(n.id);
+                return s
+                  ? {
+                      ...n,
+                      x: Math.round(s.startX + pos.dx),
+                      y: Math.round(s.startY + pos.dy),
+                    }
+                  : n;
+              });
+              const nextData = {
+                ...prev,
+                nodes: nextNodes,
+                edges: syncLoopEdgeGeometry(nextNodes, prev.edges),
+              };
+              latestDataRef.current = nextData;
+              return nextData;
+            });
+          });
+        }
+        return;
+      }
+
       // 0. Marquee Box Selection
       if (selectionBoxRef.current && containerRef.current) {
         const rect = containerRef.current.getBoundingClientRect();
@@ -2644,8 +2734,25 @@ export const CanvasView = memo(function CanvasView({
         cancelAnimationFrame(rafResizeIdRef.current);
         rafResizeIdRef.current = null;
       }
+      if (rafGroupDragIdRef.current) {
+        cancelAnimationFrame(rafGroupDragIdRef.current);
+        rafGroupDragIdRef.current = null;
+      }
       latestDragPosRef.current = null;
       latestResizePosRef.current = null;
+      latestGroupDragPosRef.current = null;
+
+      // Complete a group drag from the hollow middle of a multi-selection.
+      if (groupDragRef.current) {
+        groupDragRef.current = null;
+        if (hasDraggedRef.current) {
+          pushHistory(latestDataRef.current);
+        }
+        // Either way the selection stays as it was: a background press used to
+        // clear it, but inside the group that would drop the very selection
+        // the user is working with.
+        return;
+      }
 
       // Complete step bend dragging
       if (stepBendDragRef.current) {
@@ -4378,23 +4485,28 @@ export const CanvasView = memo(function CanvasView({
                   onMouseDown={(e) => e.stopPropagation()}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  {/* Color Palette Dots */}
-                  {Object.entries(CANVAS_COLOR_PALETTES).map(([key, col]) => (
-                    <div
-                      key={key}
-                      onClick={() => handleNodeColorChange(node.id, key)}
-                      style={{
-                        width: 14,
-                        height: 14,
-                        borderRadius: "50%",
-                        backgroundColor: col.stroke,
-                        cursor: "pointer",
-                        border: node.color === key ? "2px solid #f59e0b" : "1px solid rgba(0,0,0,0.2)",
-                        transition: "transform 0.1s ease",
-                      }}
-                      title={col.label}
-                    />
-                  ))}
+                  {/* Color Palette Dots — the compact card toolbar keeps to the
+                      six standard colours; the batch pickers (and the
+                      right-click menus) offer the full extended set. */}
+                  {CANVAS_STANDARD_COLOR_IDS.map((key) => {
+                    const col = CANVAS_COLOR_PALETTES[key];
+                    return (
+                      <div
+                        key={key}
+                        onClick={() => handleNodeColorChange(node.id, key)}
+                        style={{
+                          width: 14,
+                          height: 14,
+                          borderRadius: "50%",
+                          backgroundColor: col.stroke,
+                          cursor: "pointer",
+                          border: node.color === key ? "2px solid #f59e0b" : "1px solid rgba(0,0,0,0.2)",
+                          transition: "transform 0.1s ease",
+                        }}
+                        title={col.label}
+                      />
+                    );
+                  })}
                   <div style={{ width: 1, height: 14, background: colors.cardBorder, margin: "0 2px" }} />
                   {node.type === "text" && (
                     <button
@@ -5673,7 +5785,7 @@ export const CanvasView = memo(function CanvasView({
                     <div className="canvas-ctx-divider" />
                     <div className="canvas-ctx-section-label">批量色彩</div>
                     <div style={{ padding: "4px 12px 6px" }}>
-                      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                      <div className="canvas-ctx-colors">
                         {Object.entries(CANVAS_COLOR_PALETTES).map(([key, col]) => (
                           <div
                             key={key}
@@ -5965,7 +6077,7 @@ export const CanvasView = memo(function CanvasView({
                     >
                       <Palette size={11} /> 连线色彩
                     </div>
-                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <div className="canvas-ctx-colors">
                       {Object.entries(CANVAS_COLOR_PALETTES).map(([key, col]) => (
                         <div
                           key={key}
@@ -7040,8 +7152,9 @@ export const CanvasView = memo(function CanvasView({
 
           <div style={{ width: 1, height: 16, background: colors.cardBorder, margin: "0 2px" }} />
 
-          {/* Color dots */}
-          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+          {/* Color dots — wraps onto a second row now that the palette carries
+              twelve swatches. */}
+          <div className="canvas-ctx-colors" style={{ gap: 4, maxWidth: 190 }}>
             {Object.entries(CANVAS_COLOR_PALETTES).map(([k, c]) => (
               <div
                 key={k}

@@ -11,6 +11,17 @@ import { renderCardMarkdown } from "./markdown";
 import { serializeSvgForExport } from "./svgExport";
 import { getCanvasThemeColors, normalizeExportTheme } from "./canvasTheme";
 
+/**
+ * Card / edge colours.
+ *
+ * Keys 1–6 are the six colours defined by the open JSON Canvas standard, so
+ * boards stay interoperable with other tools. Keys 7–12 are our own extension
+ * for richer batch recolouring — readers that do not know them fall back to a
+ * neutral card, which is a graceful degradation.
+ *
+ * Colour is resolved through this table only; nothing hard-codes the count, so
+ * every palette picker picks new entries up automatically.
+ */
 export const CANVAS_COLOR_PALETTES: Record<string, { label: string; stroke: string; bg: string }> = {
   "1": { label: "珊瑚红", stroke: "#ef4444", bg: "rgba(239, 68, 68, 0.12)" },
   "2": { label: "活力橙", stroke: "#f97316", bg: "rgba(249, 115, 22, 0.12)" },
@@ -18,7 +29,22 @@ export const CANVAS_COLOR_PALETTES: Record<string, { label: string; stroke: stri
   "4": { label: "翡翠绿", stroke: "#10b981", bg: "rgba(16, 185, 129, 0.12)" },
   "5": { label: "天青蓝", stroke: "#06b6d4", bg: "rgba(6, 182, 212, 0.12)" },
   "6": { label: "罗兰紫", stroke: "#a855f7", bg: "rgba(168, 85, 247, 0.12)" },
+  "7": { label: "靛蓝", stroke: "#6366f1", bg: "rgba(99, 102, 241, 0.12)" },
+  "8": { label: "粉樱", stroke: "#ec4899", bg: "rgba(236, 72, 153, 0.12)" },
+  "9": { label: "玫瑰红", stroke: "#f43f5e", bg: "rgba(244, 63, 94, 0.12)" },
+  "10": { label: "青碧", stroke: "#14b8a6", bg: "rgba(20, 184, 166, 0.12)" },
+  "11": { label: "青柠", stroke: "#84cc16", bg: "rgba(132, 204, 22, 0.12)" },
+  "12": { label: "石板灰", stroke: "#64748b", bg: "rgba(100, 116, 139, 0.12)" },
 };
+
+/**
+ * The six colours defined by the JSON Canvas standard, in order.
+ *
+ * Used where space is tight — the floating card toolbar — so those compact
+ * controls keep showing the interoperable core palette, while the roomier
+ * batch pickers offer the full extended set.
+ */
+export const CANVAS_STANDARD_COLOR_IDS = ["1", "2", "3", "4", "5", "6"] as const;
 
 /**
  * Safely parses JSON Canvas 1.0 string
@@ -2919,6 +2945,77 @@ function orderByExplicitIds(
     return Math.atan2(pa.y - cy, pa.x - cx) - Math.atan2(pb.y - cy, pb.x - cx);
   });
   return [...out, ...rest];
+}
+
+/** Andrew's monotone chain. Returns the hull in counter-clockwise order. */
+function convexHull(points: Array<{ x: number; y: number }>): Array<{ x: number; y: number }> {
+  if (points.length < 3) return [...points];
+  const sorted = [...points].sort((a, b) => a.x - b.x || a.y - b.y);
+
+  const cross = (
+    o: { x: number; y: number },
+    a: { x: number; y: number },
+    b: { x: number; y: number }
+  ) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+
+  const build = (input: Array<{ x: number; y: number }>) => {
+    const chain: Array<{ x: number; y: number }> = [];
+    for (const p of input) {
+      while (chain.length >= 2 && cross(chain[chain.length - 2], chain[chain.length - 1], p) <= 0) {
+        chain.pop();
+      }
+      chain.push(p);
+    }
+    return chain;
+  };
+
+  const lower = build(sorted);
+  const upper = build([...sorted].reverse());
+  // Drop the duplicated endpoints
+  return [...lower.slice(0, -1), ...upper.slice(0, -1)];
+}
+
+/** Ray-casting point-in-polygon test. */
+function isPointInPolygon(
+  point: { x: number; y: number },
+  polygon: Array<{ x: number; y: number }>
+): boolean {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i].x;
+    const yi = polygon[i].y;
+    const xj = polygon[j].x;
+    const yj = polygon[j].y;
+    const intersects = yi > point.y !== yj > point.y;
+    if (intersects && point.x < ((xj - xi) * (point.y - yi)) / (yj - yi) + xi) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+/**
+ * True when `point` falls inside the convex hull of the given cards' centres.
+ *
+ * This is what lets a click on the hollow middle of a ring or a grid grab the
+ * whole selection. That area is empty canvas, so without this check the press
+ * would fall through to the background handler and pan the board — while the
+ * user's intent, having just arranged and selected the cards, is clearly to
+ * move the group.
+ *
+ * Points genuinely outside the group (but still within the bounding box of a
+ * concave arrangement) are correctly rejected, which a plain bounding-box test
+ * would not manage.
+ */
+export function isPointInsideNodeHull(
+  point: { x: number; y: number },
+  nodes: CanvasNode[]
+): boolean {
+  if (nodes.length < 3) return false;
+  const centres = nodes.map((n) => ({ x: n.x + n.width / 2, y: n.y + n.height / 2 }));
+  const hull = convexHull(centres);
+  if (hull.length < 3) return false;
+  return isPointInPolygon(point, hull);
 }
 
 /**

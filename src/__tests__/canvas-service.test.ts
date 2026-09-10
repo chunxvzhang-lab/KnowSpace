@@ -37,6 +37,9 @@ import {
   computeMinRingRadius,
   computeRingSpacingLayout,
   resizeRingSpacing,
+  isPointInsideNodeHull,
+  CANVAS_COLOR_PALETTES,
+  CANVAS_STANDARD_COLOR_IDS,
   disconnectNodeEdges,
   spawnMultipleBranches,
   cycleEdgeStrokePattern,
@@ -580,6 +583,83 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
       );
       expect(r).toBeGreaterThanOrEqual(layout.minRadius - 1);
     }
+  });
+
+  it("offers an extended palette while keeping the standard six first", () => {
+    // Keys 1-6 are the JSON Canvas standard, so boards stay interoperable;
+    // 7-12 are our own additions for richer batch recolouring.
+    expect(CANVAS_STANDARD_COLOR_IDS).toEqual(["1", "2", "3", "4", "5", "6"]);
+    for (const id of CANVAS_STANDARD_COLOR_IDS) {
+      expect(CANVAS_COLOR_PALETTES[id]).toBeDefined();
+    }
+
+    const ids = Object.keys(CANVAS_COLOR_PALETTES);
+    expect(ids.length).toBeGreaterThan(6);
+    expect(ids.slice(0, 6)).toEqual([...CANVAS_STANDARD_COLOR_IDS]);
+
+    // Extended entries must be usable everywhere a colour key is accepted
+    for (const id of ids) {
+      const entry = CANVAS_COLOR_PALETTES[id];
+      expect(entry.stroke).toMatch(/^#[0-9a-f]{6}$/i);
+      expect(entry.bg.length).toBeGreaterThan(0);
+      expect(entry.label.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("detects a click in the hollow middle of a ring or grid selection", () => {
+    const cards: CanvasTextNode[] = [1, 2, 3, 4, 5, 6].map((i) => ({
+      id: `h${i}`,
+      type: "text" as const,
+      text: `Card ${i}`,
+      x: i * 200,
+      y: 0,
+      width: 160,
+      height: 100,
+    }));
+    const ids = cards.map((n) => n.id);
+    const ringNodes = alignNodesInCircle(cards, ids);
+    const layout = computeRingSpacingLayout(ringNodes)!;
+
+    // Dead centre of the ring is empty canvas but belongs to the group
+    expect(isPointInsideNodeHull(layout.center, ringNodes)).toBe(true);
+
+    // Well outside the ring is not
+    expect(
+      isPointInsideNodeHull(
+        { x: layout.center.x, y: layout.center.y - layout.radius * 3 },
+        ringNodes
+      )
+    ).toBe(false);
+
+    // A grid's inner gap counts too
+    const gridNodes = alignNodesInGrid(cards, ids);
+    const gridBox = computeBoundingBox(gridNodes);
+    expect(
+      isPointInsideNodeHull(
+        { x: gridBox.minX + gridBox.width / 2, y: gridBox.minY + gridBox.height / 2 },
+        gridNodes
+      )
+    ).toBe(true);
+
+    // Fewer than three cards cannot enclose anything
+    expect(isPointInsideNodeHull({ x: 100, y: 100 }, ringNodes.slice(0, 2))).toBe(false);
+  });
+
+  it("rejects a point outside a concave arrangement's bounding box interior", () => {
+    // Four cards in an L shape: the top-right corner of the bounding box is
+    // inside the box but outside the group, so a naive bbox test would wrongly
+    // grab the selection there.
+    const cards: CanvasTextNode[] = [
+      { id: "a", type: "text", text: "a", x: 0, y: 0, width: 100, height: 100 },
+      { id: "b", type: "text", text: "b", x: 200, y: 0, width: 100, height: 100 },
+      { id: "c", type: "text", text: "c", x: 0, y: 200, width: 100, height: 100 },
+      { id: "d", type: "text", text: "d", x: 100, y: 400, width: 100, height: 100 },
+    ];
+
+    // Centre of the L's short arm is inside
+    expect(isPointInsideNodeHull({ x: 100, y: 50 }, cards)).toBe(true);
+    // The far top-right corner is inside the bbox but outside the hull
+    expect(isPointInsideNodeHull({ x: 340, y: 20 }, cards)).toBe(false);
   });
 
   it("clamps the export scale so oversized boards cannot crash the renderer", () => {

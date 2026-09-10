@@ -10052,8 +10052,18 @@ body:has(.flash-capsule-overlay) {
   user-select: none;
 }
 
+/* Colour palettes wrap onto extra rows now that the palette carries twelve
+   swatches instead of six — a single row no longer fits inside the menu. */
+.canvas-ctx-colors {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
 .canvas-color-dot {
   transition: transform 0.15s ease, box-shadow 0.15s ease;
+  flex-shrink: 0;
 }
 
 .canvas-color-dot:hover {
