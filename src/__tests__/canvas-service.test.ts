@@ -23,6 +23,10 @@ import {
   expandLoopEdgeSelection,
   computeSourceDisplayColorMap,
   alignNodesInCircle,
+  alignNodesInGrid,
+  computeRingLayout,
+  syncRingEdges,
+  projectPointOntoRing,
   disconnectNodeEdges,
   spawnMultipleBranches,
   cycleEdgeStrokePattern,
@@ -1139,6 +1143,147 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
       const r = Math.hypot(n.x + n.width / 2 - cx, n.y + n.height / 2 - cy);
       expect(r).toBeCloseTo(250, 0);
     }
+  });
+
+  it("arranges cards into a rectangular grid with aligned rows and columns", () => {
+    const nodes: CanvasTextNode[] = [1, 2, 3, 4, 5, 6].map((i) => ({
+      id: `g${i}`,
+      type: "text" as const,
+      text: `Card ${i}`,
+      x: i * 90,
+      y: i * 70,
+      width: 160,
+      height: 100,
+    }));
+    const ids = nodes.map((n) => n.id);
+
+    // 6 cards -> squarish grid of 3 columns x 2 rows
+    const aligned = alignNodesInGrid(nodes, ids);
+    const placed = ids.map((id) => aligned.find((n) => n.id === id)!);
+
+    // Group by row (Y) and column (X) using rounded coordinates
+    const rows = new Map<number, string[]>();
+    const cols = new Map<number, string[]>();
+    for (const n of placed) {
+      const r = rows.get(n.y) ?? [];
+      r.push(n.id);
+      rows.set(n.y, r);
+      const c = cols.get(n.x) ?? [];
+      c.push(n.id);
+      cols.set(n.x, c);
+    }
+
+    // 3 columns and 2 rows of distinct coordinates => a real grid
+    expect(cols.size).toBe(3);
+    expect(rows.size).toBe(2);
+    // Each row holds 3 cards, each column holds 2
+    rows.forEach((ids2) => expect(ids2.length).toBe(3));
+    cols.forEach((ids2) => expect(ids2.length).toBe(2));
+
+    // Uniform gutters: consecutive columns are evenly spaced
+    const xs = [...cols.keys()].sort((a, b) => a - b);
+    expect(xs[1] - xs[0]).toBe(xs[2] - xs[1]);
+  });
+
+  it("detects a circular layout and turns loop edges into true arcs", () => {
+    // Lay 6 cards out on a circle first
+    const nodes: CanvasTextNode[] = [0, 1, 2, 3, 4, 5].map((i) => ({
+      id: `c${i}`,
+      type: "text" as const,
+      text: `Card ${i}`,
+      x: 500 + 300 * Math.cos((i * Math.PI) / 3),
+      y: 500 + 300 * Math.sin((i * Math.PI) / 3),
+      width: 80,
+      height: 80,
+    }));
+
+    // The layout must be recognised as a ring
+    const layout = computeRingLayout(nodes);
+    expect(layout).not.toBeNull();
+    expect(layout!.radius).toBeCloseTo(300, 0);
+
+    // Loop edges created on a circular layout become circular arcs
+    const ringEdges = connectLoopNodes(nodes, [], "bezier", true);
+    expect(ringEdges).toHaveLength(6);
+    for (const e of ringEdges) {
+      expect(e.ringCenter).toBeDefined();
+      expect(e.ringRadius).toBeCloseTo(300, 0);
+    }
+
+    // Every segment renders as an SVG arc (A command) with the same radius,
+    // so the whole loop draws one perfect circle.
+    const ring = { center: ringEdges[0].ringCenter!, radius: ringEdges[0].ringRadius! };
+    for (const e of ringEdges) {
+      const from = nodes.find((n) => n.id === e.fromNode)!;
+      const to = nodes.find((n) => n.id === e.toNode)!;
+      const p1 = { x: from.x + from.width / 2, y: from.y + from.height / 2 };
+      const p2 = { x: to.x + to.width / 2, y: to.y + to.height / 2 };
+      const d = computeEdgePath(p1, "right", p2, "left", "bezier", undefined, ring);
+      expect(d).toMatch(/^M [\d.-]+ [\d.-]+ A 300 300 0 0 [01] [\d.-]+ [\d.-]+$/);
+    }
+  });
+
+  it("does not treat a plain row of cards as a ring", () => {
+    const row: CanvasTextNode[] = [1, 2, 3, 4].map((i) => ({
+      id: `r${i}`,
+      type: "text" as const,
+      text: `Card ${i}`,
+      x: i * 240,
+      y: 0,
+      width: 160,
+      height: 100,
+    }));
+    expect(computeRingLayout(row)).toBeNull();
+
+    // Chained edges on a non-circular layout keep their normal curve
+    const chain = connectChainNodes(row, [], "bezier", true);
+    for (const e of chain) {
+      expect(e.ringCenter).toBeUndefined();
+    }
+  });
+
+  it("syncs ring arcs when cards are ring-aligned, and clears them afterwards", () => {
+    // Six cards in a row (a 3x2 grid is deliberately not co-circular, while a
+    // 2x2 square would be, so six cards keep this test unambiguous).
+    const base: CanvasTextNode[] = [1, 2, 3, 4, 5, 6].map((i) => ({
+      id: `s${i}`,
+      type: "text" as const,
+      text: `Card ${i}`,
+      x: i * 240,
+      y: 0,
+      width: 160,
+      height: 100,
+    }));
+    const ids = base.map((n) => n.id);
+
+    // Form a closed loop first (not yet circular -> no ring metadata)
+    const loopEdges = connectLoopNodes(base, [], "bezier", true);
+    expect(loopEdges).toHaveLength(6);
+    for (const e of loopEdges) expect(e.ringCenter).toBeUndefined();
+
+    // Now ring-align the cards: the loop edges must adopt the arc
+    const ringNodes = alignNodesInCircle(base, ids);
+    const syncedEdges = syncRingEdges(ringNodes, loopEdges, ids);
+    for (const e of syncedEdges) {
+      expect(e.ringCenter).toBeDefined();
+      expect(e.ringRadius).toBeGreaterThan(0);
+    }
+
+    // Switching back to a grid layout clears the arcs again
+    const gridNodes = alignNodesInGrid(ringNodes, ids);
+    const clearedEdges = syncRingEdges(gridNodes, syncedEdges, ids);
+    for (const e of clearedEdges) {
+      expect(e.ringCenter).toBeUndefined();
+      expect(e.ringRadius).toBeUndefined();
+    }
+  });
+
+  it("projects anchor points exactly onto the ring circle", () => {
+    const ring = { center: { x: 100, y: 100 }, radius: 200 };
+    const projected = projectPointOntoRing({ x: 400, y: 100 }, ring);
+    expect(Math.hypot(projected.x - 100, projected.y - 100)).toBeCloseTo(200, 5);
+    expect(projected.x).toBeCloseTo(300, 5);
+    expect(projected.y).toBeCloseTo(100, 5);
   });
 
   it("exports the hub badge for one-to-many sources with the exact edge count", () => {

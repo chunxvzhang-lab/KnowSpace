@@ -87,6 +87,8 @@ import {
   getSourceNodeEdgeColor,
   computeSourceDisplayColorMap,
   expandLoopEdgeSelection,
+  syncRingEdges,
+  projectPointOntoRing,
   downloadCanvasAsImage,
   copyCanvasImageToClipboard,
   CanvasAlignDirection,
@@ -254,7 +256,7 @@ function computeBoxSelectionEdgeHits(
     const toSide = edge.toSide || optSides.toSide;
     const p1 = getNodeAnchorPoint(fromNode, fromSide);
     const p2 = getNodeAnchorPoint(toNode, toSide);
-    const mid = computeEdgeMidpoint(p1, fromSide, p2, toSide, edge.style, edge.stepOffset);
+    const mid = computeEdgeMidpoint(p1, fromSide, p2, toSide, edge.style, edge.stepOffset, getEdgeRing(edge));
     if (mid.x >= minX && mid.x <= maxX && mid.y >= minY && mid.y <= maxY) {
       hitEdgeIds.add(edge.id);
     }
@@ -1556,6 +1558,9 @@ export const CanvasView = memo(function CanvasView({
       if (selNodes.length < 2) return;
 
       const updatedNodes = alignNodes(currentData.nodes, selectedNodeIds, direction);
+      // Keep ring arcs in sync: circle alignment stamps a circular arc onto the
+      // loop edges, while any other alignment clears stale ring metadata.
+      const updatedEdges = syncRingEdges(updatedNodes, currentData.edges, selectedNodeIds);
 
       const toastMap: Record<CanvasAlignDirection, string> = {
         horizontal: "所选卡片已水平中线对齐",
@@ -1569,9 +1574,10 @@ export const CanvasView = memo(function CanvasView({
         "distribute-h": "所选卡片已水平等距分布",
         "distribute-v": "所选卡片已垂直等距分布",
         circle: `已将 ${selNodes.length} 张卡片均匀排布为环形`,
+        grid: `已将 ${selNodes.length} 张卡片按矩形网格排布`,
       };
 
-      pushHistory({ ...currentData, nodes: updatedNodes });
+      pushHistory({ ...currentData, nodes: updatedNodes, edges: updatedEdges });
       showToast(toastMap[direction] || "所选卡片已对齐");
       setContextMenu(null);
     },
@@ -3088,23 +3094,32 @@ export const CanvasView = memo(function CanvasView({
                     </div>
                   ))}
 
+                  <div className="canvas-ctx-divider" />
+                  <div className="canvas-ctx-section-label">整体排布</div>
                   {selectedNodeIds.size >= 3 && (
-                    <>
-                      <div className="canvas-ctx-divider" />
-                      <div className="canvas-ctx-section-label">环形排布</div>
-                      <div
-                        className="canvas-ctx-item"
-                        title="将选中卡片沿圆周均匀排布，配合「环形闭环连线」即可得到整齐的闭环"
-                        onClick={() => {
-                          handleAlignSelected("circle");
-                          setShowAlignMenu(false);
-                        }}
-                      >
-                        <RotateCw size={13} color="#a855f7" />
-                        <span style={{ fontWeight: 600 }}>环形对齐 (圆周等分)</span>
-                      </div>
-                    </>
+                    <div
+                      className="canvas-ctx-item"
+                      title="将选中卡片沿圆周均匀排布，配合「环形闭环连线」即可得到完全圆形的闭环"
+                      onClick={() => {
+                        handleAlignSelected("circle");
+                        setShowAlignMenu(false);
+                      }}
+                    >
+                      <RotateCw size={13} color="#a855f7" />
+                      <span style={{ fontWeight: 600 }}>环形对齐 (圆周等分)</span>
+                    </div>
                   )}
+                  <div
+                    className="canvas-ctx-item"
+                    title="将选中卡片按规整的矩形网格矩阵排布"
+                    onClick={() => {
+                      handleAlignSelected("grid");
+                      setShowAlignMenu(false);
+                    }}
+                  >
+                    <Grid size={13} color="#10b981" />
+                    <span style={{ fontWeight: 600 }}>矩形排布 (网格矩阵)</span>
+                  </div>
 
                   <div className="canvas-ctx-divider" />
                   <div className="canvas-ctx-section-label">边缘对齐</div>
@@ -3396,7 +3411,11 @@ export const CanvasView = memo(function CanvasView({
             const toSide = edge.toSide || optSides.toSide;
             const p1 = getNodeAnchorPoint(fromNode, fromSide);
             const p2 = getNodeAnchorPoint(toNode, toSide);
-            const pathData = computeEdgePath(p1, fromSide, p2, toSide, edge.style, edge.stepOffset);
+            const ringArc = getEdgeRing(edge);
+            const pathData = computeEdgePath(p1, fromSide, p2, toSide, edge.style, edge.stepOffset, ringArc);
+            // On a ring the origin dot must sit on the circle, not on the raw
+            // card anchor point.
+            const originPoint = ringArc ? projectPointOntoRing(p1, ringArc) : p1;
 
             const isSelected = selectedEdgeIds.has(edge.id);
             const effectiveColorKey =
@@ -3498,8 +3517,8 @@ export const CanvasView = memo(function CanvasView({
                 {/* Source Origin Anchor Dot (起点端点指示器: 明确发起源) */}
                 {edge.fromEnd !== "arrow" && (
                   <circle
-                    cx={p1.x}
-                    cy={p1.y}
+                    cx={originPoint.x}
+                    cy={originPoint.y}
                     r={isSelected ? 4.5 : hoveredNodeId === edge.fromNode ? 4.2 : 3.8}
                     fill={isSelected ? "#f59e0b" : edgeColor}
                     stroke={isDark ? "#0f172a" : "#ffffff"}
@@ -4284,7 +4303,7 @@ export const CanvasView = memo(function CanvasView({
           const p1 = getNodeAnchorPoint(fromNode, fromSide);
           const p2 = getNodeAnchorPoint(toNode, toSide);
           // Place label exactly at geometric midpoint — the connection line passes THROUGH the label center
-          const rawMid = computeEdgeMidpoint(p1, fromSide, p2, toSide, edge.style, edge.stepOffset);
+          const rawMid = computeEdgeMidpoint(p1, fromSide, p2, toSide, edge.style, edge.stepOffset, getEdgeRing(edge));
 
           const isSelected = selectedEdgeIds.has(edge.id);
           const effectiveColorKey =
@@ -5973,12 +5992,20 @@ export const CanvasView = memo(function CanvasView({
                         <div
                           className="canvas-ctx-item"
                           onClick={() => handleAlignSelected("circle")}
-                          title="将选中卡片沿圆周均匀排布"
+                          title="将选中卡片沿圆周均匀排布，配合环形闭环连线即得到完全圆形的闭环"
                         >
                           <RotateCw size={13} color="#a855f7" />
                           <span style={{ fontWeight: 600 }}>🔄 环形对齐 (圆周等分)</span>
                         </div>
                       )}
+                      <div
+                        className="canvas-ctx-item"
+                        onClick={() => handleAlignSelected("grid")}
+                        title="将选中卡片按规整的矩形网格矩阵排布"
+                      >
+                        <Grid size={13} color="#10b981" />
+                        <span style={{ fontWeight: 600 }}>▦ 矩形排布 (网格矩阵)</span>
+                      </div>
 
                       <div className="canvas-ctx-item" onClick={() => handleAlignSelected("left")}>
                         <AlignLeft size={13} />
@@ -6730,6 +6757,13 @@ export const CanvasView = memo(function CanvasView({
 });
 
 // Helpers & Styles
+/** Extracts the circular-arc descriptor from an edge, when it has one. */
+function getEdgeRing(edge: CanvasEdge): { center: { x: number; y: number }; radius: number } | undefined {
+  return edge.ringCenter && edge.ringRadius
+    ? { center: edge.ringCenter, radius: edge.ringRadius }
+    : undefined;
+}
+
 function getCanvasThemeColors(theme: ThemeMode) {
   const isDark =
     theme === "twitter" ||

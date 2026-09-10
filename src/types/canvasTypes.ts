@@ -63,6 +63,15 @@ export interface CanvasEdge {
   labelShape?: CanvasEdgeLabelShape;
   strokePattern?: CanvasEdgeStrokePattern;
   stepOffset?: number;
+  /**
+   * Ring layout (non-standard JSON Canvas extension, like `stepOffset`):
+   * when present, the edge is drawn as a true circular arc around this centre
+   * instead of a bezier/step/straight path. Set automatically when a closed
+   * loop is created between cards that are evenly arranged on a circle.
+   */
+  ringCenter?: { x: number; y: number };
+  /** Radius of the circular arc described by `ringCenter`. */
+  ringRadius?: number;
 }
 
 export interface CanvasData {

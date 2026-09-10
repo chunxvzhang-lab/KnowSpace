@@ -111,6 +111,31 @@ export function parseCanvasData(jsonString: string): CanvasData {
       const color = typeof item.color === "string" ? item.color : undefined;
       const label = typeof item.label === "string" ? item.label : undefined;
       const style = item.style === "straight" || item.style === "step" ? item.style : "bezier";
+      const stepOffset = typeof item.stepOffset === "number" ? item.stepOffset : undefined;
+      const strokePattern =
+        item.strokePattern === "dashed" || item.strokePattern === "dotted"
+          ? item.strokePattern
+          : undefined;
+      const labelShape =
+        item.labelShape === "rect" || item.labelShape === "diamond"
+          ? item.labelShape
+          : undefined;
+
+      // Ring layout extension: keep the circular arc metadata so a ring stays
+      // a perfect circle after reloading the .canvas file.
+      let ringCenter: { x: number; y: number } | undefined;
+      let ringRadius: number | undefined;
+      if (
+        item.ringCenter &&
+        typeof item.ringCenter === "object" &&
+        typeof item.ringCenter.x === "number" &&
+        typeof item.ringCenter.y === "number"
+      ) {
+        ringCenter = { x: item.ringCenter.x, y: item.ringCenter.y };
+      }
+      if (typeof item.ringRadius === "number" && item.ringRadius > 0) {
+        ringRadius = item.ringRadius;
+      }
 
       edges.push({
         id: item.id,
@@ -123,6 +148,11 @@ export function parseCanvasData(jsonString: string): CanvasData {
         color,
         label,
         style,
+        stepOffset,
+        strokePattern,
+        labelShape,
+        ringCenter,
+        ringRadius,
       });
     }
 
@@ -405,6 +435,28 @@ export function getStepBendHandleInfo(
 }
 
 /**
+ * Projects a point onto the given circle, i.e. moves it along the ray from the
+ * ring centre until it sits exactly on the ring radius.
+ *
+ * Used so that ring edges — whose endpoints are card anchor points that do not
+ * lie on the circle themselves — always start and end on the very same circle,
+ * producing a perfectly round outline.
+ */
+export function projectPointOntoRing(
+  point: { x: number; y: number },
+  ring: { center: { x: number; y: number }; radius: number }
+): { x: number; y: number } {
+  const ox = point.x - ring.center.x;
+  const oy = point.y - ring.center.y;
+  const dist = Math.hypot(ox, oy);
+  if (dist < 0.0001) {
+    return { x: ring.center.x + ring.radius, y: ring.center.y };
+  }
+  const scale = ring.radius / dist;
+  return { x: ring.center.x + ox * scale, y: ring.center.y + oy * scale };
+}
+
+/**
  * Generates an SVG path for connecting edges with refined curvature and orthogonal routing
  */
 export function computeEdgePath(
@@ -413,10 +465,30 @@ export function computeEdgePath(
   p2: { x: number; y: number },
   side2: CanvasNodeSide = "left",
   style: CanvasEdgeLineStyle = "bezier",
-  stepOffset?: number
+  stepOffset?: number,
+  ring?: { center: { x: number; y: number }; radius: number }
 ): string {
   const dx = p2.x - p1.x;
   const dy = p2.y - p1.y;
+
+  // ── Ring layout ────────────────────────────────────────────────────────
+  // Draw a true circular arc around the ring centre so that a closed loop of
+  // cards arranged on a circle is connected by a perfectly round outline.
+  // Both endpoints are projected onto the ring radius, and the shorter arc is
+  // always taken, which keeps every segment part of the same circle.
+  if (ring && ring.radius > 0) {
+    const a = projectPointOntoRing(p1, ring);
+    const b = projectPointOntoRing(p2, ring);
+
+    let delta = Math.atan2(b.y - ring.center.y, b.x - ring.center.x) -
+      Math.atan2(a.y - ring.center.y, a.x - ring.center.x);
+    // Normalise to (-π, π] so we always draw the shorter arc
+    while (delta > Math.PI) delta -= Math.PI * 2;
+    while (delta <= -Math.PI) delta += Math.PI * 2;
+
+    const sweep = delta >= 0 ? 1 : 0;
+    return `M ${a.x} ${a.y} A ${ring.radius} ${ring.radius} 0 0 ${sweep} ${b.x} ${b.y}`;
+  }
 
   if (style === "straight") {
     return `M ${p1.x} ${p1.y} L ${p2.x} ${p2.y}`;
@@ -462,10 +534,33 @@ export function computeEdgeMidpoint(
   p2: { x: number; y: number },
   side2: CanvasNodeSide = "left",
   style: CanvasEdgeLineStyle = "bezier",
-  stepOffset?: number
+  stepOffset?: number,
+  ring?: { center: { x: number; y: number }; radius: number }
 ): { x: number; y: number } {
   const dx = p2.x - p1.x;
   const dy = p2.y - p1.y;
+
+  // Ring layout: midpoint of the shorter circular arc (angle bisector)
+  if (ring && ring.radius > 0) {
+    const projectAngle = (p: { x: number; y: number }) => {
+      const ox = p.x - ring.center.x;
+      const oy = p.y - ring.center.y;
+      if (Math.hypot(ox, oy) < 0.0001) return 0;
+      return Math.atan2(oy, ox);
+    };
+
+    let a1 = projectAngle(p1);
+    let a2 = projectAngle(p2);
+    let delta = a2 - a1;
+    while (delta > Math.PI) delta -= Math.PI * 2;
+    while (delta <= -Math.PI) delta += Math.PI * 2;
+
+    const midAngle = a1 + delta / 2;
+    return {
+      x: Math.round(ring.center.x + ring.radius * Math.cos(midAngle)),
+      y: Math.round(ring.center.y + ring.radius * Math.sin(midAngle)),
+    };
+  }
 
   if (style === "straight") {
     return { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
@@ -1371,6 +1466,10 @@ export function connectLoopNodes(
   const count = orderedNodes.length;
   const usedIncomingSides = new Map<string, CanvasNodeSide>();
 
+  // Detect whether these cards are actually arranged on a circle. If they are,
+  // every segment becomes a true arc so the loop is a perfectly round ring.
+  const ringLayout = computeRingLayout(orderedNodes);
+
   // Unified color for the whole loop so that all ring segments visually
   // belong to a single semantic flow, regardless of which node is "from".
   //
@@ -1487,6 +1586,11 @@ export function connectLoopNodes(
         toSide,
         color: edgeColor,
         style,
+        // When the cards already sit on a common circle, connect them with a
+        // true circular arc so the closed loop reads as a perfectly round ring.
+        ...(ringLayout
+          ? { ringCenter: ringLayout.center, ringRadius: ringLayout.radius }
+          : {}),
       });
     }
   }
@@ -1829,7 +1933,11 @@ export function exportCanvasToSvg(
     const toSide = edge.toSide || optSides.toSide;
     const p1 = getNodeAnchorPoint(from, fromSide);
     const p2 = getNodeAnchorPoint(to, toSide);
-    const pathD = computeEdgePath(p1, fromSide, p2, toSide, edge.style);
+    const ringArc =
+      edge.ringCenter && edge.ringRadius
+        ? { center: edge.ringCenter, radius: edge.ringRadius }
+        : undefined;
+    const pathD = computeEdgePath(p1, fromSide, p2, toSide, edge.style, edge.stepOffset, ringArc);
 
     // Mirror the on-screen renderer's color resolution: prefer the
     // source-aware display color, then fall back to the edge's stored color.
@@ -1856,14 +1964,17 @@ export function exportCanvasToSvg(
       `    <path d="${pathD}" fill="none" stroke="${edgeColor}" stroke-width="2" stroke-linecap="round" marker-end="${markerEnd}" marker-start="${markerStart}" />`
     );
     if (edge.fromEnd !== "arrow") {
+      // On a ring the origin dot must sit on the circle too, not on the raw
+      // card anchor point.
+      const originPoint = ringArc ? projectPointOntoRing(p1, ringArc) : p1;
       lines.push(
-        `    <circle cx="${p1.x}" cy="${p1.y}" r="3.5" fill="${edgeColor}" stroke="${isDark ? "#0f172a" : "#ffffff"}" stroke-width="1.2" />`
+        `    <circle cx="${originPoint.x}" cy="${originPoint.y}" r="3.5" fill="${edgeColor}" stroke="${isDark ? "#0f172a" : "#ffffff"}" stroke-width="1.2" />`
       );
     }
 
     // 3. Edge Label Badges
     if (edge.label && edge.label.trim()) {
-      const rawMid = computeEdgeMidpoint(p1, fromSide, p2, toSide, edge.style);
+      const rawMid = computeEdgeMidpoint(p1, fromSide, p2, toSide, edge.style, edge.stepOffset, ringArc);
       const labelText = escapeSvgXml(edge.label.trim());
       const shape = edge.labelShape || "pill";
       const charWidth = 11.5;
@@ -2125,7 +2236,8 @@ export type CanvasAlignDirection =
   | "bottom" // 底端对齐
   | "distribute-h" // 水平等距分布
   | "distribute-v" // 垂直等距分布
-  | "circle"; // 环形对齐 (多张卡片沿圆周均匀排布，配合环形闭环连线使用)
+  | "circle" // 环形对齐 (多张卡片沿圆周均匀排布，配合环形闭环连线使用)
+  | "grid"; // 矩形排布 (多张卡片按规整网格矩阵排布)
 
 /**
  * Options for circular (ring) alignment of multiple cards.
@@ -2228,6 +2340,175 @@ export function alignNodesInCircle(
 }
 
 /**
+ * Options for rectangular (grid) alignment of multiple cards.
+ */
+export interface GridAlignOptions {
+  /** Number of columns. Defaults to ceil(sqrt(N)) — the squarish layout. */
+  columns?: number;
+  /** Horizontal gutter between cards (default 40). */
+  gapX?: number;
+  /** Vertical gutter between cards (default 40). */
+  gapY?: number;
+}
+
+/**
+ * Arranges the selected cards into a neat rectangular grid.
+ *
+ * Behaviour:
+ * 1. Reading order is preserved (top-to-bottom, left-to-right), so cards keep
+ *    the sequence the user already established.
+ * 2. All cells share one uniform size (the largest card, plus the gutter), so
+ *    rows and columns line up perfectly.
+ * 3. Each card is centred inside its own cell.
+ * 4. The grid stays centred on the selection's original bounding-box centre.
+ */
+export function alignNodesInGrid(
+  allNodes: CanvasNode[],
+  selectedNodeIds: Set<string> | string[],
+  options?: GridAlignOptions
+): CanvasNode[] {
+  const selSet = selectedNodeIds instanceof Set ? selectedNodeIds : new Set(selectedNodeIds);
+  const selNodes = allNodes.filter((n) => selSet.has(n.id));
+  if (selNodes.length < 2) return allNodes;
+
+  const gapX = options?.gapX ?? 40;
+  const gapY = options?.gapY ?? 40;
+
+  // Preserve reading order: rows first (with a tolerance), then columns
+  const ordered = [...selNodes].sort((a, b) => {
+    if (Math.abs(a.y - b.y) > 40) return a.y - b.y;
+    return a.x - b.x;
+  });
+
+  const count = ordered.length;
+  const requestedCols = options?.columns && options.columns > 0 ? Math.floor(options.columns) : 0;
+  const cols = Math.max(1, Math.min(count, requestedCols || Math.ceil(Math.sqrt(count))));
+  const rows = Math.ceil(count / cols);
+
+  const cellW = Math.max(...ordered.map((n) => n.width)) + gapX;
+  const cellH = Math.max(...ordered.map((n) => n.height)) + gapY;
+
+  // Keep the grid centred on the original selection centre
+  const minX = Math.min(...selNodes.map((n) => n.x));
+  const maxX = Math.max(...selNodes.map((n) => n.x + n.width));
+  const minY = Math.min(...selNodes.map((n) => n.y));
+  const maxY = Math.max(...selNodes.map((n) => n.y + n.height));
+  const cx = minX + (maxX - minX) / 2;
+  const cy = minY + (maxY - minY) / 2;
+
+  const gridW = cols * cellW - gapX;
+  const gridH = rows * cellH - gapY;
+  const startX = cx - gridW / 2;
+  const startY = cy - gridH / 2;
+
+  const positions = new Map<string, { x: number; y: number }>();
+  ordered.forEach((n, i) => {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    positions.set(n.id, {
+      x: Math.round(startX + col * cellW + (cellW - gapX - n.width) / 2),
+      y: Math.round(startY + row * cellH + (cellH - gapY - n.height) / 2),
+    });
+  });
+
+  return allNodes.map((n) => {
+    const pos = positions.get(n.id);
+    return pos ? { ...n, x: pos.x, y: pos.y } : n;
+  });
+}
+
+/**
+ * Detects whether a set of nodes is laid out on a common circle.
+ * Returns the centre and the mean radius when the deviation across all cards
+ * is within `tolerance` (relative), otherwise null.
+ */
+export function computeRingLayout(
+  nodes: CanvasNode[],
+  tolerance = 0.18
+): { center: { x: number; y: number }; radius: number } | null {
+  if (nodes.length < 3) return null;
+
+  const cx = nodes.reduce((sum, n) => sum + (n.x + n.width / 2), 0) / nodes.length;
+  const cy = nodes.reduce((sum, n) => sum + (n.y + n.height / 2), 0) / nodes.length;
+
+  const distances = nodes.map((n) => Math.hypot(n.x + n.width / 2 - cx, n.y + n.height / 2 - cy));
+  const mean = distances.reduce((a, b) => a + b, 0) / distances.length;
+  if (mean < 1) return null;
+
+  const maxDeviation = Math.max(...distances.map((d) => Math.abs(d - mean)));
+  if (maxDeviation / mean > tolerance) return null;
+
+  return { center: { x: cx, y: cy }, radius: mean };
+}
+
+/**
+ * Keeps ring edges in sync with the node layout:
+ * - when the given nodes form a circle, every loop edge between them is
+ *   stamped with the ring centre/radius so it renders as a true arc;
+ * - otherwise any stale ring metadata is cleared so the edge falls back to a
+ *   normal bezier/step/straight path.
+ *
+ * Only edges whose BOTH endpoints are inside `scopeNodeIds` are touched, so
+ * unrelated loops elsewhere on the canvas (or a manual ring the user built
+ * separately) are left alone.
+ */
+export function syncRingEdges(
+  nodes: CanvasNode[],
+  edges: CanvasEdge[],
+  scopeNodeIds: Set<string> | string[]
+): CanvasEdge[] {
+  const scope = scopeNodeIds instanceof Set ? scopeNodeIds : new Set(scopeNodeIds);
+  const scopedNodes = nodes.filter((n) => scope.has(n.id));
+
+  // Ring detection only considers cards that are themselves part of a cycle,
+  // so a plain row of cards is never mistaken for a ring.
+  const scopedIds = new Set(scopedNodes.map((n) => n.id));
+  const scopedEdges = edges.filter(
+    (e) => scopedIds.has(e.fromNode) && scopedIds.has(e.toNode)
+  );
+  if (scopedEdges.length === 0) return edges;
+
+  const loopIds = getLoopEdgeIds(scopedEdges);
+  if (loopIds.size === 0) return edges;
+
+  const loopNodeIds = new Set<string>();
+  for (const e of scopedEdges) {
+    if (loopIds.has(e.id)) {
+      loopNodeIds.add(e.fromNode);
+      loopNodeIds.add(e.toNode);
+    }
+  }
+  const loopNodes = nodes.filter((n) => loopNodeIds.has(n.id));
+
+  const layout = computeRingLayout(loopNodes);
+
+  let changed = false;
+  const next = edges.map((e) => {
+    if (!loopIds.has(e.id)) return e;
+    if (layout) {
+      if (
+        !e.ringCenter ||
+        e.ringCenter.x !== layout.center.x ||
+        e.ringCenter.y !== layout.center.y ||
+        e.ringRadius !== layout.radius
+      ) {
+        changed = true;
+        return { ...e, ringCenter: layout.center, ringRadius: layout.radius };
+      }
+      return e;
+    }
+    if (e.ringCenter || e.ringRadius) {
+      changed = true;
+      const { ringCenter: _c, ringRadius: _r, ...rest } = e;
+      return rest as CanvasEdge;
+    }
+    return e;
+  });
+
+  return changed ? next : edges;
+}
+
+/**
  * Aligns or distributes selected nodes along the specified direction
  */
 export function alignNodes(
@@ -2242,6 +2523,10 @@ export function alignNodes(
   // Ring layout needs at least 3 cards to form a meaningful circle
   if (direction === "circle") {
     return alignNodesInCircle(allNodes, selSet);
+  }
+
+  if (direction === "grid") {
+    return alignNodesInGrid(allNodes, selSet);
   }
 
   if (direction === "horizontal" || direction === "middle") {
