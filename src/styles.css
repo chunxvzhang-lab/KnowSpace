@@ -202,11 +202,35 @@ button {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 12px 0;
-  gap: 10px;
+  padding: 10px 0;
+  gap: 8px;
   flex-shrink: 0;
   z-index: 30;
   transition: all 0.24s var(--ease-spring);
+  /* The dock can need more vertical room than a short window offers. Scroll it
+     instead of letting .app-shell's overflow:hidden cut the bottom controls
+     off — that is what made the lower buttons disappear. */
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.activity-bar::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+/* Every direct child keeps its natural height: without this the flex column
+   shrinks the groups (they default to flex-shrink:1) before it ever scrolls,
+   which squashed the icons instead of revealing them. */
+.activity-brand,
+.activity-group,
+.activity-divider,
+.activity-bottom {
+  flex-shrink: 0;
 }
 
 .activity-brand {
@@ -245,7 +269,7 @@ button {
 .activity-group {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 6px;
   width: 100%;
   align-items: center;
 }
@@ -254,7 +278,7 @@ button {
   width: 26px;
   height: 1px;
   background: var(--border);
-  margin: 2px 0;
+  margin: 1px 0;
   opacity: 0.8;
 }
 
@@ -263,15 +287,18 @@ button {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   width: 100%;
+  /* Keeps the dock anchored to the bottom when there is room to spare, while
+     still stacking normally once the column has to scroll. */
+  padding-top: 2px;
 }
 
 .activity-viewmodes {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 4px;
+  gap: 3px;
+  padding: 3px;
   background: var(--surface-sunken);
   border-radius: 10px;
   border: 1px solid var(--border);
@@ -302,6 +329,82 @@ button {
   background: #ded8cb;
   color: #111111;
   border-color: #b8b0a0;
+}
+
+/* ── Short-window adaptations ─────────────────────────────────────────────
+   The dock stacks a lot of controls vertically. On a shorter screen it used to
+   simply run out of room and the bottom rows were clipped away, so it now
+   tightens up progressively. Anything that still does not fit is reachable by
+   scrolling the dock (see .activity-bar). */
+
+@media (max-height: 900px) {
+  .activity-bar {
+    padding: 8px 0;
+    gap: 6px;
+  }
+
+  .activity-group {
+    gap: 5px;
+  }
+
+  .activity-bottom {
+    gap: 5px;
+  }
+
+  .activity-brand {
+    margin-bottom: 2px;
+  }
+
+  .activity-btn {
+    width: 34px;
+    height: 34px;
+  }
+}
+
+@media (max-height: 800px) {
+  .activity-brand {
+    display: none;
+  }
+
+  .activity-btn {
+    width: 32px;
+    height: 32px;
+  }
+
+  .activity-btn.mini {
+    width: 25px;
+    height: 25px;
+  }
+
+  .activity-group {
+    gap: 4px;
+  }
+
+  .activity-viewmodes {
+    gap: 2px;
+    padding: 2px;
+  }
+}
+
+@media (max-height: 680px) {
+  .activity-bar {
+    padding: 6px 0;
+    gap: 4px;
+  }
+
+  .activity-btn {
+    width: 30px;
+    height: 30px;
+  }
+
+  .activity-btn.mini {
+    width: 22px;
+    height: 22px;
+  }
+
+  .activity-bottom {
+    gap: 4px;
+  }
 }
 
 /* Activity Bar Button System */
@@ -364,19 +467,18 @@ button {
   animation: pulse-dot 2.4s ease-in-out infinite;
 }
 
-/* Floating Tooltips */
+/* Floating Tooltips
+   Rendered through a portal by ActivityBar rather than with ::after, because
+   the dock is scrollable on short windows and a scroll container clips any
+   overflowing pseudo-element. `position: fixed` is immune to that. */
 .activity-btn[data-tooltip],
 .activity-brand[data-tooltip] {
   position: relative;
 }
 
-.activity-btn[data-tooltip]::after,
-.activity-brand[data-tooltip]::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  left: calc(100% + 12px);
-  top: 50%;
-  transform: translateY(-50%) translateX(-4px) scale(0.94);
+.activity-tooltip {
+  position: fixed;
+  transform: translateY(-50%);
   background: rgba(15, 20, 25, 0.94);
   color: #f7f9f9;
   font-size: 11.5px;
@@ -389,53 +491,41 @@ button {
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   pointer-events: none;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), visibility 0.18s;
-  z-index: 100;
+  z-index: 10000;
+  animation: activity-tooltip-in 0.18s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
-.activity-btn[data-tooltip]::before,
-.activity-brand[data-tooltip]::before {
+/* Arrow pointing back at the dock */
+.activity-tooltip::before {
   content: "";
   position: absolute;
-  left: calc(100% + 6px);
+  right: 100%;
   top: 50%;
-  transform: translateY(-50%) translateX(-4px);
+  transform: translateY(-50%);
   border-width: 5px 6px 5px 0;
   border-style: solid;
   border-color: transparent rgba(15, 20, 25, 0.94) transparent transparent;
-  pointer-events: none;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), visibility 0.18s;
-  z-index: 100;
 }
 
-.activity-btn[data-tooltip]:hover::after,
-.activity-brand[data-tooltip]:hover::after {
-  opacity: 1;
-  visibility: visible;
-  transform: translateY(-50%) translateX(0) scale(1);
+@keyframes activity-tooltip-in {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) translateX(-4px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0) scale(1);
+  }
 }
 
-.activity-btn[data-tooltip]:hover::before,
-.activity-brand[data-tooltip]:hover::before {
-  opacity: 1;
-  visibility: visible;
-  transform: translateY(-50%) translateX(0);
-}
-
-:root[data-theme="light"] .activity-btn[data-tooltip]::after,
-:root[data-theme="light"] .activity-brand[data-tooltip]::after {
+:root[data-theme="light"] .activity-tooltip {
   background: rgba(255, 255, 255, 0.96);
   color: #0f1419;
   border-color: rgba(0, 0, 0, 0.12);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.06);
 }
 
-:root[data-theme="light"] .activity-btn[data-tooltip]::before,
-:root[data-theme="light"] .activity-brand[data-tooltip]::before {
+:root[data-theme="light"] .activity-tooltip::before {
   border-color: transparent rgba(255, 255, 255, 0.96) transparent transparent;
 }
 

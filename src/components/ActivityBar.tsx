@@ -1,3 +1,5 @@
+import { useCallback, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   BookOpen,
   Bookmark,
@@ -66,8 +68,36 @@ export function ActivityBar({
   isGraphOpen = false,
   onOpenCommandPalette,
 }: ActivityBarProps) {
+  // Tooltips are rendered through a portal rather than with CSS ::after
+  // pseudo-elements: the dock scrolls on short windows, and a scroll container
+  // would clip a tooltip that extends past its right edge.
+  const [tooltip, setTooltip] = useState<{ text: string; top: number; left: number } | null>(null);
+
+  const handlePointerOver = useCallback((event: React.PointerEvent<HTMLElement>) => {
+    const target = event.target as HTMLElement | null;
+    const el = target?.closest<HTMLElement>("[data-tooltip]");
+    const text = el?.getAttribute("data-tooltip");
+    if (!el || !text) {
+      setTooltip(null);
+      return;
+    }
+    const rect = el.getBoundingClientRect();
+    setTooltip({ text, top: rect.top + rect.height / 2, left: rect.right + 12 });
+  }, []);
+
+  const handlePointerLeave = useCallback(() => setTooltip(null), []);
+  // A scroll invalidates the measured position, so simply hide it.
+  const handleScroll = useCallback(() => setTooltip(null), []);
+
   return (
-    <nav className="activity-bar" aria-label="快捷工具栏">
+    <>
+    <nav
+      className="activity-bar"
+      aria-label="快捷工具栏"
+      onPointerOver={handlePointerOver}
+      onPointerLeave={handlePointerLeave}
+      onScroll={handleScroll}
+    >
       {/* Top Brand Logo */}
       <div className="activity-brand" data-tooltip="KnowSpace · 个人知识工作台 (摸鱼Lab)">
         <div className="brand-badge">
@@ -309,5 +339,18 @@ export function ActivityBar({
         </div>
       </div>
     </nav>
+    {tooltip &&
+      typeof document !== "undefined" &&
+      createPortal(
+        <div
+          className="activity-tooltip"
+          role="tooltip"
+          style={{ top: tooltip.top, left: tooltip.left }}
+        >
+          {tooltip.text}
+        </div>,
+        document.body
+      )}
+    </>
   );
 }
