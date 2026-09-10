@@ -88,6 +88,9 @@ import {
   computeSourceDisplayColorMap,
   expandLoopEdgeSelection,
   syncRingEdges,
+  syncGridEdges,
+  computeGridLayout,
+  resizeGridSpacing,
   projectPointOntoRing,
   downloadCanvasAsImage,
   copyCanvasImageToClipboard,
@@ -553,6 +556,16 @@ export const CanvasView = memo(function CanvasView({
     mouseStartX: number;
     mouseStartY: number;
     containedNodes?: Array<{ id: string; startX: number; startY: number }>;
+    /**
+     * When the selection forms a rectangular grid, dragging one of its cards
+     * becomes an interactive spacing adjustment instead of a plain move.
+     */
+    gridSpacing?: {
+      layout: ReturnType<typeof computeGridLayout> & object;
+      baseGapX: number;
+      baseGapY: number;
+      startPositions: Array<{ id: string; startX: number; startY: number }>;
+    };
   } | null>(null);
 
   const resizeDragRef = useRef<{
@@ -576,6 +589,12 @@ export const CanvasView = memo(function CanvasView({
     startX: number;
     startY: number;
     containedMap: Map<string, { id: string; startX: number; startY: number }>;
+    gridSpacing?: {
+      layout: ReturnType<typeof computeGridLayout> & object;
+      baseGapX: number;
+      baseGapY: number;
+      startById: Map<string, { id: string; startX: number; startY: number }>;
+    };
   } | null>(null);
   const latestResizePosRef = useRef<{
     dw: number;
@@ -1560,7 +1579,10 @@ export const CanvasView = memo(function CanvasView({
       const updatedNodes = alignNodes(currentData.nodes, selectedNodeIds, direction);
       // Keep ring arcs in sync: circle alignment stamps a circular arc onto the
       // loop edges, while any other alignment clears stale ring metadata.
-      const updatedEdges = syncRingEdges(updatedNodes, currentData.edges, selectedNodeIds);
+      // Grid alignment additionally marks loop edges as orthogonal straight
+      // segments so a rectangular layout reads as a clean rectangular frame.
+      const ringSynced = syncRingEdges(updatedNodes, currentData.edges, selectedNodeIds);
+      const updatedEdges = syncGridEdges(updatedNodes, ringSynced, selectedNodeIds);
 
       const toastMap: Record<CanvasAlignDirection, string> = {
         horizontal: "所选卡片已水平中线对齐",
@@ -2011,6 +2033,36 @@ export const CanvasView = memo(function CanvasView({
 
     // If multiple nodes are selected, drag all of them collaboratively
     if (currentSelected.size > 1) {
+      // Grid spacing mode: when the selection forms a complete rectangular
+      // grid, dragging a card re-flows the whole grid and adjusts the gutters
+      // live, instead of translating every card by the same offset.
+      if (liveNode.type !== "group") {
+        const selectedCards = latestDataRef.current.nodes.filter(
+          (n) => currentSelected.has(n.id) && n.type !== "group"
+        );
+        const gridLayout = computeGridLayout(selectedCards);
+        if (gridLayout) {
+          nodeDragRef.current = {
+            nodeId: liveNode.id,
+            startNodeX: liveNode.x,
+            startNodeY: liveNode.y,
+            mouseStartX: e.clientX,
+            mouseStartY: e.clientY,
+            containedNodes: [],
+            gridSpacing: {
+              layout: gridLayout,
+              baseGapX: Math.max(4, gridLayout.gapX),
+              baseGapY: Math.max(4, gridLayout.gapY),
+              startPositions: gridLayout.orderedIds.map((id) => {
+                const n = latestDataRef.current.nodes.find((x) => x.id === id)!;
+                return { id, startX: n.x, startY: n.y };
+              }),
+            },
+          };
+          return;
+        }
+      }
+
       const selectedOthers = latestDataRef.current.nodes
         .filter((n) => currentSelected.has(n.id) && n.id !== liveNode.id);
 
@@ -2340,7 +2392,24 @@ export const CanvasView = memo(function CanvasView({
           dragInfo.containedNodes?.map((c) => [c.id, c]) || []
         );
 
-        latestDragPosRef.current = { dx, dy, updatedId, startX, startY, containedMap };
+        const gridSpacing = dragInfo.gridSpacing;
+
+        latestDragPosRef.current = {
+          dx,
+          dy,
+          updatedId,
+          startX,
+          startY,
+          containedMap,
+          gridSpacing: gridSpacing
+            ? {
+                layout: gridSpacing.layout,
+                baseGapX: gridSpacing.baseGapX,
+                baseGapY: gridSpacing.baseGapY,
+                startById: new Map(gridSpacing.startPositions.map((p) => [p.id, p])),
+              }
+            : undefined,
+        };
 
         // Standard 60fps RAF throttling: update when frame is ready without dropping intermediate movement
         if (!rafDragIdRef.current) {
@@ -2349,9 +2418,39 @@ export const CanvasView = memo(function CanvasView({
             const pos = latestDragPosRef.current;
             if (!pos) return;
             setData((prev) => {
+              // ── Grid spacing mode ──────────────────────────────────────
+              // The dragged card follows the pointer while the remaining
+              // cards re-flow around it with the new gutters.
+              let workingNodes = prev.nodes;
+              if (pos.gridSpacing) {
+                const gs = pos.gridSpacing;
+                const startPos = gs.startById.get(pos.updatedId);
+                workingNodes = prev.nodes.map((n) =>
+                  n.id === pos.updatedId && startPos
+                    ? {
+                        ...n,
+                        x: Math.round(startPos.startX + pos.dx),
+                        y: Math.round(startPos.startY + pos.dy),
+                      }
+                    : n
+                );
+                workingNodes = resizeGridSpacing(
+                  workingNodes,
+                  gs.layout,
+                  pos.updatedId,
+                  pos.dx,
+                  pos.dy,
+                  gs.baseGapX,
+                  gs.baseGapY
+                );
+                const gridData = { ...prev, nodes: workingNodes };
+                latestDataRef.current = gridData;
+                return gridData;
+              }
+
               const nextData = {
                 ...prev,
-                nodes: prev.nodes.map((n) => {
+                nodes: workingNodes.map((n) => {
                   if (n.id === pos.updatedId) {
                     return {
                       ...n,
@@ -2512,26 +2611,63 @@ export const CanvasView = memo(function CanvasView({
             dragInfo.containedNodes?.map((c) => [c.id, c]) || []
           );
 
-          const finalNodes = latestDataRef.current.nodes.map((n) => {
-            if (n.id === updatedId) {
-              return {
-                ...n,
-                x: Math.round(startX + dx),
-                y: Math.round(startY + dy),
-              };
-            }
-            const contained = containedMap.get(n.id);
-            if (contained) {
-              return {
-                ...n,
-                x: Math.round(contained.startX + dx),
-                y: Math.round(contained.startY + dy),
-              };
-            }
-            return n;
-          });
+          let finalNodes: CanvasNode[];
+          if (dragInfo.gridSpacing) {
+            // Grid spacing drag: settle the grid on the final gutters
+            const gs = dragInfo.gridSpacing;
+            const startPos = gs.startPositions.find((p) => p.id === updatedId);
+            const movedNodes = latestDataRef.current.nodes.map((n) =>
+              n.id === updatedId && startPos
+                ? {
+                    ...n,
+                    x: Math.round(startPos.startX + dx),
+                    y: Math.round(startPos.startY + dy),
+                  }
+                : n
+            );
+            finalNodes = resizeGridSpacing(
+              movedNodes,
+              gs.layout,
+              updatedId,
+              dx,
+              dy,
+              gs.baseGapX,
+              gs.baseGapY
+            );
+          } else {
+            finalNodes = latestDataRef.current.nodes.map((n) => {
+              if (n.id === updatedId) {
+                return {
+                  ...n,
+                  x: Math.round(startX + dx),
+                  y: Math.round(startY + dy),
+                };
+              }
+              const contained = containedMap.get(n.id);
+              if (contained) {
+                return {
+                  ...n,
+                  x: Math.round(contained.startX + dx),
+                  y: Math.round(contained.startY + dy),
+                };
+              }
+              return n;
+            });
+          }
 
-          const finalData = { ...latestDataRef.current, nodes: finalNodes };
+          // Re-sync straight/arc metadata with the settled layout so the
+          // rendered frame matches the grid the user just resized.
+          const settledEdges = syncGridEdges(
+            finalNodes,
+            syncRingEdges(finalNodes, latestDataRef.current.edges, selectedNodeIds),
+            selectedNodeIds
+          );
+
+          const finalData = {
+            ...latestDataRef.current,
+            nodes: finalNodes,
+            edges: settledEdges,
+          };
           latestDataRef.current = finalData;
           setData(finalData);
           emitChange(finalData);
@@ -3412,7 +3548,10 @@ export const CanvasView = memo(function CanvasView({
             const p1 = getNodeAnchorPoint(fromNode, fromSide);
             const p2 = getNodeAnchorPoint(toNode, toSide);
             const ringArc = getEdgeRing(edge);
-            const pathData = computeEdgePath(p1, fromSide, p2, toSide, edge.style, edge.stepOffset, ringArc);
+            // A rectangular grid layout connects its cards with straight
+            // orthogonal segments so the loop reads as a rectangular frame.
+            const effectiveStyle = edge.gridPath ? "straight" : edge.style;
+            const pathData = computeEdgePath(p1, fromSide, p2, toSide, effectiveStyle, edge.stepOffset, ringArc);
             // On a ring the origin dot must sit on the circle, not on the raw
             // card anchor point.
             const originPoint = ringArc ? projectPointOntoRing(p1, ringArc) : p1;
@@ -4303,7 +4442,15 @@ export const CanvasView = memo(function CanvasView({
           const p1 = getNodeAnchorPoint(fromNode, fromSide);
           const p2 = getNodeAnchorPoint(toNode, toSide);
           // Place label exactly at geometric midpoint — the connection line passes THROUGH the label center
-          const rawMid = computeEdgeMidpoint(p1, fromSide, p2, toSide, edge.style, edge.stepOffset, getEdgeRing(edge));
+          const rawMid = computeEdgeMidpoint(
+            p1,
+            fromSide,
+            p2,
+            toSide,
+            edge.gridPath ? "straight" : edge.style,
+            edge.stepOffset,
+            getEdgeRing(edge)
+          );
 
           const isSelected = selectedEdgeIds.has(edge.id);
           const effectiveColorKey =

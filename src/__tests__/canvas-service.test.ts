@@ -27,6 +27,9 @@ import {
   computeRingLayout,
   syncRingEdges,
   projectPointOntoRing,
+  computeGridLayout,
+  syncGridEdges,
+  resizeGridSpacing,
   disconnectNodeEdges,
   spawnMultipleBranches,
   cycleEdgeStrokePattern,
@@ -1183,6 +1186,132 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
     // Uniform gutters: consecutive columns are evenly spaced
     const xs = [...cols.keys()].sort((a, b) => a - b);
     expect(xs[1] - xs[0]).toBe(xs[2] - xs[1]);
+  });
+
+  it("detects a rectangular grid layout and rejects free-form arrangements", () => {
+    // 2x3 grid produced by alignNodesInGrid
+    const cards: CanvasTextNode[] = [1, 2, 3, 4, 5, 6].map((i) => ({
+      id: `q${i}`,
+      type: "text" as const,
+      text: `Card ${i}`,
+      x: i * 100,
+      y: i * 80,
+      width: 160,
+      height: 100,
+    }));
+    const gridNodes = alignNodesInGrid(cards, cards.map((n) => n.id));
+    const layout = computeGridLayout(gridNodes);
+
+    expect(layout).not.toBeNull();
+    expect(layout!.cols).toBe(3);
+    expect(layout!.rows).toBe(2);
+    expect(layout!.orderedIds).toHaveLength(6);
+
+    // Free-form (diagonal) arrangement is not a grid
+    const diagonal: CanvasTextNode[] = [1, 2, 3, 4].map((i) => ({
+      id: `d${i}`,
+      type: "text" as const,
+      text: `Card ${i}`,
+      x: i * 137,
+      y: i * 93,
+      width: 100,
+      height: 80,
+    }));
+    expect(computeGridLayout(diagonal)).toBeNull();
+  });
+
+  it("keeps the anchor card pinned when re-flowing a grid", () => {
+    const cards: CanvasTextNode[] = [1, 2, 3, 4].map((i) => ({
+      id: `a${i}`,
+      type: "text" as const,
+      text: `Card ${i}`,
+      x: i * 60,
+      y: i * 50,
+      width: 120,
+      height: 80,
+    }));
+    const ids = cards.map((n) => n.id);
+
+    // First lay them out, then pin the second card where it currently is
+    const laidOut = alignNodesInGrid(cards, ids, { columns: 2, gapX: 40, gapY: 40 });
+    const anchorBefore = laidOut.find((n) => n.id === "a2")!;
+
+    const anchored = alignNodesInGrid(laidOut, ids, {
+      columns: 2,
+      gapX: 120,
+      gapY: 40,
+      anchorNodeId: "a2",
+    });
+    const anchorAfter = anchored.find((n) => n.id === "a2")!;
+
+    // The anchor must not move...
+    expect(anchorAfter.x).toBe(anchorBefore.x);
+    expect(anchorAfter.y).toBe(anchorBefore.y);
+
+    // ...while the gutter really did grow (columns are further apart)
+    const xs = [...new Set(anchored.map((n) => n.x))].sort((a, b) => a - b);
+    expect(xs[1] - xs[0]).toBeGreaterThan(120);
+  });
+
+  it("marks loop edges as straight segments on a grid and clears it off-grid", () => {
+    const cards: CanvasTextNode[] = [1, 2, 3, 4].map((i) => ({
+      id: `m${i}`,
+      type: "text" as const,
+      text: `Card ${i}`,
+      x: i * 70,
+      y: i * 55,
+      width: 140,
+      height: 90,
+    }));
+    const ids = cards.map((n) => n.id);
+
+    // A ring formed on a scattered layout carries no grid flag
+    const loopEdges = connectLoopNodes(cards, [], "bezier", true);
+    for (const e of loopEdges) expect(e.gridPath).toBeUndefined();
+
+    // Once arranged as a grid, the loop edges become straight segments
+    const gridNodes = alignNodesInGrid(cards, ids);
+    const gridEdges = syncGridEdges(gridNodes, loopEdges, ids);
+    for (const e of gridEdges) expect(e.gridPath).toBe(true);
+
+    // Breaking the grid clears the flag again
+    const scattered = gridNodes.map((n, i) => ({ ...n, x: n.x + i * 37, y: n.y + i * 29 }));
+    const cleared = syncGridEdges(scattered, gridEdges, ids);
+    for (const e of cleared) expect(e.gridPath).toBeUndefined();
+  });
+
+  it("widens the gutters when dragging a card inside a grid", () => {
+    const cards: CanvasTextNode[] = [1, 2, 3, 4].map((i) => ({
+      id: `r${i}`,
+      type: "text" as const,
+      text: `Card ${i}`,
+      x: i * 60,
+      y: i * 45,
+      width: 120,
+      height: 80,
+    }));
+    const ids = cards.map((n) => n.id);
+    const laidOut = alignNodesInGrid(cards, ids, { columns: 2, gapX: 40, gapY: 40 });
+    const layout = computeGridLayout(laidOut)!;
+
+    // Drag the top-right card 80px to the right
+    const draggedId = layout.orderedIds[1];
+    const startById = new Map(layout.orderedIds.map((id) => [id, laidOut.find((n) => n.id === id)!]));
+    const startPos = startById.get(draggedId)!;
+
+    const moved = laidOut.map((n) =>
+      n.id === draggedId ? { ...n, x: startPos.x + 80, y: startPos.y } : n
+    );
+    const result = resizeGridSpacing(moved, layout, draggedId, 80, 0, layout.gapX, layout.gapY);
+
+    // The dragged card stays where the pointer put it
+    const afterDrag = result.find((n) => n.id === draggedId)!;
+    expect(afterDrag.x).toBe(startPos.x + 80);
+
+    // Columns are now further apart than before
+    const xsBefore = [...new Set(laidOut.map((n) => n.x))].sort((a, b) => a - b);
+    const xsAfter = [...new Set(result.map((n) => n.x))].sort((a, b) => a - b);
+    expect(xsAfter[1] - xsAfter[0]).toBeGreaterThan(xsBefore[1] - xsBefore[0]);
   });
 
   it("detects a circular layout and turns loop edges into true arcs", () => {

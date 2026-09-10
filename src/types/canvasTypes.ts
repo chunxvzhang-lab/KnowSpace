@@ -72,6 +72,12 @@ export interface CanvasEdge {
   ringCenter?: { x: number; y: number };
   /** Radius of the circular arc described by `ringCenter`. */
   ringRadius?: number;
+  /**
+   * Grid layout (non-standard JSON Canvas extension): when true the edge is
+   * drawn as a straight orthogonal segment instead of a curve, so a loop of
+   * cards arranged on a rectangular grid reads as a clean rectangular frame.
+   */
+  gridPath?: boolean;
 }
 
 export interface CanvasData {

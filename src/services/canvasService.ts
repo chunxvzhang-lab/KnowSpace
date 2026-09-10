@@ -137,6 +137,10 @@ export function parseCanvasData(jsonString: string): CanvasData {
         ringRadius = item.ringRadius;
       }
 
+      // Grid layout extension: keep the orthogonal straight-segment flag so a
+      // rectangular frame stays rectangular after reloading.
+      const gridPath = item.gridPath === true ? true : undefined;
+
       edges.push({
         id: item.id,
         fromNode: item.fromNode,
@@ -153,6 +157,7 @@ export function parseCanvasData(jsonString: string): CanvasData {
         labelShape,
         ringCenter,
         ringRadius,
+        gridPath,
       });
     }
 
@@ -1469,6 +1474,9 @@ export function connectLoopNodes(
   // Detect whether these cards are actually arranged on a circle. If they are,
   // every segment becomes a true arc so the loop is a perfectly round ring.
   const ringLayout = computeRingLayout(orderedNodes);
+  // Detect a rectangular grid layout: its loop is then drawn with straight
+  // orthogonal segments, producing a clean rectangular frame.
+  const gridLayout = ringLayout ? null : computeGridLayout(orderedNodes);
 
   // Unified color for the whole loop so that all ring segments visually
   // belong to a single semantic flow, regardless of which node is "from".
@@ -1591,6 +1599,8 @@ export function connectLoopNodes(
         ...(ringLayout
           ? { ringCenter: ringLayout.center, ringRadius: ringLayout.radius }
           : {}),
+        // Likewise, a rectangular grid gets straight orthogonal segments.
+        ...(gridLayout ? { gridPath: true } : {}),
       });
     }
   }
@@ -1937,7 +1947,8 @@ export function exportCanvasToSvg(
       edge.ringCenter && edge.ringRadius
         ? { center: edge.ringCenter, radius: edge.ringRadius }
         : undefined;
-    const pathD = computeEdgePath(p1, fromSide, p2, toSide, edge.style, edge.stepOffset, ringArc);
+    const exportStyle = edge.gridPath ? "straight" : edge.style;
+    const pathD = computeEdgePath(p1, fromSide, p2, toSide, exportStyle, edge.stepOffset, ringArc);
 
     // Mirror the on-screen renderer's color resolution: prefer the
     // source-aware display color, then fall back to the edge's stored color.
@@ -1974,7 +1985,7 @@ export function exportCanvasToSvg(
 
     // 3. Edge Label Badges
     if (edge.label && edge.label.trim()) {
-      const rawMid = computeEdgeMidpoint(p1, fromSide, p2, toSide, edge.style, edge.stepOffset, ringArc);
+      const rawMid = computeEdgeMidpoint(p1, fromSide, p2, toSide, exportStyle, edge.stepOffset, ringArc);
       const labelText = escapeSvgXml(edge.label.trim());
       const shape = edge.labelShape || "pill";
       const charWidth = 11.5;
@@ -2349,6 +2360,13 @@ export interface GridAlignOptions {
   gapX?: number;
   /** Vertical gutter between cards (default 40). */
   gapY?: number;
+  /**
+   * When set, this card keeps its current coordinates and the whole grid is
+   * translated so that it lands exactly where it already is. Used by the
+   * drag-to-resize-spacing interaction so the card under the cursor acts as
+   * the anchor while every other card re-flows around it.
+   */
+  anchorNodeId?: string;
 }
 
 /**
@@ -2411,10 +2429,203 @@ export function alignNodesInGrid(
     });
   });
 
+  // Anchor support: pin the referenced card exactly where it already is and
+  // shift the whole grid accordingly, so the card under the cursor can drive
+  // the layout during a drag without jumping.
+  let shiftX = 0;
+  let shiftY = 0;
+  if (options?.anchorNodeId) {
+    const anchor = ordered.find((n) => n.id === options.anchorNodeId);
+    const anchorPos = anchor ? positions.get(anchor.id) : undefined;
+    if (anchor && anchorPos) {
+      shiftX = anchor.x - anchorPos.x;
+      shiftY = anchor.y - anchorPos.y;
+    }
+  }
+
   return allNodes.map((n) => {
     const pos = positions.get(n.id);
-    return pos ? { ...n, x: pos.x, y: pos.y } : n;
+    return pos ? { ...n, x: pos.x + shiftX, y: pos.y + shiftY } : n;
   });
+}
+
+/**
+ * Detected rectangular-grid layout of a set of cards.
+ */
+export interface GridLayoutInfo {
+  cols: number;
+  rows: number;
+  gapX: number;
+  gapY: number;
+  cellW: number;
+  cellH: number;
+  /** nodeId -> cell coordinates */
+  positions: Map<string, { row: number; col: number }>;
+  /** Ordered node ids in reading order (row by row). */
+  orderedIds: string[];
+}
+
+/**
+ * Detects whether a set of cards forms a complete rectangular grid.
+ *
+ * A layout qualifies when:
+ * 1. it has at least 2 columns and 2 rows,
+ * 2. every card sits on a shared column X and row Y (within `tolerance`),
+ * 3. the number of cards exactly fills cols × rows (no holes).
+ *
+ * Returns null for free-form layouts so callers can fall back to normal
+ * behaviour.
+ */
+export function computeGridLayout(
+  nodes: CanvasNode[],
+  tolerance = 10
+): GridLayoutInfo | null {
+  if (nodes.length < 4) return null;
+
+  const clusterValues = (values: number[]): number[] => {
+    const sorted = [...new Set(values)].sort((a, b) => a - b);
+    const out: number[] = [];
+    for (const v of sorted) {
+      if (out.length === 0 || v - out[out.length - 1] > tolerance) out.push(v);
+    }
+    return out;
+  };
+
+  const colXs = clusterValues(nodes.map((n) => n.x));
+  const rowYs = clusterValues(nodes.map((n) => n.y));
+  const cols = colXs.length;
+  const rows = rowYs.length;
+
+  if (cols < 2 || rows < 2) return null;
+  if (cols * rows !== nodes.length) return null;
+
+  const positions = new Map<string, { row: number; col: number }>();
+  for (const n of nodes) {
+    const col = colXs.findIndex((x) => Math.abs(x - n.x) <= tolerance);
+    const row = rowYs.findIndex((y) => Math.abs(y - n.y) <= tolerance);
+    if (col < 0 || row < 0) return null;
+    positions.set(n.id, { row, col });
+  }
+  if (positions.size !== nodes.length) return null;
+
+  const cellW = cols > 1 ? colXs[1] - colXs[0] : 0;
+  const cellH = rows > 1 ? rowYs[1] - rowYs[0] : 0;
+
+  const maxW = Math.max(...nodes.map((n) => n.width));
+  const maxH = Math.max(...nodes.map((n) => n.height));
+
+  const orderedIds = [...nodes]
+    .sort((a, b) => {
+      const pa = positions.get(a.id)!;
+      const pb = positions.get(b.id)!;
+      return pa.row - pb.row || pa.col - pb.col;
+    })
+    .map((n) => n.id);
+
+  return {
+    cols,
+    rows,
+    gapX: cellW - maxW,
+    gapY: cellH - maxH,
+    cellW,
+    cellH,
+    positions,
+    orderedIds,
+  };
+}
+
+/**
+ * Re-flows a rectangular grid while the user drags one of its cards, so the
+ * drag turns into an interactive spacing adjustment:
+ *
+ * - the dragged card follows the pointer exactly (it is the anchor),
+ * - the horizontal gutter grows with the horizontal drag distance, spread
+ *   across the columns,
+ * - the vertical gutter grows with the vertical drag distance, spread across
+ *   the rows.
+ *
+ * Returns nodes unchanged when the layout is not a proper grid.
+ */
+export function resizeGridSpacing(
+  allNodes: CanvasNode[],
+  layout: GridLayoutInfo,
+  draggedNodeId: string,
+  deltaX: number,
+  deltaY: number,
+  baseGapX: number,
+  baseGapY: number,
+  minGap = 4
+): CanvasNode[] {
+  const ids = new Set(layout.orderedIds);
+  const spreadX = Math.max(1, layout.cols - 1);
+  const spreadY = Math.max(1, layout.rows - 1);
+
+  const gapX = Math.max(minGap, baseGapX + deltaX / spreadX);
+  const gapY = Math.max(minGap, baseGapY + deltaY / spreadY);
+
+  // The dragged card has already been moved to the pointer position by the
+  // caller; passing it as the anchor keeps it exactly there while every other
+  // card re-flows around it with the new gutters.
+  return alignNodesInGrid(allNodes, ids, {
+    columns: layout.cols,
+    gapX,
+    gapY,
+    anchorNodeId: draggedNodeId,
+  });
+}
+
+/**
+ * Keeps grid straight-line metadata in sync with the layout: when the given
+ * cards form a rectangular grid, loop edges between them are flagged as
+ * orthogonal straight segments; otherwise the flag is cleared.
+ */
+export function syncGridEdges(
+  nodes: CanvasNode[],
+  edges: CanvasEdge[],
+  scopeNodeIds: Set<string> | string[]
+): CanvasEdge[] {
+  const scope = scopeNodeIds instanceof Set ? scopeNodeIds : new Set(scopeNodeIds);
+  const scopedNodes = nodes.filter((n) => scope.has(n.id));
+  const scopedIds = new Set(scopedNodes.map((n) => n.id));
+
+  const scopedEdges = edges.filter(
+    (e) => scopedIds.has(e.fromNode) && scopedIds.has(e.toNode)
+  );
+  if (scopedEdges.length === 0) return edges;
+
+  const loopIds = getLoopEdgeIds(scopedEdges);
+  if (loopIds.size === 0) return edges;
+
+  const loopNodeIds = new Set<string>();
+  for (const e of scopedEdges) {
+    if (loopIds.has(e.id)) {
+      loopNodeIds.add(e.fromNode);
+      loopNodeIds.add(e.toNode);
+    }
+  }
+  const loopNodes = nodes.filter((n) => loopNodeIds.has(n.id));
+
+  const isGrid = computeGridLayout(loopNodes) !== null;
+
+  let changed = false;
+  const next = edges.map((e) => {
+    if (!loopIds.has(e.id)) return e;
+    if (isGrid) {
+      if (e.gridPath !== true) {
+        changed = true;
+        return { ...e, gridPath: true };
+      }
+      return e;
+    }
+    if (e.gridPath) {
+      changed = true;
+      const { gridPath: _g, ...rest } = e;
+      return rest as CanvasEdge;
+    }
+    return e;
+  });
+
+  return changed ? next : edges;
 }
 
 /**
