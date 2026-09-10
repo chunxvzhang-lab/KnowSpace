@@ -126,6 +126,14 @@ export type KnowSpaceDesktopAPI = {
     buffer: ArrayBuffer | Uint8Array;
     filename?: string;
   }) => Promise<{ success?: boolean; canceled?: boolean; filePath?: string; message?: string }>;
+  /**
+   * Reads a local image back as a data URL. Used when exporting the canvas:
+   * the rasteriser refuses to run on a canvas that referenced a file:// image,
+   * and fetch/XHR cannot reach those paths reliably.
+   */
+  readFileAsDataUrl?: (params: {
+    filePath: string;
+  }) => Promise<{ success?: boolean; dataUrl?: string; message?: string }>;
   openInNewWindow?: (absolutePath: string) => Promise<boolean>;
   printToPdf?: (params?: {
     title?: string;

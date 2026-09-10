@@ -1711,6 +1711,33 @@ ipcMain.handle("bookmd:save-png-data", async (event, request = {}) => {
   }
 });
 
+ipcMain.handle("bookmd:read-file-as-data-url", async (event, request = {}) => {
+  const { filePath } = request;
+  if (!filePath || typeof filePath !== "string") {
+    return { success: false, message: "缺少文件路径" };
+  }
+
+  try {
+    const data = await fs.promises.readFile(filePath);
+    const ext = path.extname(filePath).slice(1).toLowerCase();
+    const mime =
+      ext === "jpg" || ext === "jpeg"
+        ? "image/jpeg"
+        : ext === "gif"
+        ? "image/gif"
+        : ext === "webp"
+        ? "image/webp"
+        : ext === "svg"
+        ? "image/svg+xml"
+        : ext === "bmp"
+        ? "image/bmp"
+        : "image/png";
+    return { success: true, dataUrl: `data:${mime};base64,${data.toString("base64")}` };
+  } catch (err) {
+    return { success: false, message: err.message };
+  }
+});
+
 ipcMain.handle("bookmd:save-png-buffer", async (event, request = {}) => {
   const targetWin = getWindowFromEvent(event);
   const { buffer, filename = "KnowSpace白板" } = request;

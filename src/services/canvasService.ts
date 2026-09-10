@@ -2259,6 +2259,266 @@ function canvasToPngBlob(canvas: HTMLCanvasElement): Promise<Blob> {
   });
 }
 
+/** True for references that stay inside the document and can never taint it. */
+function isInternalReference(url: string): boolean {
+  const trimmed = url.trim();
+  if (!trimmed) return true;
+  if (trimmed.startsWith("#")) return true;
+  if (/^data:/i.test(trimmed)) return true;
+  if (/^(blob|about|javascript):/i.test(trimmed)) return true;
+  return false;
+}
+
+/**
+ * Reads a URL into a data URL. Tries `fetch` first and falls back to XHR,
+ * which is the only route that reliably reaches `file://` resources on a
+ * `file://` page in Electron (fetch rejects them as cross-origin).
+ */
+/** Converts a file:// URL into an OS path, or null when it is not one. */
+function fileUrlToPath(url: string): string | null {
+  if (!/^file:\/\//i.test(url)) return null;
+  let p = url.slice("file://".length);
+  try {
+    p = decodeURIComponent(p);
+  } catch {
+    // keep the raw value
+  }
+  if (/^\/[a-zA-Z]:/.test(p)) p = p.slice(1); // file:///C:/x → C:/x
+  return p.replace(/\//g, "\\");
+}
+
+/** Bound on fetching a single external resource during export. */
+const RESOURCE_READ_TIMEOUT_MS = 3000;
+
+async function readUrlAsDataUrl(url: string): Promise<string | null> {
+  // Local files first: the page's security context blocks fetch/XHR on
+  // file:// resources, but the main process can read them directly — this is
+  // what lets card images survive instead of being dropped from the export.
+  const localPath = fileUrlToPath(url);
+  if (localPath && typeof window !== "undefined") {
+    const desktop = window.knowSpaceDesktop ?? window.bookMDDesktop;
+    if (desktop?.readFileAsDataUrl) {
+      try {
+        const res = await desktop.readFileAsDataUrl({ filePath: localPath });
+        if (res?.success && res.dataUrl) return res.dataUrl;
+      } catch {
+        // fall through to the network paths
+      }
+    }
+  }
+
+  // Every read is time-boxed: a hanging remote image must never stall the
+  // whole export, it just gets dropped.
+  try {
+    const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+    const timer = controller
+      ? setTimeout(() => controller.abort(), RESOURCE_READ_TIMEOUT_MS)
+      : null;
+    try {
+      const res = await fetch(url, controller ? { signal: controller.signal } : undefined);
+      if (res.ok) {
+        const blob = await res.blob();
+        if (blob.size > 0) return await blobToDataUrl(blob);
+      }
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  } catch {
+    // fall through to XHR
+  }
+
+  return new Promise<string | null>((resolve) => {
+    let settled = false;
+    const finish = (value: string | null) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+
+    try {
+      const xhr = new XMLHttpRequest();
+      xhr.open("GET", url, true);
+      xhr.responseType = "blob";
+      xhr.onload = () => {
+        const blob = xhr.response as Blob | null;
+        if (blob && blob.size > 0) {
+          blobToDataUrl(blob).then(finish).catch(() => finish(null));
+        } else {
+          finish(null);
+        }
+      };
+      xhr.onerror = () => finish(null);
+      xhr.ontimeout = () => finish(null);
+      xhr.onabort = () => finish(null);
+      xhr.timeout = RESOURCE_READ_TIMEOUT_MS;
+      xhr.send();
+    } catch {
+      finish(null);
+    }
+  });
+}
+
+/**
+ * Rewrites an exported SVG so every external resource is either inlined as a
+ * data URL or removed.
+ *
+ * An SVG loaded through a blob URL inherits the page's security context, so a
+ * single `<img src="file://…">` or cross-origin image inside it taints the
+ * canvas it is drawn onto — and a tainted canvas refuses `toBlob()`, which is
+ * exactly the "Tainted canvases may not be exported" failure. Inlining keeps
+ * the picture; anything we cannot read is dropped so the export still succeeds
+ * instead of failing outright.
+ */
+export async function sanitizeSvgResources(svgString: string): Promise<string> {
+  const viaDom = await sanitizeSvgViaDom(svgString);
+  if (viaDom !== null) return viaDom;
+  // The markup was not well-formed XML (the card bodies are HTML inside a
+  // foreignObject, which is easy to get wrong), so fall back to a textual
+  // rewrite. Less precise, but it is what keeps the export from failing.
+  return sanitizeSvgViaRegex(svgString);
+}
+
+/** Returns null when the SVG could not be parsed as XML. */
+async function sanitizeSvgViaDom(svgString: string): Promise<string | null> {
+  if (typeof DOMParser === "undefined" || typeof XMLSerializer === "undefined") {
+    return null;
+  }
+
+  let doc: Document;
+  try {
+    doc = new DOMParser().parseFromString(svgString, "image/svg+xml");
+  } catch {
+    return null;
+  }
+  if (doc.getElementsByTagName("parsererror").length > 0) return null;
+
+  const targets: Array<{ el: Element; attr: string; url: string }> = [];
+  const nodes = Array.from(doc.querySelectorAll("img, image"));
+  for (const el of nodes) {
+    for (const attr of ["src", "href", "xlink:href"]) {
+      const url = el.getAttribute(attr);
+      if (url && !isInternalReference(url)) {
+        targets.push({ el, attr, url });
+        break;
+      }
+    }
+  }
+
+  // CSS background images can taint the canvas just as easily.
+  for (const el of Array.from(doc.querySelectorAll("[style]"))) {
+    const style = el.getAttribute("style") ?? "";
+    const match = /url\((['"]?)(?!data:|#)([^'")]+)\1\)/i.exec(style);
+    if (match) targets.push({ el, attr: "style", url: match[2] });
+  }
+
+  if (targets.length === 0) return svgString;
+
+  const resolved = await Promise.all(
+    targets.map(async (t) => ({ ...t, dataUrl: await readUrlAsDataUrl(t.url) }))
+  );
+
+  for (const t of resolved) {
+    if (t.attr === "style") {
+      const style = t.el.getAttribute("style") ?? "";
+      t.el.setAttribute(
+        "style",
+        t.dataUrl
+          ? style.replace(t.url, t.dataUrl)
+          : style.replace(/url\([^)]*\)/gi, "none")
+      );
+      continue;
+    }
+
+    if (t.dataUrl) {
+      t.el.setAttribute(t.attr, t.dataUrl);
+      if (t.attr === "href") {
+        t.el.setAttributeNS("http://www.w3.org/1999/xlink", "xlink:href", t.dataUrl);
+      }
+    } else {
+      t.el.remove();
+    }
+  }
+
+  try {
+    return new XMLSerializer().serializeToString(doc);
+  } catch {
+    return null;
+  }
+}
+
+const SVG_IMAGE_TAG_RE =
+  /<(?:img|image)\b[^>]*?\b(src|href|xlink:href)\s*=\s*(["'])(.*?)\2[^>]*?>/gi;
+const SVG_CSS_URL_RE = /url\(\s*(["']?)(?!data:|#)([^'")]+)\1\s*\)/gi;
+
+/** Textual fallback used when the SVG is not well-formed XML. */
+async function sanitizeSvgViaRegex(svgString: string): Promise<string> {
+  const urls = new Set<string>();
+  let match: RegExpExecArray | null;
+
+  SVG_IMAGE_TAG_RE.lastIndex = 0;
+  while ((match = SVG_IMAGE_TAG_RE.exec(svgString)) !== null) {
+    if (!isInternalReference(match[3])) urls.add(match[3]);
+  }
+  SVG_CSS_URL_RE.lastIndex = 0;
+  while ((match = SVG_CSS_URL_RE.exec(svgString)) !== null) {
+    if (!isInternalReference(match[2])) urls.add(match[2]);
+  }
+  if (urls.size === 0) return svgString;
+
+  const resolved = new Map<string, string | null>();
+  await Promise.all(
+    [...urls].map(async (url) => {
+      resolved.set(url, await readUrlAsDataUrl(url));
+    })
+  );
+
+  let out = svgString.replace(SVG_IMAGE_TAG_RE, (full, _attr, _quote, url) => {
+    const dataUrl = resolved.get(url);
+    if (dataUrl) return full.split(url).join(dataUrl);
+    // Drop the element entirely — an unreadable external reference would
+    // taint the canvas and abort the whole export.
+    return "";
+  });
+
+  out = out.replace(SVG_CSS_URL_RE, (full, quote, url) => {
+    const dataUrl = resolved.get(url);
+    return dataUrl ? `url(${quote}${dataUrl}${quote})` : "none";
+  });
+
+  return out;
+}
+
+/**
+ * Last-resort fallback: strips every image from the SVG. Used only when a
+ * canvas still reports itself as tainted after sanitisation, so the user gets
+ * a text-and-shape export rather than no file at all.
+ */
+function stripSvgImages(svgString: string): string {
+  if (typeof DOMParser === "undefined" || typeof XMLSerializer === "undefined") {
+    return svgString;
+  }
+  try {
+    const doc = new DOMParser().parseFromString(svgString, "image/svg+xml");
+    if (doc.getElementsByTagName("parsererror").length > 0) return svgString;
+    for (const el of Array.from(doc.querySelectorAll("img, image"))) el.remove();
+    for (const el of Array.from(doc.querySelectorAll("[style]"))) {
+      const style = el.getAttribute("style") ?? "";
+      if (/url\(/i.test(style)) {
+        el.setAttribute("style", style.replace(/url\([^)]*\)/gi, "none"));
+      }
+    }
+    return new XMLSerializer().serializeToString(doc);
+  } catch {
+    return svgString;
+  }
+}
+
+/** Detects the security error thrown when a canvas has been tainted. */
+function isTaintedCanvasError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err ?? "");
+  return /tainted|securityerror|may not be exported|insecure/i.test(message);
+}
+
 function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     if (typeof FileReader === "undefined") {
@@ -2305,31 +2565,63 @@ export async function exportCanvasToPngBlob(
   }
 
   const scale = resolveExportScale(baseWidth, baseHeight, options?.scale ?? 2);
-  const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
-  const url = URL.createObjectURL(svgBlob);
+
+  // Inline every external reference (or drop what cannot be read) before the
+  // SVG is loaded into an <img>. A single file:// or cross-origin resource
+  // taints the canvas permanently, and a tainted canvas cannot be exported —
+  // the exact "Tainted canvases may not be exported" failure users hit on
+  // boards whose cards embed images.
+  const safeSvg = await sanitizeSvgResources(svgString);
+
+  const rasterise = async (svg: string): Promise<Blob> => {
+    const svgBlob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(svgBlob);
+    try {
+      const img = await loadImageForExport(url);
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(baseWidth * scale));
+      canvas.height = Math.max(1, Math.round(baseHeight * scale));
+
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("无法创建 Canvas 2D 上下文");
+
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      try {
+        return await canvasToPngBlob(canvas);
+      } finally {
+        // Release the backing store right away — a 24 MP canvas pins ~96 MB.
+        canvas.width = 0;
+        canvas.height = 0;
+      }
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  };
 
   try {
-    const img = await loadImageForExport(url);
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, Math.round(baseWidth * scale));
-    canvas.height = Math.max(1, Math.round(baseHeight * scale));
+    return await rasterise(safeSvg);
+  } catch (err) {
+    if (!isTaintedCanvasError(err)) throw err;
 
-    const ctx = canvas.getContext("2d");
-    if (!ctx) throw new Error("无法创建 Canvas 2D 上下文");
-
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = "high";
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-    const blob = await canvasToPngBlob(canvas);
-
-    // Release the backing store right away — a 24 MP canvas pins ~96 MB.
-    canvas.width = 0;
-    canvas.height = 0;
-
-    return blob;
-  } finally {
-    URL.revokeObjectURL(url);
+    // Something still slipped through (an unreachable relative path, a CSS
+    // reference, a resource that loaded after we inspected it). Drop every
+    // image and retry once so the user still gets a usable file rather than
+    // an error dialog.
+    const stripped = stripSvgImages(safeSvg);
+    if (stripped === safeSvg) {
+      throw new Error("白板包含无法内联的外部图片，浏览器安全策略阻止了图片导出");
+    }
+    try {
+      return await rasterise(stripped);
+    } catch (retryErr) {
+      if (isTaintedCanvasError(retryErr)) {
+        throw new Error("白板包含无法内联的外部图片，浏览器安全策略阻止了图片导出");
+      }
+      throw retryErr;
+    }
   }
 }
 

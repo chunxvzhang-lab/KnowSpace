@@ -15,6 +15,7 @@ import {
   downloadCanvasAsImage,
   copyCanvasImageToClipboard,
   resolveExportScale,
+  sanitizeSvgResources,
   reverseEdgeDirection,
   connectOneToMany,
   connectChainNodes,
@@ -288,6 +289,60 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
     // Clipboard copy
     const copied = await copyCanvasImageToClipboard(data);
     expect(typeof copied).toBe("boolean");
+  });
+
+  it("removes external SVG resources so the canvas can never be tainted", async () => {
+    // A file:// image inside the exported SVG is what produced
+    // "Tainted canvases may not be exported" — toBlob() refuses to run.
+    const svg =
+      `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">` +
+      `<image href="file:///C:/private/shot.png" width="10" height="10"/>` +
+      `<rect width="100" height="100"/></svg>`;
+
+    const out = await sanitizeSvgResources(svg);
+    expect(out).not.toContain("file:///C:/private/shot.png");
+    // Everything else in the drawing must survive
+    expect(out).toContain("<rect");
+  });
+
+  it("keeps data URLs and internal references untouched", async () => {
+    const svg =
+      `<svg xmlns="http://www.w3.org/2000/svg">` +
+      `<image href="data:image/png;base64,iVBORw0KGgo="/>` +
+      `<use href="#shared-shape"/></svg>`;
+
+    const out = await sanitizeSvgResources(svg);
+    expect(out).toContain("data:image/png;base64,iVBORw0KGgo=");
+    expect(out).toContain("#shared-shape");
+  });
+
+  it("strips img tags nested inside foreignObject card bodies", async () => {
+    const svg =
+      `<svg xmlns="http://www.w3.org/2000/svg"><foreignObject x="0" y="0" width="200" height="100">` +
+      `<div xmlns="http://www.w3.org/1999/xhtml"><img src="file:///nowhere/tracker.png"/><p>text</p></div>` +
+      `</foreignObject></svg>`;
+
+    const out = await sanitizeSvgResources(svg);
+    expect(out).not.toContain("tracker.png");
+    expect(out).toContain("text");
+  }, 15000);
+
+  it("rewrites CSS url() references that would taint the canvas", async () => {
+    // Deliberately not well-formed XML (unclosed <br>) so this also exercises
+    // the textual fallback path.
+    const svg =
+      `<svg xmlns="http://www.w3.org/2000/svg">` +
+      `<foreignObject><div xmlns="http://www.w3.org/1999/xhtml">` +
+      `<span style="background-image:url('file:///nowhere/paper.png')">a<br></span>` +
+      `</div></foreignObject></svg>`;
+
+    const out = await sanitizeSvgResources(svg);
+    expect(out).not.toContain("paper.png");
+  }, 15000);
+
+  it("leaves an SVG with no external resources untouched", async () => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg"><circle cx="5" cy="5" r="4"/></svg>`;
+    expect(await sanitizeSvgResources(svg)).toBe(svg);
   });
 
   it("clamps the export scale so oversized boards cannot crash the renderer", () => {
