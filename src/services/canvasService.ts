@@ -7,6 +7,7 @@ import type {
   CanvasTextNode,
   CanvasGroupNode,
 } from "../types/canvasTypes";
+import { renderCardMarkdown } from "./markdown";
 
 export const CANVAS_COLOR_PALETTES: Record<string, { label: string; stroke: string; bg: string }> = {
   "1": { label: "珊瑚红", stroke: "#ef4444", bg: "rgba(239, 68, 68, 0.12)" },
@@ -1669,10 +1670,48 @@ export function exportCanvasToSvg(
       ? "#0f172a"
       : "#f8fafc";
 
-  const cardBg = isDark ? "#1e293b" : "#ffffff";
-  const cardText = isDark ? "#f1f5f9" : "#0f172a";
-  const cardBorder = isDark ? "#334155" : "#e2e8f0";
-  const defaultEdgeColor = isDark ? "#38bdf8" : "#0284c7";
+  // ── Theme palette (mirrors getCanvasThemeColors in CanvasView) ───────────
+  const isEink = options?.theme === "eink";
+  const themePalette = isEink
+    ? {
+        cardBg: "#ffffff",
+        cardBorder: "#1a1a1a",
+        cardText: "#1a1a1a",
+        cardHeaderBg: "#ede8df",
+        cardHeaderBorder: "#d5cebf",
+        cardHeaderText: "#1a1a1a",
+        cardShadow: "0 2px 8px rgba(0,0,0,0.10)",
+        codeBg: "#efe9dd",
+        quoteBorder: "#b9b1a0",
+      }
+    : isDark
+    ? {
+        cardBg: "#1e293b",
+        cardBorder: "rgba(255,255,255,0.12)",
+        cardText: "#f1f5f9",
+        cardHeaderBg: "rgba(255,255,255,0.04)",
+        cardHeaderBorder: "rgba(255,255,255,0.08)",
+        cardHeaderText: "#e2e8f0",
+        cardShadow: "0 8px 24px rgba(0,0,0,0.35)",
+        codeBg: "rgba(255,255,255,0.08)",
+        quoteBorder: "rgba(255,255,255,0.28)",
+      }
+    : {
+        cardBg: "#ffffff",
+        cardBorder: "#e2e8f0",
+        cardText: "#1e293b",
+        cardHeaderBg: "#f8fafc",
+        cardHeaderBorder: "#e2e8f0",
+        cardHeaderText: "#334155",
+        cardShadow: "0 4px 16px rgba(0,0,0,0.06)",
+        codeBg: "rgba(15,23,42,0.06)",
+        quoteBorder: "rgba(100,116,139,0.45)",
+      };
+
+  const cardBg = themePalette.cardBg;
+  const cardText = themePalette.cardText;
+  const cardBorder = themePalette.cardBorder;
+  const defaultEdgeColor = isEink ? "#1a1a1a" : isDark ? "#38bdf8" : "#0284c7";
   const dotColor = isDark ? "rgba(255, 255, 255, 0.12)" : "rgba(0, 0, 0, 0.08)";
 
   const nodeMap = new Map<string, CanvasNode>(data.nodes.map((n) => [n.id, n]));
@@ -1723,6 +1762,36 @@ export function exportCanvasToSvg(
     `    <marker id="arrow-default" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 1 L 10 5 L 0 9 z" fill="${defaultEdgeColor}" /></marker>`
   );
   lines.push(`  </defs>`);
+
+  // ── Embedded stylesheet ──────────────────────────────────────────────────
+  // Mirrors the on-screen card styling so the exported image reproduces every
+  // visible element (header tint, origin badge, rich Markdown body, …).
+  lines.push(`  <style><![CDATA[`);
+  lines.push(`    .ks-card{width:100%;height:100%;box-sizing:border-box;border-radius:12px;display:flex;flex-direction:column;overflow:hidden;background:${themePalette.cardBg};box-shadow:${themePalette.cardShadow};font-family:system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;}`);
+  lines.push(`    .ks-hdr{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:6px 10px;font-size:11px;font-weight:600;border-bottom:1px solid ${themePalette.cardHeaderBorder};flex-shrink:0;}`);
+  lines.push(`    .ks-title{display:inline-flex;align-items:center;gap:4px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}`);
+  lines.push(`    .ks-badge{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;white-space:nowrap;flex-shrink:0;}`);
+  lines.push(`    .ks-body{flex:1;padding:8px 12px;overflow:hidden;font-size:13px;line-height:1.6;color:${themePalette.cardText};}`);
+  lines.push(`    .ks-body > *:first-child{margin-top:0;}`);
+  lines.push(`    .ks-body > *:last-child{margin-bottom:0;}`);
+  lines.push(`    .ks-body h1{font-size:17px;font-weight:700;margin:0 0 8px;}`);
+  lines.push(`    .ks-body h2{font-size:15.5px;font-weight:700;margin:0 0 8px;}`);
+  lines.push(`    .ks-body h3{font-size:14px;font-weight:700;margin:0 0 6px;}`);
+  lines.push(`    .ks-body h4,.ks-body h5,.ks-body h6{font-size:13px;font-weight:700;margin:0 0 6px;}`);
+  lines.push(`    .ks-body p{margin:0 0 6px;}`);
+  lines.push(`    .ks-body ul,.ks-body ol{margin:0 0 6px;padding-left:20px;}`);
+  lines.push(`    .ks-body li{margin:2px 0;}`);
+  lines.push(`    .ks-body li.task-list-item{list-style:none;margin-left:-18px;}`);
+  lines.push(`    .ks-body code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px;padding:1px 4px;border-radius:4px;background:${themePalette.codeBg};}`);
+  lines.push(`    .ks-body pre{padding:8px 10px;border-radius:6px;overflow:hidden;background:${themePalette.codeBg};margin:0 0 6px;}`);
+  lines.push(`    .ks-body pre code{padding:0;background:none;}`);
+  lines.push(`    .ks-body blockquote{margin:0 0 6px;padding-left:10px;border-left:3px solid ${themePalette.quoteBorder};opacity:.88;}`);
+  lines.push(`    .ks-body a{color:${defaultEdgeColor};text-decoration:underline;}`);
+  lines.push(`    .ks-body table{border-collapse:collapse;font-size:12px;}`);
+  lines.push(`    .ks-body th,.ks-body td{border:1px solid ${themePalette.cardBorder};padding:2px 6px;}`);
+  lines.push(`    .ks-body hr{border:none;border-top:1px solid ${themePalette.cardBorder};margin:8px 0;}`);
+  lines.push(`    .ks-body img{max-width:100%;}`);
+  lines.push(`  ]]></style>`);
 
   // Background Rect
   if (bgColor !== "none") {
@@ -1829,85 +1898,84 @@ export function exportCanvasToSvg(
     lines.push(`  </g>`);
   });
 
-  // 4. Cards Layer
+  // 4. Cards Layer — rendered through foreignObject so the exported image
+  // reproduces exactly what the user sees on screen: tinted header, origin
+  // badge, full rich Markdown body, file/link layouts, task checkboxes, etc.
+  const outgoingCountMap = new Map<string, number>();
+  for (const e of data.edges) {
+    if (e.fromNode) {
+      outgoingCountMap.set(e.fromNode, (outgoingCountMap.get(e.fromNode) ?? 0) + 1);
+    }
+  }
+
   data.nodes
     .filter((n) => n.type !== "group")
     .forEach((card) => {
-      const pal = card.color && CANVAS_COLOR_PALETTES[card.color] ? CANVAS_COLOR_PALETTES[card.color] : CANVAS_COLOR_PALETTES["5"];
-      const headerColor = pal.stroke;
+      const pal =
+        card.color && CANVAS_COLOR_PALETTES[card.color]
+          ? CANVAS_COLOR_PALETTES[card.color]
+          : undefined;
 
-      lines.push(`  <g class="canvas-card" data-id="${card.id}" filter="url(#card-shadow)">`);
-      // Card Body Rect
-      lines.push(
-        `    <rect x="${card.x}" y="${card.y}" width="${card.width}" height="${card.height}" rx="12" fill="${cardBg}" stroke="${cardBorder}" stroke-width="1.2" />`
-      );
-      // Card Header Banner
-      lines.push(
-        `    <path d="M ${card.x} ${card.y + 26} L ${card.x} ${card.y + 12} Q ${card.x} ${card.y} ${card.x + 12} ${card.y} L ${card.x + card.width - 12} ${card.y} Q ${card.x + card.width} ${card.y} ${card.x + card.width} ${card.y + 12} L ${card.x + card.width} ${card.y + 26} Z" fill="${headerColor}" />`
-      );
+      const outgoingCount = outgoingCountMap.get(card.id) ?? 0;
+      const isOneToManySource = outgoingCount >= 2;
+      const sourceColorKey = sourceDisplayColorMap.get(card.id);
+      const sourcePal =
+        sourceColorKey && CANVAS_COLOR_PALETTES[sourceColorKey]
+          ? CANVAS_COLOR_PALETTES[sourceColorKey]
+          : undefined;
 
-      // Card Header Icon & Title
-      let cardTitle = "文本卡片";
-      if (card.type === "file") cardTitle = card.file.replace(/\.(md|markdown)$/i, "");
-      else if (card.type === "link") cardTitle = "网页超链";
-      lines.push(
-        `    <text x="${card.x + 10}" y="${card.y + 15}" fill="#ffffff" font-family="system-ui, sans-serif" font-size="11" font-weight="600" dominant-baseline="central">${escapeSvgXml(cardTitle)}</text>`
-      );
+      // Border priority mirrors CanvasView:
+      // one-to-many source color > node color > default border
+      const borderStroke =
+        isOneToManySource && sourcePal ? sourcePal.stroke : pal ? pal.stroke : cardBorder;
+      const borderWidth = (isOneToManySource && sourcePal) || pal ? 2 : 1;
+      const headerBg = pal ? pal.bg : themePalette.cardHeaderBg;
 
-      // Card Body Content Lines
-      if (card.type === "text") {
-        const rawLines = card.text.split("\n");
-        let curY = card.y + 44;
-        const maxY = card.y + card.height - 12;
-
-        for (const rawLine of rawLines) {
-          if (curY > maxY) break;
-          const trimmed = rawLine.trim();
-          if (!trimmed) {
-            curY += 8;
-            continue;
-          }
-
-          let displayLine = trimmed;
-          let isHeader = false;
-          if (trimmed.startsWith("### ")) {
-            displayLine = trimmed.slice(4);
-            isHeader = true;
-          } else if (trimmed.startsWith("## ")) {
-            displayLine = trimmed.slice(3);
-            isHeader = true;
-          } else if (trimmed.startsWith("# ")) {
-            displayLine = trimmed.slice(2);
-            isHeader = true;
-          } else if (trimmed.startsWith("- [x] ")) {
-            displayLine = "☑ " + trimmed.slice(6);
-          } else if (trimmed.startsWith("- [ ] ")) {
-            displayLine = "☐ " + trimmed.slice(6);
-          } else if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
-            displayLine = "• " + trimmed.slice(2);
-          }
-
-          // Truncate long lines to fit card width
-          const maxChars = Math.floor((card.width - 24) / 8);
-          if (displayLine.length > maxChars) {
-            displayLine = displayLine.slice(0, maxChars - 1) + "…";
-          }
-
-          lines.push(
-            `    <text x="${card.x + 12}" y="${curY}" fill="${isHeader ? headerColor : cardText}" font-family="system-ui, sans-serif" font-size="${isHeader ? "13" : "11.5"}" font-weight="${isHeader ? "bold" : "normal"}">${escapeSvgXml(displayLine)}</text>`
-          );
-          curY += isHeader ? 20 : 16;
-        }
-      } else if (card.type === "file") {
-        lines.push(
-          `    <text x="${card.x + 12}" y="${card.y + 50}" fill="${cardText}" font-family="system-ui, sans-serif" font-size="12" font-weight="600">📄 ${escapeSvgXml(card.file)}</text>`
-        );
+      // Header icon + label — identical wording to the on-screen card
+      let headerIcon = "📝";
+      let headerLabel = "便签卡片";
+      if (card.type === "file") {
+        headerIcon = "📄";
+        headerLabel = card.file;
       } else if (card.type === "link") {
-        lines.push(
-          `    <text x="${card.x + 12}" y="${card.y + 50}" fill="${defaultEdgeColor}" font-family="system-ui, sans-serif" font-size="11.5" text-decoration="underline">🔗 ${escapeSvgXml(card.url)}</text>`
-        );
+        headerIcon = "🔗";
+        headerLabel = "外部参考";
       }
 
+      // Body content
+      let bodyHtml = "";
+      if (card.type === "text") {
+        bodyHtml = renderCardMarkdown(card.text);
+      } else if (card.type === "file") {
+        bodyHtml =
+          `<p style="margin:0 0 6px 0;font-weight:600;">${escapeSvgXml(card.file)}</p>` +
+          `<p style="margin:0;opacity:0.7;font-size:11.5px;">库内 Markdown 文档卡片。点击右上角图标可在主阅读区全屏打开。</p>`;
+      } else {
+        bodyHtml = `<a href="${escapeSvgXml(card.url)}">${escapeSvgXml(card.url)}</a>`;
+      }
+
+      // "🌱 发起源 · N" hub badge
+      let badgeHtml = "";
+      if (isOneToManySource) {
+        const badgeBg = sourcePal ? sourcePal.bg : "rgba(16, 185, 129, 0.15)";
+        const badgeFg = sourcePal ? sourcePal.stroke : "#10b981";
+        badgeHtml = `<span class="ks-badge" style="background:${badgeBg};color:${badgeFg};border:1px solid ${badgeFg};">🌱 发起源 · ${outgoingCount}</span>`;
+      }
+
+      lines.push(`  <g class="canvas-card" data-id="${card.id}">`);
+      lines.push(
+        `    <foreignObject x="${card.x}" y="${card.y}" width="${card.width}" height="${card.height}">`
+      );
+      lines.push(
+        `      <div xmlns="http://www.w3.org/1999/xhtml" class="ks-card" style="border:${borderWidth}px solid ${borderStroke};">`
+      );
+      lines.push(
+        `        <div class="ks-hdr" style="background:${headerBg};color:${themePalette.cardHeaderText};">` +
+          `<span class="ks-title">${headerIcon} ${escapeSvgXml(headerLabel)}</span>${badgeHtml}</div>`
+      );
+      lines.push(`        <div class="ks-body">${bodyHtml}</div>`);
+      lines.push(`      </div>`);
+      lines.push(`    </foreignObject>`);
       lines.push(`  </g>`);
     });
 

@@ -400,6 +400,7 @@ export const CanvasView = memo(function CanvasView({
   // a fixed-positioned portal. The menu is intentionally rendered at the
   // document body level so it can never be clipped by the canvas container's
   // `overflow: hidden` or any ancestor that would otherwise occlude it.
+  const [showAlignMenu, setShowAlignMenu] = useState(false);
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -462,7 +463,10 @@ export const CanvasView = memo(function CanvasView({
       }
     };
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setContextMenu(null);
+      if (e.key === "Escape") {
+        setContextMenu(null);
+        setShowAlignMenu(false);
+      }
     };
     const handleResize = () => setContextMenu(null);
     window.addEventListener("mousedown", handleOutside);
@@ -474,6 +478,19 @@ export const CanvasView = memo(function CanvasView({
       window.removeEventListener("resize", handleResize);
     };
   }, [contextMenu]);
+
+  // Close the toolbar align dropdown on any outside click
+  useEffect(() => {
+    if (!showAlignMenu) return;
+    const handleOutside = () => setShowAlignMenu(false);
+    window.addEventListener("mousedown", handleOutside);
+    return () => window.removeEventListener("mousedown", handleOutside);
+  }, [showAlignMenu]);
+
+  // The align dropdown only makes sense while 2+ cards are selected
+  useEffect(() => {
+    if (selectedNodeIds.size < 2 && showAlignMenu) setShowAlignMenu(false);
+  }, [selectedNodeIds, showAlignMenu]);
 
   // Edge label editing state
   const [editingEdgeId, setEditingEdgeId] = useState<string | null>(null);
@@ -3008,36 +3025,119 @@ export const CanvasView = memo(function CanvasView({
                 <span className="canvas-btn-label">环形闭环</span>
               </button>
             )}
-            <button
-              className="canvas-tool-btn"
-              onClick={() => handleAlignSelected("horizontal")}
-              title="将选中的卡片沿水平中线对齐"
-              style={{
-                ...toolBtnStyle(theme, colors),
-                backgroundColor: "rgba(2, 132, 199, 0.12)",
-                color: "#0284c7",
-                border: "1px solid rgba(2, 132, 199, 0.25)",
-                fontWeight: 600,
-              }}
+            {/* Unified align / distribute dropdown */}
+            <div
+              style={{ position: "relative", flexShrink: 0 }}
+              onMouseDown={(e) => e.stopPropagation()}
             >
-              <AlignJustify size={13} />
-              <span className="canvas-btn-label">水平对齐</span>
-            </button>
-            <button
-              className="canvas-tool-btn"
-              onClick={() => handleAlignSelected("vertical")}
-              title="将选中的卡片沿垂直中线对齐"
-              style={{
-                ...toolBtnStyle(theme, colors),
-                backgroundColor: "rgba(2, 132, 199, 0.12)",
-                color: "#0284c7",
-                border: "1px solid rgba(2, 132, 199, 0.25)",
-                fontWeight: 600,
-              }}
-            >
-              <AlignCenter size={13} />
-              <span className="canvas-btn-label">垂直对齐</span>
-            </button>
+              <button
+                className="canvas-tool-btn"
+                onClick={() => setShowAlignMenu((v) => !v)}
+                title="对齐与分布 (多选卡片)"
+                style={{
+                  ...toolBtnStyle(theme, colors),
+                  backgroundColor: showAlignMenu
+                    ? "rgba(2, 132, 199, 0.24)"
+                    : "rgba(2, 132, 199, 0.12)",
+                  color: "#0284c7",
+                  border: "1px solid rgba(2, 132, 199, 0.25)",
+                  fontWeight: 600,
+                }}
+              >
+                <AlignCenter size={13} />
+                <span className="canvas-btn-label">对齐 ▾</span>
+              </button>
+              {showAlignMenu && (
+                <div
+                  className="canvas-align-menu"
+                  style={{
+                    position: "absolute",
+                    top: "calc(100% + 8px)",
+                    right: 0,
+                    zIndex: 300,
+                    minWidth: 196,
+                    padding: "6px 0",
+                    borderRadius: 10,
+                    backgroundColor:
+                      theme === "eink" ? "#f4f1ea" : !isDark ? "#ffffff" : "#1e293b",
+                    border: `1px solid ${colors.cardBorder}`,
+                    boxShadow: "0 12px 36px rgba(0,0,0,0.22)",
+                    fontSize: 12.5,
+                    color: colors.cardText,
+                    userSelect: "none",
+                  }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="canvas-ctx-section-label">中心对齐</div>
+                  {([
+                    ["horizontal", "水平中线对齐", AlignJustify],
+                    ["vertical", "垂直中线对齐", AlignCenter],
+                  ] as const).map(([dir, label, Icon]) => (
+                    <div
+                      key={dir}
+                      className="canvas-ctx-item"
+                      onClick={() => {
+                        handleAlignSelected(dir);
+                        setShowAlignMenu(false);
+                      }}
+                    >
+                      <Icon size={13} />
+                      <span style={{ fontWeight: 600 }}>{label}</span>
+                    </div>
+                  ))}
+
+                  <div className="canvas-ctx-divider" />
+                  <div className="canvas-ctx-section-label">边缘对齐</div>
+                  {([
+                    ["left", "左对齐", AlignLeft],
+                    ["center", "水平居中", null],
+                    ["right", "右对齐", AlignRight],
+                    ["top", "顶端对齐", ArrowUpToLine],
+                    ["bottom", "底端对齐", ArrowDownToLine],
+                  ] as const).map(([dir, label, Icon]) => (
+                    <div
+                      key={dir}
+                      className="canvas-ctx-item"
+                      onClick={() => {
+                        handleAlignSelected(dir);
+                        setShowAlignMenu(false);
+                      }}
+                    >
+                      {Icon ? <Icon size={13} /> : <AlignCenter size={13} />}
+                      <span>{label}</span>
+                    </div>
+                  ))}
+
+                  {selectedNodeIds.size >= 3 && (
+                    <>
+                      <div className="canvas-ctx-divider" />
+                      <div className="canvas-ctx-section-label">等距分布</div>
+                      <div
+                        className="canvas-ctx-item"
+                        onClick={() => {
+                          handleAlignSelected("distribute-h");
+                          setShowAlignMenu(false);
+                        }}
+                      >
+                        <AlignHorizontalJustifyCenter size={13} />
+                        <span>水平等距分布</span>
+                      </div>
+                      <div
+                        className="canvas-ctx-item"
+                        onClick={() => {
+                          handleAlignSelected("distribute-v");
+                          setShowAlignMenu(false);
+                        }}
+                      >
+                        <AlignVerticalJustifyCenter size={13} />
+                        <span>垂直等距分布</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           </>
         )}
 
@@ -5843,11 +5943,11 @@ export const CanvasView = memo(function CanvasView({
 
                       <div className="canvas-ctx-item" onClick={() => handleAlignSelected("horizontal")}>
                         <AlignJustify size={13} color="#0284c7" />
-                        <span style={{ fontWeight: 600 }}>水平对齐</span>
+                        <span style={{ fontWeight: 600 }}>水平中线对齐 (中心 Y 对齐)</span>
                       </div>
                       <div className="canvas-ctx-item" onClick={() => handleAlignSelected("vertical")}>
                         <AlignCenter size={13} color="#0284c7" />
-                        <span style={{ fontWeight: 600 }}>垂直对齐</span>
+                        <span style={{ fontWeight: 600 }}>垂直中线对齐 (中心 X 对齐)</span>
                       </div>
 
                       <div className="canvas-ctx-item" onClick={() => handleAlignSelected("left")}>

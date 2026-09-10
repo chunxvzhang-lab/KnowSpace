@@ -201,12 +201,25 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
     expect(svg).toContain("<svg xmlns=\"http://www.w3.org/2000/svg\"");
     // Contains group container
     expect(svg).toContain("📁 核心域");
-    // Contains cards
+    // Cards are rendered as foreignObject so every on-screen detail survives
+    expect(svg).toContain("<foreignObject");
+    expect(svg).toContain('class="ks-card"');
+    expect(svg).toContain('class="ks-hdr"');
+    expect(svg).toContain('class="ks-body"');
+    // Rich Markdown body is preserved (heading + real task-list checkboxes)
     expect(svg).toContain("系统模型");
-    expect(svg).toContain("☑ 模块完成");
-    expect(svg).toContain("☐ 待定");
+    expect(svg).toContain('type="checkbox"');
+    expect(svg).toContain("模块完成");
+    expect(svg).toContain("待定");
+    // File card keeps its filename in the header
     expect(svg).toContain("📄 设计图.md");
-    expect(svg).toContain("🔗 https://example.com");
+    // Link card keeps its icon in the header and the URL in the body
+    expect(svg).toContain("🔗 外部参考");
+    expect(svg).toContain("https://example.com");
+    // card-1 emits two edges -> rendered as a hub with the origin badge
+    expect(svg).toContain("🌱 发起源 · 2");
+    // Header tint follows the card palette (card-1 uses palette "2" = 活力橙)
+    expect(svg).toContain("background:rgba(249, 115, 22, 0.12)");
     // Contains centered edge labels with transform translate
     expect(svg).toContain("推导演化");
     expect(svg).toContain("参考链接");
@@ -1010,6 +1023,51 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
     const svg = exportCanvasToSvg({ nodes: [nodeA, nodeB], edges: [directedEdge] });
     expect(svg).toContain("<circle cx=");
     expect(svg).toContain('r="3.5"');
+  });
+
+  it("keeps aligned geometry identical between state and the exported SVG (preview == export)", () => {
+    const a: CanvasTextNode = { id: "a", type: "text", text: "A", x: 0, y: 0, width: 200, height: 100 };
+    const b: CanvasTextNode = { id: "b", type: "text", text: "B", x: 300, y: 260, width: 200, height: 100 };
+    const c: CanvasTextNode = { id: "c", type: "text", text: "C", x: 600, y: 90, width: 200, height: 100 };
+
+    // Center-align the three cards on the horizontal midline
+    const aligned = alignNodes([a, b, c], ["a", "b", "c"], "horizontal");
+    const picked = ["a", "b", "c"].map((id) => aligned.find((n) => n.id === id)!);
+
+    // Every center shares the exact same Y
+    const centersY = picked.map((n) => n.y + n.height / 2);
+    expect(new Set(centersY).size).toBe(1);
+
+    // The exported SVG must place the cards at exactly those coordinates,
+    // which is what makes "preview" and "export" agree.
+    const svg = exportCanvasToSvg({ nodes: aligned, edges: [] }, { theme: "light" });
+    for (const n of picked) {
+      expect(svg).toContain(
+        `<foreignObject x="${n.x}" y="${n.y}" width="${n.width}" height="${n.height}">`
+      );
+    }
+  });
+
+  it("exports the hub badge for one-to-many sources with the exact edge count", () => {
+    const hub: CanvasTextNode = { id: "hub", type: "text", text: "Hub", x: 0, y: 0, width: 200, height: 100 };
+    const targets: CanvasTextNode[] = [1, 2, 3].map((i) => ({
+      id: `t${i}`,
+      type: "text" as const,
+      text: `Target ${i}`,
+      x: 400,
+      y: i * 140,
+      width: 200,
+      height: 100,
+    }));
+
+    const edges = connectOneToMany(hub, targets, [], "bezier", [hub, ...targets]);
+    expect(edges).toHaveLength(3);
+
+    const svg = exportCanvasToSvg({ nodes: [hub, ...targets], edges }, { theme: "light" });
+    expect(svg).toContain("🌱 发起源 · 3");
+    expect(svg).toContain('class="ks-badge"');
+    // Targets only emit no edges, so they must NOT be flagged as hubs
+    expect(svg).not.toContain("🌱 发起源 · 1");
   });
 });
 
