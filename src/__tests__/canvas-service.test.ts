@@ -18,6 +18,7 @@ import {
   connectOneToMany,
   connectChainNodes,
   connectLoopNodes,
+  getLoopEdgeColors,
   disconnectNodeEdges,
   spawnMultipleBranches,
   cycleEdgeStrokePattern,
@@ -616,6 +617,78 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
 
     // Entry and exit sides on top node must NEVER be both "bottom" (fixing the screenshot 1 bug)
     expect(outFromTop!.fromSide).not.toBe(inToTop!.toSide);
+  });
+
+  it("uses one identical color for every edge within the same ring", () => {
+    const n1: CanvasTextNode = { id: "r1", type: "text", text: "1", x: 200, y: 100, width: 100, height: 100 };
+    const n2: CanvasTextNode = { id: "r2", type: "text", text: "2", x: 400, y: 100, width: 100, height: 100 };
+    const n3: CanvasTextNode = { id: "r3", type: "text", text: "3", x: 400, y: 300, width: 100, height: 100 };
+    const n4: CanvasTextNode = { id: "r4", type: "text", text: "4", x: 200, y: 300, width: 100, height: 100 };
+
+    const ring = connectLoopNodes([n1, n2, n3, n4], [], "bezier", true);
+    expect(ring).toHaveLength(4);
+
+    const colors = new Set(ring.map((e) => e.color));
+    expect(colors.size).toBe(1); // every segment shares the same color
+  });
+
+  it("assigns different colors to different rings on the same canvas", () => {
+    // First ring
+    const a1: CanvasTextNode = { id: "a1", type: "text", text: "A1", x: 100, y: 100, width: 80, height: 80 };
+    const a2: CanvasTextNode = { id: "a2", type: "text", text: "A2", x: 260, y: 100, width: 80, height: 80 };
+    const a3: CanvasTextNode = { id: "a3", type: "text", text: "A3", x: 260, y: 260, width: 80, height: 80 };
+    const a4: CanvasTextNode = { id: "a4", type: "text", text: "A4", x: 100, y: 260, width: 80, height: 80 };
+
+    // Second ring (spatially separated so angular ordering is stable)
+    const b1: CanvasTextNode = { id: "b1", type: "text", text: "B1", x: 700, y: 500, width: 80, height: 80 };
+    const b2: CanvasTextNode = { id: "b2", type: "text", text: "B2", x: 860, y: 500, width: 80, height: 80 };
+    const b3: CanvasTextNode = { id: "b3", type: "text", text: "B3", x: 860, y: 660, width: 80, height: 80 };
+    const b4: CanvasTextNode = { id: "b4", type: "text", text: "B4", x: 700, y: 660, width: 80, height: 80 };
+
+    const ringA = connectLoopNodes([a1, a2, a3, a4], [], "bezier", true);
+    const allNodes = [a1, a2, a3, a4, b1, b2, b3, b4];
+    const ringB = connectLoopNodes([b1, b2, b3, b4], ringA, "bezier", true, allNodes);
+
+    const colorA = ringA[0].color;
+    const colorB = ringB[0].color;
+
+    expect(colorA).toBeDefined();
+    expect(colorB).toBeDefined();
+    expect(colorB).not.toBe(colorA); // rings must be visually distinct
+
+    // Each ring is internally uniform
+    expect(new Set(ringA.map((e) => e.color)).size).toBe(1);
+    expect(new Set(ringB.map((e) => e.color)).size).toBe(1);
+  });
+
+  it("detects loop colors only from edges that actually form a cycle", () => {
+    // A closed ring a -> b -> c -> a
+    const ringEdges: CanvasEdge[] = [
+      { id: "e1", fromNode: "a", toNode: "b", color: "1" },
+      { id: "e2", fromNode: "b", toNode: "c", color: "1" },
+      { id: "e3", fromNode: "c", toNode: "a", color: "1" },
+    ];
+    expect(getLoopEdgeColors(ringEdges)).toEqual(new Set(["1"]));
+
+    // A simple chain x -> y -> z on its own nodes is NOT a cycle,
+    // so it claims no loop color
+    const chainEdges: CanvasEdge[] = [
+      { id: "c1", fromNode: "x", toNode: "y", color: "2" },
+      { id: "c2", fromNode: "y", toNode: "z", color: "2" },
+    ];
+    expect(getLoopEdgeColors(chainEdges).size).toBe(0);
+
+    // Mixed canvas: the disconnected chain must not contribute,
+    // only the actual ring does
+    const mixed: CanvasEdge[] = [...chainEdges, ...ringEdges];
+    expect(getLoopEdgeColors(mixed)).toEqual(new Set(["1"]));
+
+    // A mere two-way pair (u -> v, v -> u) is not a ring either
+    const pairEdges: CanvasEdge[] = [
+      { id: "p1", fromNode: "u", toNode: "v", color: "3" },
+      { id: "p2", fromNode: "v", toNode: "u", color: "3" },
+    ];
+    expect(getLoopEdgeColors(pairEdges).size).toBe(0);
   });
 
   it("cycles edge stroke patterns through solid, dashed, and dotted", () => {

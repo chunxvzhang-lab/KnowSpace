@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   ZoomIn,
   ZoomOut,
@@ -68,7 +69,6 @@ import {
   CANVAS_COLOR_PALETTES,
   CANVAS_RELATION_PRESETS,
   isNodeInsideGroup,
-  findContainerForNode,
   toggleChecklistInMarkdown,
   createEdgeBetweenNodes,
   spawnConnectedCard,
@@ -84,8 +84,8 @@ import {
   reverseEdgeDirection,
   getOptimalAnchorSides,
   getStepBendHandleInfo,
-  getNextEdgeColorForSource,
   getSourceNodeEdgeColor,
+  computeSourceDisplayColorMap,
   downloadCanvasAsImage,
   copyCanvasImageToClipboard,
   CanvasAlignDirection,
@@ -395,6 +395,10 @@ export const CanvasView = memo(function CanvasView({
   } | null>(null);
 
   // Right-click context menu state
+  // `x`/`y` are viewport coordinates (pageX/pageY) used to render the menu via
+  // a fixed-positioned portal. The menu is intentionally rendered at the
+  // document body level so it can never be clipped by the canvas container's
+  // `overflow: hidden` or any ancestor that would otherwise occlude it.
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -405,17 +409,19 @@ export const CanvasView = memo(function CanvasView({
   } | null>(null);
   const contextMenuRef = useRef<HTMLDivElement | null>(null);
 
-  // Dynamically clamp context menu position and maxHeight to strictly prevent any viewport overflow / occlusion
+  // Dynamically clamp context menu position against the actual viewport so
+  // the menu never spills off-screen, even when the canvas is nested in a
+  // narrow layout (e.g. dual-document workspace).
   useLayoutEffect(() => {
-    if (!contextMenu || !contextMenuRef.current || !containerRef.current) return;
+    if (!contextMenu || !contextMenuRef.current) return;
     const menuEl = contextMenuRef.current;
-    const containerEl = containerRef.current;
-    const containerRect = containerEl.getBoundingClientRect();
 
     const padding = 12;
-    // Constrain maximum height so the menu never exceeds the visible canvas container
-    const maxAvailableH = Math.max(160, containerRect.height - padding * 2);
-    menuEl.style.maxHeight = `${maxAvailableH}px`;
+    const viewportW = typeof window !== "undefined" ? window.innerWidth : 1024;
+    const viewportH = typeof window !== "undefined" ? window.innerHeight : 768;
+
+    // Constrain maximum height to viewport so content can always be reached
+    menuEl.style.maxHeight = `${Math.max(160, viewportH - padding * 2)}px`;
 
     // Measure actual rendered dimensions
     const menuW = menuEl.offsetWidth || 260;
@@ -424,17 +430,20 @@ export const CanvasView = memo(function CanvasView({
     let clampedX = contextMenu.x;
     let clampedY = contextMenu.y;
 
-    // Clamp horizontally within container bounds
-    if (clampedX + menuW > containerRect.width - padding) {
-      clampedX = Math.max(padding, containerRect.width - menuW - padding);
+    // Clamp horizontally within the viewport
+    if (clampedX + menuW > viewportW - padding) {
+      clampedX = Math.max(padding, viewportW - menuW - padding);
     }
     if (clampedX < padding) {
       clampedX = padding;
     }
 
-    // Clamp vertically within container bounds: if overflowing bottom, shift upwards
-    if (clampedY + menuH > containerRect.height - padding) {
-      clampedY = Math.max(padding, containerRect.height - menuH - padding);
+    // Clamp vertically: if overflowing bottom, flip upward (preferred over
+    // compressing the menu) so the user can always see the option closest to
+    // the cursor.
+    if (clampedY + menuH > viewportH - padding) {
+      const flippedY = contextMenu.y - menuH;
+      clampedY = Math.max(padding, flippedY < padding ? padding : flippedY);
     }
     if (clampedY < padding) {
       clampedY = padding;
@@ -1829,19 +1838,16 @@ export const CanvasView = memo(function CanvasView({
     e.preventDefault();
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
-    const clientX = e.clientX - rect.left;
-    const clientY = e.clientY - rect.top;
-    const canvasX = Math.round((clientX - viewportRef.current.panX) / viewportRef.current.zoom);
-    const canvasY = Math.round((clientY - viewportRef.current.panY) / viewportRef.current.zoom);
-
-    const mWidth = 260;
-    const mHeight = Math.min(620, Math.max(160, rect.height - 24));
-    const safeX = clientX + mWidth > rect.width ? Math.max(12, rect.width - mWidth - 12) : Math.max(12, clientX);
-    const safeY = clientY + mHeight > rect.height ? Math.max(12, rect.height - mHeight - 12) : Math.max(12, clientY);
+    const localX = e.clientX - rect.left;
+    const localY = e.clientY - rect.top;
+    const canvasX = Math.round((localX - viewportRef.current.panX) / viewportRef.current.zoom);
+    const canvasY = Math.round((localY - viewportRef.current.panY) / viewportRef.current.zoom);
 
     setContextMenu({
-      x: safeX,
-      y: safeY,
+      // Use viewport-absolute coordinates so the portal-rendered menu can use
+      // position: fixed and never be clipped by ancestor `overflow: hidden`.
+      x: e.clientX,
+      y: e.clientY,
       canvasX,
       canvasY,
     });
@@ -1852,23 +1858,18 @@ export const CanvasView = memo(function CanvasView({
     e.stopPropagation();
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
-    const clientX = e.clientX - rect.left;
-    const clientY = e.clientY - rect.top;
-    const canvasX = Math.round((clientX - viewportRef.current.panX) / viewportRef.current.zoom);
-    const canvasY = Math.round((clientY - viewportRef.current.panY) / viewportRef.current.zoom);
+    const localX = e.clientX - rect.left;
+    const localY = e.clientY - rect.top;
+    const canvasX = Math.round((localX - viewportRef.current.panX) / viewportRef.current.zoom);
+    const canvasY = Math.round((localY - viewportRef.current.panY) / viewportRef.current.zoom);
 
     if (!selectedNodeIds.has(node.id)) {
       setSelectedNodeIds(new Set([node.id]));
     }
 
-    const mWidth = 260;
-    const mHeight = Math.min(580, Math.max(160, rect.height - 24));
-    const safeX = clientX + mWidth > rect.width ? Math.max(12, rect.width - mWidth - 12) : Math.max(12, clientX);
-    const safeY = clientY + mHeight > rect.height ? Math.max(12, rect.height - mHeight - 12) : Math.max(12, clientY);
-
     setContextMenu({
-      x: safeX,
-      y: safeY,
+      x: e.clientX,
+      y: e.clientY,
       canvasX,
       canvasY,
       targetNodeId: node.id,
@@ -1880,10 +1881,10 @@ export const CanvasView = memo(function CanvasView({
     e.stopPropagation();
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
-    const clientX = e.clientX - rect.left;
-    const clientY = e.clientY - rect.top;
-    const canvasX = Math.round((clientX - viewportRef.current.panX) / viewportRef.current.zoom);
-    const canvasY = Math.round((clientY - viewportRef.current.panY) / viewportRef.current.zoom);
+    const localX = e.clientX - rect.left;
+    const localY = e.clientY - rect.top;
+    const canvasX = Math.round((localX - viewportRef.current.panX) / viewportRef.current.zoom);
+    const canvasY = Math.round((localY - viewportRef.current.panY) / viewportRef.current.zoom);
 
     if (selectedEdgeIds.has(edge.id) && selectedEdgeIds.size > 1) {
       // keep multiple selection
@@ -1892,14 +1893,9 @@ export const CanvasView = memo(function CanvasView({
     }
     setSelectedNodeIds(new Set());
 
-    const mWidth = 260;
-    const mHeight = Math.min(520, Math.max(160, rect.height - 24));
-    const safeX = clientX + mWidth > rect.width ? Math.max(12, rect.width - mWidth - 12) : Math.max(12, clientX);
-    const safeY = clientY + mHeight > rect.height ? Math.max(12, rect.height - mHeight - 12) : Math.max(12, clientY);
-
     setContextMenu({
-      x: safeX,
-      y: safeY,
+      x: e.clientX,
+      y: e.clientY,
       canvasX,
       canvasY,
       targetEdgeId: edge.id,
@@ -2758,73 +2754,12 @@ export const CanvasView = memo(function CanvasView({
     return map;
   }, [data.edges]);
 
-  // Dynamic source-aware color mapping:
-  // Guarantees that multiple cards initiating connections (especially inside the same container)
-  // are visually distinguished with different colors, even if previously saved with colliding colors.
-  const sourceDisplayColorMap = useMemo(() => {
-    const map = new Map<string, string>();
-    const paletteKeys = Object.keys(CANVAS_COLOR_PALETTES);
-    const usedColors = new Set<string>();
-
-    // 1. Group source nodes by container
-    const containerSourceMap = new Map<string, string[]>();
-    const rootSources: string[] = [];
-
-    for (const [sourceId] of nodeOutgoingMap.entries()) {
-      const node = nodeMap.get(sourceId);
-      if (!node) continue;
-      const container = findContainerForNode(node, data.nodes);
-      if (container) {
-        const list = containerSourceMap.get(container.id) || [];
-        list.push(sourceId);
-        containerSourceMap.set(container.id, list);
-      } else {
-        rootSources.push(sourceId);
-      }
-    }
-
-    // 2. Containers: assign mutually distinct colors to siblings with outgoing edges
-    for (const [_containerId, sourceIds] of containerSourceMap.entries()) {
-      const containerUsed = new Set<string>();
-      for (const sId of sourceIds) {
-        const sNode = nodeMap.get(sId);
-        const existingColor = data.edges.find(
-          (e) => e.fromNode === sId && e.color && CANVAS_COLOR_PALETTES[e.color]
-        )?.color;
-        let preferredColor = existingColor || sNode?.color;
-
-        // If preferred color collides with another sibling in this container, pick an unused one
-        if (!preferredColor || containerUsed.has(preferredColor) || !CANVAS_COLOR_PALETTES[preferredColor]) {
-          preferredColor =
-            paletteKeys.find((k) => !containerUsed.has(k) && !usedColors.has(k)) ||
-            paletteKeys.find((k) => !containerUsed.has(k)) ||
-            paletteKeys[containerUsed.size % paletteKeys.length];
-        }
-
-        containerUsed.add(preferredColor);
-        usedColors.add(preferredColor);
-        map.set(sId, preferredColor);
-      }
-    }
-
-    // 3. Free nodes outside containers
-    for (const sId of rootSources) {
-      const sNode = nodeMap.get(sId);
-      const existingColor = data.edges.find(
-        (e) => e.fromNode === sId && e.color && CANVAS_COLOR_PALETTES[e.color]
-      )?.color;
-      let preferredColor = existingColor || sNode?.color;
-      if (!preferredColor || usedColors.has(preferredColor) || !CANVAS_COLOR_PALETTES[preferredColor]) {
-        preferredColor =
-          paletteKeys.find((k) => !usedColors.has(k)) ||
-          paletteKeys[usedColors.size % paletteKeys.length];
-      }
-      usedColors.add(preferredColor);
-      map.set(sId, preferredColor);
-    }
-
-    return map;
-  }, [nodeOutgoingMap, nodeMap, data.nodes, data.edges]);
+  // Dynamic source-aware color mapping (shared with the SVG/PNG export
+  // pipeline so that on-screen and exported colors stay perfectly in sync).
+  const sourceDisplayColorMap = useMemo(
+    () => computeSourceDisplayColorMap(data.nodes, data.edges),
+    [data.nodes, data.edges]
+  );
 
   const currentMultiRootNode = useMemo(() => {
     if (selectedNodeIds.size < 2) return undefined;
@@ -5066,35 +5001,37 @@ export const CanvasView = memo(function CanvasView({
       )}
 
       {/* 8. RIGHT-CLICK CONTEXT MENU (MINDMAP INSPIRED) */}
-      {contextMenu && (
-        <div
-          ref={contextMenuRef}
-          className="canvas-context-menu"
-          style={{
-            position: "absolute",
-            left: contextMenu.x,
-            top: contextMenu.y,
-            zIndex: 1000,
-            backgroundColor: theme === "eink" ? "#f4f1ea" : !isDark ? "#ffffff" : "#1e293b",
-            color: colors.cardText,
-            border: `1px solid ${colors.cardBorder}`,
-            boxShadow: !isDark ? "0 10px 32px rgba(0,0,0,0.14)" : "0 14px 40px rgba(0,0,0,0.55)",
-            borderRadius: 10,
-            padding: "6px 0",
-            minWidth: 230,
-            maxWidth: 300,
-            maxHeight: "calc(100% - 24px)",
-            overflowY: "auto",
-            fontSize: 12.5,
-            userSelect: "none",
-          }}
-          onMouseDown={(e) => e.stopPropagation()}
-          onClick={(e) => e.stopPropagation()}
-          onContextMenu={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-          }}
-        >
+      {contextMenu &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            ref={contextMenuRef}
+            className="canvas-context-menu"
+            style={{
+              position: "fixed",
+              left: contextMenu.x,
+              top: contextMenu.y,
+              zIndex: 10000,
+              backgroundColor: theme === "eink" ? "#f4f1ea" : !isDark ? "#ffffff" : "#1e293b",
+              color: colors.cardText,
+              border: `1px solid ${colors.cardBorder}`,
+              boxShadow: !isDark ? "0 10px 32px rgba(0,0,0,0.14)" : "0 14px 40px rgba(0,0,0,0.55)",
+              borderRadius: 10,
+              padding: "6px 0",
+              minWidth: 230,
+              maxWidth: 300,
+              maxHeight: "calc(100% - 24px)",
+              overflowY: "auto",
+              fontSize: 12.5,
+              userSelect: "none",
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+          >
           {contextMenu.targetEdgeId ? (
             // 1. Edge Context Menu (Batch or Single)
             (() => {
@@ -6422,8 +6359,9 @@ export const CanvasView = memo(function CanvasView({
               </div>
             </>
           )}
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
 
       {/* 8.5 Floating Batch Toolbar for Multiple Selected Edges */}
       {selectedEdgeIds.size > 1 && (

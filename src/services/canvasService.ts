@@ -893,6 +893,92 @@ export function getNextEdgeColorForSource(
 }
 
 /**
+ * Computes a globally consistent, source-aware color map for all nodes that
+ * initiate connections in the canvas. This is the single source of truth used
+ * by both the on-screen renderer and SVG/PNG export so that colors stay
+ * strictly identical between the two pipelines.
+ *
+ * Rules:
+ * 1. If a source node already has a saved outgoing edge color in the palette,
+ *    prefer it.
+ * 2. If the source node has an explicit `color` and that color is not yet
+ *    used by another sibling in the same container, use it.
+ * 3. Otherwise, pick the first unused palette color within the container, then
+ *    across the whole canvas, finally cycling as last resort.
+ */
+export function computeSourceDisplayColorMap(
+  nodes: CanvasNode[],
+  edges: CanvasEdge[]
+): Map<string, string> {
+  const map = new Map<string, string>();
+  const paletteKeys = Object.keys(CANVAS_COLOR_PALETTES);
+  const usedColors = new Set<string>();
+  const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+
+  const sourceIds = new Set<string>();
+  for (const edge of edges) {
+    if (edge.fromNode && nodeMap.has(edge.fromNode)) {
+      sourceIds.add(edge.fromNode);
+    }
+  }
+
+  const containerSourceMap = new Map<string, string[]>();
+  const rootSources: string[] = [];
+
+  for (const sourceId of sourceIds) {
+    const node = nodeMap.get(sourceId);
+    if (!node) continue;
+    const container = findContainerForNode(node, nodes);
+    if (container) {
+      const list = containerSourceMap.get(container.id) || [];
+      list.push(sourceId);
+      containerSourceMap.set(container.id, list);
+    } else {
+      rootSources.push(sourceId);
+    }
+  }
+
+  for (const [, sourceIdsInContainer] of containerSourceMap.entries()) {
+    const containerUsed = new Set<string>();
+    for (const sId of sourceIdsInContainer) {
+      const sNode = nodeMap.get(sId);
+      const existingColor = edges.find(
+        (e) => e.fromNode === sId && e.color && CANVAS_COLOR_PALETTES[e.color]
+      )?.color;
+      let preferredColor = existingColor || sNode?.color;
+
+      if (!preferredColor || containerUsed.has(preferredColor) || !CANVAS_COLOR_PALETTES[preferredColor]) {
+        preferredColor =
+          paletteKeys.find((k) => !containerUsed.has(k) && !usedColors.has(k)) ||
+          paletteKeys.find((k) => !containerUsed.has(k)) ||
+          paletteKeys[containerUsed.size % paletteKeys.length];
+      }
+
+      containerUsed.add(preferredColor);
+      usedColors.add(preferredColor);
+      map.set(sId, preferredColor);
+    }
+  }
+
+  for (const sId of rootSources) {
+    const sNode = nodeMap.get(sId);
+    const existingColor = edges.find(
+      (e) => e.fromNode === sId && e.color && CANVAS_COLOR_PALETTES[e.color]
+    )?.color;
+    let preferredColor = existingColor || sNode?.color;
+    if (!preferredColor || usedColors.has(preferredColor) || !CANVAS_COLOR_PALETTES[preferredColor]) {
+      preferredColor =
+        paletteKeys.find((k) => !usedColors.has(k)) ||
+        paletteKeys[usedColors.size % paletteKeys.length];
+    }
+    usedColors.add(preferredColor);
+    map.set(sId, preferredColor);
+  }
+
+  return map;
+}
+
+/**
  * Automatically computes best attachment sides and creates an edge between two nodes
  */
 export function createEdgeBetweenNodes(
@@ -1046,11 +1132,83 @@ export function connectChainNodes(
 }
 
 /**
+ * Determines whether a directed edge participates in a closed ring of at
+ * least 3 nodes. Implemented as a BFS from the edge's target node back to
+ * its source, skipping the edge under test.
+ *
+ * The return path must be at least 2 hops long so that a mere two-way pair
+ * (A->B together with B->A, i.e. a bidirectional arrow) is NOT treated as a
+ * ring — those should stay free to reuse any palette color.
+ */
+function isEdgeOnCycle(
+  edge: CanvasEdge,
+  outgoing: Map<string, CanvasEdge[]>
+): boolean {
+  const start = edge.toNode;
+  const target = edge.fromNode;
+  if (start === target) return true; // self-loop
+
+  const visited = new Set<string>([start]);
+  // Track hop distance so we can require a return path of >= 2 edges
+  const queue: Array<{ node: string; dist: number }> = [{ node: start, dist: 0 }];
+
+  while (queue.length > 0) {
+    const { node, dist } = queue.shift()!;
+    const outs = outgoing.get(node);
+    if (!outs) continue;
+    for (const e of outs) {
+      if (e.id === edge.id) continue; // skip the edge being tested
+      const nextDist = dist + 1;
+      if (e.toNode === target && nextDist >= 2) return true;
+      if (!visited.has(e.toNode)) {
+        visited.add(e.toNode);
+        queue.push({ node: e.toNode, dist: nextDist });
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Collects the palette colors already claimed by edges that form a closed
+ * loop. This lets newly created rings pick a color that no other ring on the
+ * canvas is currently using, so that multiple loops stay visually distinct.
+ * Edges that are NOT part of a cycle (chains, one-to-many stars) are ignored
+ * so they remain free to use any palette color.
+ */
+export function getLoopEdgeColors(edges: CanvasEdge[]): Set<string> {
+  const colors = new Set<string>();
+  if (!edges || edges.length === 0) return colors;
+
+  const outgoing = new Map<string, CanvasEdge[]>();
+  for (const e of edges) {
+    const list = outgoing.get(e.fromNode);
+    if (list) list.push(e);
+    else outgoing.set(e.fromNode, [e]);
+  }
+
+  for (const e of edges) {
+    if (!e.color) continue;
+    if (isEdgeOnCycle(e, outgoing)) {
+      colors.add(e.color);
+    }
+  }
+
+  return colors;
+}
+
+/**
  * Creates closed loop / ring edges connecting a sequence of nodes:
  * A -> B -> C -> ... -> A
  * Useful for circular workflows, iterative thinking loops, and cyclic systems.
  * Slices nodes in angular order around the group's centroid, and binds edges
  * with tangential perimeter flow to produce clean, rounded circular loops without reverse buckles.
+ *
+ * Coloring strategy:
+ * 1. Every edge inside the ring shares one identical color (one ring = one flow).
+ * 2. The chosen color is never one already claimed by another ring on the
+ *    canvas, so two different loops are always visually distinguishable.
  */
 export function connectLoopNodes(
   nodes: CanvasNode[],
@@ -1077,6 +1235,30 @@ export function connectLoopNodes(
   const newEdges: CanvasEdge[] = [];
   const count = orderedNodes.length;
   const usedIncomingSides = new Map<string, CanvasNodeSide>();
+
+  // Unified color for the whole loop so that all ring segments visually
+  // belong to a single semantic flow, regardless of which node is "from".
+  //
+  // We first resolve the first node's preferred source color, but we then
+  // reject it when that color is already claimed by another ring on the
+  // canvas — guaranteeing "one ring = one color, different rings = different
+  // colors".
+  const preferredLoopColor = getSourceNodeEdgeColor(
+    orderedNodes[0],
+    existingEdges,
+    allNodes || nodes
+  );
+  const loopUsedColors = getLoopEdgeColors(existingEdges);
+  const paletteKeys = Object.keys(CANVAS_COLOR_PALETTES);
+
+  let loopEdgeColor: string;
+  if (preferredLoopColor && !loopUsedColors.has(preferredLoopColor)) {
+    loopEdgeColor = preferredLoopColor;
+  } else {
+    loopEdgeColor =
+      paletteKeys.find((k) => !loopUsedColors.has(k)) ??
+      paletteKeys[loopUsedColors.size % paletteKeys.length];
+  }
 
   const nextClockwiseSide = (s: CanvasNodeSide): CanvasNodeSide => {
     switch (s) {
@@ -1161,7 +1343,7 @@ export function connectLoopNodes(
 
       usedIncomingSides.set(to.id, toSide);
 
-      const edgeColor = getSourceNodeEdgeColor(from, [...existingEdges, ...newEdges], allNodes || nodes);
+      const edgeColor = loopEdgeColor;
       newEdges.push({
         id: `edge-${Date.now()}-${Math.random().toString(36).slice(2, 6)}-${i + 1}`,
         fromNode: from.id,
@@ -1361,6 +1543,20 @@ export function exportCanvasToSvg(
 
   const nodeMap = new Map<string, CanvasNode>(data.nodes.map((n) => [n.id, n]));
 
+  // Build a source-aware color map so SVG export is byte-identical to the
+  // on-screen renderer (which reconciles color collisions inside containers
+  // and across the canvas via the same logic).
+  const sourceDisplayColorMap = computeSourceDisplayColorMap(data.nodes, data.edges);
+  // Pre-collect any hex colors that actually appear on edges so we register
+  // matching arrow markers up-front in <defs>.
+  const exportHexColors = new Set<string>();
+  for (const edge of data.edges) {
+    const effectiveColorKey = sourceDisplayColorMap.get(edge.fromNode) || edge.color;
+    if (effectiveColorKey && effectiveColorKey.startsWith("#")) {
+      exportHexColors.add(effectiveColorKey);
+    }
+  }
+
   const lines: string[] = [];
   lines.push(`<?xml version="1.0" encoding="UTF-8"?>`);
   lines.push(
@@ -1381,6 +1577,12 @@ export function exportCanvasToSvg(
   Object.entries(CANVAS_COLOR_PALETTES).forEach(([k, c]) => {
     lines.push(
       `    <marker id="arrow-${k}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 1 L 10 5 L 0 9 z" fill="${c.stroke}" /></marker>`
+    );
+  });
+  // Arrow markers for any custom hex colors that may appear on edges
+  exportHexColors.forEach((hex) => {
+    lines.push(
+      `    <marker id="arrow-${hex.replace("#", "hex-")}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 1 L 10 5 L 0 9 z" fill="${hex}" /></marker>`
     );
   });
   lines.push(
@@ -1426,15 +1628,25 @@ export function exportCanvasToSvg(
     const p2 = getNodeAnchorPoint(to, toSide);
     const pathD = computeEdgePath(p1, fromSide, p2, toSide, edge.style);
 
+    // Mirror the on-screen renderer's color resolution: prefer the
+    // source-aware display color, then fall back to the edge's stored color.
+    const effectiveColorKey = sourceDisplayColorMap.get(edge.fromNode) || edge.color;
     const edgeColor =
-      edge.color && CANVAS_COLOR_PALETTES[edge.color]
-        ? CANVAS_COLOR_PALETTES[edge.color].stroke
-        : edge.color?.startsWith("#")
-        ? edge.color
+      effectiveColorKey && CANVAS_COLOR_PALETTES[effectiveColorKey]
+        ? CANVAS_COLOR_PALETTES[effectiveColorKey].stroke
+        : effectiveColorKey && effectiveColorKey.startsWith("#")
+        ? effectiveColorKey
         : defaultEdgeColor;
 
-    const markerEnd = edge.toEnd === "arrow" ? `url(#arrow-${edge.color || "default"})` : "none";
-    const markerStart = edge.fromEnd === "arrow" ? `url(#arrow-${edge.color || "default"})` : "none";
+    const markerRef = effectiveColorKey
+      ? CANVAS_COLOR_PALETTES[effectiveColorKey]
+        ? `arrow-${effectiveColorKey}`
+        : effectiveColorKey.startsWith("#")
+        ? `arrow-${effectiveColorKey.replace("#", "hex-")}`
+        : "arrow-default"
+      : "arrow-default";
+    const markerEnd = edge.toEnd === "arrow" ? `url(#${markerRef})` : "none";
+    const markerStart = edge.fromEnd === "arrow" ? `url(#${markerRef})` : "none";
 
     lines.push(`  <g class="canvas-edge" data-id="${edge.id}">`);
     lines.push(

@@ -37,7 +37,8 @@
     "win": {
       "icon": "build/icon.ico",
       "target": [
-        "msi"
+        "msi",
+        "nsis"
       ]
     },
     "msi": {
@@ -46,6 +47,17 @@
       "runAfterFinish": true,
       "shortcutName": "KnowSpace",
       "artifactName": "KnowSpace-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "KnowSpace",
+      "uninstallDisplayName": "KnowSpace ${version}",
+      "artifactName": "KnowSpace-Setup-${version}.${ext}"
     }
   },
   "dependencies": {
