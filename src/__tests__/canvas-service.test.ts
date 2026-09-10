@@ -19,6 +19,9 @@ import {
   connectChainNodes,
   connectLoopNodes,
   getLoopEdgeColors,
+  getLoopEdgeIds,
+  expandLoopEdgeSelection,
+  computeSourceDisplayColorMap,
   disconnectNodeEdges,
   spawnMultipleBranches,
   cycleEdgeStrokePattern,
@@ -689,6 +692,88 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
       { id: "p2", fromNode: "v", toNode: "u", color: "3" },
     ];
     expect(getLoopEdgeColors(pairEdges).size).toBe(0);
+  });
+
+  it("maps every node of a ring to ONE identical display color (regression)", () => {
+    const n1: CanvasTextNode = { id: "c1", type: "text", text: "1", x: 200, y: 100, width: 100, height: 100 };
+    const n2: CanvasTextNode = { id: "c2", type: "text", text: "2", x: 400, y: 100, width: 100, height: 100 };
+    const n3: CanvasTextNode = { id: "c3", type: "text", text: "3", x: 480, y: 300, width: 100, height: 100 };
+    const n4: CanvasTextNode = { id: "c4", type: "text", text: "4", x: 380, y: 460, width: 100, height: 100 };
+    const n5: CanvasTextNode = { id: "c5", type: "text", text: "5", x: 180, y: 420, width: 100, height: 100 };
+
+    const nodes = [n1, n2, n3, n4, n5];
+    const ring = connectLoopNodes(nodes, [], "bezier", true);
+    expect(ring).toHaveLength(5);
+
+    // The ring itself must be uniform...
+    expect(new Set(ring.map((e) => e.color)).size).toBe(1);
+
+    // ...AND the display color map used by the renderer / exporter must
+    // resolve every ring node to that same single color, instead of
+    // splitting the ring into a rainbow of segments.
+    const displayMap = computeSourceDisplayColorMap(nodes, ring);
+    const resolved = new Set<string>();
+    for (const e of ring) {
+      const key = displayMap.get(e.fromNode) || e.color!;
+      resolved.add(key);
+    }
+    expect(resolved.size).toBe(1);
+    expect([...resolved][0]).toBe(ring[0].color);
+  });
+
+  it("keeps two separate rings mapped to two different display colors", () => {
+    const a1: CanvasTextNode = { id: "da1", type: "text", text: "A1", x: 100, y: 100, width: 80, height: 80 };
+    const a2: CanvasTextNode = { id: "da2", type: "text", text: "A2", x: 260, y: 100, width: 80, height: 80 };
+    const a3: CanvasTextNode = { id: "da3", type: "text", text: "A3", x: 260, y: 260, width: 80, height: 80 };
+    const a4: CanvasTextNode = { id: "da4", type: "text", text: "A4", x: 100, y: 260, width: 80, height: 80 };
+    const b1: CanvasTextNode = { id: "db1", type: "text", text: "B1", x: 900, y: 600, width: 80, height: 80 };
+    const b2: CanvasTextNode = { id: "db2", type: "text", text: "B2", x: 1060, y: 600, width: 80, height: 80 };
+    const b3: CanvasTextNode = { id: "db3", type: "text", text: "B3", x: 1060, y: 760, width: 80, height: 80 };
+    const b4: CanvasTextNode = { id: "db4", type: "text", text: "B4", x: 900, y: 760, width: 80, height: 80 };
+
+    const ringA = connectLoopNodes([a1, a2, a3, a4], [], "bezier", true);
+    const allNodes = [a1, a2, a3, a4, b1, b2, b3, b4];
+    const ringB = connectLoopNodes([b1, b2, b3, b4], ringA, "bezier", true, allNodes);
+    const allEdges = [...ringA, ...ringB];
+
+    const displayMap = computeSourceDisplayColorMap(allNodes, allEdges);
+
+    const colorOf = (edges: CanvasEdge[]) => {
+      const set = new Set<string>();
+      for (const e of edges) set.add(displayMap.get(e.fromNode) || e.color!);
+      return set;
+    };
+
+    const colorsA = colorOf(ringA);
+    const colorsB = colorOf(ringB);
+
+    expect(colorsA.size).toBe(1); // ring A is uniform
+    expect(colorsB.size).toBe(1); // ring B is uniform
+    expect([...colorsA][0]).not.toBe([...colorsB][0]); // and they differ
+  });
+
+  it("expands a single ring segment selection to the whole ring", () => {
+    const nodes: CanvasTextNode[] = [
+      { id: "x1", type: "text", text: "1", x: 100, y: 100, width: 80, height: 80 },
+      { id: "x2", type: "text", text: "2", x: 300, y: 100, width: 80, height: 80 },
+      { id: "x3", type: "text", text: "3", x: 300, y: 300, width: 80, height: 80 },
+      { id: "x4", type: "text", text: "4", x: 100, y: 300, width: 80, height: 80 },
+    ];
+    const ring = connectLoopNodes(nodes, [], "bezier", true);
+    // A dangling edge pointing to a node outside the ring — it can never
+    // complete a cycle, so it must not be classified as a loop edge.
+    const unrelated: CanvasEdge = { id: "solo", fromNode: "x1", toNode: "outside", color: "2" };
+    const edges = [...ring, unrelated];
+
+    // All ring edges are detected as loop edges
+    const loopIds = getLoopEdgeIds(edges);
+    expect(loopIds.size).toBe(4);
+    expect(loopIds.has("solo")).toBe(false);
+
+    // Selecting one segment expands to the full ring, leaving the chain edge out
+    const expanded = expandLoopEdgeSelection(edges, [ring[0].id]);
+    expect(expanded.size).toBe(4);
+    expect(expanded.has("solo")).toBe(false);
   });
 
   it("cycles edge stroke patterns through solid, dashed, and dotted", () => {

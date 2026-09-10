@@ -915,6 +915,65 @@ export function computeSourceDisplayColorMap(
   const usedColors = new Set<string>();
   const nodeMap = new Map(nodes.map((n) => [n.id, n]));
 
+  // ── Ring groups take absolute precedence ────────────────────────────────
+  // Every node participating in the same closed ring must resolve to ONE
+  // identical color. Without this, the generic "one distinct color per source
+  // node" logic below would split a ring into a rainbow of segments, which is
+  // exactly what a merged source card must not do.
+  const loopEdgeIds = getLoopEdgeIds(edges);
+  if (loopEdgeIds.size > 0) {
+    // Union-Find over the ring edges so that each connected ring is one group
+    const parent = new Map<string, string>();
+    const findRoot = (x: string): string => {
+      let cur = x;
+      while (parent.get(cur) !== undefined && parent.get(cur) !== cur) {
+        parent.set(cur, parent.get(parent.get(cur)!)!);
+        cur = parent.get(cur)!;
+      }
+      return cur;
+    };
+    const union = (a: string, b: string) => {
+      const ra = findRoot(a);
+      const rb = findRoot(b);
+      if (ra !== rb) parent.set(ra, rb);
+    };
+
+    // First pass: build the connectivity
+    for (const e of edges) {
+      if (!loopEdgeIds.has(e.id)) continue;
+      if (!parent.has(e.fromNode)) parent.set(e.fromNode, e.fromNode);
+      if (!parent.has(e.toNode)) parent.set(e.toNode, e.toNode);
+      union(e.fromNode, e.toNode);
+    }
+
+    // Second pass: collect member nodes and the ring's single color
+    const groupNodes = new Map<string, Set<string>>();
+    const groupColor = new Map<string, string>();
+    for (const e of edges) {
+      if (!loopEdgeIds.has(e.id)) continue;
+      const root = findRoot(e.fromNode);
+      let set = groupNodes.get(root);
+      if (!set) {
+        set = new Set<string>();
+        groupNodes.set(root, set);
+      }
+      set.add(e.fromNode);
+      set.add(e.toNode);
+      if (!groupColor.has(root) && e.color && CANVAS_COLOR_PALETTES[e.color]) {
+        groupColor.set(root, e.color);
+      }
+    }
+
+    for (const [root, nodeIds] of groupNodes.entries()) {
+      const color =
+        groupColor.get(root) ??
+        paletteKeys.find((k) => !usedColors.has(k)) ??
+        paletteKeys[usedColors.size % paletteKeys.length];
+      for (const nid of nodeIds) map.set(nid, color);
+      usedColors.add(color);
+    }
+  }
+
   const sourceIds = new Set<string>();
   for (const edge of edges) {
     if (edge.fromNode && nodeMap.has(edge.fromNode)) {
@@ -941,6 +1000,11 @@ export function computeSourceDisplayColorMap(
   for (const [, sourceIdsInContainer] of containerSourceMap.entries()) {
     const containerUsed = new Set<string>();
     for (const sId of sourceIdsInContainer) {
+      // Node already resolved by a ring group — keep the ring's unified color
+      if (map.has(sId)) {
+        containerUsed.add(map.get(sId)!);
+        continue;
+      }
       const sNode = nodeMap.get(sId);
       const existingColor = edges.find(
         (e) => e.fromNode === sId && e.color && CANVAS_COLOR_PALETTES[e.color]
@@ -961,6 +1025,8 @@ export function computeSourceDisplayColorMap(
   }
 
   for (const sId of rootSources) {
+    // Node already resolved by a ring group — keep the ring's unified color
+    if (map.has(sId)) continue;
     const sNode = nodeMap.get(sId);
     const existingColor = edges.find(
       (e) => e.fromNode === sId && e.color && CANVAS_COLOR_PALETTES[e.color]
@@ -1171,6 +1237,28 @@ function isEdgeOnCycle(
 }
 
 /**
+ * Returns the ids of every edge that participates in a closed ring of at
+ * least 3 nodes. See isEdgeOnCycle for the detailed rules.
+ */
+export function getLoopEdgeIds(edges: CanvasEdge[]): Set<string> {
+  const ids = new Set<string>();
+  if (!edges || edges.length === 0) return ids;
+
+  const outgoing = new Map<string, CanvasEdge[]>();
+  for (const e of edges) {
+    const list = outgoing.get(e.fromNode);
+    if (list) list.push(e);
+    else outgoing.set(e.fromNode, [e]);
+  }
+
+  for (const e of edges) {
+    if (isEdgeOnCycle(e, outgoing)) ids.add(e.id);
+  }
+
+  return ids;
+}
+
+/**
  * Collects the palette colors already claimed by edges that form a closed
  * loop. This lets newly created rings pick a color that no other ring on the
  * canvas is currently using, so that multiple loops stay visually distinct.
@@ -1181,21 +1269,67 @@ export function getLoopEdgeColors(edges: CanvasEdge[]): Set<string> {
   const colors = new Set<string>();
   if (!edges || edges.length === 0) return colors;
 
-  const outgoing = new Map<string, CanvasEdge[]>();
+  const loopIds = getLoopEdgeIds(edges);
   for (const e of edges) {
-    const list = outgoing.get(e.fromNode);
-    if (list) list.push(e);
-    else outgoing.set(e.fromNode, [e]);
-  }
-
-  for (const e of edges) {
-    if (!e.color) continue;
-    if (isEdgeOnCycle(e, outgoing)) {
-      colors.add(e.color);
-    }
+    if (e.color && loopIds.has(e.id)) colors.add(e.color);
   }
 
   return colors;
+}
+
+/**
+ * Expands a set of edge ids so that, whenever a selected edge belongs to a
+ * closed ring, every other edge of that same ring is included as well.
+ *
+ * Used by color / stroke mutations so that the "one ring = one color" rule
+ * survives partial edits: right-clicking a single segment of a ring will
+ * repaint the entire ring instead of breaking it into mixed colors.
+ */
+export function expandLoopEdgeSelection(
+  edges: CanvasEdge[],
+  targetIds: Iterable<string>
+): Set<string> {
+  const result = new Set<string>(targetIds);
+  const loopIds = getLoopEdgeIds(edges);
+  if (loopIds.size === 0) return result;
+
+  // Adjacency: node -> ids of ring edges touching it
+  const byNode = new Map<string, string[]>();
+  for (const e of edges) {
+    if (!loopIds.has(e.id)) continue;
+    for (const nid of [e.fromNode, e.toNode]) {
+      const list = byNode.get(nid);
+      if (list) list.push(e.id);
+      else byNode.set(nid, [e.id]);
+    }
+  }
+
+  const edgeById = new Map(edges.map((e) => [e.id, e]));
+  const queue: string[] = [];
+  for (const id of result) {
+    if (loopIds.has(id)) queue.push(id);
+  }
+
+  const visitedNodes = new Set<string>();
+  while (queue.length > 0) {
+    const eid = queue.pop()!;
+    const edge = edgeById.get(eid);
+    if (!edge) continue;
+    for (const nid of [edge.fromNode, edge.toNode]) {
+      if (visitedNodes.has(nid)) continue;
+      visitedNodes.add(nid);
+      const neighbours = byNode.get(nid);
+      if (!neighbours) continue;
+      for (const neighbourId of neighbours) {
+        if (!result.has(neighbourId)) {
+          result.add(neighbourId);
+          queue.push(neighbourId);
+        }
+      }
+    }
+  }
+
+  return result;
 }
 
 /**

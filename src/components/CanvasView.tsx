@@ -86,6 +86,7 @@ import {
   getStepBendHandleInfo,
   getSourceNodeEdgeColor,
   computeSourceDisplayColorMap,
+  expandLoopEdgeSelection,
   downloadCanvasAsImage,
   copyCanvasImageToClipboard,
   CanvasAlignDirection,
@@ -1111,13 +1112,16 @@ export const CanvasView = memo(function CanvasView({
     (colorKey: string) => {
       if (!editable || selectedEdgeIds.size === 0) return;
       const currentData = latestDataRef.current;
+      // Selecting a single segment of a closed ring repaints the whole ring,
+      // so the "one ring = one color" invariant is never broken.
+      const affected = expandLoopEdgeSelection(currentData.edges, selectedEdgeIds);
       pushHistory({
         ...currentData,
         edges: currentData.edges.map((e) =>
-          selectedEdgeIds.has(e.id) ? { ...e, color: colorKey } : e
+          affected.has(e.id) ? { ...e, color: colorKey } : e
         ),
       });
-      showToast(`已修改 ${selectedEdgeIds.size} 条连线的颜色`);
+      showToast(`已修改 ${affected.size} 条连线的颜色`);
     },
     [editable, selectedEdgeIds, pushHistory, showToast]
   );
@@ -1264,9 +1268,12 @@ export const CanvasView = memo(function CanvasView({
     (edgeId: string, color?: string) => {
       if (!editable) return;
       const currentData = latestDataRef.current;
+      // A right-click on one segment of a closed ring recolors the entire
+      // ring, keeping its color unified.
+      const affected = expandLoopEdgeSelection(currentData.edges, [edgeId]);
       pushHistory({
         ...currentData,
-        edges: currentData.edges.map((e) => (e.id === edgeId ? { ...e, color } : e)),
+        edges: currentData.edges.map((e) => (affected.has(e.id) ? { ...e, color } : e)),
       });
     },
     [editable, pushHistory]
