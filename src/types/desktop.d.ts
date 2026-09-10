@@ -118,6 +118,14 @@ export type KnowSpaceDesktopAPI = {
     dataUrl: string;
     filename?: string;
   }) => Promise<{ success?: boolean; canceled?: boolean; filePath?: string; message?: string }>;
+  /**
+   * Saves raw PNG bytes. Preferred over `savePngData` because it avoids
+   * base64-encoding a multi-megabyte image before sending it over IPC.
+   */
+  savePngBuffer?: (params: {
+    buffer: ArrayBuffer | Uint8Array;
+    filename?: string;
+  }) => Promise<{ success?: boolean; canceled?: boolean; filePath?: string; message?: string }>;
   openInNewWindow?: (absolutePath: string) => Promise<boolean>;
   printToPdf?: (params?: {
     title?: string;

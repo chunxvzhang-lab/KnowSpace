@@ -1711,6 +1711,39 @@ ipcMain.handle("bookmd:save-png-data", async (event, request = {}) => {
   }
 });
 
+ipcMain.handle("bookmd:save-png-buffer", async (event, request = {}) => {
+  const targetWin = getWindowFromEvent(event);
+  const { buffer, filename = "KnowSpace白板" } = request;
+  if (!buffer) return { success: false, message: "缺少图片数据" };
+
+  const cleanFilename = (filename || "KnowSpace白板").replace(/\.(svg|png)$/i, "");
+  const defaultPath = path.join(app.getPath("downloads"), `${cleanFilename}.png`);
+
+  const saveResult = await dialog.showSaveDialog(targetWin || undefined, {
+    title: "导出白板为 PNG 高清图片",
+    defaultPath,
+    filters: [
+      { name: "PNG 高清图片 (*.png)", extensions: ["png"] },
+      { name: "所有文件 (*.*)", extensions: ["*"] },
+    ],
+  });
+
+  if (saveResult.canceled || !saveResult.filePath) {
+    return { canceled: true };
+  }
+
+  try {
+    // The renderer sends a plain ArrayBuffer (arriving as a Uint8Array here),
+    // so no base64 decoding is needed and peak memory stays flat.
+    const data = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
+    await fs.promises.writeFile(saveResult.filePath, data);
+    return { success: true, filePath: saveResult.filePath };
+  } catch (err) {
+    console.error("Failed to write PNG file:", err);
+    return { success: false, message: err.message };
+  }
+});
+
 ipcMain.handle("bookmd:export-svg-as-png", async (event, request = {}) => {
   const targetWin = getWindowFromEvent(event);
   const { svgHtml, theme = "twitter", filename = "mermaid-diagram" } = request;

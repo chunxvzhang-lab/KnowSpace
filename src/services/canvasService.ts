@@ -1021,7 +1021,7 @@ export function computeSourceDisplayColorMap(
   // identical color. Without this, the generic "one distinct color per source
   // node" logic below would split a ring into a rainbow of segments, which is
   // exactly what a merged source card must not do.
-  const loopEdgeIds = getLoopEdgeIds(edges);
+  const loopEdgeIds = getLoopEdgeIdsCached(edges);
   if (loopEdgeIds.size > 0) {
     // Union-Find over the ring edges so that each connected ring is one group
     const parent = new Map<string, string>();
@@ -1076,19 +1076,45 @@ export function computeSourceDisplayColorMap(
   }
 
   const sourceIds = new Set<string>();
+  // Indexed in a single pass instead of scanning `edges` inside the per-source
+  // loops below: that used to make the whole function O(sources × edges) and
+  // it runs on every geometry change, including each drag frame.
+  const sourceExistingColor = new Map<string, string>();
   for (const edge of edges) {
-    if (edge.fromNode && nodeMap.has(edge.fromNode)) {
-      sourceIds.add(edge.fromNode);
+    if (!edge.fromNode || !nodeMap.has(edge.fromNode)) continue;
+    sourceIds.add(edge.fromNode);
+    if (
+      !sourceExistingColor.has(edge.fromNode) &&
+      edge.color &&
+      CANVAS_COLOR_PALETTES[edge.color]
+    ) {
+      sourceExistingColor.set(edge.fromNode, edge.color);
     }
   }
 
   const containerSourceMap = new Map<string, string[]>();
   const rootSources: string[] = [];
 
+  // Groups are extracted and sorted once here. Calling findContainerForNode()
+  // per source re-filtered and re-sorted `nodes` every time, making this loop
+  // O(sources × nodes); running on every drag frame made that noticeable.
+  // Sorted smallest-first so the first hit is still the tightest container,
+  // which is exactly findContainerForNode's contract.
+  const groupsByArea = nodes
+    .filter((n): n is CanvasGroupNode => n.type === "group")
+    .sort((a, b) => a.width * a.height - b.width * b.height);
+  const findContainerFast = (node: CanvasNode): CanvasGroupNode | undefined => {
+    if (node.type === "group") return undefined;
+    for (const g of groupsByArea) {
+      if (isNodeInsideGroup(node, g)) return g;
+    }
+    return undefined;
+  };
+
   for (const sourceId of sourceIds) {
     const node = nodeMap.get(sourceId);
     if (!node) continue;
-    const container = findContainerForNode(node, nodes);
+    const container = findContainerFast(node);
     if (container) {
       const list = containerSourceMap.get(container.id) || [];
       list.push(sourceId);
@@ -1107,9 +1133,7 @@ export function computeSourceDisplayColorMap(
         continue;
       }
       const sNode = nodeMap.get(sId);
-      const existingColor = edges.find(
-        (e) => e.fromNode === sId && e.color && CANVAS_COLOR_PALETTES[e.color]
-      )?.color;
+      const existingColor = sourceExistingColor.get(sId);
       let preferredColor = existingColor || sNode?.color;
 
       if (!preferredColor || containerUsed.has(preferredColor) || !CANVAS_COLOR_PALETTES[preferredColor]) {
@@ -1129,9 +1153,7 @@ export function computeSourceDisplayColorMap(
     // Node already resolved by a ring group — keep the ring's unified color
     if (map.has(sId)) continue;
     const sNode = nodeMap.get(sId);
-    const existingColor = edges.find(
-      (e) => e.fromNode === sId && e.color && CANVAS_COLOR_PALETTES[e.color]
-    )?.color;
+    const existingColor = sourceExistingColor.get(sId);
     let preferredColor = existingColor || sNode?.color;
     if (!preferredColor || usedColors.has(preferredColor) || !CANVAS_COLOR_PALETTES[preferredColor]) {
       preferredColor =
@@ -1356,6 +1378,45 @@ export function getLoopEdgeIds(edges: CanvasEdge[]): Set<string> {
     if (isEdgeOnCycle(e, outgoing)) ids.add(e.id);
   }
 
+  return ids;
+}
+
+/**
+ * Order-independent FNV-1a fingerprint of the edge topology (ids + endpoints).
+ *
+ * Card coordinates change on every drag frame, but the topology does not, so
+ * this lets us skip the O(E×(V+E)) cycle scan while a card is being dragged —
+ * otherwise every frame would re-run a BFS per edge.
+ */
+function edgeTopologyFingerprint(edges: CanvasEdge[]): number {
+  let hash = 2166136261;
+  for (let i = 0; i < edges.length; i += 1) {
+    const e = edges[i];
+    const key = `${e.id}\u0000${e.fromNode}\u0000${e.toNode}`;
+    for (let j = 0; j < key.length; j += 1) {
+      hash ^= key.charCodeAt(j);
+      hash = Math.imul(hash, 16777619);
+    }
+  }
+  // Fold the edge count in as well to make collisions even less likely.
+  hash ^= edges.length;
+  return hash >>> 0;
+}
+
+let cachedTopologyHash = -1;
+let cachedLoopEdgeIds: Set<string> | null = null;
+
+/**
+ * Memoised `getLoopEdgeIds`. Cache is module-level but purely an optimisation:
+ * identical input always produces the identical set, so callers cannot observe
+ * a behavioural difference.
+ */
+function getLoopEdgeIdsCached(edges: CanvasEdge[]): Set<string> {
+  const hash = edgeTopologyFingerprint(edges);
+  if (hash === cachedTopologyHash && cachedLoopEdgeIds) return cachedLoopEdgeIds;
+  const ids = getLoopEdgeIds(edges);
+  cachedTopologyHash = hash;
+  cachedLoopEdgeIds = ids;
   return ids;
 }
 
@@ -2115,64 +2176,169 @@ export function exportCanvasToSvg(
 /**
  * Rasterizes canvas SVG into a high-DPI PNG image Data URL
  */
+/**
+ * Hard ceiling on the rasterised pixel count. Beyond this the backing canvas
+ * alone would hold ~100 MB and the subsequent PNG encode would allocate
+ * roughly as much again — which is what used to crash (闪退) the renderer on
+ * large boards.
+ */
+const MAX_EXPORT_PIXELS = 24_000_000;
+/** Chromium refuses to allocate a canvas larger than 16384px on either side. */
+const MAX_EXPORT_EDGE = 16_384;
+/** Rasterisation watchdog; generous because big boards legitimately take a while. */
+const EXPORT_RASTERISE_TIMEOUT_MS = 20_000;
+
+/**
+ * Clamps the requested export scale so the resulting bitmap always stays
+ * inside both the per-side and the total-pixel limits. Without this a large
+ * whiteboard exported at scale 2 would ask for a canvas the browser cannot
+ * allocate, and the renderer would die instead of reporting an error.
+ */
+export function resolveExportScale(
+  width: number,
+  height: number,
+  requested: number
+): number {
+  const safeW = Math.max(1, width);
+  const safeH = Math.max(1, height);
+  let scale = Math.max(0.1, requested);
+
+  if (safeW * scale > MAX_EXPORT_EDGE) scale = MAX_EXPORT_EDGE / safeW;
+  if (safeH * scale > MAX_EXPORT_EDGE) scale = Math.min(scale, MAX_EXPORT_EDGE / safeH);
+
+  const maxByPixels = Math.sqrt(MAX_EXPORT_PIXELS / (safeW * safeH));
+  if (scale > maxByPixels) scale = maxByPixels;
+
+  return Math.max(0.1, scale);
+}
+
+function loadImageForExport(url: string): Promise<HTMLImageElement> {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const img = new Image();
+    const timer = setTimeout(() => {
+      img.onload = null;
+      img.onerror = null;
+      img.src = "";
+      reject(new Error("白板图片栅格化超时，请缩小画布范围后重试"));
+    }, EXPORT_RASTERISE_TIMEOUT_MS);
+
+    img.onload = () => {
+      clearTimeout(timer);
+      resolve(img);
+    };
+    img.onerror = () => {
+      clearTimeout(timer);
+      reject(new Error("白板图片渲染失败"));
+    };
+    img.src = url;
+  });
+}
+
+function canvasToPngBlob(canvas: HTMLCanvasElement): Promise<Blob> {
+  return new Promise<Blob>((resolve, reject) => {
+    if (typeof canvas.toBlob === "function") {
+      canvas.toBlob((blob) => {
+        if (blob) resolve(blob);
+        else reject(new Error("白板图片编码失败"));
+      }, "image/png");
+      return;
+    }
+
+    // Very old engines without toBlob: encode manually, byte by byte, so we
+    // never build a multi-megabyte base64 string in one go.
+    try {
+      const dataUrl = canvas.toDataURL("image/png");
+      const base64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+      resolve(new Blob([bytes], { type: "image/png" }));
+    } catch (err) {
+      reject(err instanceof Error ? err : new Error("白板图片编码失败"));
+    }
+  });
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    if (typeof FileReader === "undefined") {
+      reject(new Error("当前环境不支持图片转换"));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error ?? new Error("图片转换失败"));
+    reader.readAsDataURL(blob);
+  });
+}
+
+/**
+ * Rasterises the canvas into a PNG Blob.
+ *
+ * Returning a Blob (instead of a base64 data URL) is deliberate: a data URL
+ * for a large board can exceed 80 MB of text, and every hop — the string
+ * itself, the IPC structured clone, and the main-process Buffer conversion —
+ * used to duplicate it, tripling peak memory and crashing the app.
+ */
+export async function exportCanvasToPngBlob(
+  data: CanvasData,
+  options?: CanvasExportOptions
+): Promise<Blob> {
+  const svgString = exportCanvasToSvg(data, options);
+  const bbox = computeBoundingBox(data.nodes);
+  const pad = options?.padding ?? 48;
+  const baseWidth = Math.max(800, Math.ceil(bbox.width + pad * 2));
+  const baseHeight = Math.max(600, Math.ceil(bbox.height + pad * 2));
+
+  const canRasterise =
+    typeof document !== "undefined" &&
+    typeof Image !== "undefined" &&
+    typeof Blob !== "undefined" &&
+    typeof URL !== "undefined" &&
+    typeof URL.createObjectURL === "function" &&
+    Boolean(document.createElement("canvas").getContext?.("2d"));
+
+  if (!canRasterise) {
+    // Headless / test environment: hand back the vector so callers still get
+    // a usable, if unscaled, image instead of an exception.
+    return new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+  }
+
+  const scale = resolveExportScale(baseWidth, baseHeight, options?.scale ?? 2);
+  const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+  const url = URL.createObjectURL(svgBlob);
+
+  try {
+    const img = await loadImageForExport(url);
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(baseWidth * scale));
+    canvas.height = Math.max(1, Math.round(baseHeight * scale));
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("无法创建 Canvas 2D 上下文");
+
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+    const blob = await canvasToPngBlob(canvas);
+
+    // Release the backing store right away — a 24 MP canvas pins ~96 MB.
+    canvas.width = 0;
+    canvas.height = 0;
+
+    return blob;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 export async function exportCanvasToPng(
   data: CanvasData,
   options?: CanvasExportOptions
 ): Promise<string> {
-  const svgString = exportCanvasToSvg(data, options);
-  const bbox = computeBoundingBox(data.nodes);
-  const pad = options?.padding ?? 48;
-  const totalWidth = Math.max(800, Math.ceil(bbox.width + pad * 2));
-  const totalHeight = Math.max(600, Math.ceil(bbox.height + pad * 2));
-  const scale = options?.scale ?? 2;
-
-  return new Promise<string>((resolve, reject) => {
-    const testCanvas = typeof document !== "undefined" ? document.createElement("canvas") : null;
-    const hasCanvas2d = Boolean(testCanvas && testCanvas.getContext && testCanvas.getContext("2d"));
-
-    if (typeof Image === "undefined" || typeof document === "undefined" || !hasCanvas2d) {
-      const base64 = typeof Buffer !== "undefined" ? Buffer.from(svgString).toString("base64") : btoa(svgString);
-      resolve(`data:image/svg+xml;base64,${base64}`);
-      return;
-    }
-
-    const img = new Image();
-    const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
-    const url = URL.createObjectURL(svgBlob);
-
-    const timeout = setTimeout(() => {
-      URL.revokeObjectURL(url);
-      reject(new Error("白板图片导出栅格化超时"));
-    }, 8000);
-
-    img.onload = () => {
-      clearTimeout(timeout);
-      try {
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.round(totalWidth * scale);
-        canvas.height = Math.round(totalHeight * scale);
-        const ctx = canvas.getContext("2d");
-        if (!ctx) throw new Error("无法创建 Canvas 2D 上下文");
-
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = "high";
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        URL.revokeObjectURL(url);
-        resolve(canvas.toDataURL("image/png"));
-      } catch (err) {
-        URL.revokeObjectURL(url);
-        reject(err);
-      }
-    };
-
-    img.onerror = (err) => {
-      clearTimeout(timeout);
-      URL.revokeObjectURL(url);
-      reject(err);
-    };
-
-    img.src = url;
-  });
+  const blob = await exportCanvasToPngBlob(data, options);
+  return blobToDataUrl(blob);
 }
 
 /**
@@ -2196,26 +2362,47 @@ export async function downloadCanvasAsImage(
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
     return;
   }
 
-  // PNG Export
-  const pngDataUrl = await exportCanvasToPng(data, options);
-  if (typeof window !== "undefined" && window.knowSpaceDesktop?.savePngData) {
-    await window.knowSpaceDesktop.savePngData({
-      dataUrl: pngDataUrl,
+  // PNG export
+  const blob = await exportCanvasToPngBlob(data, options);
+  const desktop =
+    typeof window !== "undefined"
+      ? window.knowSpaceDesktop ?? window.bookMDDesktop
+      : undefined;
+
+  // Preferred path: hand the raw bytes to the main process. Passing a base64
+  // data URL instead meant the payload was duplicated as a string and then
+  // again during IPC serialisation, which is what made big exports crash.
+  if (desktop?.savePngBuffer) {
+    const buffer = await blob.arrayBuffer();
+    const res = await desktop.savePngBuffer({
+      buffer,
       filename: `${cleanName}.png`,
     });
-    return;
+    if (res?.success || res?.canceled) return;
+    throw new Error(res?.message || "保存图片失败");
   }
 
+  // Legacy bridge without the buffer API
+  if (desktop?.savePngData && blob.type === "image/png") {
+    const dataUrl = await blobToDataUrl(blob);
+    const res = await desktop.savePngData({ dataUrl, filename: `${cleanName}.png` });
+    if (res?.success || res?.canceled) return;
+    throw new Error(res?.message || "保存图片失败");
+  }
+
+  // Browser fallback: download straight from the Blob URL (no base64 step)
+  const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = pngDataUrl;
+  a.href = url;
   a.download = `${cleanName}.png`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 /**
@@ -2226,14 +2413,20 @@ export async function copyCanvasImageToClipboard(
   options?: CanvasExportOptions
 ): Promise<boolean> {
   try {
-    const pngDataUrl = await exportCanvasToPng(data, options);
-    const res = await fetch(pngDataUrl);
-    const blob = await res.blob();
-    if (typeof navigator !== "undefined" && navigator.clipboard && typeof ClipboardItem !== "undefined") {
-      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-      return true;
-    }
-    return false;
+    const blob = await exportCanvasToPngBlob(data, options);
+    if (blob.type !== "image/png") return false;
+    if (typeof navigator === "undefined" || !navigator.clipboard) return false;
+    if (typeof ClipboardItem === "undefined") return false;
+
+    // Clipboards in Chromium require a PNG; the Blob is already one, so there
+    // is no need to round-trip it through a data URL and fetch() first.
+    const pngBlob =
+      blob.type === "image/png"
+        ? blob
+        : new Blob([await blob.arrayBuffer()], { type: "image/png" });
+
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": pngBlob })]);
+    return true;
   } catch (err) {
     console.error("复制白板图片至剪贴板失败:", err);
     return false;
@@ -2750,7 +2943,9 @@ export function syncLoopEdgeGeometry(
   nodes: CanvasNode[],
   edges: CanvasEdge[]
 ): CanvasEdge[] {
-  const loopIds = getLoopEdgeIds(edges);
+  // Memoised on the edge topology: this runs on every drag frame, where the
+  // topology is unchanged and only the coordinates move.
+  const loopIds = getLoopEdgeIdsCached(edges);
   if (loopIds.size === 0) return edges;
 
   const nodeMap = new Map(nodes.map((n) => [n.id, n]));

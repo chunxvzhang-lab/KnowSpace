@@ -117,6 +117,12 @@ const MIN_ZOOM = 0.15;
 const MAX_ZOOM = 3.0;
 const SIDES: CanvasNodeSide[] = ["top", "right", "bottom", "left"];
 
+/**
+ * Shared empty Map so the drag hot path never allocates a throwaway one when
+ * nothing else moves alongside the dragged card.
+ */
+const EMPTY_DRAG_MAP = new Map<string, { id: string; startX: number; startY: number }>();
+
 function getNodePalette(color?: string): { label: string; stroke: string; bg: string } | undefined {
   if (!color) return undefined;
   if (CANVAS_COLOR_PALETTES[color]) return CANVAS_COLOR_PALETTES[color];
@@ -530,6 +536,11 @@ export const CanvasView = memo(function CanvasView({
     currentX: number;
     currentY: number;
   } | null>(null);
+  // Mirrors connectingState for the global mouse listeners, so those listeners
+  // can stay mounted across renders instead of being re-attached every time
+  // the connection cursor moves.
+  const connectingStateRef = useRef(connectingState);
+  connectingStateRef.current = connectingState;
 
   // Dragging card or canvas refs
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -556,6 +567,12 @@ export const CanvasView = memo(function CanvasView({
     mouseStartY: number;
     containedNodes?: Array<{ id: string; startX: number; startY: number }>;
     /**
+     * Same data as `containedNodes`, pre-indexed once at drag start. Rebuilding
+     * this Map on every mousemove (which can fire several hundred times per
+     * second) allocated constantly for no benefit.
+     */
+    containedMap?: Map<string, { id: string; startX: number; startY: number }>;
+    /**
      * When the selection forms a rectangular grid, dragging one of its cards
      * becomes an interactive spacing adjustment instead of a plain move.
      */
@@ -564,6 +581,8 @@ export const CanvasView = memo(function CanvasView({
       baseGapX: number;
       baseGapY: number;
       startPositions: Array<{ id: string; startX: number; startY: number }>;
+      /** Pre-indexed `startPositions`, built once per drag. */
+      startById: Map<string, { id: string; startX: number; startY: number }>;
     };
   } | null>(null);
 
@@ -617,17 +636,26 @@ export const CanvasView = memo(function CanvasView({
   }, []);
 
   // Synchronize internal data changes to parent
+  // Kept in a ref so `emitChange` (and everything built on it, such as the
+  // global mousemove/mouseup listeners) stays referentially stable even when
+  // the parent passes a fresh inline callback on every render. Previously that
+  // identity churn made React detach and re-attach the window listeners after
+  // every single render.
+  const onSourceChangeRef = useRef(onSourceChange);
+  onSourceChangeRef.current = onSourceChange;
+
   const emitChange = useCallback(
     (newData: CanvasData) => {
       setData(newData);
       latestDataRef.current = newData;
-      if (onSourceChange) {
+      const handler = onSourceChangeRef.current;
+      if (handler) {
         const serialized = serializeCanvasData(newData);
         lastEmittedSourceRef.current = serialized;
-        onSourceChange(serialized);
+        handler(serialized);
       }
     },
-    [onSourceChange]
+    []
   );
 
   // Push history snapshot
@@ -2040,6 +2068,12 @@ export const CanvasView = memo(function CanvasView({
         );
         const gridLayout = computeGridLayout(selectedCards);
         if (gridLayout) {
+          const gridStartById = new Map(
+            gridLayout.orderedIds.map((id) => {
+              const n = latestDataRef.current.nodes.find((x) => x.id === id)!;
+              return [id, { id, startX: n.x, startY: n.y }];
+            })
+          );
           nodeDragRef.current = {
             nodeId: liveNode.id,
             startNodeX: liveNode.x,
@@ -2047,14 +2081,13 @@ export const CanvasView = memo(function CanvasView({
             mouseStartX: e.clientX,
             mouseStartY: e.clientY,
             containedNodes: [],
+            containedMap: new Map(),
             gridSpacing: {
               layout: gridLayout,
               baseGapX: Math.max(4, gridLayout.gapX),
               baseGapY: Math.max(4, gridLayout.gapY),
-              startPositions: gridLayout.orderedIds.map((id) => {
-                const n = latestDataRef.current.nodes.find((x) => x.id === id)!;
-                return { id, startX: n.x, startY: n.y };
-              }),
+              startPositions: [...gridStartById.values()],
+              startById: gridStartById,
             },
           };
           return;
@@ -2084,6 +2117,7 @@ export const CanvasView = memo(function CanvasView({
         mouseStartX: e.clientX,
         mouseStartY: e.clientY,
         containedNodes: allContained,
+        containedMap: new Map(allContained.map((c) => [c.id, c])),
       };
       return;
     }
@@ -2119,17 +2153,19 @@ export const CanvasView = memo(function CanvasView({
           });
 
       if (isFresh) freshGroupIdsRef.current.delete(liveNode.id);
+      const groupContained = contained.map((c) => ({
+        id: c.id,
+        startX: c.x,
+        startY: c.y,
+      }));
       nodeDragRef.current = {
         nodeId: liveNode.id,
         startNodeX: liveNode.x,
         startNodeY: liveNode.y,
         mouseStartX: e.clientX,
         mouseStartY: e.clientY,
-        containedNodes: contained.map((c) => ({
-          id: c.id,
-          startX: c.x,
-          startY: c.y,
-        })),
+        containedNodes: groupContained,
+        containedMap: new Map(groupContained.map((c) => [c.id, c])),
       };
     } else {
       nodeDragRef.current = {
@@ -2139,6 +2175,7 @@ export const CanvasView = memo(function CanvasView({
         mouseStartX: e.clientX,
         mouseStartY: e.clientY,
         containedNodes: [],
+        containedMap: new Map(),
       };
     }
   };
@@ -2386,27 +2423,17 @@ export const CanvasView = memo(function CanvasView({
         const updatedId = dragInfo.nodeId;
         const startX = dragInfo.startNodeX;
         const startY = dragInfo.startNodeY;
-        const containedMap = new Map(
-          dragInfo.containedNodes?.map((c) => [c.id, c]) || []
-        );
-
-        const gridSpacing = dragInfo.gridSpacing;
-
+        // Reuse the Maps built once at drag start. These used to be rebuilt on
+        // every mousemove, which fires far more often than the frame rate.
         latestDragPosRef.current = {
           dx,
           dy,
           updatedId,
           startX,
           startY,
-          containedMap,
-          gridSpacing: gridSpacing
-            ? {
-                layout: gridSpacing.layout,
-                baseGapX: gridSpacing.baseGapX,
-                baseGapY: gridSpacing.baseGapY,
-                startById: new Map(gridSpacing.startPositions.map((p) => [p.id, p])),
-              }
-            : undefined,
+          containedMap: dragInfo.containedMap ?? EMPTY_DRAG_MAP,
+          // The drag-start gridSpacing already carries a ready `startById` Map.
+          gridSpacing: dragInfo.gridSpacing,
         };
 
         // Standard 60fps RAF throttling: update when frame is ready without dropping intermediate movement
@@ -2524,7 +2551,7 @@ export const CanvasView = memo(function CanvasView({
       }
 
       // 4. Connecting edge
-      if (connectingState && containerRef.current) {
+      if (connectingStateRef.current && containerRef.current) {
         const rect = containerRef.current.getBoundingClientRect();
         const currentZoom = viewportRef.current.zoom;
         const currentPanX = viewportRef.current.panX;
@@ -2615,9 +2642,7 @@ export const CanvasView = memo(function CanvasView({
           const updatedId = dragInfo.nodeId;
           const startX = dragInfo.startNodeX;
           const startY = dragInfo.startNodeY;
-          const containedMap = new Map(
-            dragInfo.containedNodes?.map((c) => [c.id, c]) || []
-          );
+          const containedMap = dragInfo.containedMap ?? EMPTY_DRAG_MAP;
 
           let finalNodes: CanvasNode[];
           if (dragInfo.gridSpacing) {
@@ -2717,9 +2742,10 @@ export const CanvasView = memo(function CanvasView({
 
         resizeDragRef.current = null;
       }
-      if (connectingState) {
-        setConnectingState(null);
-      }
+      // Unconditional: React bails out when the value is already null, and this
+      // keeps `connectingState` out of the listener's dependency list so the
+      // listeners are attached once instead of on every connection update.
+      setConnectingState(null);
     };
 
     window.addEventListener("mousemove", handleMouseMove);
@@ -2728,7 +2754,7 @@ export const CanvasView = memo(function CanvasView({
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [connectingState, pushHistory]);
+  }, [pushHistory]);
 
   // Keyboard Shortcuts
   useEffect(() => {
@@ -2841,6 +2867,7 @@ export const CanvasView = memo(function CanvasView({
 
   // Export canvas image
   const handleDownloadExport = async () => {
+    if (isExporting) return;
     setIsExporting(true);
     try {
       await downloadCanvasAsImage(data, title || "KnowSpace白板", exportFormat, {
@@ -2849,14 +2876,19 @@ export const CanvasView = memo(function CanvasView({
         scale: 2,
       });
       setShowExportModal(false);
+      showToast(exportFormat === "svg" ? "已导出矢量 SVG" : "白板图片已导出");
     } catch (err) {
       console.error("导出白板图片失败:", err);
+      // Surface the failure instead of dying silently — a previous hard crash
+      // here left the user staring at a closed window with no explanation.
+      showToast(`导出失败：${err instanceof Error ? err.message : "未知错误"}`);
     } finally {
       setIsExporting(false);
     }
   };
 
   const handleCopyExport = async () => {
+    if (isExporting) return;
     setIsExporting(true);
     try {
       const ok = await copyCanvasImageToClipboard(data, {
@@ -2867,9 +2899,12 @@ export const CanvasView = memo(function CanvasView({
       if (ok) {
         setExportCopyFeedback(true);
         setTimeout(() => setExportCopyFeedback(false), 2200);
+      } else {
+        showToast("复制失败：当前环境不支持剪贴板图片写入");
       }
     } catch (err) {
       console.error("复制白板图片失败:", err);
+      showToast(`复制失败：${err instanceof Error ? err.message : "未知错误"}`);
     } finally {
       setIsExporting(false);
     }

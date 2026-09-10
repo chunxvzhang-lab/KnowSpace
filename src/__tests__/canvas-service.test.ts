@@ -14,6 +14,7 @@ import {
   exportCanvasToPng,
   downloadCanvasAsImage,
   copyCanvasImageToClipboard,
+  resolveExportScale,
   reverseEdgeDirection,
   connectOneToMany,
   connectChainNodes,
@@ -269,10 +270,17 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
     expect(clickSpy).toHaveBeenCalled();
 
     // PNG download via desktop knowSpaceDesktop bridge
-    const savePngMock = vi.fn().mockResolvedValue(true);
-    (window as any).knowSpaceDesktop = { savePngData: savePngMock };
+    const savePngBufferMock = vi.fn().mockResolvedValue({ success: true });
+    const savePngDataMock = vi.fn().mockResolvedValue({ success: true });
+    (window as any).knowSpaceDesktop = {
+      savePngBuffer: savePngBufferMock,
+      savePngData: savePngDataMock,
+    };
     await downloadCanvasAsImage(data, "test-canvas", "png");
-    expect(savePngMock).toHaveBeenCalled();
+    // The raw-buffer bridge must be preferred: base64 data URLs used to
+    // duplicate a multi-megabyte string across the IPC boundary and crash.
+    expect(savePngBufferMock).toHaveBeenCalled();
+    expect(savePngDataMock).not.toHaveBeenCalled();
 
     clickSpy.mockRestore();
     delete (window as any).knowSpaceDesktop;
@@ -280,6 +288,28 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
     // Clipboard copy
     const copied = await copyCanvasImageToClipboard(data);
     expect(typeof copied).toBe("boolean");
+  });
+
+  it("clamps the export scale so oversized boards cannot crash the renderer", () => {
+    // Normal board: the requested scale is honoured
+    expect(resolveExportScale(1000, 800, 2)).toBeCloseTo(2, 5);
+    expect(resolveExportScale(1000, 800, 1)).toBeCloseTo(1, 5);
+
+    // Very wide board: capped by the 16384px per-side limit
+    const wide = resolveExportScale(20000, 100, 2);
+    expect(20000 * wide).toBeLessThanOrEqual(16384);
+    expect(wide).toBeLessThan(1);
+
+    // Very tall board: also capped per-side
+    const tall = resolveExportScale(100, 20000, 2);
+    expect(20000 * tall).toBeLessThanOrEqual(16384);
+
+    // Huge board: capped by the total pixel budget
+    const huge = resolveExportScale(20000, 20000, 2);
+    expect(20000 * huge * (20000 * huge)).toBeLessThanOrEqual(24_000_000 + 1);
+
+    // Never returns something degenerate
+    expect(resolveExportScale(10, 10, 2)).toBeGreaterThan(0);
   });
 
   it("reverses edge direction properly for single-arrow, bidirectional, and undirected lines", () => {

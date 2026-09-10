@@ -24,6 +24,7 @@ const desktopApi = {
   isFullScreen: () => ipcRenderer.invoke("bookmd:is-fullscreen"),
   exportSvgAsPng: (params) => ipcRenderer.invoke("bookmd:export-svg-as-png", params),
   savePngData: (params) => ipcRenderer.invoke("bookmd:save-png-data", params),
+  savePngBuffer: (params) => ipcRenderer.invoke("bookmd:save-png-buffer", params),
   openInNewWindow: (absolutePath) => ipcRenderer.invoke("bookmd:open-in-new-window", absolutePath),
   printToPdf: (options) => ipcRenderer.invoke("bookmd:print-to-pdf", options),
   printDocument: () => ipcRenderer.invoke("bookmd:print-document"),
