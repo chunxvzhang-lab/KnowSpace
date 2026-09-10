@@ -8,6 +8,7 @@ import type {
   CanvasGroupNode,
 } from "../types/canvasTypes";
 import { renderCardMarkdown } from "./markdown";
+import { serializeSvgForExport } from "./svgExport";
 
 export const CANVAS_COLOR_PALETTES: Record<string, { label: string; stroke: string; bg: string }> = {
   "1": { label: "珊瑚红", stroke: "#ef4444", bg: "rgba(239, 68, 68, 0.12)" },
@@ -2370,12 +2371,47 @@ async function readUrlAsDataUrl(url: string): Promise<string | null> {
  * instead of failing outright.
  */
 export async function sanitizeSvgResources(svgString: string): Promise<string> {
-  const viaDom = await sanitizeSvgViaDom(svgString);
+  // ── Step 0: make the markup well-formed XML ──────────────────────────────
+  // This has to happen FIRST. Card bodies are HTML (markdown-it runs without
+  // xhtmlOut), so <br>, <img> and the task-list <input> arrive unclosed. In
+  // XML an unclosed <img> swallows everything that follows it, which makes the
+  // whole document fail to parse — and that in turn disabled every downstream
+  // safeguard: sanitizeSvgViaDom() bailed out, stripSvgImages() returned its
+  // input unchanged, and Chromium's error-recovery parser still loaded the
+  // external <img>, tainting the canvas so toBlob() refused to run.
+  const wellFormed = serializeSvgForExport(valueBooleanAttributes(svgString));
+
+  const viaDom = await sanitizeSvgViaDom(wellFormed);
   if (viaDom !== null) return viaDom;
-  // The markup was not well-formed XML (the card bodies are HTML inside a
-  // foreignObject, which is easy to get wrong), so fall back to a textual
-  // rewrite. Less precise, but it is what keeps the export from failing.
-  return sanitizeSvgViaRegex(svgString);
+  // Still not parseable (some other malformation): fall back to a textual
+  // rewrite. Less precise, but it keeps the export from failing outright.
+  return sanitizeSvgViaRegex(wellFormed);
+}
+
+/**
+ * Attributes that HTML allows to stand alone but XML requires to carry a
+ * value. markdown-it's task lists emit `<input type="checkbox" checked
+ * disabled>`, and `checked` alone is a hard XML parse error — self-closing the
+ * tag does not help.
+ */
+const HTML_BOOLEAN_ATTR_RE =
+  /(\s)(checked|disabled|selected|readonly|required|multiple|autofocus|hidden|open|reversed|novalidate|formnovalidate|ismap|loop|muted|controls|default|defer|async|allowfullscreen|itemscope|scoped)(?=[\s/>]|$)/gi;
+
+const SVG_OR_HTML_TAG_RE = /<([a-zA-Z][\w:-]*)((?:\s+[^<>]*?)?)(\/?)>/g;
+
+/** Rewrites `disabled` into `disabled="disabled"` so the markup parses as XML. */
+export function valueBooleanAttributes(svgString: string): string {
+  return svgString.replace(
+    SVG_OR_HTML_TAG_RE,
+    (full, tag: string, attrs: string, selfClose: string) => {
+      if (!attrs) return full;
+      const fixed = attrs.replace(
+        HTML_BOOLEAN_ATTR_RE,
+        (_match, whitespace: string, name: string) => `${whitespace}${name}="${name}"`
+      );
+      return fixed === attrs ? full : `<${tag}${fixed}${selfClose}>`;
+    }
+  );
 }
 
 /** Returns null when the SVG could not be parsed as XML. */
@@ -2494,12 +2530,25 @@ async function sanitizeSvgViaRegex(svgString: string): Promise<string> {
  * a text-and-shape export rather than no file at all.
  */
 function stripSvgImages(svgString: string): string {
+  const viaDom = stripSvgImagesViaDom(svgString);
+  if (viaDom !== null) return viaDom;
+
+  // Textual fallback. This used to be the only path and it silently gave up
+  // when the markup was not well-formed XML, which is precisely the case that
+  // matters here — so now the regex always runs.
+  return svgString
+    .replace(SVG_IMAGE_TAG_RE, "")
+    .replace(SVG_CSS_URL_RE, "none");
+}
+
+/** Returns null when the SVG could not be parsed as XML. */
+function stripSvgImagesViaDom(svgString: string): string | null {
   if (typeof DOMParser === "undefined" || typeof XMLSerializer === "undefined") {
-    return svgString;
+    return null;
   }
   try {
     const doc = new DOMParser().parseFromString(svgString, "image/svg+xml");
-    if (doc.getElementsByTagName("parsererror").length > 0) return svgString;
+    if (doc.getElementsByTagName("parsererror").length > 0) return null;
     for (const el of Array.from(doc.querySelectorAll("img, image"))) el.remove();
     for (const el of Array.from(doc.querySelectorAll("[style]"))) {
       const style = el.getAttribute("style") ?? "";
@@ -2509,7 +2558,7 @@ function stripSvgImages(svgString: string): string {
     }
     return new XMLSerializer().serializeToString(doc);
   } catch {
-    return svgString;
+    return null;
   }
 }
 
@@ -2636,18 +2685,24 @@ export async function exportCanvasToPng(
 /**
  * Triggers download of canvas as PNG or SVG file
  */
+export type CanvasDownloadResult = "png" | "svg" | "canceled";
+
 export async function downloadCanvasAsImage(
   data: CanvasData,
   filename: string,
   format: "png" | "svg" = "png",
   options?: CanvasExportOptions
-): Promise<void> {
+): Promise<CanvasDownloadResult> {
   const cleanName = filename.replace(/\.(png|svg|canvas)$/i, "");
 
-  if (format === "svg") {
-    const svgContent = exportCanvasToSvg(data, options);
-    const blob = new Blob([svgContent], { type: "image/svg+xml;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
+  const saveSvg = (): void => {
+    // Run the same well-formed-XML pass used by the rasteriser, so the saved
+    // .svg file actually opens in a browser or Illustrator. Without it the
+    // unclosed tags and valueless boolean attributes from the card HTML
+    // produce a file most viewers reject.
+    const svgContent = serializeSvgForExport(valueBooleanAttributes(exportCanvasToSvg(data, options)));
+    const svgBlob = new Blob([svgContent], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(svgBlob);
     const a = document.createElement("a");
     a.href = url;
     a.download = `${cleanName}.svg`;
@@ -2655,11 +2710,26 @@ export async function downloadCanvasAsImage(
     a.click();
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    return;
+  };
+
+  if (format === "svg") {
+    saveSvg();
+    return "svg";
   }
 
-  // PNG export
-  const blob = await exportCanvasToPngBlob(data, options);
+  // PNG export. Rasterisation is the only step that the browser's security
+  // model can veto, so it gets an explicit fallback: rather than dead-ending
+  // the user with an error, hand them the vector file, which has no such
+  // restriction and still contains the whole board.
+  let blob: Blob;
+  try {
+    blob = await exportCanvasToPngBlob(data, options);
+  } catch (err) {
+    console.warn("PNG 栅格化失败，已降级为 SVG 导出:", err);
+    saveSvg();
+    return "svg";
+  }
+
   const desktop =
     typeof window !== "undefined"
       ? window.knowSpaceDesktop ?? window.bookMDDesktop
@@ -2674,7 +2744,8 @@ export async function downloadCanvasAsImage(
       buffer,
       filename: `${cleanName}.png`,
     });
-    if (res?.success || res?.canceled) return;
+    if (res?.canceled) return "canceled";
+    if (res?.success) return "png";
     throw new Error(res?.message || "保存图片失败");
   }
 
@@ -2682,7 +2753,8 @@ export async function downloadCanvasAsImage(
   if (desktop?.savePngData && blob.type === "image/png") {
     const dataUrl = await blobToDataUrl(blob);
     const res = await desktop.savePngData({ dataUrl, filename: `${cleanName}.png` });
-    if (res?.success || res?.canceled) return;
+    if (res?.canceled) return "canceled";
+    if (res?.success) return "png";
     throw new Error(res?.message || "保存图片失败");
   }
 
@@ -2695,6 +2767,7 @@ export async function downloadCanvasAsImage(
   a.click();
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return "png";
 }
 
 /**

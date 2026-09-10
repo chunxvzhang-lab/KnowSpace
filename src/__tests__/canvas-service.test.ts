@@ -16,6 +16,7 @@ import {
   copyCanvasImageToClipboard,
   resolveExportScale,
   sanitizeSvgResources,
+  valueBooleanAttributes,
   reverseEdgeDirection,
   connectOneToMany,
   connectChainNodes,
@@ -277,11 +278,19 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
       savePngBuffer: savePngBufferMock,
       savePngData: savePngDataMock,
     };
-    await downloadCanvasAsImage(data, "test-canvas", "png");
     // The raw-buffer bridge must be preferred: base64 data URLs used to
     // duplicate a multi-megabyte string across the IPC boundary and crash.
+    const pngResult = await downloadCanvasAsImage(data, "test-canvas", "png");
     expect(savePngBufferMock).toHaveBeenCalled();
     expect(savePngDataMock).not.toHaveBeenCalled();
+    expect(pngResult).toBe("png");
+
+    // Cancelling is reported distinctly so the UI can keep the dialog open
+    savePngBufferMock.mockResolvedValueOnce({ canceled: true });
+    expect(await downloadCanvasAsImage(data, "test-canvas", "png")).toBe("canceled");
+
+    // SVG format reports itself as such
+    expect(await downloadCanvasAsImage(data, "test-canvas", "svg")).toBe("svg");
 
     clickSpy.mockRestore();
     delete (window as any).knowSpaceDesktop;
@@ -340,9 +349,61 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
     expect(out).not.toContain("paper.png");
   }, 15000);
 
-  it("leaves an SVG with no external resources untouched", async () => {
+  it("repairs unclosed HTML void tags so the export becomes valid XML", async () => {
+    // Mirrors exactly what exportCanvasToSvg() produces: markdown-it runs
+    // without xhtmlOut, so card bodies carry <br>, <img> and the task-list
+    // <input> unclosed. In XML an unclosed <img> swallows everything after it,
+    // which used to make the document unparseable — that in turn disabled the
+    // inlining pass AND the strip-images retry, and Chromium's error-recovery
+    // parser still loaded the external image, tainting the canvas.
+    const svg =
+      `<?xml version="1.0" encoding="UTF-8"?>` +
+      `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="200">` +
+      `<foreignObject x="0" y="0" width="400" height="200">` +
+      `<div xmlns="http://www.w3.org/1999/xhtml" class="ks-card">` +
+      `<div class="ks-body"><p>before<br>after</p>` +
+      `<img src="file:///nowhere/shot.png" alt="s">` +
+      `<input type="checkbox" checked disabled></div>` +
+      `</div></foreignObject></svg>`;
+
+    const out = await sanitizeSvgResources(svg);
+
+    // The external reference must be gone
+    expect(out).not.toContain("shot.png");
+
+    // The result must be parseable XML — this is the actual fix
+    const doc = new DOMParser().parseFromString(out, "image/svg+xml");
+    expect(doc.getElementsByTagName("parsererror").length).toBe(0);
+
+    // Void elements are now self-closed
+    expect(out).toMatch(/<br\s*\/>/);
+    expect(out).toMatch(/<input[^>]*\/>/);
+
+    // Surrounding card content survives
+    expect(out).toContain("before");
+    expect(out).toContain("after");
+  }, 15000);
+
+  it("preserves the drawing when there are no external resources", async () => {
     const svg = `<svg xmlns="http://www.w3.org/2000/svg"><circle cx="5" cy="5" r="4"/></svg>`;
-    expect(await sanitizeSvgResources(svg)).toBe(svg);
+    const out = await sanitizeSvgResources(svg);
+    // The markup may be normalised (XML declaration, namespace order), but the
+    // drawing itself must be identical.
+    expect(out).toContain('<circle cx="5" cy="5" r="4"/>');
+    expect(out).not.toContain("url(");
+  });
+
+  it("gives XML values to HTML boolean attributes", () => {
+    // `checked` alone is legal HTML but a hard XML parse error.
+    const input =
+      `<div xmlns="http://www.w3.org/1999/xhtml">` +
+      `<input class="task-list-item-checkbox" type="checkbox" disabled checked>` +
+      `</div>`;
+    const out = valueBooleanAttributes(input);
+    expect(out).toContain('disabled="disabled"');
+    expect(out).toContain('checked="checked"');
+    // Attributes that already have values must be left alone
+    expect(out).toContain('type="checkbox"');
   });
 
   it("clamps the export scale so oversized boards cannot crash the renderer", () => {

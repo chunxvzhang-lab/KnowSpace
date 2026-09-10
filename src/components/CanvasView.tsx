@@ -2870,13 +2870,26 @@ export const CanvasView = memo(function CanvasView({
     if (isExporting) return;
     setIsExporting(true);
     try {
-      await downloadCanvasAsImage(data, title || "KnowSpace白板", exportFormat, {
+      const result = await downloadCanvasAsImage(data, title || "KnowSpace白板", exportFormat, {
         theme,
         background: exportBg,
         scale: 2,
       });
+      if (result === "canceled") {
+        showToast("已取消导出");
+        return;
+      }
       setShowExportModal(false);
-      showToast(exportFormat === "svg" ? "已导出矢量 SVG" : "白板图片已导出");
+      if (result === "svg" && exportFormat !== "svg") {
+        // The rasteriser was vetoed by the browser's security model and the
+        // vector file was saved instead — say so, rather than silently
+        // handing the user a different format than they asked for.
+        showToast("浏览器安全限制无法生成 PNG，已改为导出矢量 SVG");
+      } else if (result === "svg") {
+        showToast("已导出矢量 SVG");
+      } else {
+        showToast("白板图片已导出");
+      }
     } catch (err) {
       console.error("导出白板图片失败:", err);
       // Surface the failure instead of dying silently — a previous hard crash
