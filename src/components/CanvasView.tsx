@@ -90,6 +90,10 @@ import {
   syncLoopEdgeGeometry,
   computeGridLayout,
   resizeGridSpacing,
+  computeRingSpacingLayout,
+  resizeRingSpacing,
+  computeMinRingRadius,
+  alignNodesInCircle,
   projectPointOntoRing,
   downloadCanvasAsImage,
   copyCanvasImageToClipboard,
@@ -97,6 +101,7 @@ import {
   alignNodes,
 } from "../services/canvasService";
 import { renderCardMarkdown } from "../services/markdown";
+import { getCanvasThemeColors } from "../services/canvasTheme";
 
 export type CanvasViewProps = {
   title: string;
@@ -411,6 +416,9 @@ export const CanvasView = memo(function CanvasView({
   // document body level so it can never be clipped by the canvas container's
   // `overflow: hidden` or any ancestor that would otherwise occlude it.
   const [showAlignMenu, setShowAlignMenu] = useState(false);
+  // Non-null while the ring radius slider is being dragged; holds the radius
+  // being previewed so the label and the board stay in step.
+  const [ringRadiusDraft, setRingRadiusDraft] = useState<number | null>(null);
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -584,6 +592,14 @@ export const CanvasView = memo(function CanvasView({
       /** Pre-indexed `startPositions`, built once per drag. */
       startById: Map<string, { id: string; startX: number; startY: number }>;
     };
+    /**
+     * When the selection already sits on a circle, dragging one of its cards
+     * resizes the ring — and therefore the spacing between cards — instead of
+     * translating it.
+     */
+    ringSpacing?: {
+      layout: NonNullable<ReturnType<typeof computeRingSpacingLayout>>;
+    };
   } | null>(null);
 
   const resizeDragRef = useRef<{
@@ -612,6 +628,9 @@ export const CanvasView = memo(function CanvasView({
       baseGapX: number;
       baseGapY: number;
       startById: Map<string, { id: string; startX: number; startY: number }>;
+    };
+    ringSpacing?: {
+      layout: NonNullable<ReturnType<typeof computeRingSpacingLayout>>;
     };
   } | null>(null);
   const latestResizePosRef = useRef<{
@@ -2092,6 +2111,26 @@ export const CanvasView = memo(function CanvasView({
           };
           return;
         }
+
+        // Ring spacing mode: the cards already sit on a circle, so dragging one
+        // of them resizes the ring — and with it the spacing between cards.
+        // Checked after the grid on purpose: a rectangular arrangement also
+        // satisfies the circle test (its corners are equidistant from the
+        // centre), and the rectangular reading is the more specific one.
+        const ringLayout = computeRingSpacingLayout(selectedCards);
+        if (ringLayout) {
+          nodeDragRef.current = {
+            nodeId: liveNode.id,
+            startNodeX: liveNode.x,
+            startNodeY: liveNode.y,
+            mouseStartX: e.clientX,
+            mouseStartY: e.clientY,
+            containedNodes: [],
+            containedMap: new Map(),
+            ringSpacing: { layout: ringLayout },
+          };
+          return;
+        }
       }
 
       const selectedOthers = latestDataRef.current.nodes
@@ -2434,6 +2473,7 @@ export const CanvasView = memo(function CanvasView({
           containedMap: dragInfo.containedMap ?? EMPTY_DRAG_MAP,
           // The drag-start gridSpacing already carries a ready `startById` Map.
           gridSpacing: dragInfo.gridSpacing,
+          ringSpacing: dragInfo.ringSpacing,
         };
 
         // Standard 60fps RAF throttling: update when frame is ready without dropping intermediate movement
@@ -2476,6 +2516,37 @@ export const CanvasView = memo(function CanvasView({
                 };
                 latestDataRef.current = gridData;
                 return gridData;
+              }
+
+              // ── Ring spacing mode ──────────────────────────────────────
+              // The dragged card follows the pointer; its distance from the
+              // ring centre becomes the new radius, and every other card keeps
+              // its seat while re-distributing around that circle.
+              if (pos.ringSpacing) {
+                const rs = pos.ringSpacing;
+                const movedNodes = prev.nodes.map((n) =>
+                  n.id === pos.updatedId
+                    ? {
+                        ...n,
+                        x: Math.round(pos.startX + pos.dx),
+                        y: Math.round(pos.startY + pos.dy),
+                      }
+                    : n
+                );
+                const moved = movedNodes.find((n) => n.id === pos.updatedId);
+                if (moved) {
+                  const ringNodes = resizeRingSpacing(movedNodes, rs.layout, pos.updatedId, {
+                    x: moved.x + moved.width / 2,
+                    y: moved.y + moved.height / 2,
+                  });
+                  const ringData = {
+                    ...prev,
+                    nodes: ringNodes,
+                    edges: syncLoopEdgeGeometry(ringNodes, prev.edges),
+                  };
+                  latestDataRef.current = ringData;
+                  return ringData;
+                }
               }
 
               const movedNodes = workingNodes.map((n) => {
@@ -2645,7 +2716,22 @@ export const CanvasView = memo(function CanvasView({
           const containedMap = dragInfo.containedMap ?? EMPTY_DRAG_MAP;
 
           let finalNodes: CanvasNode[];
-          if (dragInfo.gridSpacing) {
+          if (dragInfo.ringSpacing) {
+            // Ring spacing drag: settle the ring on the final radius
+            const rs = dragInfo.ringSpacing;
+            const movedNodes = latestDataRef.current.nodes.map((n) =>
+              n.id === updatedId
+                ? { ...n, x: Math.round(startX + dx), y: Math.round(startY + dy) }
+                : n
+            );
+            const moved = movedNodes.find((n) => n.id === updatedId);
+            finalNodes = moved
+              ? resizeRingSpacing(movedNodes, rs.layout, updatedId, {
+                  x: moved.x + moved.width / 2,
+                  y: moved.y + moved.height / 2,
+                })
+              : movedNodes;
+          } else if (dragInfo.gridSpacing) {
             // Grid spacing drag: settle the grid on the final gutters
             const gs = dragInfo.gridSpacing;
             const startPos = gs.startPositions.find((p) => p.id === updatedId);
@@ -3007,6 +3093,73 @@ export const CanvasView = memo(function CanvasView({
     return "卡片";
   }, [currentMultiRootNode]);
 
+  // ── Ring spacing controls ────────────────────────────────────────────────
+  // Live metrics for the alignment dropdown's radius slider. Only meaningful
+  // while three or more selected cards actually sit on a common circle.
+  const selectedRingInfo = useMemo(() => {
+    if (selectedNodeIds.size < 3) return null;
+    const cards = data.nodes.filter((n) => selectedNodeIds.has(n.id) && n.type !== "group");
+    if (cards.length < 3) return null;
+    const layout = computeRingSpacingLayout(cards);
+    if (!layout) return null;
+    return {
+      layout,
+      // Generous upper bound so the slider has usable travel without letting
+      // the ring fly off the board.
+      maxRadius: Math.max(layout.radius * 3, layout.minRadius * 4, 1200),
+    };
+  }, [selectedNodeIds, data.nodes]);
+
+  // Frozen snapshot taken when a slider drag begins. Re-deriving the ring every
+  // frame would let the seating order and start angle drift, making the cards
+  // visibly jitter while the handle moves.
+  const ringSliderSnapshotRef = useRef<typeof selectedRingInfo>(null);
+
+  const applyRingRadius = useCallback(
+    (radius: number, info: NonNullable<typeof selectedRingInfo>) => {
+      const current = latestDataRef.current;
+      const nextNodes = alignNodesInCircle(current.nodes, new Set(info.layout.orderedIds), {
+        radius,
+        startAngleDeg: info.layout.startAngleDeg,
+        orderedIds: info.layout.orderedIds,
+        clampToMinRadius: true,
+        // Pin the centre so the ring grows in place rather than drifting.
+        center: info.layout.center,
+      });
+      const nextData = {
+        ...current,
+        nodes: nextNodes,
+        // Keep the closed loop's arc glued to the resized cards
+        edges: syncLoopEdgeGeometry(nextNodes, current.edges),
+      };
+      latestDataRef.current = nextData;
+      setData(nextData);
+    },
+    []
+  );
+
+  const handleRingSliderStart = useCallback(() => {
+    ringSliderSnapshotRef.current = selectedRingInfo;
+  }, [selectedRingInfo]);
+
+  const handleRingSliderChange = useCallback(
+    (radius: number) => {
+      const info = ringSliderSnapshotRef.current ?? selectedRingInfo;
+      if (!info) return;
+      setRingRadiusDraft(radius);
+      applyRingRadius(radius, info);
+    },
+    [selectedRingInfo, applyRingRadius]
+  );
+
+  const handleRingSliderCommit = useCallback(() => {
+    if (!ringSliderSnapshotRef.current) return;
+    ringSliderSnapshotRef.current = null;
+    setRingRadiusDraft(null);
+    // A single history entry for the whole gesture, not one per frame.
+    pushHistory(latestDataRef.current);
+  }, [pushHistory]);
+
   return (
     <div
       ref={containerRef}
@@ -3285,17 +3438,43 @@ export const CanvasView = memo(function CanvasView({
                   <div className="canvas-ctx-divider" />
                   <div className="canvas-ctx-section-label">整体排布</div>
                   {selectedNodeIds.size >= 3 && (
-                    <div
-                      className="canvas-ctx-item"
-                      title="将选中卡片沿圆周均匀排布，配合「环形闭环连线」即可得到完全圆形的闭环"
-                      onClick={() => {
-                        handleAlignSelected("circle");
-                        setShowAlignMenu(false);
-                      }}
-                    >
-                      <RotateCw size={13} color="#a855f7" />
-                      <span style={{ fontWeight: 600 }}>环形对齐 (圆周等分)</span>
-                    </div>
+                    <>
+                      <div
+                        className="canvas-ctx-item"
+                        title="将选中卡片沿圆周均匀排布，配合「环形闭环连线」即可得到完全圆形的闭环"
+                        onClick={() => handleAlignSelected("circle")}
+                      >
+                        <RotateCw size={13} color="#a855f7" />
+                        <span style={{ fontWeight: 600 }}>环形对齐 (圆周等分)</span>
+                      </div>
+                      {selectedRingInfo && (
+                        <div
+                          className="canvas-ctx-slider"
+                          onMouseDown={(e) => e.stopPropagation()}
+                        >
+                          <div className="canvas-ctx-section-label">
+                            环半径 ·{" "}
+                            {Math.round(ringRadiusDraft ?? selectedRingInfo.layout.radius)}px
+                          </div>
+                          <input
+                            type="range"
+                            aria-label="环半径"
+                            min={Math.round(selectedRingInfo.layout.minRadius)}
+                            max={Math.round(selectedRingInfo.maxRadius)}
+                            step={2}
+                            value={Math.round(ringRadiusDraft ?? selectedRingInfo.layout.radius)}
+                            onPointerDown={handleRingSliderStart}
+                            onChange={(e) => handleRingSliderChange(Number(e.target.value))}
+                            onPointerUp={handleRingSliderCommit}
+                            onKeyUp={handleRingSliderCommit}
+                            onBlur={handleRingSliderCommit}
+                          />
+                          <div className="canvas-ctx-slider-hint">
+                            也可直接拖动环上的卡片实时调整间距
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
                   <div
                     className="canvas-ctx-item"
@@ -6964,72 +7143,8 @@ function getEdgeRing(edge: CanvasEdge): { center: { x: number; y: number }; radi
     : undefined;
 }
 
-function getCanvasThemeColors(theme: ThemeMode) {
-  const isDark =
-    theme === "twitter" ||
-    (theme === "system" && window.matchMedia?.("(prefers-color-scheme: dark)").matches);
-  const isEink = theme === "eink";
-
-  if (isEink) {
-    return {
-      canvasBg: "#f4f1ea",
-      dotColor: "#1a1a1a",
-      cardBg: "#ffffff",
-      cardBorder: "#1a1a1a",
-      cardText: "#1a1a1a",
-      cardHeaderBg: "#ede8df",
-      cardHeaderBorder: "#d5cebf",
-      cardHeaderText: "#1a1a1a",
-      cardShadow: "0 2px 8px rgba(0,0,0,0.1)",
-      groupBorder: "#1a1a1a",
-      groupBg: "rgba(0,0,0,0.02)",
-      edgeColor: "#1a1a1a",
-      edgeLabelBg: "#f4f1ea",
-      edgeLabelText: "#1a1a1a",
-      anchorDotBg: "#1a1a1a",
-    };
-  }
-
-  if (!isDark) {
-    // Light Theme
-    return {
-      canvasBg: "#ffffff",
-      dotColor: "#e2e8f0",
-      cardBg: "#ffffff",
-      cardBorder: "#e2e8f0",
-      cardText: "#1e293b", // Slate 800 - crisp, high-contrast dark text
-      cardHeaderBg: "#f8fafc",
-      cardHeaderBorder: "#e2e8f0",
-      cardHeaderText: "#334155",
-      cardShadow: "0 4px 16px rgba(0,0,0,0.06)",
-      groupBorder: "rgba(100, 116, 139, 0.4)",
-      groupBg: "rgba(241, 245, 249, 0.6)",
-      edgeColor: "#0284c7",
-      edgeLabelBg: "#ffffff",
-      edgeLabelText: "#0f172a",
-      anchorDotBg: "#0284c7",
-    };
-  }
-
-  // Dark Theme (Twitter / Dark)
-  return {
-    canvasBg: "#0f172a",
-    dotColor: "rgba(255,255,255,0.15)",
-    cardBg: "#1e293b",
-    cardBorder: "rgba(255,255,255,0.12)",
-    cardText: "#f1f5f9", // Crisp light text on dark background
-    cardHeaderBg: "rgba(255,255,255,0.04)",
-    cardHeaderBorder: "rgba(255,255,255,0.08)",
-    cardHeaderText: "#e2e8f0",
-    cardShadow: "0 8px 24px rgba(0,0,0,0.35)",
-    groupBorder: "rgba(255,255,255,0.2)",
-    groupBg: "rgba(255,255,255,0.03)",
-    edgeColor: "#38bdf8",
-    edgeLabelBg: "#1e293b",
-    edgeLabelText: "#f1f5f9",
-    anchorDotBg: "#38bdf8",
-  };
-}
+// getCanvasThemeColors now lives in ../services/canvasTheme so that the SVG/PNG
+// exporter reads exactly the same palette the screen does.
 
 function toolBtnStyle(theme: ThemeMode, colors: ReturnType<typeof getCanvasThemeColors>): React.CSSProperties {
   return {

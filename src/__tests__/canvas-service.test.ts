@@ -34,6 +34,9 @@ import {
   syncGridEdges,
   syncLoopEdgeGeometry,
   resizeGridSpacing,
+  computeMinRingRadius,
+  computeRingSpacingLayout,
+  resizeRingSpacing,
   disconnectNodeEdges,
   spawnMultipleBranches,
   cycleEdgeStrokePattern,
@@ -42,6 +45,7 @@ import {
   computeEdgeMidpoint,
   alignNodes,
 } from "../services/canvasService";
+import { getCanvasThemeColors } from "../services/canvasTheme";
 import type { CanvasData, CanvasTextNode, CanvasFileNode, CanvasGroupNode, CanvasEdge } from "../types/canvasTypes";
 
 describe("canvasService - JSON Canvas 1.0 Specification", () => {
@@ -428,6 +432,154 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
 
     // With no bridge available it degrades to a plain false, never a throw
     expect(await copyCanvasImageToClipboard(data)).toBe(false);
+  });
+
+  it("exports with the same backdrop and dot grid the screen shows", () => {
+    const data: CanvasData = {
+      nodes: [{ id: "1", type: "text", text: "Theme", x: 0, y: 0, width: 200, height: 120 }],
+      edges: [],
+    };
+
+    // The exporter used to keep its own hand-maintained palette: light exported
+    // on #f8fafc instead of #ffffff, and e-ink lost its paper tone entirely.
+    for (const theme of ["light", "eink", "twitter"] as const) {
+      const palette = getCanvasThemeColors(theme);
+      const svg = exportCanvasToSvg(data, { theme });
+
+      expect(svg).toContain(palette.canvasBg);
+      expect(svg).toContain(palette.dotColor);
+      // The old hard-coded fallbacks must be gone
+      if (theme !== "light") expect(svg).not.toContain("#f8fafc");
+      if (theme !== "twitter") expect(svg).not.toContain("rgba(255, 255, 255, 0.12)");
+    }
+
+    // An explicit white/transparent background still overrides the theme
+    expect(exportCanvasToSvg(data, { theme: "eink", background: "white" })).toContain("#ffffff");
+    const transparent = exportCanvasToSvg(data, { theme: "eink", background: "transparent" });
+    expect(transparent).not.toContain(`fill="${getCanvasThemeColors("eink").canvasBg}"`);
+  });
+
+  it("computes the smallest radius that keeps ring neighbours apart", () => {
+    const cards: CanvasTextNode[] = [1, 2, 3, 4].map((i) => ({
+      id: `m${i}`,
+      type: "text" as const,
+      text: `Card ${i}`,
+      x: i * 40,
+      y: i * 30,
+      width: 160,
+      height: 100,
+    }));
+
+    expect(computeMinRingRadius(cards)).toBeGreaterThan(0);
+    // Fewer than three cards cannot form a ring
+    expect(computeMinRingRadius(cards.slice(0, 2))).toBe(0);
+
+    // More cards of the same size need a larger radius to stay clear
+    const many = [...cards, ...cards.map((c) => ({ ...c, id: `${c.id}-b` }))];
+    expect(computeMinRingRadius(many)).toBeGreaterThan(computeMinRingRadius(cards));
+  });
+
+  it("detects a ring so the radius can be adjusted interactively", () => {
+    const cards: CanvasTextNode[] = [1, 2, 3, 4, 5, 6].map((i) => ({
+      id: `r${i}`,
+      type: "text" as const,
+      text: `Card ${i}`,
+      x: i * 200,
+      y: 0,
+      width: 160,
+      height: 100,
+    }));
+    const ids = cards.map((n) => n.id);
+    const ringNodes = alignNodesInCircle(cards, ids);
+
+    const layout = computeRingSpacingLayout(ringNodes);
+    expect(layout).not.toBeNull();
+    expect(layout!.orderedIds).toHaveLength(6);
+    expect(layout!.minRadius).toBeGreaterThan(0);
+    expect(layout!.radius).toBeGreaterThan(0);
+
+    // Free-form arrangements are not a ring
+    expect(computeRingSpacingLayout(cards)).toBeNull();
+    // Fewer than three cards is not a ring either
+    expect(computeRingSpacingLayout(ringNodes.slice(0, 2))).toBeNull();
+  });
+
+  it("resizes a ring in place when one of its cards is dragged", () => {
+    const cards: CanvasTextNode[] = [1, 2, 3, 4, 5, 6].map((i) => ({
+      id: `s${i}`,
+      type: "text" as const,
+      text: `Card ${i}`,
+      x: i * 200,
+      y: 0,
+      width: 160,
+      height: 100,
+    }));
+    const ids = cards.map((n) => n.id);
+    const ringNodes = alignNodesInCircle(cards, ids);
+    const layout = computeRingSpacingLayout(ringNodes)!;
+
+    const dragged = ringNodes.find((n) => n.id === layout.orderedIds[0])!;
+    const draggedCenter = {
+      x: dragged.x + dragged.width / 2,
+      y: dragged.y + dragged.height / 2,
+    };
+    // Push the card 60% further out from the centre
+    const pushed = {
+      x: layout.center.x + (draggedCenter.x - layout.center.x) * 1.6,
+      y: layout.center.y + (draggedCenter.y - layout.center.y) * 1.6,
+    };
+
+    const resized = resizeRingSpacing(ringNodes, layout, dragged.id, pushed);
+
+    // Every card now sits further from the SAME centre — the ring grew in
+    // place instead of creeping across the canvas.
+    for (const n of resized) {
+      const r = Math.hypot(
+        n.x + n.width / 2 - layout.center.x,
+        n.y + n.height / 2 - layout.center.y
+      );
+      expect(r).toBeGreaterThan(layout.radius * 1.2);
+    }
+
+    // Seating order is preserved, so cards do not swap places mid-drag
+    const angles = layout.orderedIds.map((id) => {
+      const n = resized.find((x) => x.id === id)!;
+      return Math.atan2(
+        n.y + n.height / 2 - layout.center.y,
+        n.x + n.width / 2 - layout.center.x
+      );
+    });
+    const sorted = [...angles].sort((a, b) => a - b);
+    expect(angles).toEqual(sorted);
+  });
+
+  it("never collapses a ring below the collision floor", () => {
+    const cards: CanvasTextNode[] = [1, 2, 3, 4, 5, 6].map((i) => ({
+      id: `t${i}`,
+      type: "text" as const,
+      text: `Card ${i}`,
+      x: i * 200,
+      y: 0,
+      width: 160,
+      height: 100,
+    }));
+    const ids = cards.map((n) => n.id);
+    const ringNodes = alignNodesInCircle(cards, ids);
+    const layout = computeRingSpacingLayout(ringNodes)!;
+
+    // Drag the card right on top of the centre
+    const collapsed = resizeRingSpacing(ringNodes, layout, layout.orderedIds[0], {
+      x: layout.center.x,
+      y: layout.center.y,
+    });
+
+    for (const n of collapsed) {
+      const r = Math.hypot(
+        n.x + n.width / 2 - layout.center.x,
+        n.y + n.height / 2 - layout.center.y
+      );
+      expect(r).toBeGreaterThanOrEqual(layout.minRadius - 1);
+    }
   });
 
   it("clamps the export scale so oversized boards cannot crash the renderer", () => {

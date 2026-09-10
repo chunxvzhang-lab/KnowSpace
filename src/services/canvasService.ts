@@ -9,6 +9,7 @@ import type {
 } from "../types/canvasTypes";
 import { renderCardMarkdown } from "./markdown";
 import { serializeSvgForExport } from "./svgExport";
+import { getCanvasThemeColors, normalizeExportTheme } from "./canvasTheme";
 
 export const CANVAS_COLOR_PALETTES: Record<string, { label: string; stroke: string; bg: string }> = {
   "1": { label: "珊瑚红", stroke: "#ef4444", bg: "rgba(239, 68, 68, 0.12)" },
@@ -1828,12 +1829,14 @@ export function exportCanvasToSvg(
   data: CanvasData,
   options?: CanvasExportOptions
 ): string {
-  const isDark =
-    options?.theme === "twitter" ||
-    options?.theme === "dark" ||
-    (options?.theme === "system" &&
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-color-scheme: dark)").matches);
+  // The very same palette the on-screen renderer uses, so the exported image
+  // matches what the user is looking at. This used to be a hand-maintained
+  // copy that had drifted: the light theme exported on a #f8fafc backdrop
+  // instead of #ffffff, e-ink lost its paper tone, and the dot grid never
+  // matched in any theme.
+  const themePalette = getCanvasThemeColors(normalizeExportTheme(options?.theme));
+  const isDark = themePalette.isDark;
+  const isEink = themePalette.isEink;
 
   const bbox = computeBoundingBox(data.nodes);
   const pad = options?.padding ?? 48;
@@ -1847,53 +1850,13 @@ export function exportCanvasToSvg(
       ? "none"
       : options?.background === "white"
       ? "#ffffff"
-      : isDark
-      ? "#0f172a"
-      : "#f8fafc";
-
-  // ── Theme palette (mirrors getCanvasThemeColors in CanvasView) ───────────
-  const isEink = options?.theme === "eink";
-  const themePalette = isEink
-    ? {
-        cardBg: "#ffffff",
-        cardBorder: "#1a1a1a",
-        cardText: "#1a1a1a",
-        cardHeaderBg: "#ede8df",
-        cardHeaderBorder: "#d5cebf",
-        cardHeaderText: "#1a1a1a",
-        cardShadow: "0 2px 8px rgba(0,0,0,0.10)",
-        codeBg: "#efe9dd",
-        quoteBorder: "#b9b1a0",
-      }
-    : isDark
-    ? {
-        cardBg: "#1e293b",
-        cardBorder: "rgba(255,255,255,0.12)",
-        cardText: "#f1f5f9",
-        cardHeaderBg: "rgba(255,255,255,0.04)",
-        cardHeaderBorder: "rgba(255,255,255,0.08)",
-        cardHeaderText: "#e2e8f0",
-        cardShadow: "0 8px 24px rgba(0,0,0,0.35)",
-        codeBg: "rgba(255,255,255,0.08)",
-        quoteBorder: "rgba(255,255,255,0.28)",
-      }
-    : {
-        cardBg: "#ffffff",
-        cardBorder: "#e2e8f0",
-        cardText: "#1e293b",
-        cardHeaderBg: "#f8fafc",
-        cardHeaderBorder: "#e2e8f0",
-        cardHeaderText: "#334155",
-        cardShadow: "0 4px 16px rgba(0,0,0,0.06)",
-        codeBg: "rgba(15,23,42,0.06)",
-        quoteBorder: "rgba(100,116,139,0.45)",
-      };
+      : themePalette.canvasBg;
 
   const cardBg = themePalette.cardBg;
   const cardText = themePalette.cardText;
   const cardBorder = themePalette.cardBorder;
-  const defaultEdgeColor = isEink ? "#1a1a1a" : isDark ? "#38bdf8" : "#0284c7";
-  const dotColor = isDark ? "rgba(255, 255, 255, 0.12)" : "rgba(0, 0, 0, 0.08)";
+  const defaultEdgeColor = themePalette.edgeColor;
+  const dotColor = themePalette.dotColor;
 
   const nodeMap = new Map<string, CanvasNode>(data.nodes.map((n) => [n.id, n]));
 
@@ -1984,14 +1947,20 @@ export function exportCanvasToSvg(
   data.nodes
     .filter((n): n is CanvasGroupNode => n.type === "group")
     .forEach((g) => {
-      const pal = g.color && CANVAS_COLOR_PALETTES[g.color] ? CANVAS_COLOR_PALETTES[g.color] : CANVAS_COLOR_PALETTES["5"];
+      // Mirrors the on-screen renderer: a custom palette colour wins, otherwise
+      // fall back to the theme's own group tones. This used to hard-code the
+      // sky-blue palette entry, so an untinted group looked nothing like the
+      // one on screen — most visibly in the e-ink theme.
+      const pal = g.color && CANVAS_COLOR_PALETTES[g.color] ? CANVAS_COLOR_PALETTES[g.color] : undefined;
+      const groupFill = pal ? pal.bg : themePalette.groupBg;
+      const groupStroke = pal ? pal.stroke : themePalette.groupBorder;
       lines.push(`  <g class="canvas-group" data-id="${g.id}">`);
       lines.push(
-        `    <rect x="${g.x}" y="${g.y}" width="${g.width}" height="${g.height}" rx="16" fill="${pal.bg}" stroke="${pal.stroke}" stroke-width="2" stroke-dasharray="6,6" />`
+        `    <rect x="${g.x}" y="${g.y}" width="${g.width}" height="${g.height}" rx="16" fill="${groupFill}" stroke="${groupStroke}" stroke-width="2" stroke-dasharray="6,6" />`
       );
       // Group title header
       lines.push(
-        `    <path d="M ${g.x} ${g.y + 32} L ${g.x} ${g.y + 14} Q ${g.x} ${g.y} ${g.x + 14} ${g.y} L ${g.x + g.width - 14} ${g.y} Q ${g.x + g.width} ${g.y} ${g.x + g.width} ${g.y + 14} L ${g.x + g.width} ${g.y + 32} Z" fill="${pal.stroke}" />`
+        `    <path d="M ${g.x} ${g.y + 32} L ${g.x} ${g.y + 14} Q ${g.x} ${g.y} ${g.x + 14} ${g.y} L ${g.x + g.width - 14} ${g.y} Q ${g.x + g.width} ${g.y} ${g.x + g.width} ${g.y + 14} L ${g.x + g.width} ${g.y + 32} Z" fill="${groupStroke}" />`
       );
       lines.push(
         `    <text x="${g.x + 14}" y="${g.y + 19}" fill="#ffffff" font-family="system-ui, sans-serif" font-size="13" font-weight="600" dominant-baseline="central">📁 ${escapeSvgXml(g.label || "分组容器")}</text>`
@@ -2062,7 +2031,7 @@ export function exportCanvasToSvg(
       const labelHeight = 24;
       const labelX = rawMid.x - labelWidth / 2;
       const labelY = rawMid.y - labelHeight / 2;
-      const labelBg = isDark ? "#1e293b" : "#ffffff";
+      const labelBg = themePalette.edgeLabelBg;
 
       lines.push(`    <g class="canvas-edge-label" transform="translate(${rawMid.x}, ${rawMid.y})">`);
       if (shape === "diamond") {
@@ -2082,7 +2051,7 @@ export function exportCanvasToSvg(
         );
       }
       lines.push(
-        `      <text x="0" y="0" fill="${cardText}" font-family="system-ui, sans-serif" font-size="11.5" font-weight="600" text-anchor="middle" dominant-baseline="central">${labelText}</text>`
+        `      <text x="0" y="0" fill="${themePalette.edgeLabelText}" font-family="system-ui, sans-serif" font-size="11.5" font-weight="600" text-anchor="middle" dominant-baseline="central">${labelText}</text>`
       );
       lines.push(`    </g>`);
     }
@@ -2885,6 +2854,155 @@ export interface CircleAlignOptions {
    * Defaults to -90 (top).
    */
   startAngleDeg?: number;
+  /**
+   * Explicit clockwise seating order, outermost card first.
+   *
+   * The interactive spacing controls pass the order captured when the ring was
+   * formed. Without it the order is re-derived from the current angles, and
+   * shrinking the ring would let cards swap seats mid-drag.
+   */
+  orderedIds?: string[];
+  /**
+   * Applies the collision floor to an explicit `radius` too, so an
+   * interactive resize can never collapse the ring into an unreadable pile.
+   * Off by default to keep programmatic callers in full control.
+   */
+  clampToMinRadius?: boolean;
+  /**
+   * Explicit circle centre. Defaults to the selection's bounding-box centre.
+   *
+   * Interactive resizing pins the centre captured when the drag started —
+   * otherwise the centre would be re-derived from the bounding box on every
+   * frame and the whole ring would creep across the canvas as it grows.
+   */
+  center?: { x: number; y: number };
+}
+
+/**
+ * Smallest radius at which neighbouring cards still clear each other.
+ *
+ * Adjacent card centres sit a chord of 2R·sin(π/N) apart, so requiring that
+ * chord to cover (most of) the average card diagonal gives R. Shared by the
+ * alignment routine and the interactive spacing controls so the slider's lower
+ * bound and the drag's floor are always the same number.
+ */
+export function computeMinRingRadius(nodes: CanvasNode[]): number {
+  const count = nodes.length;
+  if (count < 3) return 0;
+  const avgDiagonal =
+    nodes.reduce((sum, n) => sum + Math.hypot(n.width, n.height), 0) / count;
+  const requiredChord = avgDiagonal * 0.9;
+  return requiredChord / (2 * Math.sin(Math.PI / count));
+}
+
+/** Reorders `nodes` to match `orderedIds`, appending anything unlisted. */
+function orderByExplicitIds(
+  nodes: CanvasNode[],
+  orderedIds: string[],
+  centerOf: (n: CanvasNode) => { x: number; y: number },
+  cx: number,
+  cy: number
+): CanvasNode[] {
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const out: CanvasNode[] = [];
+  for (const id of orderedIds) {
+    const n = byId.get(id);
+    if (n) {
+      out.push(n);
+      byId.delete(id);
+    }
+  }
+  // Anything not named explicitly keeps its relative angular position.
+  const rest = [...byId.values()].sort((a, b) => {
+    const pa = centerOf(a);
+    const pb = centerOf(b);
+    return Math.atan2(pa.y - cy, pa.x - cx) - Math.atan2(pb.y - cy, pb.x - cx);
+  });
+  return [...out, ...rest];
+}
+
+/**
+ * A ring captured for interactive spacing adjustment.
+ */
+export interface RingSpacingLayout {
+  center: { x: number; y: number };
+  radius: number;
+  count: number;
+  /** Radius below which neighbouring cards would collide. */
+  minRadius: number;
+  startAngleDeg: number;
+  /** Clockwise seating order, frozen for the duration of the interaction. */
+  orderedIds: string[];
+}
+
+/**
+ * Captures the current ring so a slider or a card drag can resize it.
+ *
+ * Returns null when fewer than three cards are involved or when they do not
+ * already sit on a common circle — in that case the caller should fall back to
+ * plain card dragging.
+ */
+export function computeRingSpacingLayout(
+  nodes: CanvasNode[],
+  tolerance = 0.18
+): RingSpacingLayout | null {
+  if (nodes.length < 3) return null;
+
+  const ring = computeRingLayout(nodes, tolerance);
+  if (!ring) return null;
+
+  const cx = ring.center.x;
+  const cy = ring.center.y;
+  const centerOf = (n: CanvasNode) => ({ x: n.x + n.width / 2, y: n.y + n.height / 2 });
+
+  const ordered = [...nodes].sort((a, b) => {
+    const pa = centerOf(a);
+    const pb = centerOf(b);
+    return Math.atan2(pa.y - cy, pa.x - cx) - Math.atan2(pb.y - cy, pb.x - cx);
+  });
+
+  // Match alignNodesInCircle's default so the first resize is a no-op.
+  const startAngleDeg =
+    (Math.atan2(centerOf(ordered[0]).y - cy, centerOf(ordered[0]).x - cx) * 180) / Math.PI;
+
+  return {
+    center: ring.center,
+    radius: ring.radius,
+    count: ordered.length,
+    minRadius: computeMinRingRadius(ordered),
+    startAngleDeg,
+    orderedIds: ordered.map((n) => n.id),
+  };
+}
+
+/**
+ * Re-flows a ring while one of its cards is dragged, turning the drag into a
+ * live radius (and therefore spacing) adjustment.
+ *
+ * The dragged card follows the pointer; every other card keeps its seat and
+ * re-distributes around the centre at the new radius. The centre is pinned to
+ * where the ring was when the drag started, so the whole ring does not drift
+ * across the canvas.
+ */
+export function resizeRingSpacing(
+  allNodes: CanvasNode[],
+  layout: RingSpacingLayout,
+  draggedNodeId: string,
+  draggedCenter: { x: number; y: number }
+): CanvasNode[] {
+  const radius = Math.max(
+    layout.minRadius,
+    Math.hypot(draggedCenter.x - layout.center.x, draggedCenter.y - layout.center.y)
+  );
+
+  return alignNodesInCircle(allNodes, new Set(layout.orderedIds), {
+    radius,
+    startAngleDeg: layout.startAngleDeg,
+    orderedIds: layout.orderedIds,
+    clampToMinRadius: true,
+    // Pin the centre so the ring grows/shrinks in place instead of creeping.
+    center: layout.center,
+  });
 }
 
 /**
@@ -2916,24 +3034,30 @@ export function alignNodesInCircle(
     y: n.y + n.height / 2,
   });
 
-  // Circle centre = bounding-box centre of the current selection
+  // Circle centre = bounding-box centre of the current selection, unless the
+  // caller pinned one (interactive resizing does, to stop the ring drifting).
   const minX = Math.min(...selNodes.map((n) => n.x));
   const maxX = Math.max(...selNodes.map((n) => n.x + n.width));
   const minY = Math.min(...selNodes.map((n) => n.y));
   const maxY = Math.max(...selNodes.map((n) => n.y + n.height));
-  const cx = minX + (maxX - minX) / 2;
-  const cy = minY + (maxY - minY) / 2;
+  const cx = options?.center?.x ?? minX + (maxX - minX) / 2;
+  const cy = options?.center?.y ?? minY + (maxY - minY) / 2;
 
-  // Preserve the existing clockwise ordering around the centre
-  const ordered = [...selNodes].sort((a, b) => {
-    const pa = centerOf(a);
-    const pb = centerOf(b);
-    const angleA = Math.atan2(pa.y - cy, pa.x - cx);
-    const angleB = Math.atan2(pb.y - cy, pb.x - cx);
-    return angleA - angleB;
-  });
+  // Clockwise seating order. An explicit order (passed by the interactive
+  // spacing controls) wins, so cards keep their seats while the radius
+  // changes; otherwise the order is derived from the current angles.
+  const ordered = options?.orderedIds
+    ? orderByExplicitIds(selNodes, options.orderedIds, centerOf, cx, cy)
+    : [...selNodes].sort((a, b) => {
+        const pa = centerOf(a);
+        const pb = centerOf(b);
+        const angleA = Math.atan2(pa.y - cy, pa.x - cx);
+        const angleB = Math.atan2(pb.y - cy, pb.x - cx);
+        return angleA - angleB;
+      });
 
   const count = ordered.length;
+  const minRadius = computeMinRingRadius(ordered);
 
   // Radius: never collapse inward, never let neighbours overlap
   let radius = options?.radius;
@@ -2944,13 +3068,9 @@ export function alignNodesInCircle(
         return Math.hypot(p.x - cx, p.y - cy);
       })
     );
-    // Minimum radius so that adjacent card centres are at least the average
-    // card diagonal apart: chord = 2R·sin(π/N)  ⇒  R = chord / (2·sin(π/N))
-    const avgDiagonal =
-      ordered.reduce((sum, n) => sum + Math.hypot(n.width, n.height), 0) / count;
-    const requiredChord = avgDiagonal * 0.9;
-    const minRadius = requiredChord / (2 * Math.sin(Math.PI / count));
     radius = Math.max(currentSpread, minRadius);
+  } else if (options?.clampToMinRadius) {
+    radius = Math.max(radius, minRadius);
   }
 
   const startAngle = ((options?.startAngleDeg ?? -90) * Math.PI) / 180;
