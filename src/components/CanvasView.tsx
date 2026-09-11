@@ -430,6 +430,45 @@ export const CanvasView = memo(function CanvasView({
     targetEdgeId?: string;
   } | null>(null);
   const contextMenuRef = useRef<HTMLDivElement | null>(null);
+  /** Pending "close the menu after a colour pick" timer. */
+  const colorMenuCloseTimerRef = useRef<number | null>(null);
+
+  /**
+   * Closes the context menu on a short delay instead of synchronously.
+   *
+   * `<input type="color">` opens a native OS colour chooser. Unmounting the
+   * menu from its onChange handler destroys the input while Chromium is still
+   * dismissing that dialog, which crashes the renderer — this is the 闪退 users
+   * hit whenever they picked a custom colour. Letting the dialog finish first
+   * avoids it entirely.
+   *
+   * Debounced so a picker that fires onChange repeatedly while the user drags
+   * schedules only one close.
+   */
+  const closeMenuAfterColorPick = useCallback(() => {
+    // A real debounce, not a one-shot: while the user drags inside the chooser
+    // onChange fires repeatedly, and each call pushes the close further out.
+    // The menu therefore only disappears once they have actually stopped, by
+    // which point the dialog is on its way out.
+    if (colorMenuCloseTimerRef.current !== null) {
+      window.clearTimeout(colorMenuCloseTimerRef.current);
+    }
+    colorMenuCloseTimerRef.current = window.setTimeout(() => {
+      colorMenuCloseTimerRef.current = null;
+      setContextMenu(null);
+    }, 500);
+  }, []);
+
+  // Never leave a timer behind that would touch state after unmount.
+  useEffect(
+    () => () => {
+      if (colorMenuCloseTimerRef.current !== null) {
+        window.clearTimeout(colorMenuCloseTimerRef.current);
+        colorMenuCloseTimerRef.current = null;
+      }
+    },
+    []
+  );
 
   // Dynamically clamp context menu position against the actual viewport so
   // the menu never spills off-screen, even when the canvas is nested in a
@@ -1093,7 +1132,10 @@ export const CanvasView = memo(function CanvasView({
         selectedNodeIds.has(n.id) ? { ...n, color: color || undefined } : n
       ),
     });
-    setContextMenu(null);
+    // Deliberately does NOT close the context menu here — the caller decides
+    // when. When the colour came from the native picker, closing has to wait
+    // until that dialog has finished dismissing; unmounting the <input> from
+    // onChange tears it down mid-flight and crashes the renderer (闪退).
   }, [editable, selectedNodeIds, data, pushHistory]);
 
   const handleBringToFront = useCallback((nodeId: string) => {
@@ -3199,6 +3241,23 @@ export const CanvasView = memo(function CanvasView({
     }
     return "卡片";
   }, [currentMultiRootNode]);
+
+  // Seed for the batch custom-colour picker: reuse a custom colour already set
+  // on one of the selected cards, otherwise start from a neutral blue.
+  const batchCustomColor = useMemo(() => {
+    const withHex = data.nodes.find(
+      (n) => selectedNodeIds.has(n.id) && typeof n.color === "string" && n.color.startsWith("#")
+    );
+    return (withHex?.color as string | undefined) ?? "#3b82f6";
+  }, [data.nodes, selectedNodeIds]);
+
+  // Same idea for the selection of edges.
+  const batchEdgeCustomColor = useMemo(() => {
+    const withHex = data.edges.find(
+      (e) => selectedEdgeIds.has(e.id) && typeof e.color === "string" && e.color.startsWith("#")
+    );
+    return (withHex?.color as string | undefined) ?? "#3b82f6";
+  }, [data.edges, selectedEdgeIds]);
 
   // ── Ring spacing controls ────────────────────────────────────────────────
   // Live metrics for the alignment dropdown's radius slider. Only meaningful
@@ -5805,6 +5864,41 @@ export const CanvasView = memo(function CanvasView({
                             title={col.label}
                           />
                         ))}
+                        {/* Custom colour applied to every selected edge */}
+                        <label
+                          title="自定义色彩（应用到所选全部连线）"
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            width: 18,
+                            height: 18,
+                            borderRadius: "50%",
+                            border: "1px dashed rgba(128,128,128,0.5)",
+                            cursor: "pointer",
+                            overflow: "hidden",
+                            position: "relative",
+                          }}
+                        >
+                          <input
+                            type="color"
+                            aria-label="自定义批量连线色彩"
+                            defaultValue={batchEdgeCustomColor}
+                            onChange={(e) => {
+                              handleBatchSetEdgeColor(e.target.value);
+                              // Let the native chooser finish closing first
+                              closeMenuAfterColorPick();
+                            }}
+                            style={{
+                              position: "absolute",
+                              opacity: 0,
+                              width: "100%",
+                              height: "100%",
+                              cursor: "pointer",
+                            }}
+                          />
+                          <span style={{ fontSize: 10 }}>🎨</span>
+                        </label>
                       </div>
                     </div>
 
@@ -6316,7 +6410,8 @@ export const CanvasView = memo(function CanvasView({
                               defaultValue={targetNode.color?.startsWith("#") ? targetNode.color : "#3b82f6"}
                               onChange={(e) => {
                                 handleNodeColorChange(targetNode.id, e.target.value);
-                                setContextMenu(null);
+                                // Wait for the native chooser to finish closing
+                                closeMenuAfterColorPick();
                               }}
                               style={{ position: "absolute", opacity: 0, width: "100%", height: "100%", cursor: "pointer" }}
                             />
@@ -6553,6 +6648,7 @@ export const CanvasView = memo(function CanvasView({
                               className="canvas-color-dot"
                               onClick={() => {
                                 handleBatchColorChange(key);
+                                // No native dialog involved, so closing now is safe
                                 setContextMenu(null);
                               }}
                               style={{
@@ -6566,6 +6662,41 @@ export const CanvasView = memo(function CanvasView({
                               title={col.label}
                             />
                           ))}
+                          {/* Custom colour applied to the whole selection */}
+                          <label
+                            title="自定义色彩（应用到所选全部卡片）"
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              width: 18,
+                              height: 18,
+                              borderRadius: "50%",
+                              border: "1px dashed rgba(128,128,128,0.5)",
+                              cursor: "pointer",
+                              overflow: "hidden",
+                              position: "relative",
+                            }}
+                          >
+                            <input
+                              type="color"
+                              aria-label="自定义批量色彩"
+                              defaultValue={batchCustomColor}
+                              onChange={(e) => {
+                                handleBatchColorChange(e.target.value);
+                                // Let the native chooser finish closing first
+                                closeMenuAfterColorPick();
+                              }}
+                              style={{
+                                position: "absolute",
+                                opacity: 0,
+                                width: "100%",
+                                height: "100%",
+                                cursor: "pointer",
+                              }}
+                            />
+                            <span style={{ fontSize: 10 }}>🎨</span>
+                          </label>
                         </div>
                       </div>
 
@@ -6774,7 +6905,8 @@ export const CanvasView = memo(function CanvasView({
                                   }
                                   onChange={(e) => {
                                     handleNodeColorChange(targetNode.id, e.target.value);
-                                    setContextMenu(null);
+                                    // Wait for the native chooser to finish closing
+                                    closeMenuAfterColorPick();
                                   }}
                                   style={{
                                     position: "absolute",
