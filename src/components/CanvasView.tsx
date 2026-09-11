@@ -134,7 +134,10 @@ function getNodePalette(color?: string): { label: string; stroke: string; bg: st
   if (!color) return undefined;
   if (CANVAS_COLOR_PALETTES[color]) return CANVAS_COLOR_PALETTES[color];
   if (color.startsWith("#")) {
-    return { label: "自定义", stroke: color, bg: `${color}18` };
+    // 1f hex ≈ 12% — the same tint the standard palette uses for its `bg`,
+    // instead of 18 (~9%) which made a custom colour read noticeably paler
+    // than its own swatch.
+    return { label: "自定义", stroke: color, bg: `${color}1f` };
   }
   return undefined;
 }
@@ -432,32 +435,12 @@ export const CanvasView = memo(function CanvasView({
   const contextMenuRef = useRef<HTMLDivElement | null>(null);
   /** Pending "close the menu after a colour pick" timer. */
   const colorMenuCloseTimerRef = useRef<number | null>(null);
-
   /**
-   * Closes the context menu on a short delay instead of synchronously.
-   *
-   * `<input type="color">` opens a native OS colour chooser. Unmounting the
-   * menu from its onChange handler destroys the input while Chromium is still
-   * dismissing that dialog, which crashes the renderer — this is the 闪退 users
-   * hit whenever they picked a custom colour. Letting the dialog finish first
-   * avoids it entirely.
-   *
-   * Debounced so a picker that fires onChange repeatedly while the user drags
-   * schedules only one close.
+   * Board state captured the moment a colour drag began. Dragging inside the
+   * native chooser only previews against this baseline; the history entry is
+   * committed once, from here, when the pick settles.
    */
-  const closeMenuAfterColorPick = useCallback(() => {
-    // A real debounce, not a one-shot: while the user drags inside the chooser
-    // onChange fires repeatedly, and each call pushes the close further out.
-    // The menu therefore only disappears once they have actually stopped, by
-    // which point the dialog is on its way out.
-    if (colorMenuCloseTimerRef.current !== null) {
-      window.clearTimeout(colorMenuCloseTimerRef.current);
-    }
-    colorMenuCloseTimerRef.current = window.setTimeout(() => {
-      colorMenuCloseTimerRef.current = null;
-      setContextMenu(null);
-    }, 500);
-  }, []);
+  const colorPickStartRef = useRef<CanvasData | null>(null);
 
   // Never leave a timer behind that would touch state after unmount.
   useEffect(
@@ -741,6 +724,114 @@ export const CanvasView = memo(function CanvasView({
       emitChange(newData);
     },
     [emitChange]
+  );
+
+  // ── Colour-picker preview & commit ───────────────────────────────────────
+  // Dragging inside the native OS colour chooser fires onChange dozens of
+  // times a second. Committing each of those through pushHistory (with its
+  // whole-board JSON serialisation) is what used to crash the app mid-drag —
+  // so the drag only *previews* against the baseline below, and exactly one
+  // history entry is written once the pick settles.
+
+  /** Records the pre-pick baseline the first time a colour drag fires. */
+  const captureColorSnapshot = useCallback(() => {
+    if (!colorPickStartRef.current) {
+      colorPickStartRef.current = latestDataRef.current;
+    }
+  }, []);
+
+  /**
+   * Writes ONE history entry for a whole colour-drag gesture, from the
+   * baseline captured when it began. Unmounting the menu from the picker's
+   * onChange destroys the <input type="color"> while Chromium is still
+   * dismissing the native dialog, which is what used to crash the renderer
+   * (闪退) — so the menu is only closed from closeMenuAfterColorPick, well
+   * after the dialog has gone.
+   */
+  const commitColorPick = useCallback(() => {
+    const before = colorPickStartRef.current;
+    colorPickStartRef.current = null;
+    if (!before || before === latestDataRef.current) return;
+    setHistory((prev) => ({
+      past: [...prev.past.slice(-25), before],
+      future: [],
+    }));
+    emitChange(latestDataRef.current);
+  }, [emitChange]);
+
+  const closeMenuAfterColorPick = useCallback(() => {
+    // A real debounce, not a one-shot: while the user drags inside the chooser
+    // onChange fires repeatedly, and each call pushes the close further out.
+    // The menu therefore only disappears once they have actually stopped, by
+    // which point the dialog is on its way out.
+    if (colorMenuCloseTimerRef.current !== null) {
+      window.clearTimeout(colorMenuCloseTimerRef.current);
+    }
+    colorMenuCloseTimerRef.current = window.setTimeout(() => {
+      colorMenuCloseTimerRef.current = null;
+      commitColorPick();
+      setContextMenu(null);
+    }, 500);
+  }, [commitColorPick]);
+
+  /**
+   * Applies a colour to the board WITHOUT writing history — the live preview
+   * while the native chooser is open. Exactly one entry is committed later by
+   * commitColorPick().
+   */
+  const previewBatchNodeColor = useCallback(
+    (color: string) => {
+      if (!editable || selectedNodeIds.size === 0) return;
+      captureColorSnapshot();
+      setData((prev) => {
+        const next = {
+          ...prev,
+          nodes: prev.nodes.map((n) =>
+            selectedNodeIds.has(n.id) ? { ...n, color: color || undefined } : n
+          ),
+        };
+        latestDataRef.current = next;
+        return next;
+      });
+    },
+    [editable, selectedNodeIds, captureColorSnapshot]
+  );
+
+  const previewBatchEdgeColor = useCallback(
+    (color: string) => {
+      if (!editable || selectedEdgeIds.size === 0) return;
+      captureColorSnapshot();
+      setData((prev) => {
+        const affected = expandLoopEdgeSelection(prev.edges, selectedEdgeIds);
+        const next = {
+          ...prev,
+          edges: prev.edges.map((e) =>
+            affected.has(e.id) ? { ...e, color: color || undefined } : e
+          ),
+        };
+        latestDataRef.current = next;
+        return next;
+      });
+    },
+    [editable, selectedEdgeIds, captureColorSnapshot]
+  );
+
+  const previewNodeColor = useCallback(
+    (nodeId: string, color: string) => {
+      if (!editable) return;
+      captureColorSnapshot();
+      setData((prev) => {
+        const next = {
+          ...prev,
+          nodes: prev.nodes.map((n) =>
+            n.id === nodeId ? { ...n, color: color || undefined } : n
+          ),
+        };
+        latestDataRef.current = next;
+        return next;
+      });
+    },
+    [editable, captureColorSnapshot]
   );
 
   const handleUndo = useCallback(() => {
@@ -4605,7 +4696,11 @@ export const CanvasView = memo(function CanvasView({
                   justifyContent: "space-between",
                   padding: "6px 10px",
                   borderBottom: `1px solid ${colors.cardHeaderBorder}`,
-                  background: palette ? palette.bg : colors.cardHeaderBg,
+                  // The header band takes the swatch colour itself — exactly the
+                  // colour the user picked, not a washed-out tint of it. Text
+                  // flips to white so it stays readable on the solid band.
+                  background: palette ? palette.stroke : colors.cardHeaderBg,
+                  color: palette ? "#ffffff" : colors.cardHeaderText,
                   borderTopLeftRadius: 10,
                   borderTopRightRadius: 10,
                   cursor: "move",
@@ -4634,7 +4729,7 @@ export const CanvasView = memo(function CanvasView({
                       {node.type === "file" && <FileText size={13} color="#10b981" />}
                       {node.type === "text" && <Edit2 size={13} color={colors.edgeColor} />}
                       {node.type === "link" && <Link size={13} color="#a855f7" />}
-                      <span style={{ fontSize: 11, fontWeight: 600, color: colors.cardHeaderText }}>
+                      <span style={{ fontSize: 11, fontWeight: 600 }}>
                         {node.type === "file" ? node.file : node.type === "text" ? "便签卡片" : "外部参考"}
                       </span>
                       {isOneToManySource && (
@@ -5885,8 +5980,9 @@ export const CanvasView = memo(function CanvasView({
                             aria-label="自定义批量连线色彩"
                             defaultValue={batchEdgeCustomColor}
                             onChange={(e) => {
-                              handleBatchSetEdgeColor(e.target.value);
-                              // Let the native chooser finish closing first
+                              // Live preview only; one history entry is
+                              // written once the pick settles
+                              previewBatchEdgeColor(e.target.value);
                               closeMenuAfterColorPick();
                             }}
                             style={{
@@ -6409,8 +6505,9 @@ export const CanvasView = memo(function CanvasView({
                               type="color"
                               defaultValue={targetNode.color?.startsWith("#") ? targetNode.color : "#3b82f6"}
                               onChange={(e) => {
-                                handleNodeColorChange(targetNode.id, e.target.value);
-                                // Wait for the native chooser to finish closing
+                                // Live preview only; one history entry is
+                                // written once the pick settles
+                                previewNodeColor(targetNode.id, e.target.value);
                                 closeMenuAfterColorPick();
                               }}
                               style={{ position: "absolute", opacity: 0, width: "100%", height: "100%", cursor: "pointer" }}
@@ -6683,8 +6780,9 @@ export const CanvasView = memo(function CanvasView({
                               aria-label="自定义批量色彩"
                               defaultValue={batchCustomColor}
                               onChange={(e) => {
-                                handleBatchColorChange(e.target.value);
-                                // Let the native chooser finish closing first
+                                // Live preview only; one history entry is
+                                // written once the pick settles
+                                previewBatchNodeColor(e.target.value);
                                 closeMenuAfterColorPick();
                               }}
                               style={{
@@ -6904,8 +7002,9 @@ export const CanvasView = memo(function CanvasView({
                                     targetNode?.color?.startsWith("#") ? targetNode.color : "#3b82f6"
                                   }
                                   onChange={(e) => {
-                                    handleNodeColorChange(targetNode.id, e.target.value);
-                                    // Wait for the native chooser to finish closing
+                                    // Live preview only; one history entry is
+                                    // written once the pick settles
+                                    previewNodeColor(targetNode.id, e.target.value);
                                     closeMenuAfterColorPick();
                                   }}
                                   style={{
@@ -7410,11 +7509,12 @@ function toolBtnStyle(theme: ThemeMode, colors: ReturnType<typeof getCanvasTheme
   };
 }
 
-function cardHeaderBtnStyle(colors: ReturnType<typeof getCanvasThemeColors>): React.CSSProperties {
+function cardHeaderBtnStyle(_colors: ReturnType<typeof getCanvasThemeColors>): React.CSSProperties {
   return {
     background: "none",
     border: "none",
-    color: colors.cardHeaderText,
+    // No explicit colour: inherit from the header band, which flips to white
+    // when a solid palette colour sits behind it.
     cursor: "pointer",
     padding: "2px 4px",
     borderRadius: 4,
