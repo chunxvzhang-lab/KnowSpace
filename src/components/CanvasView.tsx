@@ -43,6 +43,12 @@ import {
   FilePlus,
   Share2,
   Unlink,
+  Play,
+  Pause,
+  ChevronLeft,
+  ChevronRight,
+  Music,
+  Video,
 } from "lucide-react";
 import type { ThemeMode } from "../core/types";
 import type {
@@ -57,6 +63,7 @@ import type {
   CanvasViewport,
   CanvasEdgeLabelShape,
   CanvasEdgeLineStyle,
+  CanvasObstacle,
 } from "../types/canvasTypes";
 import {
   parseCanvasData,
@@ -102,6 +109,10 @@ import {
   copyCanvasImageToClipboard,
   CanvasAlignDirection,
   alignNodes,
+  getMediaFileType,
+  isMediaFile,
+  isImageFile,
+  buildPresentationSequence,
 } from "../services/canvasService";
 import { renderCardMarkdown } from "../services/markdown";
 import { getCanvasThemeColors } from "../services/canvasTheme";
@@ -119,6 +130,7 @@ export type CanvasViewProps = {
   onSave?: () => void;
   isDirty?: boolean;
   isSaving?: boolean;
+  currentFilePath?: string;
 };
 
 const MIN_ZOOM = 0.15;
@@ -296,6 +308,7 @@ export const CanvasView = memo(function CanvasView({
   onSave,
   isDirty = false,
   isSaving = false,
+  currentFilePath,
 }: CanvasViewProps) {
   // Theme-aware design tokens
   const colors = useMemo(() => getCanvasThemeColors(theme), [theme]);
@@ -388,6 +401,15 @@ export const CanvasView = memo(function CanvasView({
   editingNodeIdRef.current = editingNodeId;
   const editingTextRef = useRef<string>("");
   editingTextRef.current = editingText;
+
+  // Multimodal media file input ref
+  const mediaFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Presentation Mode state
+  const [isPresentationMode, setIsPresentationMode] = useState(false);
+  const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+  const [isAutoPlaying, setIsAutoPlaying] = useState(false);
+  const savedViewportBeforePresentationRef = useRef<CanvasViewport | null>(null);
 
   // Mouse marquee box selection
   const [isBoxSelectMode, setIsBoxSelectMode] = useState(false);
@@ -2140,6 +2162,70 @@ export const CanvasView = memo(function CanvasView({
     async (canvasX: number, canvasY: number) => {
       if (!editable) return;
       let text = "";
+      let imageBlob: Blob | null = null;
+      try {
+        if (navigator?.clipboard?.read) {
+          const items = await navigator.clipboard.read();
+          for (const item of items) {
+            const imgType = item.types.find((t) => t.startsWith("image/"));
+            if (imgType) {
+              imageBlob = await item.getType(imgType);
+              break;
+            }
+          }
+        }
+      } catch {
+        // clipboard permission fallback
+      }
+
+      if (imageBlob) {
+        try {
+          const reader = new FileReader();
+          const base64 = await new Promise<string>((resolve, reject) => {
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(imageBlob!);
+          });
+
+          let finalFilePath = base64;
+          const desktop = typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
+          if (desktop?.savePastedImage) {
+            const res = await desktop.savePastedImage({
+              currentFilePath,
+              bufferBase64: base64,
+              originalName: "pasted_image",
+              ext: imageBlob.type.replace("image/", "") || "png",
+            });
+            if (res?.success && res.relativePath) {
+              finalFilePath = res.relativePath;
+            }
+          }
+
+          const newCard: CanvasFileNode = {
+            id: `file-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            type: "file",
+            file: finalFilePath,
+            x: Math.round(canvasX - 180),
+            y: Math.round(canvasY - 130),
+            width: 360,
+            height: 260,
+          };
+
+          const currentData = latestDataRef.current;
+          pushHistory({
+            ...currentData,
+            nodes: [...currentData.nodes, newCard],
+          });
+          setSelectedNodeIds(new Set([newCard.id]));
+          setSelectedNodeId(newCard.id);
+          showToast("已从剪贴板粘贴为图片卡片");
+          setContextMenu(null);
+          return;
+        } catch {
+          // fallback to text
+        }
+      }
+
       try {
         if (navigator?.clipboard?.readText) {
           text = await navigator.clipboard.readText();
@@ -2171,8 +2257,323 @@ export const CanvasView = memo(function CanvasView({
       showToast("已从剪贴板粘贴为新卡片");
       setContextMenu(null);
     },
-    [editable, pushHistory, showToast]
+    [editable, currentFilePath, pushHistory, showToast]
   );
+
+  const handleTriggerInsertMedia = useCallback(() => {
+    if (!editable) return;
+    mediaFileInputRef.current?.click();
+  }, [editable]);
+
+  const handleMediaFileInputChange = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = Array.from(e.target.files || []);
+      if (files.length === 0 || !editable) return;
+
+      const desktop = typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
+      const newNodes: CanvasNode[] = [];
+
+      const centerX = -viewport.panX / viewport.zoom + (containerRef.current?.clientWidth || 800) / (2 * viewport.zoom);
+      const centerY = -viewport.panY / viewport.zoom + (containerRef.current?.clientHeight || 600) / (2 * viewport.zoom);
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const offsetX = i * 28;
+        const offsetY = i * 28;
+
+        try {
+          const reader = new FileReader();
+          const base64 = await new Promise<string>((resolve, reject) => {
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+
+          let finalFilePath = base64;
+          if (desktop?.savePastedImage) {
+            const res = await desktop.savePastedImage({
+              currentFilePath,
+              bufferBase64: base64,
+              originalName: file.name,
+              ext: file.name.split(".").pop() || "png",
+            });
+            if (res?.success && res.relativePath) {
+              finalFilePath = res.relativePath;
+            }
+          }
+
+          newNodes.push({
+            id: `file-${Date.now()}-${Math.random().toString(36).slice(2, 6)}-${i}`,
+            type: "file",
+            file: finalFilePath,
+            x: Math.round(centerX + offsetX - 180),
+            y: Math.round(centerY + offsetY - 130),
+            width: 360,
+            height: 260,
+          });
+        } catch {
+          // fallback
+        }
+      }
+
+      if (newNodes.length > 0) {
+        const currentData = latestDataRef.current;
+        pushHistory({
+          ...currentData,
+          nodes: [...currentData.nodes, ...newNodes],
+        });
+        setSelectedNodeIds(new Set(newNodes.map((n) => n.id)));
+        setSelectedNodeId(newNodes[0].id);
+        showToast(`已插入 ${newNodes.length} 张媒体卡片`);
+      }
+
+      e.target.value = "";
+    },
+    [editable, viewport, currentFilePath, pushHistory, showToast]
+  );
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = "copy";
+  }, []);
+
+  const handleCanvasDrop = useCallback(
+    async (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!editable || !containerRef.current) return;
+
+      const rect = containerRef.current.getBoundingClientRect();
+      const localX = e.clientX - rect.left;
+      const localY = e.clientY - rect.top;
+      const canvasX = Math.round((localX - viewportRef.current.panX) / viewportRef.current.zoom);
+      const canvasY = Math.round((localY - viewportRef.current.panY) / viewportRef.current.zoom);
+
+      const files = Array.from(e.dataTransfer.files || []);
+      if (files.length === 0) return;
+
+      const desktop = typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
+      const newNodes: CanvasNode[] = [];
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const offsetX = i * 28;
+        const offsetY = i * 28;
+
+        if (isMediaFile(file.name) || file.type.startsWith("image/")) {
+          try {
+            const reader = new FileReader();
+            const base64 = await new Promise<string>((resolve, reject) => {
+              reader.onload = () => resolve(reader.result as string);
+              reader.onerror = reject;
+              reader.readAsDataURL(file);
+            });
+
+            let finalFilePath = base64;
+            if (desktop?.savePastedImage) {
+              const res = await desktop.savePastedImage({
+                currentFilePath,
+                bufferBase64: base64,
+                originalName: file.name,
+                ext: file.name.split(".").pop() || "png",
+              });
+              if (res?.success && res.relativePath) {
+                finalFilePath = res.relativePath;
+              }
+            }
+
+            newNodes.push({
+              id: `file-${Date.now()}-${Math.random().toString(36).slice(2, 6)}-${i}`,
+              type: "file",
+              file: finalFilePath,
+              x: Math.round(canvasX + offsetX - 180),
+              y: Math.round(canvasY + offsetY - 130),
+              width: 360,
+              height: 260,
+            });
+          } catch {
+            // fallback
+          }
+        } else if (file.name.endsWith(".md") || file.name.endsWith(".canvas")) {
+          newNodes.push({
+            id: `file-${Date.now()}-${Math.random().toString(36).slice(2, 6)}-${i}`,
+            type: "file",
+            file: file.name,
+            x: Math.round(canvasX + offsetX - 140),
+            y: Math.round(canvasY + offsetY - 90),
+            width: 280,
+            height: 180,
+          });
+        }
+      }
+
+      if (newNodes.length > 0) {
+        const currentData = latestDataRef.current;
+        pushHistory({
+          ...currentData,
+          nodes: [...currentData.nodes, ...newNodes],
+        });
+        setSelectedNodeIds(new Set(newNodes.map((n) => n.id)));
+        setSelectedNodeId(newNodes[0].id);
+        showToast(`已将 ${newNodes.length} 个文件添加为画布卡片`);
+      }
+    },
+    [editable, currentFilePath, pushHistory, showToast]
+  );
+
+  // Node lookups & relationship maps
+  const nodeMap = useMemo(() => new Map(data.nodes.map((n) => [n.id, n])), [data.nodes]);
+
+  const canvasObstacles = useMemo<CanvasObstacle[]>(
+    () =>
+      data.nodes.map((n) => ({
+        id: n.id,
+        x: n.x,
+        y: n.y,
+        width: n.width,
+        height: n.height,
+      })),
+    [data.nodes]
+  );
+
+  const presentationSequence = useMemo(() => buildPresentationSequence(data), [data]);
+
+  const focusSlide = useCallback(
+    (index: number) => {
+      if (presentationSequence.length === 0 || !containerRef.current) return;
+      const targetId = presentationSequence[index];
+      const targetNode = nodeMap.get(targetId);
+      if (!targetNode) return;
+
+      const rect = containerRef.current.getBoundingClientRect();
+      const containerW = rect.width || 1000;
+      const containerH = rect.height || 700;
+
+      const targetZoom = Math.min(
+        1.3,
+        Math.max(0.55, Math.min((containerW - 200) / targetNode.width, (containerH - 160) / targetNode.height))
+      );
+
+      const targetPanX = Math.round(containerW / 2 - (targetNode.x + targetNode.width / 2) * targetZoom);
+      const targetPanY = Math.round(containerH / 2 - (targetNode.y + targetNode.height / 2) * targetZoom);
+
+      setViewport({ panX: targetPanX, panY: targetPanY, zoom: targetZoom });
+      setSelectedNodeIds(new Set([targetId]));
+      setSelectedNodeId(targetId);
+    },
+    [presentationSequence, nodeMap]
+  );
+
+  const handleTogglePresentation = useCallback(() => {
+    if (isPresentationMode) {
+      setIsPresentationMode(false);
+      setIsAutoPlaying(false);
+      if (savedViewportBeforePresentationRef.current) {
+        setViewport(savedViewportBeforePresentationRef.current);
+      }
+    } else {
+      if (presentationSequence.length === 0) {
+        showToast("画布中暂无可演示的卡片");
+        return;
+      }
+      savedViewportBeforePresentationRef.current = { ...viewport };
+      setIsPresentationMode(true);
+      setCurrentSlideIndex(0);
+      focusSlide(0);
+    }
+  }, [isPresentationMode, presentationSequence, viewport, focusSlide, showToast]);
+
+  const handleNextSlide = useCallback(() => {
+    if (presentationSequence.length === 0) return;
+    const nextIdx = (currentSlideIndex + 1) % presentationSequence.length;
+    setCurrentSlideIndex(nextIdx);
+    focusSlide(nextIdx);
+  }, [currentSlideIndex, presentationSequence, focusSlide]);
+
+  const handlePrevSlide = useCallback(() => {
+    if (presentationSequence.length === 0) return;
+    const prevIdx = (currentSlideIndex - 1 + presentationSequence.length) % presentationSequence.length;
+    setCurrentSlideIndex(prevIdx);
+    focusSlide(prevIdx);
+  }, [currentSlideIndex, presentationSequence, focusSlide]);
+
+  useEffect(() => {
+    if (!isPresentationMode || !isAutoPlaying) return;
+    const timer = setInterval(() => {
+      handleNextSlide();
+    }, 3500);
+    return () => clearInterval(timer);
+  }, [isPresentationMode, isAutoPlaying, handleNextSlide]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "F5") {
+        e.preventDefault();
+        handleTogglePresentation();
+        return;
+      }
+
+      if (!isPresentationMode) return;
+
+      if (e.key === "Escape") {
+        e.preventDefault();
+        handleTogglePresentation();
+      } else if (e.key === "ArrowRight" || e.key === " " || e.key === "PageDown") {
+        e.preventDefault();
+        handleNextSlide();
+      } else if (e.key === "ArrowLeft" || e.key === "PageUp") {
+        e.preventDefault();
+        handlePrevSlide();
+      } else if (e.key === "Home") {
+        e.preventDefault();
+        setCurrentSlideIndex(0);
+        focusSlide(0);
+      } else if (e.key === "End") {
+        e.preventDefault();
+        const last = presentationSequence.length - 1;
+        setCurrentSlideIndex(last);
+        focusSlide(last);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isPresentationMode, handleTogglePresentation, handleNextSlide, handlePrevSlide, presentationSequence, focusSlide]);
+
+  // Global Clipboard Paste listener for media cards (Ctrl+V / Cmd+V)
+  useEffect(() => {
+    const handlePasteEvent = (e: ClipboardEvent) => {
+      if (editingNodeId || editingEdgeId || !editable) return;
+      const activeEl = document.activeElement;
+      if (
+        activeEl &&
+        (activeEl.tagName === "INPUT" ||
+          activeEl.tagName === "TEXTAREA" ||
+          activeEl.getAttribute("contenteditable") === "true")
+      ) {
+        return;
+      }
+      const centerX =
+        -viewport.panX / viewport.zoom +
+        (containerRef.current?.clientWidth || 800) / (2 * viewport.zoom);
+      const centerY =
+        -viewport.panY / viewport.zoom +
+        (containerRef.current?.clientHeight || 600) / (2 * viewport.zoom);
+      handlePasteClipboardAsCard(centerX, centerY);
+    };
+
+    window.addEventListener("paste", handlePasteEvent);
+    return () => window.removeEventListener("paste", handlePasteEvent);
+  }, [
+    editingNodeId,
+    editingEdgeId,
+    editable,
+    viewport.panX,
+    viewport.panY,
+    viewport.zoom,
+    handlePasteClipboardAsCard,
+  ]);
 
   const handleAlignToGrid = useCallback(() => {
     if (!editable) return;
@@ -3454,8 +3855,6 @@ export const CanvasView = memo(function CanvasView({
   }, [minimapBBox]);
 
   // Node lookups & relationship maps
-  const nodeMap = useMemo(() => new Map(data.nodes.map((n) => [n.id, n])), [data.nodes]);
-
   const nodeOutgoingMap = useMemo(() => {
     const map = new Map<string, { count: number; color?: string; targets: string[] }>();
     for (const e of data.edges) {
@@ -3654,7 +4053,19 @@ export const CanvasView = memo(function CanvasView({
       onWheel={handleWheel}
       onMouseDown={handleMouseDownBackground}
       onContextMenu={handleContextMenuCanvas}
+      onDragOver={handleDragOver}
+      onDrop={handleCanvasDrop}
     >
+      {/* Hidden file input for multimodal media insertion */}
+      <input
+        type="file"
+        ref={mediaFileInputRef}
+        accept="image/*,audio/*,video/*,application/pdf"
+        style={{ display: "none" }}
+        onChange={handleMediaFileInputChange}
+        multiple
+      />
+
       {/* 1. TOP FLOATING GLASSMORPHIC TOOLBAR */}
       <div
         className="canvas-toolbar"
@@ -3746,6 +4157,14 @@ export const CanvasView = memo(function CanvasView({
               style={toolBtnStyle(theme, colors)}
             >
               <Plus size={14} /> <span className="canvas-btn-label">文本卡片</span>
+            </button>
+            <button
+              className="canvas-tool-btn"
+              onClick={handleTriggerInsertMedia}
+              title="插入多模态媒体卡片 (支持剪贴板图片与本地文件)"
+              style={toolBtnStyle(theme, colors)}
+            >
+              <ImageIcon size={14} /> <span className="canvas-btn-label">图片卡片</span>
             </button>
             <button
               className="canvas-tool-btn"
@@ -4109,6 +4528,24 @@ export const CanvasView = memo(function CanvasView({
           <ImageIcon size={14} /> <span className="canvas-btn-label">导出图片</span>
         </button>
 
+        <button
+          className={`canvas-tool-btn ${isPresentationMode ? "active" : ""}`}
+          onClick={handleTogglePresentation}
+          title={isPresentationMode ? "退出演示模式 (Esc)" : "进入白板分镜演示模式 (F5)"}
+          style={{
+            ...toolBtnStyle(theme, colors),
+            color: isPresentationMode ? "#8b5cf6" : colors.cardText,
+            fontWeight: 600,
+            backgroundColor: isPresentationMode
+              ? isDark
+                ? "rgba(139, 92, 246, 0.25)"
+                : "rgba(139, 92, 246, 0.15)"
+              : "transparent",
+          }}
+        >
+          <Play size={14} /> <span className="canvas-btn-label">{isPresentationMode ? "退出演示" : "演示 (F5)"}</span>
+        </button>
+
         <div style={{ width: 1, height: 18, background: colors.cardBorder }} />
 
         {/* Zoom Controls */}
@@ -4170,6 +4607,7 @@ export const CanvasView = memo(function CanvasView({
           height: "100%",
           transform: `translate3d(${viewport.panX}px, ${viewport.panY}px, 0) scale(${viewport.zoom})`,
           transformOrigin: "0 0",
+          transition: isPresentationMode ? "transform 0.45s cubic-bezier(0.25, 1, 0.5, 1)" : undefined,
           backgroundImage: `radial-gradient(${colors.dotColor} 1.2px, transparent 1.2px)`,
           backgroundSize: "28px 28px",
           backfaceVisibility: "hidden",
@@ -4264,7 +4702,19 @@ export const CanvasView = memo(function CanvasView({
             // any leftover arc metadata is ignored in that case.
             const ringArc = edge.gridPath ? undefined : getEdgeRing(edge);
             const effectiveStyle = edge.gridPath ? "straight" : edge.style;
-            const pathData = computeEdgePath(p1, fromSide, p2, toSide, effectiveStyle, edge.stepOffset, ringArc);
+            const edgeObstacles = canvasObstacles.filter(
+              (o) => o.id !== edge.fromNode && o.id !== edge.toNode
+            );
+            const pathData = computeEdgePath(
+              p1,
+              fromSide,
+              p2,
+              toSide,
+              effectiveStyle,
+              edge.stepOffset,
+              ringArc,
+              edgeObstacles
+            );
             // On a ring the origin dot must sit on the circle, not on the raw
             // card anchor point.
             const originPoint = ringArc ? projectPointOntoRing(p1, ringArc) : p1;
@@ -4299,10 +4749,16 @@ export const CanvasView = memo(function CanvasView({
                 ? "2.5 4"
                 : undefined;
 
+            const isEdgeConnectedToCurrentSlide =
+              isPresentationMode &&
+              (edge.fromNode === presentationSequence[currentSlideIndex] ||
+                edge.toNode === presentationSequence[currentSlideIndex]);
+            const edgeOpacity = isPresentationMode ? (isEdgeConnectedToCurrentSlide ? 1 : 0.15) : 1;
+
             return (
               <g
                 key={edge.id}
-                style={{ pointerEvents: "all" }}
+                style={{ pointerEvents: "all", opacity: edgeOpacity, transition: "opacity 0.3s ease" }}
                 onContextMenu={(e) => handleContextMenuEdge(e, edge)}
               >
                 {/* Thick invisible hit area */}
@@ -4732,21 +5188,25 @@ export const CanvasView = memo(function CanvasView({
             effectiveSourceColor && CANVAS_COLOR_PALETTES[effectiveSourceColor]
               ? CANVAS_COLOR_PALETTES[effectiveSourceColor]
               : undefined;
+          const isCurrentSlide = isPresentationMode && presentationSequence[currentSlideIndex] === node.id;
           const isMultiRoot = selectedNodeIds.size >= 2 && currentMultiRootNode?.id === node.id;
           return (
             <div
               key={node.id}
-              className={`canvas-node card-${node.type} ${isSelected ? "selected" : ""} ${isConnectingTarget ? "connecting-target" : ""}`}
+              className={`canvas-node card-${node.type} ${isSelected ? "selected" : ""} ${isConnectingTarget ? "connecting-target" : ""} ${isCurrentSlide ? "current-slide" : ""}`}
               style={{
                 position: "absolute",
                 left: node.x,
                 top: node.y,
                 width: node.width,
                 height: node.height,
-                zIndex: 10,
+                zIndex: isCurrentSlide ? 60 : 10,
                 borderRadius: 12,
                 backgroundColor: colors.cardBg,
-                border: isSelected
+                opacity: isPresentationMode ? (isCurrentSlide ? 1 : 0.22) : 1,
+                border: isCurrentSlide
+                  ? "2px solid #8b5cf6"
+                  : isSelected
                   ? "2px solid #f59e0b"
                   : isConnectingTarget && isHovered
                   ? "2px solid #0284c7"
@@ -4757,7 +5217,9 @@ export const CanvasView = memo(function CanvasView({
                   : palette
                   ? `2px solid ${palette.stroke}`
                   : `1px solid ${colors.cardBorder}`,
-                boxShadow: isSelected
+                boxShadow: isCurrentSlide
+                  ? "0 0 0 4px rgba(139, 92, 246, 0.45), 0 16px 48px rgba(139, 92, 246, 0.4)"
+                  : isSelected
                   ? "0 12px 36px rgba(245,158,11,0.35)"
                   : isConnectingTarget && isHovered
                   ? "0 0 0 3px rgba(2, 132, 199, 0.4), 0 12px 36px rgba(2, 132, 199, 0.35)"
@@ -4768,7 +5230,7 @@ export const CanvasView = memo(function CanvasView({
                 flexDirection: "column",
                 color: colors.cardText,
                 cursor: isConnectingTarget ? "crosshair" : isEditing ? "text" : "move",
-                transition: "border-color 0.15s ease, box-shadow 0.15s ease",
+                transition: "border-color 0.15s ease, box-shadow 0.15s ease, opacity 0.3s ease",
               }}
               onMouseEnter={() => setHoveredNodeId(node.id)}
               onMouseLeave={() => setHoveredNodeId((prev) => (prev === node.id ? null : prev))}
@@ -4955,11 +5417,27 @@ export const CanvasView = memo(function CanvasView({
                     </span>
                   ) : (
                     <>
-                      {node.type === "file" && <FileText size={13} color="#10b981" />}
+                      {node.type === "file" && (
+                        (() => {
+                          const mType = getMediaFileType(node.file);
+                          if (mType === "image") return <ImageIcon size={13} color="#0284c7" />;
+                          if (mType === "audio") return <Music size={13} color="#a855f7" />;
+                          if (mType === "video") return <Video size={13} color="#ef4444" />;
+                          return <FileText size={13} color="#10b981" />;
+                        })()
+                      )}
                       {node.type === "text" && <Edit2 size={13} color={colors.edgeColor} />}
                       {node.type === "link" && <Link size={13} color="#a855f7" />}
                       <span style={{ fontSize: 11, fontWeight: 600 }}>
-                        {node.type === "file" ? node.file : node.type === "text" ? "便签卡片" : "外部参考"}
+                        {node.type === "file"
+                          ? node.file.startsWith("data:")
+                            ? "嵌入图片"
+                            : node.file.length > 28
+                            ? "..." + node.file.slice(-24)
+                            : node.file
+                          : node.type === "text"
+                          ? "便签卡片"
+                          : "外部参考"}
                       </span>
                       {isOneToManySource && (
                         <span
@@ -5015,7 +5493,7 @@ export const CanvasView = memo(function CanvasView({
                     </button>
                   ) : (
                     <>
-                      {node.type === "file" && onOpenFile && (
+                      {node.type === "file" && onOpenFile && !node.file.startsWith("data:") && (
                         <button
                           className="card-header-btn"
                           onMouseDown={(e) => e.stopPropagation()}
@@ -5023,7 +5501,7 @@ export const CanvasView = memo(function CanvasView({
                             e.stopPropagation();
                             onOpenFile(node.file);
                           }}
-                          title="在工作区打开对应笔记"
+                          title="在工作区打开对应文件"
                           style={cardHeaderBtnStyle(colors)}
                         >
                           <ExternalLink size={12} />
@@ -5104,14 +5582,89 @@ export const CanvasView = memo(function CanvasView({
                     dangerouslySetInnerHTML={{ __html: renderCardMarkdown(node.text) }}
                   />
                 ) : node.type === "file" ? (
-                  <div style={{ opacity: 0.9, fontSize: 12 }}>
-                    <p style={{ margin: "0 0 6px 0", fontWeight: 600, color: colors.cardText }}>
-                      {node.file}
-                    </p>
-                    <p style={{ margin: 0, opacity: 0.7, fontSize: 11.5 }}>
-                      库内 Markdown 文档卡片。点击右上角图标可在主阅读区全屏打开。
-                    </p>
-                  </div>
+                  (() => {
+                    const mType = getMediaFileType(node.file);
+                    if (mType === "image") {
+                      return (
+                        <div
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            overflow: "hidden",
+                            borderRadius: 6,
+                            backgroundColor: isDark ? "rgba(0,0,0,0.25)" : "rgba(0,0,0,0.04)",
+                          }}
+                        >
+                          <img
+                            src={node.file}
+                            alt="canvas image"
+                            style={{
+                              maxWidth: "100%",
+                              maxHeight: "100%",
+                              objectFit: "contain",
+                              borderRadius: 4,
+                              userSelect: "none",
+                              pointerEvents: "none",
+                            }}
+                          />
+                        </div>
+                      );
+                    }
+                    if (mType === "video") {
+                      return (
+                        <div
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            borderRadius: 6,
+                            overflow: "hidden",
+                            backgroundColor: "#000000",
+                          }}
+                        >
+                          <video
+                            src={node.file}
+                            controls
+                            style={{ maxWidth: "100%", maxHeight: "100%" }}
+                          />
+                        </div>
+                      );
+                    }
+                    if (mType === "audio") {
+                      return (
+                        <div
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: 8,
+                            padding: 10,
+                          }}
+                        >
+                          <Music size={28} color="#a855f7" />
+                          <audio src={node.file} controls style={{ width: "95%" }} />
+                        </div>
+                      );
+                    }
+                    return (
+                      <div style={{ opacity: 0.9, fontSize: 12 }}>
+                        <p style={{ margin: "0 0 6px 0", fontWeight: 600, color: colors.cardText }}>
+                          {node.file}
+                        </p>
+                        <p style={{ margin: 0, opacity: 0.7, fontSize: 11.5 }}>
+                          库内文档卡片。点击右上角图标可在主阅读区全屏打开。
+                        </p>
+                      </div>
+                    );
+                  })()
                 ) : (
                   <a
                     href={node.url}
@@ -5169,6 +5722,9 @@ export const CanvasView = memo(function CanvasView({
           const toSide = edge.toSide || optSides.toSide;
           const p1 = getNodeAnchorPoint(fromNode, fromSide);
           const p2 = getNodeAnchorPoint(toNode, toSide);
+          const edgeObstacles = canvasObstacles.filter(
+            (o) => o.id !== edge.fromNode && o.id !== edge.toNode
+          );
           // Place label exactly at geometric midpoint — the connection line passes THROUGH the label center
           const rawMid = computeEdgeMidpoint(
             p1,
@@ -5177,7 +5733,8 @@ export const CanvasView = memo(function CanvasView({
             toSide,
             edge.gridPath ? "straight" : edge.style,
             edge.stepOffset,
-            getEdgeRing(edge)
+            getEdgeRing(edge),
+            edgeObstacles
           );
 
           const isSelected = selectedEdgeIds.has(edge.id);
@@ -5199,6 +5756,12 @@ export const CanvasView = memo(function CanvasView({
           const badgeBorder = isSelected ? "#f59e0b" : edgeColor;
           const badgeColor = isSelected ? "#f59e0b" : colors.edgeLabelText;
 
+          const isEdgeConnectedToCurrentSlide =
+            isPresentationMode &&
+            (edge.fromNode === presentationSequence[currentSlideIndex] ||
+              edge.toNode === presentationSequence[currentSlideIndex]);
+          const labelOpacity = isPresentationMode ? (isEdgeConnectedToCurrentSlide ? 1 : 0.18) : 1;
+
           return (
             <div
               key={`edge-label-${edge.id}`}
@@ -5209,6 +5772,8 @@ export const CanvasView = memo(function CanvasView({
                 top: rawMid.y,
                 transform: "translate(-50%, -50%)",
                 zIndex: isSelected || isEditing ? 35 : 25,
+                opacity: labelOpacity,
+                transition: "opacity 0.3s ease",
                 pointerEvents: "all",
                 userSelect: "none",
               }}
@@ -7747,6 +8312,135 @@ export const CanvasView = memo(function CanvasView({
         >
           <Check size={13} color="#10b981" />
           <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* 10. Presentation Mode Floating Controls */}
+      {isPresentationMode && presentationSequence.length > 0 && (
+        <div
+          className="canvas-presentation-bar"
+          style={{
+            position: "absolute",
+            bottom: 28,
+            left: "50%",
+            transform: "translateX(-50%)",
+            backgroundColor: isDark ? "rgba(15, 23, 42, 0.94)" : "rgba(255, 255, 255, 0.96)",
+            backdropFilter: "blur(16px)",
+            border: `1px solid ${isDark ? "rgba(255, 255, 255, 0.15)" : "rgba(0, 0, 0, 0.12)"}`,
+            borderRadius: 36,
+            padding: "8px 18px",
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            zIndex: 1000,
+            boxShadow: "0 12px 36px rgba(0, 0, 0, 0.35)",
+            color: colors.cardText,
+            userSelect: "none",
+          }}
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <span
+            style={{
+              fontSize: 12,
+              fontWeight: 700,
+              color: "#8b5cf6",
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+            }}
+          >
+            🪐 演示模式
+          </span>
+
+          <div style={{ width: 1, height: 18, background: colors.cardBorder }} />
+
+          <button
+            onClick={handlePrevSlide}
+            title="上一张 (← / PageUp)"
+            style={{
+              background: "none",
+              border: "none",
+              color: colors.cardText,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              padding: 4,
+              borderRadius: 6,
+            }}
+          >
+            <ChevronLeft size={18} />
+          </button>
+
+          <span style={{ fontSize: 13, fontWeight: 600, minWidth: 54, textAlign: "center" }}>
+            {currentSlideIndex + 1} / {presentationSequence.length}
+          </span>
+
+          <button
+            onClick={handleNextSlide}
+            title="下一张 (→ / 空格 / PageDown)"
+            style={{
+              background: "none",
+              border: "none",
+              color: colors.cardText,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              padding: 4,
+              borderRadius: 6,
+            }}
+          >
+            <ChevronRight size={18} />
+          </button>
+
+          <div style={{ width: 1, height: 18, background: colors.cardBorder }} />
+
+          <button
+            onClick={() => setIsAutoPlaying((prev) => !prev)}
+            title={isAutoPlaying ? "暂停自动放映" : "自动放映 (每 3.5 秒切换)"}
+            style={{
+              background: isAutoPlaying
+                ? isDark
+                  ? "rgba(139, 92, 246, 0.3)"
+                  : "rgba(139, 92, 246, 0.15)"
+                : "none",
+              border: "none",
+              color: isAutoPlaying ? "#8b5cf6" : colors.cardText,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              fontSize: 12,
+              fontWeight: 500,
+              padding: "4px 8px",
+              borderRadius: 6,
+            }}
+          >
+            {isAutoPlaying ? <Pause size={14} /> : <Play size={14} />}
+            <span>{isAutoPlaying ? "暂停" : "自动"}</span>
+          </button>
+
+          <button
+            onClick={handleTogglePresentation}
+            title="退出演示模式 (Esc)"
+            style={{
+              background: "rgba(239, 68, 68, 0.12)",
+              border: "none",
+              color: "#ef4444",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              fontSize: 12,
+              fontWeight: 600,
+              padding: "4px 10px",
+              borderRadius: 16,
+              marginLeft: 4,
+            }}
+          >
+            <X size={13} />
+            <span>退出</span>
+          </button>
         </div>
       )}
     </div>

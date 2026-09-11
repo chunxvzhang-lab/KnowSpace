@@ -6,6 +6,8 @@ import type {
   CanvasEdgeLineStyle,
   CanvasTextNode,
   CanvasGroupNode,
+  MediaFileType,
+  CanvasObstacle,
 } from "../types/canvasTypes";
 import { renderCardMarkdown } from "./markdown";
 import { serializeSvgForExport } from "./svgExport";
@@ -468,6 +470,82 @@ export function getStepBendHandleInfo(
 }
 
 /**
+ * Recognizes media file types (images, audio, video, PDF) supported on the canvas
+ */
+const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "ico", "avif"]);
+const AUDIO_EXTENSIONS = new Set(["mp3", "wav", "ogg", "m4a", "flac", "aac"]);
+const VIDEO_EXTENSIONS = new Set(["mp4", "webm", "mov", "m4v", "ogv"]);
+const PDF_EXTENSIONS = new Set(["pdf"]);
+const MARKDOWN_EXTENSIONS = new Set(["md", "markdown", "canvas"]);
+
+export function getMediaFileType(filePathOrUrl?: string): MediaFileType {
+  if (!filePathOrUrl || typeof filePathOrUrl !== "string") return "other";
+  const trimmed = filePathOrUrl.trim();
+  if (trimmed.startsWith("data:image/")) return "image";
+  if (trimmed.startsWith("data:audio/")) return "audio";
+  if (trimmed.startsWith("data:video/")) return "video";
+  if (trimmed.startsWith("data:application/pdf")) return "pdf";
+
+  const clean = trimmed.split("?")[0].split("#")[0];
+  const parts = clean.split(".");
+  if (parts.length <= 1) return "other";
+  const ext = parts[parts.length - 1].toLowerCase();
+
+  if (IMAGE_EXTENSIONS.has(ext)) return "image";
+  if (AUDIO_EXTENSIONS.has(ext)) return "audio";
+  if (VIDEO_EXTENSIONS.has(ext)) return "video";
+  if (PDF_EXTENSIONS.has(ext)) return "pdf";
+  if (MARKDOWN_EXTENSIONS.has(ext)) return "markdown";
+  return "other";
+}
+
+export function isMediaFile(filePathOrUrl?: string): boolean {
+  const type = getMediaFileType(filePathOrUrl);
+  return type === "image" || type === "audio" || type === "video" || type === "pdf";
+}
+
+export function isImageFile(filePathOrUrl?: string): boolean {
+  return getMediaFileType(filePathOrUrl) === "image";
+}
+
+export interface AABBBox {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
+export function horizontalSegmentIntersectsBox(x1: number, x2: number, y: number, box: AABBBox): boolean {
+  if (y < box.minY || y > box.maxY) return false;
+  const segMinX = Math.min(x1, x2);
+  const segMaxX = Math.max(x1, x2);
+  return Math.max(segMinX, box.minX) < Math.min(segMaxX, box.maxX);
+}
+
+export function verticalSegmentIntersectsBox(x: number, y1: number, y2: number, box: AABBBox): boolean {
+  if (x < box.minX || x > box.maxX) return false;
+  const segMinY = Math.min(y1, y2);
+  const segMaxY = Math.max(y1, y2);
+  return Math.max(segMinY, box.minY) < Math.min(segMaxY, box.maxY);
+}
+
+export function pathIntersectsBox(
+  points: Array<{ x: number; y: number }>,
+  box: AABBBox
+): boolean {
+  for (let i = 0; i < points.length - 1; i++) {
+    const pt1 = points[i];
+    const pt2 = points[i + 1];
+    if (Math.abs(pt1.y - pt2.y) < 0.001) {
+      if (horizontalSegmentIntersectsBox(pt1.x, pt2.x, pt1.y, box)) return true;
+    } else if (Math.abs(pt1.x - pt2.x) < 0.001) {
+      if (verticalSegmentIntersectsBox(pt1.x, pt1.y, pt2.y, box)) return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Projects a point onto the given circle, i.e. moves it along the ray from the
  * ring centre until it sits exactly on the ring radius.
  *
@@ -490,7 +568,8 @@ export function projectPointOntoRing(
 }
 
 /**
- * Generates an SVG path for connecting edges with refined curvature and orthogonal routing
+ * Generates an SVG path for connecting edges with refined curvature, orthogonal routing,
+ * and smart AABB obstacle avoidance.
  */
 export function computeEdgePath(
   p1: { x: number; y: number },
@@ -499,7 +578,8 @@ export function computeEdgePath(
   side2: CanvasNodeSide = "left",
   style: CanvasEdgeLineStyle = "bezier",
   stepOffset?: number,
-  ring?: { center: { x: number; y: number }; radius: number }
+  ring?: { center: { x: number; y: number }; radius: number },
+  obstacles?: CanvasObstacle[]
 ): string {
   const dx = p2.x - p1.x;
   const dy = p2.y - p1.y;
@@ -528,6 +608,83 @@ export function computeEdgePath(
   }
 
   if (style === "step") {
+    // 1. Check obstacle avoidance if obstacle bounding boxes are provided
+    if (obstacles && obstacles.length > 0) {
+      const MARGIN = 14;
+      const isHorizontal = (side1 === "left" || side1 === "right") && (side2 === "left" || side2 === "right");
+      const isVertical = (side1 === "top" || side1 === "bottom") && (side2 === "top" || side2 === "bottom");
+
+      if (isHorizontal) {
+        const midX = p1.x + dx / 2 + (stepOffset || 0);
+        const defaultPts = [
+          { x: p1.x, y: p1.y },
+          { x: midX, y: p1.y },
+          { x: midX, y: p2.y },
+          { x: p2.x, y: p2.y },
+        ];
+
+        const colliding = obstacles.find((obs) => {
+          const box: AABBBox = {
+            minX: obs.x - MARGIN,
+            minY: obs.y - MARGIN,
+            maxX: obs.x + obs.width + MARGIN,
+            maxY: obs.y + obs.height + MARGIN,
+          };
+          return pathIntersectsBox(defaultPts, box);
+        });
+
+        if (colliding) {
+          const box: AABBBox = {
+            minX: colliding.x - MARGIN,
+            minY: colliding.y - MARGIN,
+            maxX: colliding.x + colliding.width + MARGIN,
+            maxY: colliding.y + colliding.height + MARGIN,
+          };
+
+          const routeAbove = Math.abs(p1.y - box.minY) < Math.abs(p1.y - box.maxY);
+          const bypassY = routeAbove ? box.minY - MARGIN : box.maxY + MARGIN;
+          const seg1X = p1.x < p2.x ? Math.min(p1.x + 24, box.minX - 6) : Math.max(p1.x - 24, box.maxX + 6);
+          const seg2X = p1.x < p2.x ? Math.max(p2.x - 24, box.maxX + 6) : Math.min(p2.x + 24, box.minX - 6);
+
+          return `M ${p1.x} ${p1.y} L ${seg1X} ${p1.y} L ${seg1X} ${bypassY} L ${seg2X} ${bypassY} L ${seg2X} ${p2.y} L ${p2.x} ${p2.y}`;
+        }
+      } else if (isVertical) {
+        const midY = p1.y + dy / 2 + (stepOffset || 0);
+        const defaultPts = [
+          { x: p1.x, y: p1.y },
+          { x: p1.x, y: midY },
+          { x: p2.x, y: midY },
+          { x: p2.x, y: p2.y },
+        ];
+
+        const colliding = obstacles.find((obs) => {
+          const box: AABBBox = {
+            minX: obs.x - MARGIN,
+            minY: obs.y - MARGIN,
+            maxX: obs.x + obs.width + MARGIN,
+            maxY: obs.y + obs.height + MARGIN,
+          };
+          return pathIntersectsBox(defaultPts, box);
+        });
+
+        if (colliding) {
+          const box: AABBBox = {
+            minX: colliding.x - MARGIN,
+            minY: colliding.y - MARGIN,
+            maxX: colliding.x + colliding.width + MARGIN,
+            maxY: colliding.y + colliding.height + MARGIN,
+          };
+
+          const routeLeft = Math.abs(p1.x - box.minX) < Math.abs(p1.x - box.maxX);
+          const bypassX = routeLeft ? box.minX - MARGIN : box.maxX + MARGIN;
+          const seg1Y = p1.y < p2.y ? Math.min(p1.y + 24, box.minY - 6) : Math.max(p1.y - 24, box.maxY + 6);
+          const seg2Y = p1.y < p2.y ? Math.max(p2.y - 24, box.maxY + 6) : Math.min(p2.y + 24, box.minY - 6);
+
+          return `M ${p1.x} ${p1.y} L ${p1.x} ${seg1Y} L ${bypassX} ${seg1Y} L ${bypassX} ${seg2Y} L ${p2.x} ${seg2Y} L ${p2.x} ${p2.y}`;
+        }
+      }
+    }
+
     // Orthogonal step routing tailored to anchor orientations and optional draggable offset:
     // Case 1: Horizontal start to Horizontal end (e.g. right -> left)
     if ((side1 === "left" || side1 === "right") && (side2 === "left" || side2 === "right")) {
@@ -568,7 +725,8 @@ export function computeEdgeMidpoint(
   side2: CanvasNodeSide = "left",
   style: CanvasEdgeLineStyle = "bezier",
   stepOffset?: number,
-  ring?: { center: { x: number; y: number }; radius: number }
+  ring?: { center: { x: number; y: number }; radius: number },
+  obstacles?: CanvasObstacle[]
 ): { x: number; y: number } {
   const dx = p2.x - p1.x;
   const dy = p2.y - p1.y;
@@ -600,6 +758,74 @@ export function computeEdgeMidpoint(
   }
 
   if (style === "step") {
+    if (obstacles && obstacles.length > 0) {
+      const MARGIN = 14;
+      const isHorizontal = (side1 === "left" || side1 === "right") && (side2 === "left" || side2 === "right");
+      const isVertical = (side1 === "top" || side1 === "bottom") && (side2 === "top" || side2 === "bottom");
+
+      if (isHorizontal) {
+        const midX = p1.x + dx / 2 + (stepOffset || 0);
+        const defaultPts = [
+          { x: p1.x, y: p1.y },
+          { x: midX, y: p1.y },
+          { x: midX, y: p2.y },
+          { x: p2.x, y: p2.y },
+        ];
+        const colliding = obstacles.find((obs) => {
+          const box: AABBBox = {
+            minX: obs.x - MARGIN,
+            minY: obs.y - MARGIN,
+            maxX: obs.x + obs.width + MARGIN,
+            maxY: obs.y + obs.height + MARGIN,
+          };
+          return pathIntersectsBox(defaultPts, box);
+        });
+        if (colliding) {
+          const box: AABBBox = {
+            minX: colliding.x - MARGIN,
+            minY: colliding.y - MARGIN,
+            maxX: colliding.x + colliding.width + MARGIN,
+            maxY: colliding.y + colliding.height + MARGIN,
+          };
+          const routeAbove = Math.abs(p1.y - box.minY) < Math.abs(p1.y - box.maxY);
+          const bypassY = routeAbove ? box.minY - MARGIN : box.maxY + MARGIN;
+          const seg1X = p1.x < p2.x ? Math.min(p1.x + 24, box.minX - 6) : Math.max(p1.x - 24, box.maxX + 6);
+          const seg2X = p1.x < p2.x ? Math.max(p2.x - 24, box.maxX + 6) : Math.min(p2.x + 24, box.minX - 6);
+          return { x: Math.round((seg1X + seg2X) / 2), y: Math.round(bypassY) };
+        }
+      } else if (isVertical) {
+        const midY = p1.y + dy / 2 + (stepOffset || 0);
+        const defaultPts = [
+          { x: p1.x, y: p1.y },
+          { x: p1.x, y: midY },
+          { x: p2.x, y: midY },
+          { x: p2.x, y: p2.y },
+        ];
+        const colliding = obstacles.find((obs) => {
+          const box: AABBBox = {
+            minX: obs.x - MARGIN,
+            minY: obs.y - MARGIN,
+            maxX: obs.x + obs.width + MARGIN,
+            maxY: obs.y + obs.height + MARGIN,
+          };
+          return pathIntersectsBox(defaultPts, box);
+        });
+        if (colliding) {
+          const box: AABBBox = {
+            minX: colliding.x - MARGIN,
+            minY: colliding.y - MARGIN,
+            maxX: colliding.x + colliding.width + MARGIN,
+            maxY: colliding.y + colliding.height + MARGIN,
+          };
+          const routeLeft = Math.abs(p1.x - box.minX) < Math.abs(p1.x - box.maxX);
+          const bypassX = routeLeft ? box.minX - MARGIN : box.maxX + MARGIN;
+          const seg1Y = p1.y < p2.y ? Math.min(p1.y + 24, box.minY - 6) : Math.max(p1.y - 24, box.maxY + 6);
+          const seg2Y = p1.y < p2.y ? Math.max(p2.y - 24, box.maxY + 6) : Math.min(p2.y + 24, box.minY - 6);
+          return { x: Math.round(bypassX), y: Math.round((seg1Y + seg2Y) / 2) };
+        }
+      }
+    }
+
     if ((side1 === "left" || side1 === "right") && (side2 === "left" || side2 === "right")) {
       return { x: p1.x + dx / 2 + (stepOffset || 0), y: (p1.y + p2.y) / 2 };
     }
@@ -620,6 +846,70 @@ export function computeEdgeMidpoint(
     x: Math.round(0.125 * p1.x + 0.375 * cp1.x + 0.375 * cp2.x + 0.125 * p2.x),
     y: Math.round(0.125 * p1.y + 0.375 * cp1.y + 0.375 * cp2.y + 0.125 * p2.y),
   };
+}
+
+/**
+ * Builds the topological / spatial presentation slide sequence for Canvas Presentation Mode.
+ * Prioritizes directed edges (causal/flow order), and orders unlinked cards spatially.
+ */
+export function buildPresentationSequence(data: CanvasData): string[] {
+  const presentableNodes = data.nodes.filter((n) => n.type !== "group");
+  if (presentableNodes.length === 0) return [];
+
+  const nodeIds = new Set(presentableNodes.map((n) => n.id));
+  const adj = new Map<string, string[]>();
+  const inDegree = new Map<string, number>();
+
+  for (const id of nodeIds) {
+    adj.set(id, []);
+    inDegree.set(id, 0);
+  }
+
+  for (const edge of data.edges) {
+    if (nodeIds.has(edge.fromNode) && nodeIds.has(edge.toNode) && edge.fromNode !== edge.toNode) {
+      adj.get(edge.fromNode)!.push(edge.toNode);
+      inDegree.set(edge.toNode, (inDegree.get(edge.toNode) || 0) + 1);
+    }
+  }
+
+  const result: string[] = [];
+  const visited = new Set<string>();
+  const nodeMap = new Map(presentableNodes.map((n) => [n.id, n]));
+
+  const spatialSort = (aId: string, bId: string) => {
+    const na = nodeMap.get(aId)!;
+    const nb = nodeMap.get(bId)!;
+    if (Math.abs(na.y - nb.y) > 60) return na.y - nb.y;
+    return na.x - nb.x;
+  };
+
+  const roots = Array.from(nodeIds).filter((id) => (inDegree.get(id) || 0) === 0).sort(spatialSort);
+
+  const queue: string[] = [...roots];
+  while (queue.length > 0) {
+    const curr = queue.shift()!;
+    if (visited.has(curr)) continue;
+    visited.add(curr);
+    result.push(curr);
+
+    const children = (adj.get(curr) || []).filter((id) => !visited.has(id)).sort(spatialSort);
+    for (const child of children) {
+      inDegree.set(child, inDegree.get(child)! - 1);
+      if (inDegree.get(child)! <= 0) {
+        queue.push(child);
+      }
+    }
+  }
+
+  const remaining = Array.from(nodeIds).filter((id) => !visited.has(id)).sort(spatialSort);
+  for (const id of remaining) {
+    if (!visited.has(id)) {
+      visited.add(id);
+      result.push(id);
+    }
+  }
+
+  return result;
 }
 
 /**
@@ -2392,7 +2682,8 @@ export function exportCanvasToSvg(
         ? { center: edge.ringCenter, radius: edge.ringRadius }
         : undefined;
     const exportStyle = edge.gridPath ? "straight" : edge.style;
-    const pathD = computeEdgePath(p1, fromSide, p2, toSide, exportStyle, edge.stepOffset, ringArc);
+    const obstacles = data.nodes.filter((n) => n.id !== edge.fromNode && n.id !== edge.toNode);
+    const pathD = computeEdgePath(p1, fromSide, p2, toSide, exportStyle, edge.stepOffset, ringArc, obstacles);
 
     // Mirror the on-screen renderer's color resolution: prefer the
     // edge's own explicit color, then fall back to source-aware display color.
@@ -2429,7 +2720,7 @@ export function exportCanvasToSvg(
 
     // 3. Edge Label Badges
     if (edge.label && edge.label.trim()) {
-      const rawMid = computeEdgeMidpoint(p1, fromSide, p2, toSide, exportStyle, edge.stepOffset, ringArc);
+      const rawMid = computeEdgeMidpoint(p1, fromSide, p2, toSide, exportStyle, edge.stepOffset, ringArc, obstacles);
       const labelText = escapeSvgXml(edge.label.trim());
       const shape = edge.labelShape || "pill";
       const charWidth = 11.5;
@@ -2500,9 +2791,25 @@ export function exportCanvasToSvg(
       // Header icon + label — identical wording to the on-screen card
       let headerIcon = "📝";
       let headerLabel = "便签卡片";
+      const mediaType = card.type === "file" ? getMediaFileType(card.file) : card.type === "link" ? getMediaFileType(card.url) : "other";
+
       if (card.type === "file") {
-        headerIcon = "📄";
-        headerLabel = card.file;
+        if (mediaType === "image") {
+          headerIcon = "🖼️";
+          headerLabel = card.file.split(/[/\\]/).pop() || card.file;
+        } else if (mediaType === "audio") {
+          headerIcon = "🎵";
+          headerLabel = card.file.split(/[/\\]/).pop() || card.file;
+        } else if (mediaType === "video") {
+          headerIcon = "🎬";
+          headerLabel = card.file.split(/[/\\]/).pop() || card.file;
+        } else if (mediaType === "pdf") {
+          headerIcon = "📑";
+          headerLabel = card.file.split(/[/\\]/).pop() || card.file;
+        } else {
+          headerIcon = "📄";
+          headerLabel = card.file;
+        }
       } else if (card.type === "link") {
         headerIcon = "🔗";
         headerLabel = "外部参考";
@@ -2513,9 +2820,19 @@ export function exportCanvasToSvg(
       if (card.type === "text") {
         bodyHtml = renderCardMarkdown(card.text);
       } else if (card.type === "file") {
-        bodyHtml =
-          `<p style="margin:0 0 6px 0;font-weight:600;">${escapeSvgXml(card.file)}</p>` +
-          `<p style="margin:0;opacity:0.7;font-size:11.5px;">库内 Markdown 文档卡片。点击右上角图标可在主阅读区全屏打开。</p>`;
+        if (mediaType === "image") {
+          bodyHtml = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden;background:rgba(0,0,0,0.03);border-radius:6px;"><img src="${escapeSvgXml(card.file)}" alt="${escapeSvgXml(headerLabel)}" style="max-width:100%;max-height:100%;object-fit:contain;" /></div>`;
+        } else if (mediaType === "audio") {
+          bodyHtml = `<div style="padding:12px;display:flex;flex-direction:column;gap:6px;"><span style="font-weight:600;font-size:12px;">🎵 ${escapeSvgXml(headerLabel)}</span><span style="font-size:11px;opacity:0.7;">音频媒体资源</span></div>`;
+        } else if (mediaType === "video") {
+          bodyHtml = `<div style="padding:12px;display:flex;flex-direction:column;gap:6px;"><span style="font-weight:600;font-size:12px;">🎬 ${escapeSvgXml(headerLabel)}</span><span style="font-size:11px;opacity:0.7;">视频媒体资源</span></div>`;
+        } else if (mediaType === "pdf") {
+          bodyHtml = `<div style="padding:12px;display:flex;flex-direction:column;gap:6px;"><span style="font-weight:600;font-size:12px;">📑 ${escapeSvgXml(headerLabel)}</span><span style="font-size:11px;opacity:0.7;">PDF 文档资源</span></div>`;
+        } else {
+          bodyHtml =
+            `<p style="margin:0 0 6px 0;font-weight:600;">${escapeSvgXml(card.file)}</p>` +
+            `<p style="margin:0;opacity:0.7;font-size:11.5px;">库内 Markdown 文档卡片。点击右上角图标可在主阅读区全屏打开。</p>`;
+        }
       } else {
         bodyHtml = `<a href="${escapeSvgXml(card.url)}">${escapeSvgXml(card.url)}</a>`;
       }

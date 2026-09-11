@@ -1814,6 +1814,88 @@ describe("CanvasView Component", () => {
     expect(directoryOpen).toBe(false);
     expect(sidebarOpen).toBe(false);
   });
+
+  it("enters presentation mode, focuses on slides, and navigates with controls", () => {
+    const data: CanvasData = {
+      nodes: [
+        { id: "node-1", type: "text", text: "第一幕：引言", x: 100, y: 100, width: 220, height: 120 },
+        { id: "node-2", type: "text", text: "第二幕：核心展开", x: 400, y: 100, width: 220, height: 120 },
+      ],
+      edges: [{ id: "e-1", fromNode: "node-1", toNode: "node-2" }],
+    };
+
+    const { container } = render(
+      <CanvasView
+        title="白板分镜演示测试"
+        source={JSON.stringify(data)}
+        onSourceChange={vi.fn()}
+        editable={true}
+        theme="twitter"
+      />
+    );
+
+    // Initial state: presentation bar not visible
+    expect(container.querySelector(".canvas-presentation-bar")).toBeNull();
+
+    // Click presentation button in toolbar
+    const presBtn = screen.getByTitle("进入白板分镜演示模式 (F5)");
+    expect(presBtn).toBeDefined();
+    fireEvent.click(presBtn);
+
+    // Presentation bar is now displayed
+    expect(container.querySelector(".canvas-presentation-bar")).not.toBeNull();
+    expect(screen.getByText("🪐 演示模式")).toBeDefined();
+    expect(screen.getByText("1 / 2")).toBeDefined();
+
+    // Active slide card has current-slide class
+    const slide1 = screen.getByText("第一幕：引言").closest(".canvas-node")!;
+    expect(slide1.classList.contains("current-slide")).toBe(true);
+
+    // Click Next Slide button
+    const nextBtn = screen.getByTitle("下一张 (→ / 空格 / PageDown)");
+    fireEvent.click(nextBtn);
+    expect(screen.getByText("2 / 2")).toBeDefined();
+    const slide2 = screen.getByText("第二幕：核心展开").closest(".canvas-node")!;
+    expect(slide2.classList.contains("current-slide")).toBe(true);
+
+    // Click Exit button
+    const exitBtns = screen.getAllByTitle("退出演示模式 (Esc)");
+    fireEvent.click(exitBtns[0]);
+    expect(container.querySelector(".canvas-presentation-bar")).toBeNull();
+  });
+
+  it("renders multimodal image card with img preview and dedicated header icon", () => {
+    const data: CanvasData = {
+      nodes: [
+        {
+          id: "media-img-1",
+          type: "file",
+          file: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+          x: 100,
+          y: 100,
+          width: 300,
+          height: 200,
+        },
+      ],
+      edges: [],
+    };
+
+    const { container } = render(
+      <CanvasView
+        title="多模态图片卡片测试"
+        source={JSON.stringify(data)}
+        onSourceChange={vi.fn()}
+        editable={true}
+        theme="twitter"
+      />
+    );
+
+    // Renders embedded image card title and img tag
+    expect(screen.getByText("嵌入图片")).toBeDefined();
+    const imgEl = container.querySelector("img[alt='canvas image']");
+    expect(imgEl).not.toBeNull();
+    expect(imgEl?.getAttribute("src")).toContain("data:image/png;base64");
+  });
 });
 
 

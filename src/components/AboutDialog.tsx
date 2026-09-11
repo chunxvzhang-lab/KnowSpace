@@ -121,7 +121,7 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
             <div>
               <div className="about-header-title-row">
                 <span className="about-app-name">KnowSpace</span>
-                <span className="about-version-badge">v2.0.0</span>
+                <span className="about-version-badge">v2.1.0</span>
               </div>
               <p className="about-tagline">Personal Knowledge Workspace · 个人知识工作台</p>
             </div>
@@ -138,7 +138,7 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
             <div className="about-slogan-title">Write. Read. Connect. Know.</div>
             <div className="about-slogan-sub">记录 · 阅读 · 连接 · 认知</div>
             <p className="about-description" style={{ marginTop: 6 }}>
-              <strong>KnowSpace</strong> 是一款本地优先（Local-First）、现代化高颜值的个人知识工作台。以私密、高效、纯粹为核心，融汇无限可视化白板、时间旅行版本快照、毫秒混合检索、交互式思维导图、全景知识图谱与块级双向链接，助你构建立体多维的结构化思维空间。
+              <strong>KnowSpace</strong> 是一款本地优先（Local-First）、现代化高颜值的个人知识工作台。以私密、高效、纯粹为核心，融汇多模态空间白板、AABB 绕障避障寻路算法、F5 分镜全屏演示、时间旅行版本快照、毫秒混合检索、交互式思维导图、全景知识图谱与块级双向链接，助你构建立体多维的结构化思维空间。
             </p>
           </div>
 
@@ -147,13 +147,28 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
             <div className="about-card-title">
               <History size={16} className="about-icon text-blue" />
               <span>版本更新日志 · What&apos;s New</span>
-              <span className="about-changelog-version-badge">v2.0.0</span>
+              <span className="about-changelog-version-badge">v2.1.0</span>
             </div>
             <div className="about-changelog-list">
-              {/* v2.0.0 */}
+              {/* v2.1.0 */}
               <div className="about-changelog-group">
                 <div className="about-changelog-group-label">
                   <Sparkles size={12} className="text-cyan" />
+                  <span>v2.1.0 多模态空间白板、AABB绕障寻路与F5分镜全屏演示</span>
+                </div>
+                <ul className="about-changelog-items">
+                  <li>🖼️ <strong>多模态媒体卡片 (Multimodal Canvas 2.1)</strong>：支持剪贴板截图一键直接粘贴 (<code>Ctrl+V</code>)、图片/音视频外部拖拽投放 (Drag & Drop) 自动存入 <code>assets/</code> 目录并在视口落点生成媒体卡片，原生内置媒体播放控制与专属识别标头。</li>
+                  <li>🛣️ <strong>智能正交折线 AABB 绕障避障寻路算法</strong>：折线自动检测端点间阻挡卡片包围盒（+14px 安全避让边距），动态规划 5 段正交平滑绕障路径，彻底杜绝穿透遮挡卡片文字，关系标签中心点自适应吸附。</li>
+                  <li>📽️ <strong>F5 白板分镜全屏演示模式 (Presentation Mode)</strong>：基于 DAG 拓扑因果关系自动计算镜头演播序，电影级平滑聚焦运镜，演播卡片柔和呼吸发光高亮，背景优雅弱化遮罩，悬浮控制台支持全键盘流与自动播放。</li>
+                  <li>🎨 <strong>连线调色板与视觉控制深化</strong>：统一环形回路连线色彩、单条连线右键调色盘与自定义十六进制 HEX 拾色器、离屏高保真 1:1 图片与工程文件高度一致性保障。</li>
+                  <li>🧪 <strong>子功能全覆盖强化</strong>：媒体大图灯箱 (MediaLightbox) 缩放与下载、排版状态栏指标实时计算、双链与未链接提及一键升级、外部并发冲突仲裁与未保存确认对话框。</li>
+                </ul>
+              </div>
+
+              {/* v2.0.0 */}
+              <div className="about-changelog-group" style={{ marginTop: 10, opacity: 0.9 }}>
+                <div className="about-changelog-group-label">
+                  <Sparkles size={12} className="text-blue" />
                   <span>v2.0.0 无限空间白板、时间旅行版本快照与全库混合检索</span>
                 </div>
                 <ul className="about-changelog-items">
@@ -337,7 +352,7 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
           <div className="about-card">
             <div className="about-card-title">
               <Github size={16} className="about-icon text-purple" />
-              <span>GitHub 官方开源仓库</span>
+              <span>GitHub 官方开源仓库与版本发布</span>
             </div>
             <div className="about-info-row">
               <span className="about-label">项目主页：</span>
@@ -351,6 +366,21 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
                 title="在外部浏览器打开"
               >
                 <span>{repoUrl}</span>
+                <ExternalLink size={13} />
+              </a>
+            </div>
+            <div className="about-info-row" style={{ marginTop: 6 }}>
+              <span className="about-label">最新发布：</span>
+              <a
+                href={`${repoUrl}/releases`}
+                className="about-link"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleOpenExternal(`${repoUrl}/releases`);
+                }}
+                title="下载最新安装包与便携版"
+              >
+                <span>{repoUrl}/releases (下载 v2.1.0 安装包与便携版)</span>
                 <ExternalLink size={13} />
               </a>
             </div>
@@ -423,6 +453,14 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
             >
               {copied ? <Check size={14} className="text-green" /> : <Copy size={14} />}
               <span>{copied ? "已复制链接" : "复制仓库地址"}</span>
+            </button>
+            <button
+              type="button"
+              className="about-action-btn secondary"
+              onClick={() => handleOpenExternal(`${repoUrl}/releases`)}
+            >
+              <ExternalLink size={14} />
+              <span>版本发布 (Releases)</span>
             </button>
             <button
               type="button"

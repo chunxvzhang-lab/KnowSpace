@@ -3325,6 +3325,7 @@ export function App() {
                 onSave={() => saveSession()}
                 isDirty={isDirty}
                 isSaving={isSaving}
+                currentFilePath={session.absolutePath || session.fileName}
               />
             ) : session ? (
               <DocumentWorkspace

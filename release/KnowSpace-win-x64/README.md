@@ -10,8 +10,12 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-v2.0.1-1D9BF0?style=flat-square&logo=github" alt="Version 2.0.1" />
+  <img src="https://img.shields.io/badge/Version-v2.1.0-1D9BF0?style=flat-square&logo=github" alt="Version 2.1.0" />
+  <img src="https://img.shields.io/badge/Multimodal-Canvas_Media_Cards-F59E0B?style=flat-square" alt="Multimodal Canvas" />
+  <img src="https://img.shields.io/badge/Routing-AABB_Obstacle_Avoidance-00BA7C?style=flat-square" alt="AABB Obstacle Avoidance" />
+  <img src="https://img.shields.io/badge/Presentation-F5_Cinematic_Slides-8B5CF6?style=flat-square" alt="F5 Presentation Mode" />
   <img src="https://img.shields.io/badge/Performance-120FPS_Instant_Load-00BA7C?style=flat-square" alt="120FPS Instant Load" />
+  <img src="https://img.shields.io/badge/Tests-347_Passing_100%25-00BA7C?style=flat-square" alt="347 Passing Tests" />
   <img src="https://img.shields.io/badge/Canvas-JSON_Canvas_1.0-00BA7C?style=flat-square" alt="Infinite Canvas" />
   <img src="https://img.shields.io/badge/Snapshots-Ctrl%2BShift%2BH-1D9BF0?style=flat-square" alt="Version History" />
   <img src="https://img.shields.io/badge/Search-Hybrid_Vault_Index-8B5CF6?style=flat-square" alt="Hybrid Vault Search" />
@@ -26,7 +30,7 @@
   <img src="https://img.shields.io/badge/React_19-61DAFB?style=flat-square&logo=react&logoColor=black" alt="React 19" />
   <img src="https://img.shields.io/badge/Electron_42-47848F?style=flat-square&logo=electron&logoColor=white" alt="Electron 42" />
   <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="MIT License" />
-  <img src="https://img.shields.io/badge/Team-摸鱼Lab-orange?style=flat-square" alt="摸鱼Lab" />
+  <img src="https://img.shields.io/badge/Team-KnowSpace_Lab-orange?style=flat-square" alt="KnowSpace Lab" />
 </p>
 
 <p align="center">
@@ -34,13 +38,14 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/chunxvzhang-lab/KnowSpace/releases">🚀 下载最新版本 (Releases)</a> •
   <a href="docs/全功能高清图片手册.md">🖼️ 全功能高清图片手册 (Picture Manual)</a> •
   <a href="docs/USER_MANUAL.md">📖 操作手册 (User Manual)</a> •
   <a href="docs/knowspace-roadmap-v2.0-v3.0.md">🪐 演进路线图 (Roadmap)</a> •
   <a href="#-核心能力体系">核心体系</a> •
   <a href="#-核心功能特性">功能特性</a> •
   <a href="#-键盘快捷键">快捷键</a> •
-  <a href="#-便携版与-msi-安装包">下载运行</a> •
+  <a href="#-便携版与-msi-安装包">安装程序与便携版</a> •
   <a href="#-english">English</a>
 </p>
 
@@ -52,7 +57,7 @@
 
 ## 🏛️ 核心能力体系
 
-- **🎨 Infinite Canvas 2.0（无限空间可视化白板 · 兼容 JSON Canvas 1.0）**：标准开放的二维空间思维白板（`Ctrl+Shift+C`），**多模态卡片自由挂载**（富文本 Markdown、嵌入文档预览、逻辑分组容器），**高精度 4 锚点几何中心对齐与贝塞尔/正交折线/直线矢量连线**，支持**环形对齐（Ring Layout · 真实平滑圆形弧线闭环）与矩形网格对齐（Rectangular Grid Layout）**、**交互式环半径与网格间距微调拉杆**、**折线手柄平移拖拽**、**防冲天平滑曲线**、**上下分层垂直优先路由**、**12 色专业调色盘与单条连线/批量卡片自定义 HEX 颜色拾取器**、**连线成环卡片视觉解耦（对外发射连线独立着色，消除视觉混淆）**、**一对多发起源全景识别（起点锚固圆点、发起源徽章、高亮辉光与多选动态标注）**、**连线多选与底部批量工具栏**、**多选卡片一键断开连线**、**120FPS 硬件栅格化与视口视锥剔除（Viewport Frustum Culling）**；配备右下角缩略雷达小地图与全景聚焦控制；**独创画布逆向拓扑萃取长文算法**，一键将白板因果关系逆向萃取为逻辑严密的 Markdown 专著。
+- **🎨 Infinite Canvas 2.1（空间多模态无限白板 · 兼容 JSON Canvas 1.0）**：标准开放的二维空间思维白板（`Ctrl+Shift+C`），**多模态媒体卡片自由挂载**（剪贴板截图 `Ctrl+V` 一键自动存入 `assets/` 落地为媒体卡片、桌面图片/音视频文件批量拖拽投放、富文本 Markdown、嵌入文档滚动预览、逻辑分组容器），**智能正交折线 AABB 绕障避障寻路算法**（自动检测卡片包围盒与 +14px 安全边距，5 段平滑正交绕行，彻底杜绝线条穿透遮挡卡片文字，标签中心点自适应吸附），**F5 沉浸式分镜全屏演示模式**（因果 DAG 拓扑镜头序、电影级平滑聚焦运镜、当前演播卡片脉冲呼吸发光光晕、背景优雅弱化、悬浮控制台全键盘调度与自动播放），**高精度 4 锚点几何中心对齐与贝塞尔/正交折线/直线矢量连线**，支持**环形对齐（Ring Layout · 真实平滑圆形弧线闭环）与矩形网格对齐（Rectangular Grid Layout）**、**交互式环半径与网格间距微调拉杆**、**折线手柄平移拖拽**、**防冲天平滑曲线**、**上下分层垂直优先路由**、**12 色专业调色盘与单条连线/批量卡片自定义 HEX 颜色拾取器**、**连线成环卡片视觉解耦（对外发射连线独立着色，消除视觉混淆）**、**一对多发起源全景识别（起点锚固圆点、发起源徽章、高亮辉光与多选动态标注）**、**连线多选与底部批量工具栏**、**多选卡片一键断开连线**、**120FPS 硬件栅格化与视口视锥剔除（Viewport Frustum Culling）**；配备右下角缩略雷达小地图与全景聚焦控制；**独创画布逆向拓扑萃取长文算法**，一键将白板因果关系逆向萃取为逻辑严密的 Markdown 专著。
 - **🚀 Instant Load & 120FPS Engine（秒开体验与工业级高刷引擎）**：彻底攻克大型知识库与包含数百篇笔记文件夹的打开性能瓶颈！引入**协作式空闲时间片调度器（Cooperative Idle-Sliced Background Indexer）**，首屏活动文档优先 <50ms 秒开呈现，后台全量索引 600ms 初始防抖与 20ms 退避分片让出时间片，保证 0 dropped frames；配合 **Electron 批量并发读取 IPC（`readMarkdownBatch`）**与 **32MB 内存 LRU 缓存（256 篇常驻）**，二次切换零磁盘 I/O。
 - **⏳ Local Version History（本地时间旅行与版本快照历史）**：运行在本地知识库根目录隐藏空间（`.knowspace/snapshots/`）的无感版本防丢卫士（`Ctrl+Shift+H`），**30秒去抖静默捕获与 SHA-256 哈希去重**，配备直观版本时间轴；**左右双栏 Side-by-Side 与统一 Unified 视图**，Myers LCS 逐行与行内字符微粒度高亮，**一键无损安全还原与手动里程碑快照**。
 - **🔍 Hybrid Vault Search（全库毫秒级混合检索引擎）**：全新文档级与段落级倒排索引（Inverted Index），万篇笔记键盘键入即刻（< 15ms）出结果。**深度支持结构化检索语法**：`tag:#架构`、`link:[[分布式协议]]`、`"严格短语"`、`-排除词`、时间范围过滤，提供「当前章节」与「全库检索」一键无缝切换、语法快捷辅助芯片与物理行微光脉冲联动。
@@ -280,15 +285,29 @@
 
 ---
 
-### 11. 🎨 无限空间可视化白板 (Infinite Canvas · JSON Canvas 1.0 兼容 · `Ctrl + Shift + C`)
-*标准开放的二维空间思维白板，打通从零散卡片、拓扑因果连线到结构化专著的完整心智飞跃。*
+### 11. 🎨 空间多模态无限可视化白板 (Infinite Canvas 2.1 · JSON Canvas 1.0 兼容 · `Ctrl + Shift + C`)
+*标准开放的二维空间思维白板，融合多模态媒体、AABB 避障连线与 F5 分镜演示，打通从灵感卡片、拓扑因果到专著产出的完整飞跃。*
 
 <p align="center">
   <img src="docs/manual-images/32-infinite-canvas.png" alt="无限空间可视化白板与多模态卡片" width="90%" style="border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);" />
 </p>
 
 - **🌐 标准开放与跨生态流转 (JSON Canvas 1.0)**：原生采用社区通用规范存储为 `.canvas` 文件，与 **Obsidian Canvas** 等外部空间工具 100% 双向互通；在文件树中以专属翠绿 Boxes 图标区分，支持新建、重命名、移动与双击秒开。
-- **📦 多模态节点自由挂载**：
+- **🖼️ 多模态媒体卡片体系 (Multimodal Media Cards · v2.1.0 升级)**：
+  - **剪贴板截图一键直接粘贴 (`Ctrl + V`)**：无论聚焦于画布任何位置，直接粘贴剪贴板截图或图片数据，系统自动在当前白板同级创建 `assets/` 目录并生成以时间戳命名的无损图片文件，同时在当前画布视口中心精准挂载为媒体卡片！
+  - **外部多媒体拖拽投放 (Drag & Drop)**：支持从操作系统桌面或文件管理器直接拖拽单张/多张图片、音视频文件进入白板，在鼠标拖拽落点批量生成媒体卡片；
+  - **全类型自适应与流媒体播放**：图片卡片内自适应比例缩放显示，卡片上方配备格式专属识别标头（🖼️）；音频与视频卡片原生内置播放控制器，支持在白板中直接预览与收听；
+  - **1:1 导出保真**：SVG/PNG 离屏高保真导出引擎完整保留内嵌媒体卡片与高清画面。
+- **🛣️ 智能正交折线 AABB 绕障避障寻路算法 (AABB Obstacle Avoidance Routing · v2.1.0 升级)**：
+  - **包围盒碰撞与穿透检测**：针对正交折线（Step Line），实时检测源卡片与目标卡片之间的中间障碍卡片包围盒（AABB），并附加 14px 安全避让边距；
+  - **5 段平滑正交绕障路径规划**：当发现连线直接穿过非关联卡片时，寻路引擎自动向上/下或向左/右生成 5 段正交折线绕行路径，彻底解决正交连线穿心遮挡卡片文字内容的痛点；
+  - **关系说明标签中心自适应吸附**：连线关系说明徽章（Label Badge）与几何中心点同步偏移至绕障路径段中点，杜绝标签与障碍卡片重叠。
+- **📽️ F5 白板分镜全屏演示模式 (Presentation Mode · `F5` · v2.1.0 升级)**：
+  - **因果 DAG 拓扑镜头序算法 (`buildPresentationSequence`)**：自动分析画板上有向连线构建的有向无环因果链路，上游排在先、下游排在后，辅以从左至右、从上到下的阅读序生成逻辑分镜序列，智能排除概念分组容器；
+  - **电影级平滑聚焦运镜**：采用 `cubic-bezier(0.25, 1, 0.5, 1)` 缓动曲线，平滑平移并缩放画板摄像机，使当前演播卡片精准居中呈现；
+  - **脉冲呼吸发光与背景弱化**：当前演播卡片激发专属光晕呼吸发光，非演播卡片与非关联连线透明度降至 `0.18 ~ 0.22`，最大化聚焦听众注意力；
+  - **全键盘调度与悬浮控制台**：支持 `F5` / 顶部「演示」按钮一键进入/退出、`→` / `空格` / `PageDown` 下一张、`←` / `PageUp` 上一张、`Home` / `End` 跳转首尾、`Esc` 退出；底部常驻半透明悬浮控制台，集成张数指示器、3.5 秒自动播放开关与退出按钮。
+- **📦 丰富节点自由挂载**：
   - **文本卡片 (Text Node)**：双击卡片进入行内编辑，失焦即刻渲染为标准 Markdown（完整支持公式、代码高亮与清单）；
   - **文档卡片 (File Node)**：直接挂载库内任意笔记，卡片内支持滚动预览，双击即可无缝穿梭直达原笔记；
   - **分组容器 (Group Node)**：半透明分类容器，带标题指示，支持框选和批量拖拽搬运；
@@ -400,6 +419,28 @@
 
 ---
 
+### 15. 🧪 交互子功能与端到端稳定性保障体系 (Sub-function Ecosystem & 100% Test Coverage)
+*高阶空间功能与底层每个交互细节并驾齐驱，构筑 347 项全量自动化测试 100% 绿灯守卫的坚实壁垒。*
+
+<p align="center">
+  <img src="docs/manual-images/22-backlinks-panel.png" alt="双向链接与未链接提及面板" width="48%" style="border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35); display: inline-block; margin-right: 2%;" />
+  <img src="docs/manual-images/18-dialog-conflict.png" alt="外部文件并发修改冲突协商" width="48%" style="border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35); display: inline-block;" />
+</p>
+
+- **🔍 媒体预览灯箱组件 (MediaLightbox)**：支持正文中图片与架构图一键全屏沉浸预览，0.2× ~ 6× 滚轮平滑缩放与实时比例指示（100%→125%），鼠标拖拽平移，一键重置自适应，一键下载高清原图与透明 PNG，`Esc` 极速退出。
+- **📊 极客排版状态栏 (StatusBar)**：底部实时精准统计全文字符数、行数、词数（Word Count），按中英混合流速估算「预计阅读 X 分钟」，展示原子「已保存」与未保存修改呼吸红点「未保存」标记，支持「只读模式」安全锁与超大文档「已优化」硬件加速标识。
+- **🔗 双向链接与未链接提及挖掘 (BacklinksPanel)**：实时收集全库跨目录引用当前文档的所有上下文片段，按文档智能聚合展示行号标签（如 `L12`），点击直达来源定位；智能挖掘正文中提及本文标题但尚未加双括号的文字，支持点击「+ 设为双链」一键自动化升级。
+- **🛡️ 并发冲突协商与未保存守卫 (Dialogs)**：
+  - **外部修改冲突协商 (`FileConflictDialog`)**：检测到第三方编辑器变更时，弹窗提供「重新载入磁盘内容」、「强制覆盖磁盘文件」、「另存为新文件」及「取消」四种完备仲裁策略；
+  - **未保存退出守卫 (`UnsavedChangesDialog`)**：切换文档或关闭前阻断拦截，清晰列出「保存文件」、「放弃更改」与「取消」回调。
+- **📑 目录大纲随动与书签反查 (TocPanel & BookmarkPanel)**：H1~H6 标题缩进结构随阅读平滑高亮；精选书签列表智能逆向反查所属章节标题，随时一键重访或清理。
+- **📁 知识库目录树与闪念速记物理隔离 (ChapterList)**：支持多级文件夹折叠/展开与记忆；`space/` 目录下的闪念速记卡片默认在主知识树中完全隐藏，仅在当前激活时智能局部展开，保持知识主干清爽干净。
+- **🌐 网页快照与容量淘汰服务 (WebSnapshotService)**：网页快照自动去重与时间戳刷新，严格执行 30 条上限 FIFO 自动淘汰机制，防止本地磁盘无限膨胀。
+- **📊 矢量 Mermaid 安全渲染引擎 (MermaidService)**：通过 `data-mermaid-src` Base64 编码从源头彻底杜绝 HTML 实体转义破损，具备 SVG 内存缓存与语法异常优雅降级保护 UI，绝不白屏。
+- **🧪 工业级 100% 自动化测试保障**：42 个测试套件，共 **347** 项自动化测试（覆盖空间白板、脑图、图谱、编辑器、双链、检索、版本时光机及所有细化子功能组件）全量 100% 绿灯通过！
+
+---
+
 ## ⌨️ 键盘快捷键
 
 | 快捷键 | 功能 | 说明 |
@@ -411,6 +452,9 @@
 | `右键` | **情境感知右键菜单** | (编辑器选区/正文) 提取为新笔记、生成块引用、存入闪念、富文本排版转换 |
 | `Ctrl + Shift + H` | **版本快照历史与双栏对比** | 呼出本地时间旅行面板，支持 Side-by-Side 逐行与行内对比、一键无损还原 |
 | `Ctrl + Shift + C` | **空间可视化白板** | 切换至无限空间白板视图，挂载多模态卡片并进行空间组织与连线 |
+| `F5` | **(白板中) 全屏分镜演示模式** | 一键进入/退出电影级全屏分镜演示，自动沿因果 DAG 拓扑链路平滑运镜聚焦 |
+| `Ctrl + V` | **(白板中) 剪贴板一键粘贴卡片/图片** | 直接粘贴剪贴板截图或文本，自动落盘存入 `assets/` 并在当前视口挂载卡片 |
+| `拖拽媒体文件` | **(白板中) 拖拽投放多模态卡片** | 从桌面/文件夹直接拖拽图片、视频、音频到白板，在鼠标落点批量生成媒体卡片 |
 | `R` | **(白板连线选中时) 反转连线流向** | 一键对调连线两端起止卡片与箭头指向，伴有 Toast 反馈 |
 | `Shift + 点击 / 框选` | **(白板中) 连线/卡片批量多选** | 批量多选连线呼出底部批量工具栏（一键批量改色、箭头、线型、虚实形态、反向与删除） |
 | `双击折线拐点手柄` | **(白板折线选中时) 复位折线拐点** | 双击正交折线中心调整手柄，快速将折线弯折位置复位至几何中位线 |
@@ -425,7 +469,7 @@
 | `↑ ↓ ← →` | **(导图中) 方向键导航** | 在父子主题与兄弟主题之间键盘快速漫游定位 |
 | `Ctrl + G` | **打开/收起知识网络图谱** | 开启或收起右侧关联图谱，支持 1-Hop/2-Hop 局部视野与目录色彩聚类（编辑区免失焦直接穿透） |
 | `Ctrl + Enter` | **保存归档闪念** | 在闪念微窗内一键原子追加写入 `Inbox/YYYY-MM-DD.md` 收集箱 |
-| `Esc` | **隐匿微窗 / 退出全屏** | 随时隐藏闪念胶囊、退出全屏或退出思维导图模式 |
+| `Esc` | **隐匿微窗 / 退出全屏 / 退出灯箱** | 随时隐藏闪念胶囊、退出全屏演示、退出灯箱或思维导图模式 |
 | `Ctrl + N` | **新建文件** | 打开保存对话框创建新 Markdown 文件并进入编辑 |
 | `Ctrl + S` | **保存文件** | 保存当前文档修改（未保存时顶部与底部指示灯高亮） |
 | `Ctrl + Shift + S` | **另存为** | 将当前编辑内容另存为新路径 |
@@ -447,20 +491,20 @@
 
 ## 📦 安装程序与便携版下载 (Downloads & Release Assets)
 
-本项目为 Windows 64 位系统深度优化，提供图形化安装程序、标准 MSI 安装包与免安装便携版，最新 `v2.0.1` 资产已发布：
+本项目为 Windows 64 位系统深度优化，提供图形化安装程序、标准 MSI 安装包与免安装便携版，最新 `v2.1.0` 资产已发布：
 
-> 🌐 **GitHub 官方发布主页**：[GitHub Releases · v2.0.1](https://github.com/chunxvzhang-lab/KnowSpace/releases/tag/v2.0.1)
+> 🌐 **GitHub 官方发布主页**：[GitHub Releases · v2.1.0](https://github.com/chunxvzhang-lab/KnowSpace/releases/tag/v2.1.0)
 
 ### 1. Windows 图形化安装程序（推荐）
-- **安装文件**：[`KnowSpace-Setup-2.0.1.exe`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.0.1/KnowSpace-Setup-2.0.1.exe)
+- **安装文件**：[`KnowSpace-Setup-2.1.0.exe`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.1.0/KnowSpace-Setup-2.1.0.exe)
 - **特点**：双击即可向导式安装，支持自定义安装目录，自动创建桌面快捷方式与开始菜单官方品牌图标，深度集成系统级 `.md` 与 `.canvas` 文件关联，内置标准卸载程序。
 
 ### 2. Windows MSI 标准安装包
-- **安装文件**：[`KnowSpace-2.0.1.msi`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.0.1/KnowSpace-2.0.1.msi)
+- **安装文件**：[`KnowSpace-2.1.0.msi`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.1.0/KnowSpace-2.1.0.msi)
 - **特点**：Windows Installer 官方格式，适合企业批量部署、组策略分发与企业级静默安装，支持标准控制面板卸载。
 
 ### 3. Windows 绿色免安装便携版
-- **便携文件**：[`KnowSpace-win-x64-portable.zip`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.0.1/KnowSpace-win-x64-portable.zip)
+- **便携文件**：[`KnowSpace-win-x64-portable.zip`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.1.0/KnowSpace-win-x64-portable.zip)
 - **直接运行**：解压后双击 `KnowSpace.exe` 即可直接使用完整功能。
 - **特点**：解压即用、随身携带（支持装入 U 盘或移动硬盘）；完全自包含 Electron 运行时与全套本地依赖，无需配置任何外部开发环境；支持右键「打开方式」关联 Markdown 与白板文档。
 
@@ -491,7 +535,10 @@
   - *Cooperative Idle-Sliced Background Indexer*: Eliminates UI freezing when opening large directories or switching files. Active document renders immediately (<50ms), while full-vault indexing is deferred and chunked in the background with cooperative 20ms yields. Zero dropped frames!
   - *Batch IPC File Content Reader (`readMarkdownBatch`)*: High-throughput parallel reads in Node.js worker threads bypass redundant sequential IPC calls, delivering >10× faster disk reads.
   - *32MB Expanded LRU Cache (256 Docs)*: Common workspace documents remain resident in memory; tab switching requires zero disk I/O.
-- **🎨 Infinite Canvas 2.0 (JSON Canvas 1.0 Compatible · `Ctrl + Shift + C`)**:
+- **🎨 Infinite Canvas 2.1 (Multimodal Spatial Canvas · JSON Canvas 1.0 Compatible · `Ctrl + Shift + C`)**:
+  - *Multimodal Media Cards (v2.1.0 Upgrade)*: Instant clipboard screenshot paste (`Ctrl + V`) directly saves timestamped images into local `assets/` and mounts cards at the current viewport center; drag-and-drop media files (images, audio, video) from desktop; native audio/video playback controls in card; offscreen 1:1 SVG/PNG export fidelity.
+  - *AABB Obstacle Avoidance Routing (v2.1.0 Upgrade)*: Smart 5-segment orthogonal step line routing engine detects intervening card bounding boxes with +14px safety boundary, eliminating unsightly lines cutting through card text and dynamically attaching edge label badges to the midpoint.
+  - *F5 Cinematic Fullscreen Presentation Mode (`F5` · v2.1.0 Upgrade)*: Algorithmic DAG topological causality ordering (`buildPresentationSequence`) focuses on upstream sources before downstream cards; cinematic smooth camera transitions; active slide pulse glow illumination; background dimming overlay; full keyboard flow (`F5`, `Arrows`, `Space`, `PageUp/Down`, `Home/End`, `Esc`) and floating auto-play controller.
   - *Open Standard Compatibility*: Full support for JSON Canvas 1.0 (`.canvas`), seamlessly interoperable with Obsidian Canvas and third-party spatial tools.
   - *Ring Layout & True Circular Arcs*: One-click circular alignment of multiple cards with true inward circular arc connectors and real-time interactive radius slider.
   - *Rectangular Grid Layout*: Neatly arrange cards into rectangular matrices with envelope connector styling and real-time interactive gap adjustment.
@@ -567,6 +614,9 @@
   - *File Association*: Instant launch on double-clicking any `.md` file in Windows Explorer.
   - *Atomic File Saving & Encoding Fidelity*: Temp file atomic rename with fsync, preserving UTF-8 BOM and CRLF/LF line breaks.
   - *Conflict Detection*: Automatic alert when files are modified externally.
+- **🧪 Sub-function Ecosystem & 100% Test Coverage**:
+  - *Full Spectrum Granular Sub-functions*: Zoomable Media Lightbox (0.2×~6×, smooth pan, download, Esc), Typography Status Bar (word/char count, reading time estimation, dirty state, readonly lock), Backlinks & Unlinked Mentions with 1-click upgrade to `[[wikilinks]]`, External File Conflict Arbitrator (`FileConflictDialog`), Unsaved Changes Protector (`UnsavedChangesDialog`), Dynamic TOC & Cross-Chapter Bookmark Resolver, Space Flash Note Directory Isolation, Web Snapshot FIFO Pruning (30-cap), and Mermaid Base64 entity-safe SVG rendering with graceful error fallbacks.
+  - *Rock-Solid Reliability*: 42 test suites, **347** automated unit and integration tests passing with a 100% success rate!
 
 ---
 

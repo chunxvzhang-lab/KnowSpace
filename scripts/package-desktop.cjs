@@ -11,12 +11,19 @@ const portableZip = path.join(releaseRoot, "KnowSpace-win-x64-portable.zip");
 const execPromise = promisify(exec);
 const execFileAsync = promisify(execFile);
 
+if (process.platform === "win32") {
+  process.env.PATH = "C:\\Program Files\\nodejs;" + (process.env.PATH || "");
+}
+
 async function main() {
   console.log("1. Ensuring dist is built...");
   await assertExists(path.join(root, "dist", "index.html"), "dist is missing. Run npm run build first.");
 
   console.log("2. Building MSI installer, NSIS installer, and unpacked application via electron-builder...");
-  await execPromise("npx electron-builder --win msi nsis dir", { cwd: root });
+  const builderCmd = process.platform === "win32"
+    ? `"${path.join(root, "node_modules", ".bin", "electron-builder.cmd")}"`
+    : "npx electron-builder";
+  await execPromise(`${builderCmd} --win msi nsis dir`, { cwd: root });
 
   console.log("3. Copying unpacked binaries into release/KnowSpace-win-x64...");
   await fs.mkdir(releaseRoot, { recursive: true });

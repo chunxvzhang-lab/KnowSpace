@@ -51,6 +51,11 @@ import {
   computeBezierControlPoints,
   computeEdgeMidpoint,
   alignNodes,
+  getMediaFileType,
+  isMediaFile,
+  isImageFile,
+  pathIntersectsBox,
+  buildPresentationSequence,
 } from "../services/canvasService";
 import { getCanvasThemeColors } from "../services/canvasTheme";
 import type { CanvasData, CanvasTextNode, CanvasFileNode, CanvasGroupNode, CanvasEdge } from "../types/canvasTypes";
@@ -2077,7 +2082,140 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
     // Targets only emit no edges, so they must NOT be flagged as hubs
     expect(svg).not.toContain("🌱 发起源 · 1");
   });
+
+  describe("Multimodal Media & Spatial Intelligence", () => {
+    it("correctly identifies media file types by extension and data URLs", () => {
+      expect(getMediaFileType("photo.PNG")).toBe("image");
+      expect(getMediaFileType("graphic.svg")).toBe("image");
+      expect(getMediaFileType("data:image/webp;base64,AAA")).toBe("image");
+      expect(getMediaFileType("audio.mp3")).toBe("audio");
+      expect(getMediaFileType("podcast.wav")).toBe("audio");
+      expect(getMediaFileType("recording.flac")).toBe("audio");
+      expect(getMediaFileType("clip.mp4")).toBe("video");
+      expect(getMediaFileType("movie.webm")).toBe("video");
+      expect(getMediaFileType("document.pdf")).toBe("pdf");
+      expect(getMediaFileType("notes.md")).toBe("markdown");
+      expect(getMediaFileType("board.canvas")).toBe("markdown");
+      expect(getMediaFileType("archive.zip")).toBe("other");
+
+      expect(isMediaFile("pic.jpg")).toBe(true);
+      expect(isMediaFile("song.ogg")).toBe(true);
+      expect(isMediaFile("doc.pdf")).toBe(true);
+      expect(isMediaFile("read.md")).toBe(false);
+
+      expect(isImageFile("pic.jpg")).toBe(true);
+      expect(isImageFile("clip.mp4")).toBe(false);
+    });
+
+    it("detects path intersection with bounding box (AABB)", () => {
+      const box = { minX: 100, minY: 100, maxX: 200, maxY: 200 };
+      // Horizontal segment piercing through the box
+      expect(
+        pathIntersectsBox(
+          [
+            { x: 50, y: 150 },
+            { x: 250, y: 150 },
+          ],
+          box
+        )
+      ).toBe(true);
+
+      // Horizontal segment passing clearly above the box
+      expect(
+        pathIntersectsBox(
+          [
+            { x: 50, y: 50 },
+            { x: 250, y: 50 },
+          ],
+          box
+        )
+      ).toBe(false);
+
+      // Vertical segment piercing through the box
+      expect(
+        pathIntersectsBox(
+          [
+            { x: 150, y: 50 },
+            { x: 150, y: 250 },
+          ],
+          box
+        )
+      ).toBe(true);
+
+      // Vertical segment passing clearly to the right of the box
+      expect(
+        pathIntersectsBox(
+          [
+            { x: 250, y: 50 },
+            { x: 250, y: 250 },
+          ],
+          box
+        )
+      ).toBe(false);
+    });
+
+    it("intelligently routes orthogonal step edges around intervening obstacle cards", () => {
+      const p1 = { x: 50, y: 150 };
+      const p2 = { x: 450, y: 150 };
+      // Default direct step line path without obstacles
+      const directPath = computeEdgePath(p1, "right", p2, "left", "step");
+      expect(directPath).toBe("M 50 150 L 250 150 L 250 150 L 450 150");
+
+      // Place an obstacle card directly in the middle (x: 200, y: 100, width: 100, height: 100)
+      const obstacle = { id: "obs-1", x: 200, y: 100, width: 100, height: 100 };
+      const bypassedPath = computeEdgePath(p1, "right", p2, "left", "step", 0, undefined, [obstacle]);
+
+      // The line must detour around the obstacle: it generates 5 orthogonal L segments (6 parts when split)
+      expect(bypassedPath).not.toEqual(directPath);
+      expect(bypassedPath.split("L")).toHaveLength(6);
+
+      // computeEdgeMidpoint also avoids the obstacle and returns midpoint along detour
+      const directMid = computeEdgeMidpoint(p1, "right", p2, "left", "step");
+      const bypassedMid = computeEdgeMidpoint(p1, "right", p2, "left", "step", 0, undefined, [obstacle]);
+      expect(bypassedMid.y).not.toEqual(directMid.y);
+    });
+
+    it("builds a presentation sequence ordered by topological links and spatial coordinates", () => {
+      const nodeA: CanvasTextNode = { id: "node-a", type: "text", text: "Introduction", x: 100, y: 100, width: 200, height: 100 };
+      const nodeB: CanvasTextNode = { id: "node-b", type: "text", text: "Deep Dive", x: 400, y: 100, width: 200, height: 100 };
+      const nodeC: CanvasTextNode = { id: "node-c", type: "text", text: "Conclusion", x: 700, y: 100, width: 200, height: 100 };
+      const group: CanvasGroupNode = { id: "grp-1", type: "group", label: "Overview Container", x: 50, y: 50, width: 900, height: 300 };
+
+      // Directed edges: A -> B -> C
+      const edge1: CanvasEdge = { id: "e1", fromNode: "node-a", toNode: "node-b" };
+      const edge2: CanvasEdge = { id: "e2", fromNode: "node-b", toNode: "node-c" };
+
+      const canvasData: CanvasData = {
+        nodes: [nodeB, group, nodeC, nodeA], // Unordered input with group
+        edges: [edge1, edge2],
+      };
+
+      const sequence = buildPresentationSequence(canvasData);
+      // Groups are skipped so presentation focuses strictly on content cards
+      expect(sequence).not.toContain("grp-1");
+      // Topological order: node-a -> node-b -> node-c
+      expect(sequence).toEqual(["node-a", "node-b", "node-c"]);
+    });
+
+    it("exports image cards with img tags and media badges in SVG export", () => {
+      const imgNode: CanvasFileNode = {
+        id: "img-1",
+        type: "file",
+        file: "assets/diagram.png",
+        x: 100,
+        y: 100,
+        width: 320,
+        height: 240,
+      };
+
+      const svg = exportCanvasToSvg({ nodes: [imgNode], edges: [] }, { theme: "light" });
+      expect(svg).toContain("<img");
+      expect(svg).toContain('src="assets/diagram.png"');
+      expect(svg).toContain("🖼️ diagram.png");
+    });
+  });
 });
+
 
 
 

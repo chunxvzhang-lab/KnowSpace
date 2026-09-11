@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-v2.0.0-1D9BF0?style=flat-square" alt="Version 2.0.0" />
+  <img src="https://img.shields.io/badge/Version-v2.1.0-1D9BF0?style=flat-square" alt="Version 2.1.0" />
   <img src="https://img.shields.io/badge/Platform-Windows%20x64-blue?style=flat-square" alt="Platform" />
   <img src="https://img.shields.io/badge/Team-%E6%91%B8%E9%B1%BCLab-orange?style=flat-square" alt="摸鱼Lab" />
   <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License" />

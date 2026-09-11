@@ -96,3 +96,13 @@ export interface CanvasHistoryState {
   present: CanvasData;
   future: CanvasData[];
 }
+
+export type MediaFileType = "image" | "audio" | "video" | "pdf" | "markdown" | "other";
+
+export interface CanvasObstacle {
+  id?: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
