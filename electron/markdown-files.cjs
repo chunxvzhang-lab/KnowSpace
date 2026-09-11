@@ -30,8 +30,8 @@ const directoryScanBatchSize = 16;
 const MAX_DIRECTORY_SCAN_FILES = 3000;
 const MAX_DIRECTORY_SCAN_DEPTH = 6;
 const markdownSourceCache = new Map();
-const maxCachedSourceBytes = 4 * 1024 * 1024;
-const maxCachedSources = 8;
+const maxCachedSourceBytes = 32 * 1024 * 1024;
+const maxCachedSources = 256;
 const chapterCollator = new Intl.Collator("zh-Hans-CN", { numeric: true });
 
 // Set of registered allowed paths (directories and files)
@@ -195,6 +195,31 @@ async function readMarkdownSource(absolutePath) {
   return source;
 }
 
+async function readMarkdownSourcesBatch(absolutePaths) {
+  if (!Array.isArray(absolutePaths) || absolutePaths.length === 0) {
+    return [];
+  }
+  const results = await Promise.all(
+    absolutePaths.map(async (p) => {
+      try {
+        if (!isValidMarkdownPath(p)) return null;
+        const source = await readMarkdownSource(p);
+        return {
+          absolutePath: p,
+          markdown: source.markdown,
+          baseUrl: source.baseUrl,
+          hasBom: source.hasBom,
+          lineEnding: source.lineEnding,
+          diskVersion: source.diskVersion,
+        };
+      } catch {
+        return null;
+      }
+    })
+  );
+  return results.filter(Boolean);
+}
+
 function invalidateSourceCache(absolutePath) {
   const resolvedPath = path.resolve(absolutePath);
   for (const key of Array.from(markdownSourceCache.keys())) {
@@ -333,6 +358,7 @@ module.exports = {
   collectMarkdownFiles,
   buildDirectoryManifest,
   readMarkdownSource,
+  readMarkdownSourcesBatch,
   saveMarkdownFile,
   atomicWriteFile,
   invalidateSourceCache,

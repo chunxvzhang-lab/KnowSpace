@@ -1,6 +1,5 @@
 # 🪐 KnowSpace 产品全景功能体系与演进规划说明书 (v2.0.0 ➔ v3.0.0)
 
-> **最新演进文档已全面升级至**：[`docs/knowspace-roadmap-v2.0-v3.0.md`](file:///c:/Users/chunxvzhang/Desktop/codex/docs/knowspace-roadmap-v2.0-v3.0.md)  
 > **项目名称**：KnowSpace · Personal Knowledge Workspace（现代化个人知识工作台）  
 > **产品核心使命**：*Write. Read. Connect. Know.（记录 · 阅读 · 连接 · 认知）*  
 > **当前基线版本**：`v2.0.0` (Production Verified & Published)  

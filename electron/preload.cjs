@@ -12,6 +12,7 @@ const desktopApi = {
   openDirectory: () => ipcRenderer.invoke("bookmd:open-directory"),
   refreshDirectory: (rootPath) => ipcRenderer.invoke("bookmd:refresh-directory", rootPath),
   readMarkdownFile: (absolutePath) => ipcRenderer.invoke("bookmd:read-markdown-file", absolutePath),
+  readMarkdownBatch: (paths) => ipcRenderer.invoke("bookmd:read-markdown-batch", paths),
   getDirectoryForFile: (absolutePath) => ipcRenderer.invoke("bookmd:get-directory-for-file", absolutePath),
   saveMarkdownFile: (request) => ipcRenderer.invoke("bookmd:save-markdown-file", request),
   createMarkdownFile: (options) => ipcRenderer.invoke("bookmd:create-markdown-file", options),

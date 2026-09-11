@@ -6,6 +6,7 @@ const {
   markdownExtensions,
   buildDirectoryManifest,
   readMarkdownSource,
+  readMarkdownSourcesBatch,
   saveMarkdownFile,
   registerPath,
   isValidMarkdownPath,
@@ -15,6 +16,15 @@ const {
   listSnapshots,
   readSnapshot,
 } = require("./snapshots.cjs");
+
+// Hardware acceleration and performance optimization switches
+app.commandLine.appendSwitch("enable-gpu-rasterization");
+app.commandLine.appendSwitch("enable-zero-copy");
+app.commandLine.appendSwitch("ignore-gpu-blocklist");
+app.commandLine.appendSwitch("high-dpi-support", "1");
+app.commandLine.appendSwitch("enable-smooth-scrolling");
+// Limit V8 heap growth to prevent memory hoarding, keeping memory lean
+app.commandLine.appendSwitch("js-flags", "--max-old-space-size=512");
 
 const devServerUrl = process.env.BOOKMD_DEV_SERVER_URL;
 const isLaunchHidden = process.argv.includes("--hidden");
@@ -558,6 +568,7 @@ async function createWindow(initialFilePath = null) {
       nodeIntegration: false,
       sandbox: false,
       spellcheck: false,
+      backgroundThrottling: true,
     },
   });
 
@@ -979,6 +990,10 @@ ipcMain.handle("bookmd:refresh-directory", async (_event, rootPath) => {
 
 ipcMain.handle("bookmd:read-markdown-file", async (_event, absolutePath) => {
   return await readMarkdownSource(absolutePath);
+});
+
+ipcMain.handle("bookmd:read-markdown-batch", async (_event, paths) => {
+  return await readMarkdownSourcesBatch(paths);
 });
 
 ipcMain.handle("bookmd:open-external", async (_event, url) => {

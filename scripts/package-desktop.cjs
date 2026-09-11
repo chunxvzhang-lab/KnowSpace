@@ -105,6 +105,12 @@ async function main() {
     await fs.copyFile(path.join(root, "docs", "PROMOTIONAL_WEBSITE_PLAN.md"), path.join(docsDir, "PROMOTIONAL_WEBSITE_PLAN.md"));
   } catch (e) {}
   try {
+    await fs.copyFile(path.join(root, "docs", "knowspace-roadmap-v2.0-v3.0.md"), path.join(docsDir, "knowspace-roadmap-v2.0-v3.0.md"));
+  } catch (e) {}
+  try {
+    await fs.copyFile(path.join(root, "docs", "knowspace-roadmap-v1.9-v2.5.md"), path.join(docsDir, "knowspace-roadmap-v1.9-v2.5.md"));
+  } catch (e) {}
+  try {
     await copyDirectory(path.join(root, "docs", "manual-images"), path.join(docsDir, "manual-images"));
   } catch (e) {}
   try {

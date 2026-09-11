@@ -86,6 +86,7 @@ import {
   getOptimalAnchorSides,
   getStepBendHandleInfo,
   getSourceNodeEdgeColor,
+  getEffectiveEdgeColorKey,
   computeSourceDisplayColorMap,
   expandLoopEdgeSelection,
   syncLoopEdgeGeometry,
@@ -433,8 +434,8 @@ export const CanvasView = memo(function CanvasView({
     targetEdgeId?: string;
   } | null>(null);
   const contextMenuRef = useRef<HTMLDivElement | null>(null);
-  /** Pending "close the menu after a colour pick" timer. */
-  const colorMenuCloseTimerRef = useRef<number | null>(null);
+  /** Pending debounce timer for committing colour pick history. */
+  const colorCommitTimerRef = useRef<number | null>(null);
   /**
    * Board state captured the moment a colour drag began. Dragging inside the
    * native chooser only previews against this baseline; the history entry is
@@ -445,9 +446,9 @@ export const CanvasView = memo(function CanvasView({
   // Never leave a timer behind that would touch state after unmount.
   useEffect(
     () => () => {
-      if (colorMenuCloseTimerRef.current !== null) {
-        window.clearTimeout(colorMenuCloseTimerRef.current);
-        colorMenuCloseTimerRef.current = null;
+      if (colorCommitTimerRef.current !== null) {
+        window.clearTimeout(colorCommitTimerRef.current);
+        colorCommitTimerRef.current = null;
       }
     },
     []
@@ -677,6 +678,21 @@ export const CanvasView = memo(function CanvasView({
     startW: number;
     startH: number;
   } | null>(null);
+  // High-frequency event rAF throttling & batching refs to achieve native high refresh rates (120Hz/144Hz+) with minimal CPU load
+  const rafPanIdRef = useRef<number | null>(null);
+  const latestPanPosRef = useRef<{ dx: number; dy: number } | null>(null);
+  const rafWheelIdRef = useRef<number | null>(null);
+  const wheelAccumulatorRef = useRef<{
+    deltaX: number;
+    deltaY: number;
+    zoomEvents: Array<{ factor: number; clientX: number; clientY: number }>;
+  }>({ deltaX: 0, deltaY: 0, zoomEvents: [] });
+  const rafBoxSelectIdRef = useRef<number | null>(null);
+  const latestBoxSelectPosRef = useRef<{ clientX: number; clientY: number; isModifier: boolean } | null>(null);
+  const rafConnectIdRef = useRef<number | null>(null);
+  const latestConnectPosRef = useRef<{ clientX: number; clientY: number } | null>(null);
+  const rafStepBendIdRef = useRef<number | null>(null);
+  const latestStepBendPosRef = useRef<{ edgeId: string; newOffset: number } | null>(null);
   // Track freshly created group IDs: these groups should NOT auto-scoop
   // existing cards on their first drag (user must deliberately move cards in)
   const freshGroupIdsRef = useRef<Set<string>>(new Set());
@@ -742,11 +758,7 @@ export const CanvasView = memo(function CanvasView({
 
   /**
    * Writes ONE history entry for a whole colour-drag gesture, from the
-   * baseline captured when it began. Unmounting the menu from the picker's
-   * onChange destroys the <input type="color"> while Chromium is still
-   * dismissing the native dialog, which is what used to crash the renderer
-   * (闪退) — so the menu is only closed from closeMenuAfterColorPick, well
-   * after the dialog has gone.
+   * baseline captured when it began.
    */
   const commitColorPick = useCallback(() => {
     const before = colorPickStartRef.current;
@@ -759,18 +771,21 @@ export const CanvasView = memo(function CanvasView({
     emitChange(latestDataRef.current);
   }, [emitChange]);
 
-  const closeMenuAfterColorPick = useCallback(() => {
-    // A real debounce, not a one-shot: while the user drags inside the chooser
-    // onChange fires repeatedly, and each call pushes the close further out.
-    // The menu therefore only disappears once they have actually stopped, by
-    // which point the dialog is on its way out.
-    if (colorMenuCloseTimerRef.current !== null) {
-      window.clearTimeout(colorMenuCloseTimerRef.current);
+  const debounceCommitColorPick = useCallback(() => {
+    // A real debounce for history commit: while the user drags inside the chooser,
+    // onChange fires repeatedly, and each call pushes the commit further out.
+    // The history entry is therefore written exactly once, from the baseline
+    // captured at drag start.
+    //
+    // The context menu stays open on purpose so the user can freely compare and
+    // continue operations without any unexpected auto-dismiss. Only the history
+    // snapshot persistence is delayed by 500ms after the interaction settles.
+    if (colorCommitTimerRef.current !== null) {
+      window.clearTimeout(colorCommitTimerRef.current);
     }
-    colorMenuCloseTimerRef.current = window.setTimeout(() => {
-      colorMenuCloseTimerRef.current = null;
+    colorCommitTimerRef.current = window.setTimeout(() => {
+      colorCommitTimerRef.current = null;
       commitColorPick();
-      setContextMenu(null);
     }, 500);
   }, [commitColorPick]);
 
@@ -814,6 +829,25 @@ export const CanvasView = memo(function CanvasView({
       });
     },
     [editable, selectedEdgeIds, captureColorSnapshot]
+  );
+
+  const previewEdgeColor = useCallback(
+    (edgeId: string, color: string) => {
+      if (!editable) return;
+      captureColorSnapshot();
+      setData((prev) => {
+        const affected = expandLoopEdgeSelection(prev.edges, [edgeId]);
+        const next = {
+          ...prev,
+          edges: prev.edges.map((e) =>
+            affected.has(e.id) ? { ...e, color: color || undefined } : e
+          ),
+        };
+        latestDataRef.current = next;
+        return next;
+      });
+    },
+    [editable, captureColorSnapshot]
   );
 
   const previewNodeColor = useCallback(
@@ -941,23 +975,58 @@ export const CanvasView = memo(function CanvasView({
     });
   }, [data.nodes]);
 
-  // Mouse wheel zoom
+  // Mouse wheel zoom and pan with requestAnimationFrame batching
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
       e.preventDefault();
       if (e.ctrlKey || e.metaKey) {
         const delta = e.deltaY < 0 ? 1.15 : 0.85;
-        handleZoom(delta, e.clientX, e.clientY);
+        wheelAccumulatorRef.current.zoomEvents.push({
+          factor: delta,
+          clientX: e.clientX,
+          clientY: e.clientY,
+        });
       } else {
-        // Pan with normal wheel
-        setViewport((prev) => ({
-          ...prev,
-          panX: prev.panX - e.deltaX,
-          panY: prev.panY - e.deltaY,
-        }));
+        wheelAccumulatorRef.current.deltaX += e.deltaX;
+        wheelAccumulatorRef.current.deltaY += e.deltaY;
+      }
+
+      if (!rafWheelIdRef.current) {
+        rafWheelIdRef.current = requestAnimationFrame(() => {
+          rafWheelIdRef.current = null;
+          const { deltaX, deltaY, zoomEvents } = wheelAccumulatorRef.current;
+          wheelAccumulatorRef.current = { deltaX: 0, deltaY: 0, zoomEvents: [] };
+
+          if (deltaX !== 0 || deltaY !== 0 || zoomEvents.length > 0) {
+            setViewport((prev) => {
+              let nextPanX = prev.panX - deltaX;
+              let nextPanY = prev.panY - deltaY;
+              let nextZoom = prev.zoom;
+
+              if (containerRef.current && zoomEvents.length > 0) {
+                const rect = containerRef.current.getBoundingClientRect();
+                for (const zEvent of zoomEvents) {
+                  const targetZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, nextZoom * zEvent.factor));
+                  const cursorX = zEvent.clientX - rect.left;
+                  const cursorY = zEvent.clientY - rect.top;
+                  const factor = targetZoom / nextZoom;
+                  nextPanX = cursorX - (cursorX - nextPanX) * factor;
+                  nextPanY = cursorY - (cursorY - nextPanY) * factor;
+                  nextZoom = targetZoom;
+                }
+              }
+
+              return {
+                panX: nextPanX,
+                panY: nextPanY,
+                zoom: nextZoom,
+              };
+            });
+          }
+        });
       }
     },
-    [handleZoom]
+    []
   );
 
   // Marquee box selection starter
@@ -1749,7 +1818,13 @@ export const CanvasView = memo(function CanvasView({
       const sourceNode = currentData.nodes.find((n) => n.id === sourceNodeId);
       if (!sourceNode) return;
 
-      const { newNodes, newEdges } = spawnMultipleBranches(sourceNode, count, direction);
+      const { newNodes, newEdges } = spawnMultipleBranches(
+        sourceNode,
+        count,
+        direction,
+        currentData.edges,
+        currentData.nodes
+      );
       pushHistory({
         ...currentData,
         nodes: [...currentData.nodes, ...newNodes],
@@ -1776,7 +1851,14 @@ export const CanvasView = memo(function CanvasView({
       const currentData = latestDataRef.current;
       const sourceNode = currentData.nodes.find((n) => n.id === sourceNodeId);
       if (!sourceNode) return;
-      const { newNode, newEdge } = spawnConnectedCard(sourceNode, direction);
+      const { newNode, newEdge } = spawnConnectedCard(
+        sourceNode,
+        direction,
+        undefined,
+        undefined,
+        currentData.edges,
+        currentData.nodes
+      );
       pushHistory({
         ...currentData,
         nodes: [...currentData.nodes, newNode],
@@ -2442,7 +2524,7 @@ export const CanvasView = memo(function CanvasView({
     );
 
     if (!exists) {
-      const edgeColor = getSourceNodeEdgeColor(fromNode, currentData.edges, currentData.nodes);
+      const edgeColor = getSourceNodeEdgeColor(fromNode, currentData.edges, currentData.nodes, targetNode);
       const newEdge: CanvasEdge = {
         id: `edge-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         fromNode: fromNode.id,
@@ -2488,7 +2570,7 @@ export const CanvasView = memo(function CanvasView({
       );
 
       if (!exists) {
-        const edgeColor = getSourceNodeEdgeColor(fromNode, currentData.edges, currentData.nodes);
+        const edgeColor = getSourceNodeEdgeColor(fromNode, currentData.edges, currentData.nodes, targetNode);
         const newEdge: CanvasEdge = {
           id: `edge-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
           fromNode: fromNode.id,
@@ -2541,18 +2623,26 @@ export const CanvasView = memo(function CanvasView({
   // Global mouse move and up listeners
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      // Dragging step bend handle
+      // Dragging step bend handle (rAF throttled)
       if (stepBendDragRef.current) {
         const { edgeId, startX, startY, initialOffset, orientation } = stepBendDragRef.current;
         const zoom = viewportRef.current.zoom;
         const delta = orientation === "horizontal" ? (e.clientX - startX) / zoom : (e.clientY - startY) / zoom;
         const newOffset = Math.round(initialOffset + delta);
-        setData((prev) => ({
-          ...prev,
-          edges: prev.edges.map((edge) =>
-            edge.id === edgeId ? { ...edge, stepOffset: newOffset } : edge
-          ),
-        }));
+        latestStepBendPosRef.current = { edgeId, newOffset };
+        if (!rafStepBendIdRef.current) {
+          rafStepBendIdRef.current = requestAnimationFrame(() => {
+            rafStepBendIdRef.current = null;
+            const bend = latestStepBendPosRef.current;
+            if (!bend || !stepBendDragRef.current) return;
+            setData((prev) => ({
+              ...prev,
+              edges: prev.edges.map((edge) =>
+                edge.id === bend.edgeId ? { ...edge, stepOffset: bend.newOffset } : edge
+              ),
+            }));
+          });
+        }
         return;
       }
 
@@ -2603,7 +2693,7 @@ export const CanvasView = memo(function CanvasView({
         return;
       }
 
-      // 0. Marquee Box Selection
+      // 0. Marquee Box Selection (rAF throttled to monitor refresh rate)
       if (selectionBoxRef.current && containerRef.current) {
         const rect = containerRef.current.getBoundingClientRect();
         const currentZoom = viewportRef.current.zoom;
@@ -2611,63 +2701,83 @@ export const CanvasView = memo(function CanvasView({
         const currentPanY = viewportRef.current.panY;
         const mouseCanvasX = (e.clientX - rect.left - currentPanX) / currentZoom;
         const mouseCanvasY = (e.clientY - rect.top - currentPanY) / currentZoom;
+        const isModifier = e.shiftKey || e.ctrlKey || e.metaKey;
         const updated = {
           ...selectionBoxRef.current,
           currentX: mouseCanvasX,
           currentY: mouseCanvasY,
         };
         selectionBoxRef.current = updated;
-        setSelectionBox(updated);
+        latestBoxSelectPosRef.current = {
+          clientX: e.clientX,
+          clientY: e.clientY,
+          isModifier,
+        };
+        if (!rafBoxSelectIdRef.current) {
+          rafBoxSelectIdRef.current = requestAnimationFrame(() => {
+            rafBoxSelectIdRef.current = null;
+            if (!selectionBoxRef.current || !containerRef.current) return;
+            const currentBox = selectionBoxRef.current;
+            setSelectionBox(currentBox);
 
-        // Real-time selection calculation for live visual feedback
-        const minX = Math.min(updated.startX, updated.currentX);
-        const maxX = Math.max(updated.startX, updated.currentX);
-        const minY = Math.min(updated.startY, updated.currentY);
-        const maxY = Math.max(updated.startY, updated.currentY);
-        const isModifier = e.shiftKey || e.ctrlKey || e.metaKey;
+            // Real-time selection calculation for live visual feedback
+            const minX = Math.min(currentBox.startX, currentBox.currentX);
+            const maxX = Math.max(currentBox.startX, currentBox.currentX);
+            const minY = Math.min(currentBox.startY, currentBox.currentY);
+            const maxY = Math.max(currentBox.startY, currentBox.currentY);
 
-        if (maxX - minX > 4 || maxY - minY > 4) {
-          const hitIds = computeBoxSelectionHits(
-            minX,
-            maxX,
-            minY,
-            maxY,
-            latestDataRef.current.nodes
-          );
-          setSelectedNodeIds(
-            isModifier ? new Set([...baseSelectionBeforeBoxRef.current, ...hitIds]) : hitIds
-          );
-          const currentNodesMap = new Map(latestDataRef.current.nodes.map((n) => [n.id, n]));
-          const hitEdgeIds = computeBoxSelectionEdgeHits(
-            minX,
-            maxX,
-            minY,
-            maxY,
-            latestDataRef.current.edges,
-            currentNodesMap
-          );
-          setSelectedEdgeIds(
-            isModifier ? new Set([...baseEdgeSelectionBeforeBoxRef.current, ...hitEdgeIds]) : hitEdgeIds
-          );
-        } else {
-          setSelectedNodeIds(baseSelectionBeforeBoxRef.current);
-          setSelectedEdgeIds(baseEdgeSelectionBeforeBoxRef.current);
+            if (maxX - minX > 4 || maxY - minY > 4) {
+              const hitIds = computeBoxSelectionHits(
+                minX,
+                maxX,
+                minY,
+                maxY,
+                latestDataRef.current.nodes
+              );
+              setSelectedNodeIds(
+                isModifier ? new Set([...baseSelectionBeforeBoxRef.current, ...hitIds]) : hitIds
+              );
+              const currentNodesMap = new Map(latestDataRef.current.nodes.map((n) => [n.id, n]));
+              const hitEdgeIds = computeBoxSelectionEdgeHits(
+                minX,
+                maxX,
+                minY,
+                maxY,
+                latestDataRef.current.edges,
+                currentNodesMap
+              );
+              setSelectedEdgeIds(
+                isModifier ? new Set([...baseEdgeSelectionBeforeBoxRef.current, ...hitEdgeIds]) : hitEdgeIds
+              );
+            } else {
+              setSelectedNodeIds(baseSelectionBeforeBoxRef.current);
+              setSelectedEdgeIds(baseEdgeSelectionBeforeBoxRef.current);
+            }
+          });
         }
         return;
       }
 
-      // 1. Panning canvas
+      // 1. Panning canvas (rAF throttled to prevent 1000Hz mouse drag re-render storms)
       if (isDraggingCanvasRef.current) {
         const dx = e.clientX - canvasDragStartRef.current.x;
         const dy = e.clientY - canvasDragStartRef.current.y;
         if (Math.hypot(dx, dy) > 4) {
           canvasDragStartRef.current.hasMoved = true;
         }
-        setViewport((prev) => ({
-          ...prev,
-          panX: canvasDragStartRef.current.panX + dx,
-          panY: canvasDragStartRef.current.panY + dy,
-        }));
+        latestPanPosRef.current = { dx, dy };
+        if (!rafPanIdRef.current) {
+          rafPanIdRef.current = requestAnimationFrame(() => {
+            rafPanIdRef.current = null;
+            const pos = latestPanPosRef.current;
+            if (!pos || !isDraggingCanvasRef.current) return;
+            setViewport((prev) => ({
+              ...prev,
+              panX: canvasDragStartRef.current.panX + pos.dx,
+              panY: canvasDragStartRef.current.panY + pos.dy,
+            }));
+          });
+        }
         return;
       }
 
@@ -2844,17 +2954,25 @@ export const CanvasView = memo(function CanvasView({
         return;
       }
 
-      // 4. Connecting edge
+      // 4. Connecting edge (rAF throttled)
       if (connectingStateRef.current && containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        const currentZoom = viewportRef.current.zoom;
-        const currentPanX = viewportRef.current.panX;
-        const currentPanY = viewportRef.current.panY;
-        const mouseCanvasX = (e.clientX - rect.left - currentPanX) / currentZoom;
-        const mouseCanvasY = (e.clientY - rect.top - currentPanY) / currentZoom;
-        setConnectingState((prev) =>
-          prev ? { ...prev, currentX: mouseCanvasX, currentY: mouseCanvasY } : null
-        );
+        latestConnectPosRef.current = { clientX: e.clientX, clientY: e.clientY };
+        if (!rafConnectIdRef.current) {
+          rafConnectIdRef.current = requestAnimationFrame(() => {
+            rafConnectIdRef.current = null;
+            const pos = latestConnectPosRef.current;
+            if (!pos || !connectingStateRef.current || !containerRef.current) return;
+            const rect = containerRef.current.getBoundingClientRect();
+            const currentZoom = viewportRef.current.zoom;
+            const currentPanX = viewportRef.current.panX;
+            const currentPanY = viewportRef.current.panY;
+            const mouseCanvasX = (pos.clientX - rect.left - currentPanX) / currentZoom;
+            const mouseCanvasY = (pos.clientY - rect.top - currentPanY) / currentZoom;
+            setConnectingState((prev) =>
+              prev ? { ...prev, currentX: mouseCanvasX, currentY: mouseCanvasY } : null
+            );
+          });
+        }
       }
     };
 
@@ -2871,9 +2989,27 @@ export const CanvasView = memo(function CanvasView({
         cancelAnimationFrame(rafGroupDragIdRef.current);
         rafGroupDragIdRef.current = null;
       }
+      if (rafPanIdRef.current) {
+        cancelAnimationFrame(rafPanIdRef.current);
+        rafPanIdRef.current = null;
+      }
+      if (rafBoxSelectIdRef.current) {
+        cancelAnimationFrame(rafBoxSelectIdRef.current);
+        rafBoxSelectIdRef.current = null;
+      }
+      if (rafConnectIdRef.current) {
+        cancelAnimationFrame(rafConnectIdRef.current);
+        rafConnectIdRef.current = null;
+      }
+      if (rafStepBendIdRef.current) {
+        cancelAnimationFrame(rafStepBendIdRef.current);
+        rafStepBendIdRef.current = null;
+      }
       latestDragPosRef.current = null;
       latestResizePosRef.current = null;
       latestGroupDragPosRef.current = null;
+      latestBoxSelectPosRef.current = null;
+      latestConnectPosRef.current = null;
 
       // Complete a group drag from the hollow middle of a multi-selection.
       if (groupDragRef.current) {
@@ -2889,17 +3025,35 @@ export const CanvasView = memo(function CanvasView({
 
       // Complete step bend dragging
       if (stepBendDragRef.current) {
-        const { edgeId, initialOffset } = stepBendDragRef.current;
+        const { edgeId, startX, startY, initialOffset, orientation } = stepBendDragRef.current;
         stepBendDragRef.current = null;
-        const currentEdge = latestDataRef.current.edges.find((e) => e.id === edgeId);
-        if (currentEdge && (currentEdge.stepOffset || 0) !== initialOffset) {
-          pushHistory(latestDataRef.current);
+        const zoom = viewportRef.current.zoom;
+        const delta = orientation === "horizontal" ? (e.clientX - startX) / zoom : (e.clientY - startY) / zoom;
+        const newOffset = latestStepBendPosRef.current?.newOffset ?? Math.round(initialOffset + delta);
+        const nextEdges = latestDataRef.current.edges.map((edge) =>
+          edge.id === edgeId ? { ...edge, stepOffset: newOffset } : edge
+        );
+        const nextData = { ...latestDataRef.current, edges: nextEdges };
+        latestDataRef.current = nextData;
+        setData(nextData);
+        emitChange(nextData);
+        if (newOffset !== initialOffset) {
+          pushHistory(nextData);
         }
       }
+      latestStepBendPosRef.current = null;
 
       // Complete box selection
       if (selectionBoxRef.current) {
         const box = selectionBoxRef.current;
+        if (containerRef.current) {
+          const rect = containerRef.current.getBoundingClientRect();
+          const currentZoom = viewportRef.current.zoom;
+          const currentPanX = viewportRef.current.panX;
+          const currentPanY = viewportRef.current.panY;
+          box.currentX = (e.clientX - rect.left - currentPanX) / currentZoom;
+          box.currentY = (e.clientY - rect.top - currentPanY) / currentZoom;
+        }
         selectionBoxRef.current = null;
         setSelectionBox(null);
         const minX = Math.min(box.startX, box.currentX);
@@ -2937,12 +3091,21 @@ export const CanvasView = memo(function CanvasView({
       }
 
       if (isDraggingCanvasRef.current) {
+        if (latestPanPosRef.current) {
+          const pos = latestPanPosRef.current;
+          setViewport((prev) => ({
+            ...prev,
+            panX: canvasDragStartRef.current.panX + pos.dx,
+            panY: canvasDragStartRef.current.panY + pos.dy,
+          }));
+        }
         isDraggingCanvasRef.current = false;
         if (!canvasDragStartRef.current.hasMoved) {
           setSelectedNodeIds(new Set());
           setSelectedEdgeIds(new Set());
         }
       }
+      latestPanPosRef.current = null;
       if (nodeDragRef.current) {
         const dragInfo = nodeDragRef.current;
         const currentZoom = viewportRef.current.zoom;
@@ -3079,6 +3242,14 @@ export const CanvasView = memo(function CanvasView({
     return () => {
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
+      if (rafDragIdRef.current) cancelAnimationFrame(rafDragIdRef.current);
+      if (rafResizeIdRef.current) cancelAnimationFrame(rafResizeIdRef.current);
+      if (rafGroupDragIdRef.current) cancelAnimationFrame(rafGroupDragIdRef.current);
+      if (rafPanIdRef.current) cancelAnimationFrame(rafPanIdRef.current);
+      if (rafBoxSelectIdRef.current) cancelAnimationFrame(rafBoxSelectIdRef.current);
+      if (rafConnectIdRef.current) cancelAnimationFrame(rafConnectIdRef.current);
+      if (rafStepBendIdRef.current) cancelAnimationFrame(rafStepBendIdRef.current);
+      if (rafWheelIdRef.current) cancelAnimationFrame(rafWheelIdRef.current);
     };
   }, [pushHistory]);
 
@@ -3332,6 +3503,57 @@ export const CanvasView = memo(function CanvasView({
     }
     return "卡片";
   }, [currentMultiRootNode]);
+
+  // Viewport frustum bounds for culling off-screen elements with a generous 600px buffer
+  const viewportBounds = useMemo(() => {
+    const width = containerRef.current?.clientWidth || (typeof window !== "undefined" ? window.innerWidth : 1920);
+    const height = containerRef.current?.clientHeight || (typeof window !== "undefined" ? window.innerHeight : 1080);
+    const zoom = viewport.zoom;
+    const buffer = 600 / zoom;
+    return {
+      minX: -viewport.panX / zoom - buffer,
+      minY: -viewport.panY / zoom - buffer,
+      maxX: (width - viewport.panX) / zoom + buffer,
+      maxY: (height - viewport.panY) / zoom + buffer,
+    };
+  }, [viewport.panX, viewport.panY, viewport.zoom]);
+
+  const isNodeInViewport = useCallback(
+    (node: CanvasNode): boolean => {
+      if (selectedNodeIds.has(node.id)) return true;
+      if (editingNodeId === node.id) return true;
+      if (hoveredNodeId === node.id) return true;
+      if (connectingState && connectingState.fromNodeId === node.id) return true;
+      const nw = node.width || 300;
+      const nh = node.height || 200;
+      return !(
+        node.x + nw < viewportBounds.minX ||
+        node.x > viewportBounds.maxX ||
+        node.y + nh < viewportBounds.minY ||
+        node.y > viewportBounds.maxY
+      );
+    },
+    [selectedNodeIds, editingNodeId, hoveredNodeId, connectingState, viewportBounds]
+  );
+
+  const isEdgeInViewport = useCallback(
+    (edge: CanvasEdge, fromNode: CanvasNode, toNode: CanvasNode): boolean => {
+      if (selectedEdgeIds.has(edge.id)) return true;
+      if (selectedNodeIds.has(edge.fromNode) || selectedNodeIds.has(edge.toNode)) return true;
+      if (editingEdgeId === edge.id) return true;
+      const minX = Math.min(fromNode.x, toNode.x);
+      const maxX = Math.max(fromNode.x + (fromNode.width || 300), toNode.x + (toNode.width || 300));
+      const minY = Math.min(fromNode.y, toNode.y);
+      const maxY = Math.max(fromNode.y + (fromNode.height || 200), toNode.y + (toNode.height || 200));
+      return !(
+        maxX < viewportBounds.minX ||
+        minX > viewportBounds.maxX ||
+        maxY < viewportBounds.minY ||
+        minY > viewportBounds.maxY
+      );
+    },
+    [selectedEdgeIds, selectedNodeIds, editingEdgeId, viewportBounds]
+  );
 
   // Seed for the batch custom-colour picker: reuse a custom colour already set
   // on one of the selected cards, otherwise start from a neutral blue.
@@ -3937,7 +4159,7 @@ export const CanvasView = memo(function CanvasView({
         )}
       </div>
 
-      {/* 2. INFINITE CANVAS 2D TRANSFORM VIEWPORT */}
+      {/* 2. INFINITE CANVAS 2D TRANSFORM VIEWPORT (Hardware accelerated) */}
       <div
         className="canvas-world"
         style={{
@@ -3946,20 +4168,21 @@ export const CanvasView = memo(function CanvasView({
           left: 0,
           width: "100%",
           height: "100%",
-          transform: `translate(${viewport.panX}px, ${viewport.panY}px) scale(${viewport.zoom})`,
+          transform: `translate3d(${viewport.panX}px, ${viewport.panY}px, 0) scale(${viewport.zoom})`,
           transformOrigin: "0 0",
           backgroundImage: `radial-gradient(${colors.dotColor} 1.2px, transparent 1.2px)`,
           backgroundSize: "28px 28px",
+          backfaceVisibility: "hidden",
         }}
       >
-        {/* SVG EDGES LAYER */}
+        {/* SVG EDGES LAYER (Optimized backing store to release GPU/memory pressure) */}
         <svg
           style={{
             position: "absolute",
             top: 0,
             left: 0,
-            width: 100000,
-            height: 100000,
+            width: "100%",
+            height: "100%",
             overflow: "visible",
             pointerEvents: "none",
             zIndex: 5,
@@ -4029,6 +4252,7 @@ export const CanvasView = memo(function CanvasView({
             const fromNode = nodeMap.get(edge.fromNode);
             const toNode = nodeMap.get(edge.toNode);
             if (!fromNode || !toNode) return null;
+            if (!isEdgeInViewport(edge, fromNode, toNode)) return null;
 
             const optSides = getOptimalAnchorSides(fromNode, toNode);
             const fromSide = edge.fromSide || optSides.fromSide;
@@ -4046,8 +4270,12 @@ export const CanvasView = memo(function CanvasView({
             const originPoint = ringArc ? projectPointOntoRing(p1, ringArc) : p1;
 
             const isSelected = selectedEdgeIds.has(edge.id);
-            const effectiveColorKey =
-              (edge.fromNode && sourceDisplayColorMap.get(edge.fromNode)) || edge.color;
+            const effectiveColorKey = getEffectiveEdgeColorKey(
+              edge,
+              data.edges,
+              data.nodes,
+              sourceDisplayColorMap
+            );
             const edgeColor =
               effectiveColorKey && CANVAS_COLOR_PALETTES[effectiveColorKey]
                 ? CANVAS_COLOR_PALETTES[effectiveColorKey].stroke
@@ -4056,7 +4284,7 @@ export const CanvasView = memo(function CanvasView({
                 : colors.edgeColor;
 
             const getMarkerUrl = (col?: string, selected?: boolean) => {
-              if (selected) return "url(#canvas-arrow-selected)";
+              if (selected && !edge.color) return "url(#canvas-arrow-selected)";
               const activeCol = col || effectiveColorKey;
               if (!activeCol) return "url(#canvas-arrow-default)";
               if (CANVAS_COLOR_PALETTES[activeCol]) return `url(#canvas-arrow-${activeCol})`;
@@ -4120,7 +4348,7 @@ export const CanvasView = memo(function CanvasView({
                 <path
                   d={pathData}
                   fill="none"
-                  stroke={isSelected ? "#f59e0b" : edgeColor}
+                  stroke={isSelected && !edge.color ? "#f59e0b" : edgeColor}
                   strokeWidth={isSelected ? 2.5 : hoveredNodeId === edge.fromNode ? 2.8 : 2}
                   strokeDasharray={strokeDash}
                   markerStart={
@@ -4258,6 +4486,7 @@ export const CanvasView = memo(function CanvasView({
 
         {/* 3. MULTIMODAL CARDS LAYER */}
         {data.nodes.map((node) => {
+          if (!isNodeInViewport(node)) return null;
           const isSelected = selectedNodeIds.has(node.id);
           const isHovered = hoveredNodeId === node.id;
           const isEditing = editingNodeId === node.id;
@@ -4929,6 +5158,7 @@ export const CanvasView = memo(function CanvasView({
           const fromNode = nodeMap.get(edge.fromNode);
           const toNode = nodeMap.get(edge.toNode);
           if (!fromNode || !toNode) return null;
+          if (!isEdgeInViewport(edge, fromNode, toNode)) return null;
 
           const hasLabel = Boolean(edge.label && edge.label.trim().length > 0);
           const isEditing = editingEdgeId === edge.id;
@@ -4951,8 +5181,12 @@ export const CanvasView = memo(function CanvasView({
           );
 
           const isSelected = selectedEdgeIds.has(edge.id);
-          const effectiveColorKey =
-            (edge.fromNode && sourceDisplayColorMap.get(edge.fromNode)) || edge.color;
+          const effectiveColorKey = getEffectiveEdgeColorKey(
+            edge,
+            data.edges,
+            data.nodes,
+            sourceDisplayColorMap
+          );
           const edgeColor =
             effectiveColorKey && CANVAS_COLOR_PALETTES[effectiveColorKey]
               ? CANVAS_COLOR_PALETTES[effectiveColorKey].stroke
@@ -5983,7 +6217,7 @@ export const CanvasView = memo(function CanvasView({
                               // Live preview only; one history entry is
                               // written once the pick settles
                               previewBatchEdgeColor(e.target.value);
-                              closeMenuAfterColorPick();
+                              debounceCommitColorPick();
                             }}
                             style={{
                               position: "absolute",
@@ -6290,6 +6524,46 @@ export const CanvasView = memo(function CanvasView({
                           title={col.label}
                         />
                       ))}
+                      {/* Custom colour applied to the edge */}
+                      <label
+                        title="自定义连线色彩"
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          width: 18,
+                          height: 18,
+                          borderRadius: "50%",
+                          border: targetEdge.color?.startsWith("#")
+                            ? "2px solid #f59e0b"
+                            : "1px dashed rgba(128,128,128,0.5)",
+                          cursor: "pointer",
+                          overflow: "hidden",
+                          position: "relative",
+                        }}
+                      >
+                        <input
+                          type="color"
+                          aria-label="自定义连线色彩"
+                          defaultValue={
+                            targetEdge.color?.startsWith("#") ? targetEdge.color : "#3b82f6"
+                          }
+                          onChange={(e) => {
+                            // Live preview only; one history entry is
+                            // written once the pick settles
+                            previewEdgeColor(targetEdge.id, e.target.value);
+                            debounceCommitColorPick();
+                          }}
+                          style={{
+                            position: "absolute",
+                            opacity: 0,
+                            width: "100%",
+                            height: "100%",
+                            cursor: "pointer",
+                          }}
+                        />
+                        <span style={{ fontSize: 10 }}>🎨</span>
+                      </label>
                     </div>
                   </div>
 
@@ -6508,7 +6782,7 @@ export const CanvasView = memo(function CanvasView({
                                 // Live preview only; one history entry is
                                 // written once the pick settles
                                 previewNodeColor(targetNode.id, e.target.value);
-                                closeMenuAfterColorPick();
+                                debounceCommitColorPick();
                               }}
                               style={{ position: "absolute", opacity: 0, width: "100%", height: "100%", cursor: "pointer" }}
                             />
@@ -6783,7 +7057,7 @@ export const CanvasView = memo(function CanvasView({
                                 // Live preview only; one history entry is
                                 // written once the pick settles
                                 previewBatchNodeColor(e.target.value);
-                                closeMenuAfterColorPick();
+                                debounceCommitColorPick();
                               }}
                               style={{
                                 position: "absolute",
@@ -7005,7 +7279,7 @@ export const CanvasView = memo(function CanvasView({
                                     // Live preview only; one history entry is
                                     // written once the pick settles
                                     previewNodeColor(targetNode.id, e.target.value);
-                                    closeMenuAfterColorPick();
+                                    debounceCommitColorPick();
                                   }}
                                   style={{
                                     position: "absolute",

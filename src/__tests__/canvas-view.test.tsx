@@ -712,6 +712,47 @@ describe("CanvasView Component", () => {
     expect(lastSaved.edges[0].strokePattern).toBe("dashed");
   });
 
+  it("allows custom hex color on single edge context menu", () => {
+    vi.useFakeTimers();
+    const onSourceChange = vi.fn();
+    const edgeData: CanvasData = {
+      nodes: [
+        { id: "n1", type: "text", text: "A", x: 0, y: 0, width: 100, height: 100 },
+        { id: "n2", type: "text", text: "B", x: 200, y: 0, width: 100, height: 100 },
+      ],
+      edges: [
+        { id: "e1", fromNode: "n1", fromSide: "right", fromEnd: "none", toNode: "n2", toSide: "left", toEnd: "arrow" },
+      ],
+    };
+
+    render(
+      <CanvasView
+        title="连线自定义色彩测试"
+        source={JSON.stringify(edgeData)}
+        onSourceChange={onSourceChange}
+        editable={true}
+      />
+    );
+
+    const edgeGroup = document.querySelector("svg g[style*='pointer-events: all']")!;
+    expect(edgeGroup).toBeDefined();
+    fireEvent.contextMenu(edgeGroup);
+
+    const customColorInput = screen.getByLabelText("自定义连线色彩") as HTMLInputElement;
+    expect(customColorInput).toBeDefined();
+
+    fireEvent.change(customColorInput, { target: { value: "#10b981" } });
+
+    // Wait for the debounce commit (500ms)
+    vi.advanceTimersByTime(600);
+
+    expect(onSourceChange).toHaveBeenCalled();
+    const lastSaved = JSON.parse(onSourceChange.mock.calls[onSourceChange.mock.calls.length - 1][0]);
+    expect(lastSaved.edges[0].color).toBe("#10b981");
+
+    vi.useRealTimers();
+  });
+
   it("ensures overlapping groups do not stick together when dragged", () => {
     const multiGroupData: CanvasData = {
       nodes: [

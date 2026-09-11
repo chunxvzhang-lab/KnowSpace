@@ -88,6 +88,7 @@ export type KnowSpaceDesktopAPI = {
   openDirectory: () => Promise<DirectoryOpenResult>;
   refreshDirectory: (rootPath: string) => Promise<BookManifest & { rootPath: string }>;
   readMarkdownFile: (absolutePath: string) => Promise<ChapterSource>;
+  readMarkdownBatch?: (paths: string[]) => Promise<ChapterSource[]>;
   getDirectoryForFile: (absolutePath: string) => Promise<{
     directory: BookManifest & { rootPath: string };
     activeChapterId: string | null;

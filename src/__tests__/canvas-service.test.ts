@@ -10,6 +10,9 @@ import {
   getOptimalAnchorSides,
   getNextEdgeColorForSource,
   getSourceNodeEdgeColor,
+  getEffectiveEdgeColorKey,
+  isColorSimilar,
+  normalizeHexColor,
   exportCanvasToSvg,
   exportCanvasToPng,
   downloadCanvasAsImage,
@@ -41,6 +44,7 @@ import {
   CANVAS_COLOR_PALETTES,
   CANVAS_STANDARD_COLOR_IDS,
   disconnectNodeEdges,
+  spawnConnectedCard,
   spawnMultipleBranches,
   cycleEdgeStrokePattern,
   getStepBendHandleInfo,
@@ -1198,6 +1202,142 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
     const expanded = expandLoopEdgeSelection(edges, [ring[0].id]);
     expect(expanded.size).toBe(4);
     expect(expanded.has("solo")).toBe(false);
+  });
+
+  it("assigns distinct non-ring colors when a loop card initiates outgoing connection to outside", () => {
+    const nodes: CanvasTextNode[] = [
+      { id: "r1", type: "text", text: "Ring 1", x: 100, y: 100, width: 80, height: 80 },
+      { id: "r2", type: "text", text: "Ring 2", x: 300, y: 100, width: 80, height: 80 },
+      { id: "r3", type: "text", text: "Ring 3", x: 300, y: 300, width: 80, height: 80 },
+      { id: "out1", type: "text", text: "Out 1", x: 500, y: 100, width: 80, height: 80 },
+      { id: "out2", type: "text", text: "Out 2", x: 500, y: 300, width: 80, height: 80 },
+      { id: "out3", type: "text", text: "Out 3", x: 100, y: 500, width: 80, height: 80 },
+    ];
+    const ring = connectLoopNodes([nodes[0], nodes[1], nodes[2]], [], "bezier", true);
+    const ringColor = ring[0].color;
+    expect(ringColor).toBeDefined();
+
+    // 1. External connection from r1 to out1 must NOT use ringColor
+    const extColorR1 = getSourceNodeEdgeColor(nodes[0], ring, nodes, nodes[3]);
+    expect(extColorR1).not.toBe(ringColor);
+
+    const extEdge1: CanvasEdge = {
+      id: "ext-1",
+      fromNode: "r1",
+      toNode: "out1",
+      color: extColorR1,
+    };
+    const edgesWithExt1 = [...ring, extEdge1];
+
+    // 2. Subsequent external connection from r1 to out2 reuses the same external color
+    const extColorR1_second = getSourceNodeEdgeColor(nodes[0], edgesWithExt1, nodes, nodes[4]);
+    expect(extColorR1_second).toBe(extColorR1);
+
+    // 3. External connection from r2 to out3 must NOT use ringColor AND not collide with r1's external color
+    const extColorR2 = getSourceNodeEdgeColor(nodes[1], edgesWithExt1, nodes, nodes[5]);
+    expect(extColorR2).not.toBe(ringColor);
+    expect(extColorR2).not.toBe(extColorR1);
+  });
+
+  it("ensures spawnConnectedCard and spawnMultipleBranches on ring card isolate external edge color", () => {
+    const r1: CanvasTextNode = { id: "cr1", type: "text", text: "Ring 1", x: 100, y: 100, width: 80, height: 80 };
+    const r2: CanvasTextNode = { id: "cr2", type: "text", text: "Ring 2", x: 300, y: 100, width: 80, height: 80 };
+    const r3: CanvasTextNode = { id: "cr3", type: "text", text: "Ring 3", x: 200, y: 300, width: 80, height: 80 };
+    const ring = connectLoopNodes([r1, r2, r3], [], "bezier", true);
+    const ringColor = ring[0].color;
+
+    // spawnConnectedCard on r1
+    const { newNode, newEdge } = spawnConnectedCard(r1, "right", undefined, undefined, ring, [r1, r2, r3]);
+    expect(newEdge.color).not.toBe(ringColor);
+
+    // spawnMultipleBranches on r2
+    const { newNodes, newEdges } = spawnMultipleBranches(r2, 3, "bottom", ring, [r1, r2, r3]);
+    expect(newEdges).toHaveLength(3);
+    expect(newEdges[0].color).not.toBe(ringColor);
+    expect(newEdges[1].color).toBe(newEdges[0].color);
+    expect(newEdges[2].color).toBe(newEdges[0].color);
+  });
+
+  it("replicates exact user topology and checks edgeColor", () => {
+    const tr: CanvasTextNode = { id: "tr", type: "text", text: "Top Right", x: 600, y: 100, width: 200, height: 150 };
+    const br: CanvasTextNode = { id: "br", type: "text", text: "Bottom Right", x: 600, y: 300, width: 200, height: 150 };
+    const r: CanvasTextNode = { id: "r", type: "text", text: "Right", x: 900, y: 200, width: 200, height: 150 };
+    const l: CanvasTextNode = { id: "l", type: "text", text: "Left", x: 200, y: 200, width: 200, height: 150 };
+
+    // Ring: tr -> r -> br -> tr, all colored "11" (lime green)
+    const e1: CanvasEdge = { id: "e1", fromNode: "tr", toNode: "r", color: "11" };
+    const e2: CanvasEdge = { id: "e2", fromNode: "r", toNode: "br", color: "11" };
+    const e3: CanvasEdge = { id: "e3", fromNode: "br", toNode: "tr", color: "11" };
+
+    const edges = [e1, e2, e3];
+    const nodes = [tr, br, r, l];
+
+    const extColor = getSourceNodeEdgeColor(tr, edges, nodes, l);
+    expect(extColor).not.toBe("11");
+  });
+
+  it("identifies perceptual color similarity across hex and palette colors", () => {
+    // #afff4d (lime ring edge), #98ff1a (lime ring card), and "11" (palette lime) are mutually similar
+    expect(isColorSimilar("#afff4d", "#98ff1a")).toBe(true);
+    expect(isColorSimilar("#afff4d", "11")).toBe(true);
+    expect(isColorSimilar("#98ff1a", "11")).toBe(true);
+
+    // Completely distinct colors must not be similar
+    expect(isColorSimilar("#afff4d", "1")).toBe(false); // red
+    expect(isColorSimilar("#afff4d", "5")).toBe(false); // cyan
+    expect(isColorSimilar("#afff4d", "6")).toBe(false); // purple
+    expect(isColorSimilar("#afff4d", "7")).toBe(false); // indigo
+  });
+
+  it("handles exact user snapshot: ring card colored #98ff1a, ring edges #afff4d, external edge decouples to non-lime color", () => {
+    const ringNode1: CanvasTextNode = { id: "rn1", type: "text", text: "Top-Left", x: 1301, y: 1043, width: 200, height: 100, color: "#98ff1a" };
+    const ringNode2: CanvasTextNode = { id: "rn2", type: "text", text: "Top-Right", x: 1860, y: 1043, width: 200, height: 100, color: "#98ff1a" };
+    const ringNode3: CanvasTextNode = { id: "rn3", type: "text", text: "Bottom-Right", x: 1860, y: 1279, width: 200, height: 100, color: "#9cd1e8" };
+    const ringNode4: CanvasTextNode = { id: "rn4", type: "text", text: "Bottom-Left", x: 1301, y: 1279, width: 200, height: 100, color: "#9cd1e8" };
+    const externalCard: CanvasTextNode = { id: "extCard", type: "text", text: "Outside Left", x: 308, y: 1176, width: 200, height: 100 };
+
+    const ringEdges: CanvasEdge[] = [
+      { id: "re1", fromNode: "rn1", toNode: "rn2", color: "#afff4d" },
+      { id: "re2", fromNode: "rn2", toNode: "rn3", color: "#afff4d" },
+      { id: "re3", fromNode: "rn3", toNode: "rn4", color: "#afff4d" },
+      { id: "re4", fromNode: "rn4", toNode: "rn1", color: "#afff4d" },
+    ];
+
+    const allNodes = [ringNode1, ringNode2, ringNode3, ringNode4, externalCard];
+    const allEdges = [...ringEdges];
+
+    // 1. getSourceNodeEdgeColor must NOT return lime (#98ff1a, #afff4d, or "11")
+    const extColor = getSourceNodeEdgeColor(ringNode1, allEdges, allNodes, externalCard);
+    expect(isColorSimilar(extColor, "#afff4d")).toBe(false);
+    expect(isColorSimilar(extColor, "#98ff1a")).toBe(false);
+    expect(isColorSimilar(extColor, "11")).toBe(false);
+
+    // 2. getEffectiveEdgeColorKey dynamically decouples existing polluted edge (#98ff1a)
+    const pollutedEdge: CanvasEdge = {
+      id: "polluted-ext",
+      fromNode: "rn1",
+      toNode: "extCard",
+      color: "#98ff1a", // old buggy color saved in file
+    };
+    const edgesWithPolluted = [...allEdges, pollutedEdge];
+    const effectivePolluted = getEffectiveEdgeColorKey(pollutedEdge, edgesWithPolluted, allNodes);
+    expect(isColorSimilar(effectivePolluted, "#afff4d")).toBe(false);
+    expect(isColorSimilar(effectivePolluted, "#98ff1a")).toBe(false);
+    expect(isColorSimilar(effectivePolluted, "11")).toBe(false);
+
+    // 3. User explicit customization to orange (#f97316) is respected
+    const customEdge: CanvasEdge = {
+      id: "custom-ext",
+      fromNode: "rn1",
+      toNode: "extCard",
+      color: "#f97316",
+    };
+    const effectiveCustom = getEffectiveEdgeColorKey(customEdge, [...allEdges, customEdge], allNodes);
+    expect(effectiveCustom).toBe("#f97316");
+
+    // 4. Ring edges maintain the ring's color
+    const effectiveRingEdge = getEffectiveEdgeColorKey(ringEdges[0], edgesWithPolluted, allNodes);
+    expect(effectiveRingEdge).toBe("#afff4d");
   });
 
   it("cycles edge stroke patterns through solid, dashed, and dotted", () => {

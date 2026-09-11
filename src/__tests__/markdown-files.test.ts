@@ -169,4 +169,24 @@ function initElectron() {
     expect(results[0].lineEndNumber).toBe(8);
     expect(results[0].matchCountInBlock).toBe(4);
   });
+
+  it("reads multiple markdown files concurrently via readMarkdownSourcesBatch", async () => {
+    const fileA = path.join(tempDir, "docA.md");
+    const fileB = path.join(tempDir, "docB.md");
+    const fileC = path.join(tempDir, "docC.md");
+
+    await fs.writeFile(fileA, "# Doc A\nHello A", "utf8");
+    await fs.writeFile(fileB, "# Doc B\nHello B", "utf8");
+    await fs.writeFile(fileC, "# Doc C\nHello C", "utf8");
+
+    const batch = await markdownFiles.readMarkdownSourcesBatch([fileA, fileB, fileC, path.join(tempDir, "missing.md")]);
+    expect(batch.length).toBe(3);
+
+    const docA = batch.find((item: any) => item.absolutePath === fileA);
+    const docB = batch.find((item: any) => item.absolutePath === fileB);
+    expect(docA).toBeDefined();
+    expect(docA.markdown).toContain("Hello A");
+    expect(docB).toBeDefined();
+    expect(docB.markdown).toContain("Hello B");
+  });
 });
