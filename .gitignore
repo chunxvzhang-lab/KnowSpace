@@ -3,8 +3,6 @@
 
 # Build and release outputs
 /dist
-/web/dist
-/web/node_modules
 /release/*
 !/release/KnowSpace-win-x64
 /release/KnowSpace-win-x64/*
@@ -25,6 +23,10 @@
 *.pyc
 product_roadmap.md
 ROADMAP.md
+
+# Extracted into its own repository
+# https://github.com/chunxvzhang-lab/Knowspace-web
+/web/
 
 # Scratch and unrelated local folders
 /ai_quality_inspection_ppt
