@@ -146,7 +146,11 @@ export const FlashCapsule: React.FC = () => {
     }
 
     // Load historical flash notes and available targets for [[ suggestion
-    const loadTargets = async () => {
+    let lastTargetsLoadTime = 0;
+    const loadTargets = async (force = false) => {
+      const now = Date.now();
+      if (!force && now - lastTargetsLoadTime < 3000) return;
+      lastTargetsLoadTime = now;
       try {
         if (desktop?.getFlashNotesSummary) {
           const res = await desktop.getFlashNotesSummary();
@@ -157,12 +161,11 @@ export const FlashCapsule: React.FC = () => {
         }
       } catch {}
     };
-    loadTargets();
+    loadTargets(true);
 
     // Auto-focus textarea on mount
-    setTimeout(() => {
-      textareaRef.current?.focus();
-    }, 50);
+    textareaRef.current?.focus();
+    requestAnimationFrame(() => textareaRef.current?.focus());
 
     // Listen for focus event from main process when hotkey is triggered
     let cleanupFocus: (() => void) | undefined;
@@ -171,13 +174,9 @@ export const FlashCapsule: React.FC = () => {
         loadTargets();
         applyTheme();
         refreshSpaceConfig();
-        setTimeout(() => {
-          if (activeTab === "note") {
-            textareaRef.current?.focus();
-          } else {
-            persistentTextareaRef.current?.focus();
-          }
-        }, 50);
+        const targetTextarea = activeTab === "note" ? textareaRef.current : persistentTextareaRef.current;
+        targetTextarea?.focus();
+        requestAnimationFrame(() => targetTextarea?.focus());
       });
     }
 

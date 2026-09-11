@@ -41,6 +41,7 @@ let documentState = {
 };
 
 let flashCapsuleWindow = null;
+let flashCapsuleLoadingPromise = null;
 let lastActiveWorkspaceDir = null;
 let tray = null;
 let isFlashCapsulePinned = false;
@@ -351,6 +352,12 @@ async function createFlashCapsuleWindow() {
     },
   });
 
+  win.on("closed", () => {
+    if (flashCapsuleWindow === win) {
+      flashCapsuleWindow = null;
+    }
+  });
+
   win.on("resize", () => {
     try {
       if (!win.isDestroyed() && !win.isMaximized()) {
@@ -380,13 +387,36 @@ async function createFlashCapsuleWindow() {
   return win;
 }
 
+async function ensureFlashCapsuleWindow() {
+  if (flashCapsuleWindow && !flashCapsuleWindow.isDestroyed()) {
+    return flashCapsuleWindow;
+  }
+  if (flashCapsuleLoadingPromise) {
+    return flashCapsuleLoadingPromise;
+  }
+  flashCapsuleLoadingPromise = (async () => {
+    try {
+      const win = await createFlashCapsuleWindow();
+      flashCapsuleWindow = win;
+      return win;
+    } catch (err) {
+      console.error("Failed to create/pre-warm flash capsule window:", err);
+      flashCapsuleWindow = null;
+      throw err;
+    } finally {
+      flashCapsuleLoadingPromise = null;
+    }
+  })();
+  return flashCapsuleLoadingPromise;
+}
+
 async function toggleFlashCapsuleWindow() {
   try {
-    if (!flashCapsuleWindow || flashCapsuleWindow.isDestroyed()) {
-      flashCapsuleWindow = await createFlashCapsuleWindow();
-    }
-    if (flashCapsuleWindow.isVisible()) {
-      flashCapsuleWindow.hide();
+    const win = await ensureFlashCapsuleWindow();
+    if (!win || win.isDestroyed()) return;
+
+    if (win.isVisible()) {
+      win.hide();
     } else {
       const config = getAppConfig();
       const cursorPoint = screen.getCursorScreenPoint();
@@ -396,10 +426,10 @@ async function toggleFlashCapsuleWindow() {
       const winHeight = config.flashHeight || 360;
       const x = Math.round(bounds.x + (bounds.width - winWidth) / 2);
       const y = Math.round(bounds.y + (bounds.height - winHeight) / 3);
-      flashCapsuleWindow.setBounds({ x, y, width: winWidth, height: winHeight });
-      flashCapsuleWindow.show();
-      flashCapsuleWindow.focus();
-      flashCapsuleWindow.webContents.send("bookmd:flash-focus");
+      win.setBounds({ x, y, width: winWidth, height: winHeight });
+      win.show();
+      win.focus();
+      win.webContents.send("bookmd:flash-focus");
     }
   } catch (err) {
     console.error("Error toggling flash capsule:", err);
@@ -424,6 +454,14 @@ function initFlashCapsule() {
   } catch (e) {
     console.warn("Global shortcut register error:", e);
   }
+
+  // Pre-warm the flash capsule window silently in the background after main window initialization
+  // This eliminates the 1-2s first-time lag when invoking the capsule after software restart
+  setTimeout(() => {
+    ensureFlashCapsuleWindow().catch((err) => {
+      console.warn("Flash capsule background pre-warm failed:", err);
+    });
+  }, 800);
 }
 
 function getActiveWindow() {
@@ -1141,6 +1179,7 @@ ipcMain.handle("bookmd:save-flash-note", async (_event, payload) => {
     const cleanContent = payload.content.trim();
     const entry = `### 🕒 ${timeDisplay}\n\n${cleanContent}\n\n---\n\n`;
     fs.appendFileSync(targetFile, entry, "utf8");
+    invalidateFlashSummaryCache();
 
     // Broadcast note added to open windows
     for (const w of windows) {
@@ -1196,6 +1235,7 @@ ipcMain.handle("bookmd:select-flash-space-dir", async () => {
     }
     const selectedDir = result.filePaths[0];
     saveAppConfig({ flashSpaceDir: selectedDir });
+    invalidateFlashSummaryCache();
     return { success: true, canceled: false, newDir: selectedDir };
   } catch (err) {
     return { success: false, error: err.message };
@@ -1206,6 +1246,7 @@ ipcMain.handle("bookmd:select-flash-space-dir", async () => {
 
 ipcMain.handle("bookmd:reset-flash-space-dir", () => {
   saveAppConfig({ flashSpaceDir: "" });
+  invalidateFlashSummaryCache();
   const defaultDir = getDefaultSpaceDir();
   return { success: true, defaultDir };
 });
@@ -1246,6 +1287,14 @@ ipcMain.handle("bookmd:reset-flash-size", () => {
 });
 
 // Flash Space Timeline & Inbox Hub IPC handlers
+let cachedFlashSummary = null;
+let lastFlashSummaryMtime = 0;
+
+function invalidateFlashSummaryCache() {
+  cachedFlashSummary = null;
+  lastFlashSummaryMtime = 0;
+}
+
 ipcMain.handle("bookmd:get-flash-notes-summary", async () => {
   try {
     const { dir: spaceDir } = resolveFlashSpaceDir();
@@ -1253,7 +1302,17 @@ ipcMain.handle("bookmd:get-flash-notes-summary", async () => {
       return { success: true, spaceDir, notes: [], totalTodos: 0, completedTodos: 0 };
     }
 
-    const files = fs.readdirSync(spaceDir);
+    let dirMtime = 0;
+    try {
+      const dirStat = fs.statSync(spaceDir);
+      dirMtime = dirStat.mtimeMs;
+    } catch {}
+
+    if (cachedFlashSummary && lastFlashSummaryMtime === dirMtime && cachedFlashSummary.spaceDir === spaceDir) {
+      return cachedFlashSummary;
+    }
+
+    const files = await fs.promises.readdir(spaceDir);
     const mdFiles = files.filter((f) => f.endsWith(".md") || f.endsWith(".markdown"));
 
     const notes = [];
@@ -1263,8 +1322,8 @@ ipcMain.handle("bookmd:get-flash-notes-summary", async () => {
     for (const fileName of mdFiles) {
       try {
         const filePath = path.join(spaceDir, fileName);
-        const stats = fs.statSync(filePath);
-        const content = fs.readFileSync(filePath, "utf8");
+        const stats = await fs.promises.stat(filePath);
+        const content = await fs.promises.readFile(filePath, "utf8");
 
         const lines = content.split(/\r?\n/);
         const todos = [];
@@ -1327,13 +1386,16 @@ ipcMain.handle("bookmd:get-flash-notes-summary", async () => {
     // Sort newest first
     notes.sort((a, b) => b.modifiedTime - a.modifiedTime || b.fileName.localeCompare(a.fileName));
 
-    return {
+    cachedFlashSummary = {
       success: true,
       spaceDir,
       notes,
       totalTodos,
       completedTodos,
     };
+    lastFlashSummaryMtime = dirMtime;
+
+    return cachedFlashSummary;
   } catch (err) {
     console.error("Failed to get flash notes summary:", err);
     return { success: false, error: err.message || "读取闪念列表失败", notes: [] };
@@ -1365,6 +1427,7 @@ ipcMain.handle("bookmd:toggle-flash-todo", async (_event, payload) => {
     const replacementMark = completed ? "x" : " ";
     lines[lineIndex] = `${match[1]}${replacementMark}${match[3]}`;
     fs.writeFileSync(filePath, lines.join("\n"), "utf8");
+    invalidateFlashSummaryCache();
 
     return { success: true, completed };
   } catch (err) {
@@ -1380,6 +1443,7 @@ ipcMain.handle("bookmd:delete-flash-note", async (_event, payload) => {
     const { filePath } = payload;
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
+      invalidateFlashSummaryCache();
     }
     return { success: true };
   } catch (err) {

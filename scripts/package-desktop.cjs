@@ -15,8 +15,8 @@ async function main() {
   console.log("1. Ensuring dist is built...");
   await assertExists(path.join(root, "dist", "index.html"), "dist is missing. Run npm run build first.");
 
-  console.log("2. Building MSI installer and unpacked application via electron-builder...");
-  await execPromise("npx electron-builder --win msi dir", { cwd: root });
+  console.log("2. Building MSI installer, NSIS installer, and unpacked application via electron-builder...");
+  await execPromise("npx electron-builder --win msi nsis dir", { cwd: root });
 
   console.log("3. Copying unpacked binaries into release/KnowSpace-win-x64...");
   await fs.mkdir(releaseRoot, { recursive: true });
@@ -43,16 +43,16 @@ async function main() {
     await execFileAsync(rcedit, [
       targetExe,
       "--set-icon", iconIco,
-      "--set-file-version", appVersion,
-      "--set-product-version", appVersion,
-      "--set-version-string", "CompanyName", "摸鱼Lab",
-      "--set-version-string", "LegalCopyright", "Copyright © 2026 摸鱼Lab",
-      "--set-version-string", "FileDescription", "KnowSpace · Personal Knowledge Workspace",
       "--set-version-string", "ProductName", "KnowSpace",
+      "--set-version-string", "FileDescription", "KnowSpace - Personal Knowledge Workspace",
+      "--set-version-string", "CompanyName", "KnowSpace Team",
+      "--set-version-string", "LegalCopyright", `Copyright © ${new Date().getFullYear()} KnowSpace`,
+      "--set-file-version", appVersion,
+      "--set-product-version", appVersion
     ]);
     console.log(`Successfully embedded icon and PE metadata (v${appVersion}) into KnowSpace.exe.`);
   } catch (err) {
-    console.warn("rcedit notice:", err.message);
+    console.warn("rcedit failed (non-critical, binary will keep default icon):", err.message);
   }
 
   console.log("4. Organizing subfolders (release, docs, assets)...");
@@ -75,6 +75,19 @@ async function main() {
     try {
       await fs.copyFile(src, path.join(releaseSubDir, `KnowSpace-${appVersion}.msi`));
       console.log(`Included MSI installer: ${src} -> KnowSpace-${appVersion}.msi`);
+      break;
+    } catch (e) {}
+  }
+
+  // Copy EXE installer if exists
+  const possibleExeSources = [
+    path.join(releaseRoot, `KnowSpace-Setup-${appVersion}.exe`),
+    path.join(releaseRoot, `KnowSpace Setup ${appVersion}.exe`),
+  ];
+  for (const src of possibleExeSources) {
+    try {
+      await fs.copyFile(src, path.join(releaseSubDir, `KnowSpace-Setup-${appVersion}.exe`));
+      console.log(`Included EXE installer: ${src} -> KnowSpace-Setup-${appVersion}.exe`);
       break;
     } catch (e) {}
   }
