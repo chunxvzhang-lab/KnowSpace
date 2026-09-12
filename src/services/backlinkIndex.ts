@@ -265,11 +265,31 @@ export function updateDocumentInIndex(
   content: string,
   path?: string,
 ): void {
-  // 1. Remove old references originating from this document
-  for (const [normTarget, refs] of index.backlinks.entries()) {
-    const filtered = refs.filter((r) => r.sourceId !== docId);
-    if (filtered.length !== refs.length) {
-      index.backlinks.set(normTarget, filtered);
+  // 1. Remove old references originating from this document using forwardLinks index (O(Links) instead of O(Vault))
+  const oldForward = index.forwardLinks.get(docId);
+  if (oldForward && oldForward.size > 0) {
+    for (const normTarget of oldForward) {
+      const refs = index.backlinks.get(normTarget);
+      if (refs) {
+        const filtered = refs.filter((r) => r.sourceId !== docId);
+        if (filtered.length === 0) {
+          index.backlinks.delete(normTarget);
+        } else if (filtered.length !== refs.length) {
+          index.backlinks.set(normTarget, filtered);
+        }
+      }
+    }
+  } else if (!oldForward) {
+    // Fallback if forwardLinks was not yet tracked for this doc
+    for (const [normTarget, refs] of index.backlinks.entries()) {
+      const filtered = refs.filter((r) => r.sourceId !== docId);
+      if (filtered.length !== refs.length) {
+        if (filtered.length === 0) {
+          index.backlinks.delete(normTarget);
+        } else {
+          index.backlinks.set(normTarget, filtered);
+        }
+      }
     }
   }
 

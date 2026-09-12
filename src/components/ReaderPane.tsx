@@ -130,10 +130,17 @@ export const ReaderPane = memo(function ReaderPane({
         if (blockId) {
           const refText = `[[#^${blockId}]]`;
           navigator.clipboard.writeText(refText).then(() => {
+            blockAnchor.classList.add("is-copied");
+            const prevTooltip = blockAnchor.getAttribute("data-tooltip");
+            blockAnchor.setAttribute("data-tooltip", `✓ 已复制块引用: ${refText}`);
             const orig = blockAnchor.innerHTML;
-            blockAnchor.innerHTML = `<span class="block-anchor-symbol">✓</span><span class="block-anchor-id">已复制块引用</span>`;
+            blockAnchor.innerHTML = `<span class="block-anchor-symbol">✓</span><span class="block-anchor-id">已复制</span>`;
             setTimeout(() => {
               blockAnchor.innerHTML = orig;
+              blockAnchor.classList.remove("is-copied");
+              if (prevTooltip) {
+                blockAnchor.setAttribute("data-tooltip", prevTooltip);
+              }
             }, 1600);
           });
         }

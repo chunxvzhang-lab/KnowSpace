@@ -52,6 +52,11 @@ describe("slashCommands service", () => {
     expect(resH1.text).toBe("# 标题内容\n");
     expect(resH1.cursorOffset).toBe(2);
 
+    const wikilink = SLASH_COMMANDS.find((c) => c.id === "wikilink")!;
+    const resWiki = getCommandTemplate(wikilink);
+    expect(resWiki.text).toBe("[[]]");
+    expect(resWiki.cursorOffset).toBe(2);
+
     const ts = SLASH_COMMANDS.find((c) => c.id === "timestamp")!;
     const resTs = getCommandTemplate(ts);
     expect(resTs.text).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2} $/);

@@ -252,11 +252,29 @@ export function parseMarkdownToMindmapTree(
     customHeight: rootStyle?.customHeight,
   };
 
-  // Step 2: Check if source contains indented list items (- item or * item)
+  // Step 2: Check if source contains Markdown headings (##, ###, etc.)
+  const headingRegex = /^(#{1,6})\s+(.+)$/;
+  let subHeadingCount = 0;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const match = trimmed.match(headingRegex);
+    if (match) {
+      const level = match[1].length;
+      let rawText = match[2].trim().replace(/\s\^[a-zA-Z0-9_-]+$/, "");
+      const parsed = parseStyleComment(rawText);
+      if (level === 1 && parsed.cleanText === rootTitle && rootHeadingFound && subHeadingCount === 0) {
+        continue;
+      }
+      subHeadingCount++;
+    }
+  }
+
+  // Step 3: Check if source contains indented list items (- item or * item)
   const listRegex = /^(\s*)(?:[-*+]|\d+\.)\s+(.+)$/;
   const hasListItems = lines.some((line) => listRegex.test(line));
 
-  if (hasListItems) {
+  // If there are no chapter headings but there are list items, parse hierarchical list items
+  if (subHeadingCount === 0 && hasListItems) {
     // Parse hierarchical list items
     const stack: { node: MindmapNode; indent: number; path: string }[] = [
       { node: root, indent: -1, path: "root" },
@@ -312,8 +330,7 @@ export function parseMarkdownToMindmapTree(
     return root;
   }
 
-  // Step 3: Fallback: parse Markdown headings (#, ##, ###)
-  const headingRegex = /^(#{1,6})\s+(.+)$/;
+  // Step 4: Parse Markdown headings (#, ##, ###)
   const headings: { id: string; text: string; level: number; line: number; style?: ReturnType<typeof parseStyleComment> }[] = [];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
@@ -397,6 +414,211 @@ export function mindmapTreeToMarkdown(tree: MindmapNode): string {
 
   lines.push("");
   return lines.join("\n");
+}
+
+/**
+ * Non-destructively synchronizes the MindmapNode tree back to the original Markdown document.
+ * 
+ * Preserves 100% of all section body content (paragraphs, code blocks, tables, LaTeX math,
+ * block references, images, etc.) without mass rewriting or data destruction.
+ * Only updates heading titles, levels, order, and handles adding/removing sections.
+ */
+export function syncMindmapToDocument(originalMarkdown: string, tree: MindmapNode): string {
+  if (!originalMarkdown || !originalMarkdown.trim()) {
+    return mindmapTreeToMarkdown(tree);
+  }
+
+  const lines = originalMarkdown.split(/\r?\n/);
+  const headingRegex = /^(#{1,6})\s+(.+)$/;
+  const listRegex = /^(\s*)(?:[-*+]|\d+\.)\s+(.+)$/;
+
+  const headingIndices: number[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (headingRegex.test(lines[i].trim())) {
+      headingIndices.push(i);
+    }
+  }
+
+  // If document does not use Markdown headings, check if it was a bullet list
+  if (headingIndices.length === 0) {
+    const hasListItems = lines.some((l) => listRegex.test(l));
+    if (hasListItems) {
+      return mindmapTreeToMarkdown(tree);
+    }
+    // Plain text document: if tree has branches, output formatted outline
+    if (tree.children && tree.children.length > 0) {
+      return mindmapTreeToMarkdown(tree);
+    }
+    return originalMarkdown;
+  }
+
+  // Analyze first heading: check if it's the document's primary H1 (# ...)
+  const firstHeadingIdx = headingIndices[0];
+  const firstHeadingLine = lines[firstHeadingIdx].trim();
+  const firstHeadingMatch = firstHeadingLine.match(headingRegex);
+  const isFirstHeadingH1 = Boolean(firstHeadingMatch && firstHeadingMatch[1].length === 1);
+
+  const preludeLines: string[] = lines.slice(0, firstHeadingIdx);
+  let rootIntroLines: string[] = [];
+
+  interface ParsedSection {
+    originalLine: number;
+    level: number;
+    rawHeadingLine: string;
+    title: string;
+    cleanTitle: string;
+    blockId?: string;
+    styleTag?: string;
+    bodyLines: string[];
+  }
+
+  const sections: ParsedSection[] = [];
+  const startHeadingIndex = isFirstHeadingH1 ? 1 : 0;
+
+  if (isFirstHeadingH1) {
+    const nextHeadingIdx = headingIndices.length > 1 ? headingIndices[1] : lines.length;
+    rootIntroLines = lines.slice(firstHeadingIdx + 1, nextHeadingIdx);
+  }
+
+  for (let h = startHeadingIndex; h < headingIndices.length; h++) {
+    const lineIdx = headingIndices[h];
+    const rawLine = lines[lineIdx];
+    const match = rawLine.trim().match(headingRegex);
+    if (!match) continue;
+
+    const level = match[1].length;
+    let headingText = match[2].trim();
+
+    let blockId: string | undefined;
+    const blockMatch = headingText.match(/\s\^([a-zA-Z0-9_-]+)$/);
+    if (blockMatch) {
+      blockId = blockMatch[1];
+      headingText = headingText.replace(blockMatch[0], "").trim();
+    }
+
+    let styleTag: string | undefined;
+    const styleMatch = headingText.match(/\s*(<!--\s*(?:mindmap|style):\s*[^>]+?\s*-->)/i);
+    if (styleMatch) {
+      styleTag = styleMatch[1];
+      headingText = headingText.replace(styleMatch[0], "").trim();
+    }
+
+    const nextHeadingLineIdx = h + 1 < headingIndices.length ? headingIndices[h + 1] : lines.length;
+    const bodyLines = lines.slice(lineIdx + 1, nextHeadingLineIdx);
+
+    sections.push({
+      originalLine: lineIdx + 1,
+      level,
+      rawHeadingLine: rawLine,
+      title: headingText,
+      cleanTitle: headingText.toLowerCase(),
+      blockId,
+      styleTag,
+      bodyLines,
+    });
+  }
+
+  const matchedSectionIndices = new Set<number>();
+
+  function findMatchingSectionIndex(node: MindmapNode): number {
+    // Priority 1: Match by line
+    if (node.line) {
+      const idx = sections.findIndex(
+        (s, i) => !matchedSectionIndices.has(i) && s.originalLine === node.line
+      );
+      if (idx !== -1) return idx;
+    }
+
+    // Priority 2: Match by id with line number prefix
+    const idMatch = node.id.match(/^heading-(\d+)-/);
+    if (idMatch) {
+      const targetLine = parseInt(idMatch[1], 10);
+      const idx = sections.findIndex(
+        (s, i) => !matchedSectionIndices.has(i) && s.originalLine === targetLine
+      );
+      if (idx !== -1) return idx;
+    }
+
+    // Priority 3: Match by normalized title
+    const clean = node.text.trim().toLowerCase();
+    if (clean) {
+      const idx = sections.findIndex(
+        (s, i) => !matchedSectionIndices.has(i) && s.cleanTitle === clean
+      );
+      if (idx !== -1) return idx;
+    }
+
+    return -1;
+  }
+
+  const outputLines: string[] = [];
+
+  // Output prelude lines (frontmatter or anything before first heading)
+  if (preludeLines.length > 0) {
+    outputLines.push(...preludeLines);
+  }
+
+  // Output primary document H1 title and root intro lines
+  if (isFirstHeadingH1) {
+    const rootStyleTag = formatStyleComment(tree);
+    outputLines.push(`# ${tree.text.trim() || "中心主题"}${rootStyleTag}`);
+    if (rootIntroLines.length > 0) {
+      outputLines.push(...rootIntroLines);
+    }
+  }
+
+  // DFS traverse children of tree
+  function processNode(node: MindmapNode, depth: number) {
+    const matchedIdx = findMatchingSectionIndex(node);
+    let matched: ParsedSection | null = null;
+    if (matchedIdx !== -1) {
+      matchedSectionIndices.add(matchedIdx);
+      matched = sections[matchedIdx];
+    }
+
+    let headingLevel = isFirstHeadingH1 ? Math.min(6, depth + 1) : Math.min(6, Math.max(1, depth));
+    if (matched && matched.level) {
+      if (node.level && node.level === matched.level) {
+        headingLevel = matched.level;
+      }
+    }
+
+    const hashes = "#".repeat(headingLevel);
+    const styleComment = formatStyleComment(node);
+    const blockRef = matched?.blockId ? ` ^${matched.blockId}` : "";
+    const headingLine = `${hashes} ${node.text.trim()}${styleComment}${blockRef}`;
+
+    if (outputLines.length > 0 && outputLines[outputLines.length - 1].trim() !== "") {
+      outputLines.push("");
+    }
+    outputLines.push(headingLine);
+
+    if (matched) {
+      outputLines.push(...matched.bodyLines);
+    } else {
+      outputLines.push("");
+    }
+
+    if (node.children && node.children.length > 0) {
+      for (const child of node.children) {
+        processNode(child, depth + 1);
+      }
+    }
+  }
+
+  if (tree.children && tree.children.length > 0) {
+    for (const child of tree.children) {
+      processNode(child, 1);
+    }
+  }
+
+  // Clean up excessive trailing empty lines and ensure single final newline
+  while (outputLines.length > 0 && outputLines[outputLines.length - 1].trim() === "") {
+    outputLines.pop();
+  }
+  outputLines.push("");
+
+  return outputLines.join("\n");
 }
 
 export function cloneTree(node: MindmapNode): MindmapNode {

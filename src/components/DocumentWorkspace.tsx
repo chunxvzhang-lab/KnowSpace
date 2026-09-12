@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { memo, useState, useRef, useCallback, useEffect } from "react";
 import type { EditorViewMode, RenderedChapter, ThemeMode } from "../core/types";
 import type { MermaidTheme } from "../services/mermaid";
 import { EditorPane, type WikiLinkTarget } from "./EditorPane";
@@ -43,7 +43,7 @@ type DocumentWorkspaceProps = {
   onRevealInToc?: () => void;
 };
 
-export function DocumentWorkspace({
+export const DocumentWorkspace = memo(function DocumentWorkspace({
   viewMode,
   source,
   onSourceChange,
@@ -228,54 +228,52 @@ export function DocumentWorkspace({
         </div>
       )}
 
-      {/* Reader / Preview Section */}
-      {viewMode !== "source" && (
-        <div
-          className="workspace-pane reader-section"
-          style={
-            viewMode === "split"
-              ? { flex: `1 1 ${(1 - splitRatio) * 100}%` }
-              : { flex: "1 1 100%" }
-          }
-        >
-          {viewMode === "split" && (
-            <div className="pane-header-bar">
-              <span className="pane-header-title">实时预览</span>
-            </div>
-          )}
-          {autoPreviewPaused && (
-            <div className="large-doc-notice">
-              <AlertCircle size={15} />
-              <span>大文件自动预览已暂停（提升编辑流畅度）</span>
-              {onRefreshPreview && (
-                <button
-                  type="button"
-                  className="preview-refresh-btn"
-                  onClick={onRefreshPreview}
-                  title="立即刷新预览"
-                >
-                  <RefreshCw size={13} />
-                  <span>刷新预览</span>
-                </button>
-              )}
-            </div>
-          )}
-          <ReaderPane
-            chapter={renderedChapter}
-            containerRef={containerRef}
-            fontScale={fontScale}
-            mermaidTheme={mermaidTheme}
-            onMermaidError={onMermaidError}
-            onElementClick={handlePreviewSelectionChange}
-            showLineNumbers={showLineNumbers}
-            onOpenLightbox={onOpenLightbox}
-            wikiLinkTargets={wikiLinkTargets}
-            onWikiLinkClick={onWikiLinkClick}
-            backlinksCount={backlinksCount}
-            onOpenBacklinks={onOpenBacklinks}
-          />
-        </div>
-      )}
+      {/* Reader / Preview Section: always mounted so print & PDF export can render markdown in all modes */}
+      <div
+        className={`workspace-pane reader-section ${viewMode === "source" ? "source-mode-reader print-only-reader" : ""}`}
+        style={
+          viewMode === "split"
+            ? { flex: `1 1 ${(1 - splitRatio) * 100}%` }
+            : { flex: "1 1 100%" }
+        }
+      >
+        {viewMode === "split" && (
+          <div className="pane-header-bar">
+            <span className="pane-header-title">实时预览</span>
+          </div>
+        )}
+        {autoPreviewPaused && (
+          <div className="large-doc-notice">
+            <AlertCircle size={15} />
+            <span>大文件自动预览已暂停（提升编辑流畅度）</span>
+            {onRefreshPreview && (
+              <button
+                type="button"
+                className="preview-refresh-btn"
+                onClick={onRefreshPreview}
+                title="立即刷新预览"
+              >
+                <RefreshCw size={13} />
+                <span>刷新预览</span>
+              </button>
+            )}
+          </div>
+        )}
+        <ReaderPane
+          chapter={renderedChapter}
+          containerRef={containerRef}
+          fontScale={fontScale}
+          mermaidTheme={mermaidTheme}
+          onMermaidError={onMermaidError}
+          onElementClick={handlePreviewSelectionChange}
+          showLineNumbers={showLineNumbers}
+          onOpenLightbox={onOpenLightbox}
+          wikiLinkTargets={wikiLinkTargets}
+          onWikiLinkClick={onWikiLinkClick}
+          backlinksCount={backlinksCount}
+          onOpenBacklinks={onOpenBacklinks}
+        />
+      </div>
     </div>
   );
-}
+});

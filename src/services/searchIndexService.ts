@@ -28,6 +28,7 @@ export interface SearchIndexBlock {
   headingId?: string;
   headingText?: string;
   date?: string;
+  tokens?: string[];
 }
 
 export interface SearchIndexDocument {
@@ -461,7 +462,7 @@ export function buildVaultSearchIndex(documents: IndexedDocument[]): VaultSearch
         linkIndex.get(link)!.add(block.blockId);
       }
 
-      const tokens = tokenizeText(block.text);
+      const tokens = block.tokens ?? (block.tokens = tokenizeText(block.text));
       for (const token of tokens) {
         if (!termIndex.has(token)) termIndex.set(token, new Set());
         termIndex.get(token)!.add(block.blockId);
@@ -508,7 +509,7 @@ export function updateVaultSearchIndexForDocument(
       for (const link of block.links) {
         currentIndex.linkIndex.get(link)?.delete(block.blockId);
       }
-      const tokens = tokenizeText(block.text);
+      const tokens = block.tokens ?? tokenizeText(block.text);
       for (const token of tokens) {
         currentIndex.termIndex.get(token)?.delete(block.blockId);
       }
@@ -534,7 +535,7 @@ export function updateVaultSearchIndexForDocument(
       currentIndex.linkIndex.get(link)!.add(block.blockId);
     }
 
-    const tokens = tokenizeText(block.text);
+    const tokens = block.tokens ?? (block.tokens = tokenizeText(block.text));
     for (const token of tokens) {
       if (!currentIndex.termIndex.has(token)) currentIndex.termIndex.set(token, new Set());
       currentIndex.termIndex.get(token)!.add(block.blockId);

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { EditorState, Compartment, type Extension } from "@codemirror/state";
 import {
   EditorView,
@@ -25,7 +25,7 @@ import {
 import { tags } from "@lezer/highlight";
 import { markdown } from "@codemirror/lang-markdown";
 import { oneDark } from "@codemirror/theme-one-dark";
-import { autocompletion, closeBrackets, closeBracketsKeymap, type CompletionContext, type CompletionResult } from "@codemirror/autocomplete";
+import { autocompletion, closeBrackets, closeBracketsKeymap, startCompletion, type CompletionContext, type CompletionResult } from "@codemirror/autocomplete";
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
 import type { ThemeMode } from "../core/types";
 import { matchSlashCommands, getCommandTemplate } from "../services/slashCommands";
@@ -222,7 +222,7 @@ function resolveHighlightExtensions(theme: ThemeMode, customBaseTheme: Extension
   return [customBaseTheme, syntaxHighlighting(lightHighlightStyle), syntaxHighlighting(defaultHighlightStyle, { fallback: true })];
 }
 
-export function EditorPane({
+export const EditorPane = memo(function EditorPane({
   value,
   onChange,
   theme,
@@ -464,15 +464,15 @@ export function EditorPane({
       if (rawQuery.includes("#^")) {
         const [docPart, blockQuery] = rawQuery.split("#^");
         const blockClean = (blockQuery || "").toLowerCase();
-        const docText = context.state.doc.toString();
         const blockMatches: { id: string; snippet: string }[] = [];
-        const lines = docText.split(/\r?\n/);
-        for (let i = 0; i < lines.length; i++) {
-          const m = lines[i].match(/\s\^([a-zA-Z0-9_-]+)$/);
+        const totalLines = context.state.doc.lines;
+        for (let i = 1; i <= totalLines; i++) {
+          const lineText = context.state.doc.line(i).text;
+          const m = lineText.match(/\s\^([a-zA-Z0-9_-]+)$/);
           if (m) {
             const blockId = m[1];
             if (!blockClean || blockId.toLowerCase().includes(blockClean)) {
-              const snippet = lines[i].replace(/\s\^([a-zA-Z0-9_-]+)$/, "").trim();
+              const snippet = lineText.replace(/\s\^([a-zA-Z0-9_-]+)$/, "").trim();
               blockMatches.push({ id: blockId, snippet: snippet.slice(0, 40) });
             }
           }
@@ -529,19 +529,24 @@ export function EditorPane({
     };
 
     const slashCommandCompletionSource = (context: CompletionContext): CompletionResult | null => {
-      // Trigger when user types / at line start or after space/newline
-      const word = context.matchBefore(/(?:^|[\r\n\s])\/([a-zA-Z0-9_\u4e00-\u9fa5-]*)$/);
+      // Trigger when user types / at line start or anywhere in paragraph (beginning, middle, end)
+      const word = context.matchBefore(/\/([a-zA-Z0-9_\u4e00-\u9fa5-]*)$/);
       if (!word) return null;
 
-      const slashIndex = word.text.lastIndexOf("/");
-      const query = word.text.slice(slashIndex + 1);
-      const fromPos = word.from + slashIndex;
+      // Smart avoidance: do not trigger on URLs (http://, https://), code comments (//), or escape slashes (\/)
+      if (word.from > 0) {
+        const charBefore = context.state.doc.sliceString(word.from - 1, word.from);
+        if (charBefore === "/" || charBefore === ":" || charBefore === "\\") {
+          return null;
+        }
+      }
 
+      const query = word.text.slice(1);
       const matchedCommands = matchSlashCommands(query);
       if (matchedCommands.length === 0) return null;
 
       return {
-        from: fromPos,
+        from: word.from,
         to: context.pos,
         options: matchedCommands.map((cmd) => {
           const { text, cursorOffset } = getCommandTemplate(cmd);
@@ -556,6 +561,14 @@ export function EditorPane({
                 changes: { from, to, insert: text },
                 selection: { anchor: from + cursorOffset },
               });
+              if (cmd.id === "wikilink") {
+                // Instantly popup wikilink completion popup for seamless note selection
+                window.setTimeout(() => {
+                  try {
+                    startCompletion(view);
+                  } catch {}
+                }, 25);
+              }
             },
           };
         }),
@@ -775,4 +788,4 @@ export function EditorPane({
       )}
     </div>
   );
-}
+});

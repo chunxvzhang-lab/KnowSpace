@@ -30,6 +30,7 @@ export function LocalGraphView({
     inDegree: number;
     outDegree: number;
     isCurrent: boolean;
+    folderGroup?: string;
   } | null>(null);
 
   useEffect(() => {
@@ -49,6 +50,7 @@ export function LocalGraphView({
     const normalBorder = isEink ? "#000000" : isDark ? "#64748b" : "#cbd5e1";
     const spaceBg = isEink ? "#777777" : "#f59e0b";
     const edgeColor = isEink ? "rgba(0, 0, 0, 0.45)" : isDark ? "rgba(148, 163, 184, 0.3)" : "rgba(100, 116, 139, 0.3)";
+    const crossFolderEdgeColor = isEink ? "#000000" : isDark ? "#38bdf8" : "#0284c7";
     const textColor = isEink ? "#000000" : isDark ? "#cbd5e1" : "#334155";
 
     // 3. Initialize Cytoscape with low-overhead flags
@@ -118,6 +120,17 @@ export function LocalGraphView({
             "line-style": isEink ? "dashed" : "solid",
           },
         },
+        {
+          selector: "edge[?isCrossFolder]",
+          style: {
+            "line-color": crossFolderEdgeColor,
+            "target-arrow-color": crossFolderEdgeColor,
+            "line-style": "dashed",
+            "line-dash-pattern": [5, 4],
+            width: 1.6,
+            opacity: 0.9,
+          },
+        },
       ] as any,
       layout: {
         name: "concentric",
@@ -148,6 +161,7 @@ export function LocalGraphView({
         inDegree: node.data("inDegree") || 0,
         outDegree: node.data("outDegree") || 0,
         isCurrent: Boolean(node.data("isCurrent")),
+        folderGroup: node.data("folderGroup"),
       });
       containerRef.current?.style.setProperty("cursor", "pointer");
     });
@@ -251,6 +265,11 @@ export function LocalGraphView({
         <div className="local-graph-node-hint">
           <strong>{hoverNode.label}</strong>
           {hoverNode.isCurrent && <span className="current-tag">当前</span>}
+          {hoverNode.folderGroup && (
+            <span style={{ fontSize: 10, color: "#38bdf8", marginLeft: 4 }}>
+              [{hoverNode.folderGroup}]
+            </span>
+          )}
           <div className="hint-meta">
             入度: {hoverNode.inDegree} · 出度: {hoverNode.outDegree}
           </div>

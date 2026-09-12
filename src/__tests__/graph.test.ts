@@ -262,4 +262,41 @@ describe("graphService", () => {
     expect(graph.edges[0].source).toBe("chap-notes");
     expect(graph.edges[0].target).toBe("chap-canvas");
   });
+
+  it("identifies cross-folder edges and filters by crossFolderOnly", () => {
+    const manifest: BookManifest = {
+      id: "folder-book",
+      title: "Folder Book",
+      chapters: [
+        { id: "doc-a", title: "Doc A", src: "guides/docA.md" },
+        { id: "doc-b", title: "Doc B", src: "guides/docB.md" },
+        { id: "doc-c", title: "Doc C", src: "reference/docC.md" },
+      ],
+    };
+    const index = createBacklinkIndex([]);
+    // doc-a links to doc-b (same folder: guides) and doc-c (cross-folder: guides -> reference)
+    updateDocumentInIndex(index, "doc-a", "Doc A", "Link to [[Doc B]] and [[Doc C]].", "guides/docA.md");
+    updateDocumentInIndex(index, "doc-b", "Doc B", "Internal doc.", "guides/docB.md");
+    updateDocumentInIndex(index, "doc-c", "Doc C", "Reference doc.", "reference/docC.md");
+
+    const graph = buildGraphDataFromIndex(manifest, index, "doc-a");
+    expect(graph.nodes.length).toBe(3);
+    expect(graph.edges.length).toBe(2);
+
+    const edgeSame = graph.edges.find((e) => e.target === "doc-b")!;
+    expect(edgeSame.isCrossFolder).toBe(false);
+    expect(edgeSame.sourceDir).toBe("guides");
+    expect(edgeSame.targetDir).toBe("guides");
+
+    const edgeCross = graph.edges.find((e) => e.target === "doc-c")!;
+    expect(edgeCross.isCrossFolder).toBe(true);
+    expect(edgeCross.sourceDir).toBe("guides");
+    expect(edgeCross.targetDir).toBe("reference");
+
+    // Filter crossFolderOnly
+    const crossOnly = filterGraphData(graph, { crossFolderOnly: true });
+    expect(crossOnly.edges.length).toBe(1);
+    expect(crossOnly.edges[0].target).toBe("doc-c");
+    expect(crossOnly.nodes.map((n) => n.id).sort()).toEqual(["doc-a", "doc-c"].sort());
+  });
 });

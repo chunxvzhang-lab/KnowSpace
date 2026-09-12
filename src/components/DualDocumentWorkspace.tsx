@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import type { EditorViewMode, RenderedChapter, ThemeMode } from "../core/types";
 import type { LightboxMedia } from "./MediaLightbox";
 import type { MermaidTheme } from "../services/mermaid";
@@ -48,7 +48,7 @@ type DualDocumentWorkspaceProps = {
   onCloseSecondary: () => void;
 };
 
-export function DualDocumentWorkspace({
+export const DualDocumentWorkspace = memo(function DualDocumentWorkspace({
   primaryTitle,
   viewMode,
   source,
@@ -250,4 +250,4 @@ export function DualDocumentWorkspace({
       </div>
     </div>
   );
-}
+});

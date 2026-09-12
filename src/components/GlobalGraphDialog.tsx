@@ -78,6 +78,8 @@ export function GlobalGraphDialog({
 
   const [searchQuery, setSearchQuery] = useState("");
   const [hideIsolates, setHideIsolates] = useState(true);
+  const [clusterByFolder, setClusterByFolder] = useState(false);
+  const [crossFolderOnly, setCrossFolderOnly] = useState(false);
   const [typeFilter, setTypeFilter] = useState<"all" | "chapter" | "space">("all");
   const [selectedNode, setSelectedNode] = useState<{
     id: string;
@@ -87,6 +89,8 @@ export function GlobalGraphDialog({
     inDegree: number;
     outDegree: number;
     isCurrent: boolean;
+    folderGroup?: string;
+    crossFolderCount?: number;
   } | null>(null);
 
   const [isSpacePanning, setIsSpacePanning] = useState(false);
@@ -118,8 +122,10 @@ export function GlobalGraphDialog({
       hideIsolates,
       query: searchQuery,
       typeFilter,
+      clusterByFolder,
+      crossFolderOnly,
     });
-  }, [graphData, hideIsolates, searchQuery, typeFilter]);
+  }, [graphData, hideIsolates, searchQuery, typeFilter, clusterByFolder, crossFolderOnly]);
 
   // Handle ESC key and Spacebar panning mode
   useEffect(() => {
@@ -183,24 +189,25 @@ export function GlobalGraphDialog({
     const normalBorder = isEink ? "#000000" : isDark ? "#64748b" : "#cbd5e1";
     const spaceBg = isEink ? "#777777" : "#f59e0b";
     const edgeColor = isEink ? "rgba(0, 0, 0, 0.45)" : isDark ? "rgba(148, 163, 184, 0.28)" : "rgba(100, 116, 139, 0.25)";
+    const crossFolderEdgeColor = isEink ? "#000000" : isDark ? "#38bdf8" : "#0284c7";
     const nodeTextColor = isEink ? "#000000" : isDark ? "#f8fafc" : "#0f172a";
-    const textOutlineColor = isEink ? "#ffffff" : isDark ? "#060911" : "#ffffff";
+    const textOutlineColor = isEink ? "#ffffff" : isDark ? "#0b0f19" : "#ffffff";
 
-    // 1. Compute 2D organic force-directed positions in < 3ms (no 1D stacking, no collision)
+    // 1. Compute 2D organic force-directed positions in < 3ms
     const positions = computeOrganicGraphPositions(filteredData);
     const elements = toCytoscapeElements(filteredData);
 
     const cy = cytoscape({
       container: containerRef.current,
       elements,
-      wheelSensitivity: 4.8, // Snappy & natural zoom (previously 0.22 was ~22x too slow on mouse/trackpad)
-      minZoom: 0.1,
-      maxZoom: 5.0,
-      textureOnViewport: false, // Direct 2D canvas draw: 60fps buttery smooth for knowledge graphs
+      wheelSensitivity: 3.5,
+      minZoom: 0.15,
+      maxZoom: 4.5,
+      textureOnViewport: false,
       motionBlur: false,
       pixelRatio: "auto",
       boxSelectionEnabled: false,
-      autounselectify: false,
+      autounselectify: true,
       style: [
         {
           selector: "core",
@@ -215,7 +222,7 @@ export function GlobalGraphDialog({
           selector: "node",
           style: {
             label: "data(label)",
-            "font-size": "11.5px",
+            "font-size": "11px",
             "font-family": "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
             "font-weight": 600,
             color: nodeTextColor,
@@ -237,6 +244,9 @@ export function GlobalGraphDialog({
             },
             "background-color": (ele: any) => {
               if (ele.data("isCurrent")) return currentBg;
+              if (clusterByFolder && ele.data("clusterColor")) {
+                return isEink ? normalBg : ele.data("clusterColor");
+              }
               if (ele.data("type") === "space") return spaceBg;
               return normalBg;
             },
@@ -247,12 +257,15 @@ export function GlobalGraphDialog({
             "overlay-padding": 0,
             "active-bg-opacity": 0,
             "active-bg-size": 0,
+            "transition-property": "opacity, border-width, border-color, background-color",
+            "transition-duration": "0.18s",
+            "transition-timing-function": "ease-out",
           },
         },
         {
           selector: "edge",
           style: {
-            width: 1.5,
+            width: 1.4,
             "line-color": edgeColor,
             "target-arrow-color": edgeColor,
             "target-arrow-shape": "triangle",
@@ -260,17 +273,72 @@ export function GlobalGraphDialog({
             "arrow-scale": 0.7,
             "line-style": isEink ? "dashed" : "solid",
             "overlay-opacity": 0,
+            "transition-property": "opacity, line-color, width, target-arrow-color",
+            "transition-duration": "0.18s",
+            "transition-timing-function": "ease-out",
           },
         },
         {
-          selector: ".highlighted",
+          selector: "edge[?isCrossFolder]",
+          style: {
+            "line-color": crossFolderEdgeColor,
+            "target-arrow-color": crossFolderEdgeColor,
+            "line-style": "dashed",
+            "line-dash-pattern": [5, 4],
+            width: 1.6,
+            opacity: 0.9,
+          },
+        },
+        {
+          // 鼠标悬停探灯连线点亮效果
+          selector: "node.hovered",
+          style: {
+            "z-index": 1000,
+            opacity: 1,
+            "border-width": 2,
+            "border-color": isEink ? "#000000" : isDark ? "#38bdf8" : "#0284c7",
+            "border-opacity": 0.85,
+          },
+        },
+        {
+          selector: "edge.hovered",
+          style: {
+            "line-color": isEink ? "#000000" : isDark ? "#38bdf8" : "#0284c7",
+            "target-arrow-color": isEink ? "#000000" : isDark ? "#38bdf8" : "#0284c7",
+            width: 2.2,
+            opacity: 1,
+            "z-index": 1000,
+          },
+        },
+        {
+          selector: "edge.highlighted",
           style: {
             "line-color": isEink ? "#000000" : "#818cf8",
             "target-arrow-color": isEink ? "#000000" : "#818cf8",
-            width: 2.2,
+            width: 2.4,
             opacity: 1,
             "z-index": 999,
+          },
+        },
+        {
+          selector: "node.highlighted",
+          style: {
+            opacity: 1,
+            "background-opacity": 1,
             "border-width": 0,
+            "z-index": 999,
+          },
+        },
+        {
+          selector: "edge.highlighted[?isCrossFolder]",
+          style: {
+            "line-color": isEink ? "#000000" : "#06b6d4",
+            "target-arrow-color": isEink ? "#000000" : "#06b6d4",
+            "line-style": "dashed",
+            "line-dash-pattern": [6, 3],
+            width: 2.6,
+            opacity: 1,
+            "z-index": 999,
           },
         },
         {
@@ -288,17 +356,27 @@ export function GlobalGraphDialog({
 
     cyRef.current = cy;
 
-    // Node Cursor Feedback
-    cy.on("mouseover", "node", () => {
+    // Node Cursor Feedback & Hover Headlight
+    let activeSelectedId: string | null = null;
+
+    cy.on("mouseover", "node", (evt) => {
+      const node = evt.target;
       if (containerRef.current) {
         containerRef.current.style.cursor = "pointer";
       }
+      if (!activeSelectedId) {
+        node.addClass("hovered");
+        node.connectedEdges().addClass("hovered");
+      }
     });
 
-    cy.on("mouseout", "node", () => {
+    cy.on("mouseout", "node", (evt) => {
+      const node = evt.target;
       if (containerRef.current) {
         containerRef.current.style.cursor = isSpacePanningRef.current ? "grab" : "default";
       }
+      node.removeClass("hovered");
+      node.connectedEdges().removeClass("hovered");
     });
 
     cy.on("grab", "node", () => {
@@ -316,17 +394,30 @@ export function GlobalGraphDialog({
     // Node tap & double tap logic
     let lastTapTime = 0;
     let lastTapNodeId = "";
-    let activeSelectedId: string | null = null;
+    let lastOpenTime = 0;
+    let lastOpenNodeId = "";
+
+    const openNodeDoc = (nodeId: string) => {
+      const now = Date.now();
+      if (now - lastOpenTime < 400 && lastOpenNodeId === nodeId) {
+        return;
+      }
+      lastOpenTime = now;
+      lastOpenNodeId = nodeId;
+      onSelectNodeRef.current(nodeId);
+      onCloseRef.current();
+    };
 
     cy.on("tap", "node", (evt) => {
       const node = evt.target;
       const nodeId = node.data("id");
       const currentTime = Date.now();
 
-      // Double-click detection (320ms window)
-      if (currentTime - lastTapTime < 320 && lastTapNodeId === nodeId) {
-        onSelectNodeRef.current(nodeId);
-        onCloseRef.current();
+      // Double-click detection (350ms window)
+      if (currentTime - lastTapTime < 350 && lastTapNodeId === nodeId) {
+        openNodeDoc(nodeId);
+        lastTapTime = 0;
+        lastTapNodeId = "";
         return;
       }
       lastTapTime = currentTime;
@@ -343,6 +434,8 @@ export function GlobalGraphDialog({
       }
 
       activeSelectedId = nodeId;
+      const nodeEdges = node.connectedEdges();
+      const crossCount = nodeEdges.filter((e: any) => Boolean(e.data("isCrossFolder"))).length;
       setSelectedNode({
         id: node.data("id"),
         label: node.data("label"),
@@ -351,6 +444,8 @@ export function GlobalGraphDialog({
         inDegree: node.data("inDegree") || 0,
         outDegree: node.data("outDegree") || 0,
         isCurrent: Boolean(node.data("isCurrent")),
+        folderGroup: node.data("folderGroup"),
+        crossFolderCount: crossCount,
       });
 
       // Highlight neighborhood
@@ -362,9 +457,20 @@ export function GlobalGraphDialog({
       });
     });
 
+    // Native dbltap event fallback
+    cy.on("dbltap", "node", (evt) => {
+      const node = evt.target;
+      const nodeId = node.data("id");
+      openNodeDoc(nodeId);
+      lastTapTime = 0;
+      lastTapNodeId = "";
+    });
+
     // Click background: clear selection and highlights
     cy.on("tap", (evt) => {
       if (evt.target === cy) {
+        lastTapTime = 0;
+        lastTapNodeId = "";
         activeSelectedId = null;
         setSelectedNode(null);
         cy.batch(() => {
@@ -392,6 +498,9 @@ export function GlobalGraphDialog({
     const initialTarget = findCurrentNode(cy, currentDocIdRef.current);
     if (initialTarget && initialTarget.length > 0) {
       cy.center(initialTarget);
+      const crossCount = initialTarget.isNode()
+        ? (initialTarget as any).connectedEdges().filter((e: any) => Boolean(e.data("isCrossFolder"))).length
+        : 0;
       setSelectedNode({
         id: initialTarget.data("id"),
         label: initialTarget.data("label"),
@@ -400,6 +509,8 @@ export function GlobalGraphDialog({
         inDegree: initialTarget.data("inDegree") || 0,
         outDegree: initialTarget.data("outDegree") || 0,
         isCurrent: Boolean(initialTarget.data("isCurrent")),
+        folderGroup: initialTarget.data("folderGroup"),
+        crossFolderCount: crossCount,
       });
       cy.batch(() => {
         cy.elements().removeClass("highlighted dimmed");
@@ -482,6 +593,8 @@ export function GlobalGraphDialog({
       },
     });
 
+    const nodeEdges = targetNode.connectedEdges();
+    const crossCount = nodeEdges.filter((e: any) => Boolean(e.data("isCrossFolder"))).length;
     setSelectedNode({
       id: targetNode.data("id"),
       label: targetNode.data("label"),
@@ -490,6 +603,8 @@ export function GlobalGraphDialog({
       inDegree: targetNode.data("inDegree") || 0,
       outDegree: targetNode.data("outDegree") || 0,
       isCurrent: Boolean(targetNode.data("isCurrent")),
+      folderGroup: targetNode.data("folderGroup"),
+      crossFolderCount: crossCount,
     });
 
     cy.batch(() => {
@@ -605,6 +720,24 @@ export function GlobalGraphDialog({
           <div className="graph-filters">
             <button
               type="button"
+              className={`graph-toggle-btn ${clusterByFolder ? "is-active" : ""}`}
+              onClick={() => setClusterByFolder((prev) => !prev)}
+              title="按笔记所在文件夹进行色彩聚类染色"
+            >
+              <span>🎨 目录聚类</span>
+            </button>
+
+            <button
+              type="button"
+              className={`graph-toggle-btn ${crossFolderOnly ? "is-active" : ""}`}
+              onClick={() => setCrossFolderOnly((prev) => !prev)}
+              title="仅显示跨文件夹之间的引用连线"
+            >
+              <span>🌐 跨文件夹关系</span>
+            </button>
+
+            <button
+              type="button"
               className={`graph-toggle-btn ${hideIsolates ? "is-active" : ""}`}
               onClick={() => setHideIsolates((prev) => !prev)}
               title="隐藏 0 入度与 0 出度的孤岛节点"
@@ -695,22 +828,64 @@ export function GlobalGraphDialog({
           {/* Selected Node Details Card (Bottom-Left) */}
           {selectedNode && (
             <div className="graph-node-inspector">
-              <div className="inspector-header">
-                <span className="inspector-type">
-                  {selectedNode.type === "space" ? "⚡ 闪念笔记" : "📄 文档章节"}
-                </span>
-                {selectedNode.isCurrent && (
-                  <span className="inspector-current-tag">当前阅读</span>
-                )}
+              {/* Top row: Badges on left, Close button on right */}
+              <div className="inspector-meta-row">
+                <div className="inspector-badges">
+                  <span className={`node-type-badge type-${selectedNode.type}`}>
+                    {selectedNode.type === "space" ? "⚡ 闪念" : "📄 文档"}
+                  </span>
+                  {selectedNode.folderGroup && (
+                    <span
+                      className="node-folder-badge"
+                      title={`所属目录: ${selectedNode.folderGroup}`}
+                    >
+                      📁 {selectedNode.folderGroup}
+                    </span>
+                  )}
+                  {selectedNode.isCurrent && (
+                    <span className="node-current-badge">当前阅读</span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  className="inspector-close-btn"
+                  onClick={() => setSelectedNode(null)}
+                  title="关闭详情卡片"
+                  aria-label="关闭详情卡片"
+                >
+                  <X size={13} />
+                </button>
               </div>
-              <h3 className="inspector-title">{selectedNode.label}</h3>
+
+              {/* Dedicated Title Row */}
+              <h4 className="inspector-card-title" title={selectedNode.label}>
+                {selectedNode.label}
+              </h4>
+
+              {/* Optional Path Subtitle */}
               {selectedNode.path && (
-                <div className="inspector-path">{selectedNode.path}</div>
+                <div className="inspector-card-path" title={selectedNode.path}>
+                  {selectedNode.path}
+                </div>
               )}
-              <div className="inspector-stats">
-                <span>被引用 (入度): <strong>{selectedNode.inDegree}</strong></span>
-                <span>正向引用 (出度): <strong>{selectedNode.outDegree}</strong></span>
+
+              {/* 3-Column Metrics Grid */}
+              <div className="inspector-metrics-grid">
+                <div className="inspector-stat-cell" title="反向双链引用数 (入度)">
+                  <span className="stat-num">{selectedNode.inDegree}</span>
+                  <span className="stat-label">被引用</span>
+                </div>
+                <div className="inspector-stat-cell" title="正向引出双链数 (出度)">
+                  <span className="stat-num">{selectedNode.outDegree}</span>
+                  <span className="stat-label">引出</span>
+                </div>
+                <div className="inspector-stat-cell" title="跨越不同文件夹的双链连线数">
+                  <span className="stat-num highlight-cyan">{selectedNode.crossFolderCount ?? 0}</span>
+                  <span className="stat-label">跨目录</span>
+                </div>
               </div>
+
+              {/* Open Document Action */}
               <button
                 type="button"
                 className="inspector-open-btn"
@@ -734,6 +909,9 @@ export function GlobalGraphDialog({
             </div>
             <div className="legend-item">
               <span className="legend-dot dot-space" /> 闪念 Space
+            </div>
+            <div className="legend-item">
+              <span className="legend-dot" style={{ background: "#38bdf8", borderRadius: 2 }} /> 跨文件夹连线
             </div>
             <div className="legend-item hint-text">
               提示：双击节点直接打开

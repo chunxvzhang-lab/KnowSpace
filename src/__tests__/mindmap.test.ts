@@ -14,6 +14,7 @@ import {
   updateNodesStyle,
   parseStyleComment,
   formatStyleComment,
+  syncMindmapToDocument,
 } from "../services/mindmapService";
 
 describe("mindmapService", () => {
@@ -437,6 +438,145 @@ describe("mindmapService", () => {
       expect(serialized).toContain("align=center");
       expect(serialized).toContain("width=320");
       expect(serialized).toContain("height=110");
+    });
+  });
+
+  describe("syncMindmapToDocument (Non-destructive bidirectional synchronization)", () => {
+    const complexDoc = `# 项目工程实践指南
+
+这是指南的前言引言部分，包含了非常重要的整体背景。
+必须原封不动地保留！
+
+## 第一章：技术选型
+
+选型考虑了诸多因素，如下表所示：
+
+| 框架 | 版本 | 理由 |
+| --- | --- | --- |
+| React | 19 | 流式渲染 |
+| Vite | 6 | 极速热更新 |
+
+这里还有代码示例：
+\`\`\`typescript
+export function initializeApp() {
+  console.log("App ready");
+}
+\`\`\`
+
+### 1.1 前端工程化
+
+前端工程化详细阐述：
+- 模块化
+- 自动化构建
+
+## 第二章：架构设计
+
+系统的整体微架构设计与高可用保障。
+
+### 2.1 状态同步机
+
+状态机核心逻辑与数据流。
+
+## 第三章：运维部署
+
+Docker 与 Kubernetes 自动化部署流程。
+`;
+
+    it("preserves 100% of all paragraphs, tables, and code blocks when renaming a section", () => {
+      const tree = parseMarkdownToMindmapTree(complexDoc);
+      // Find '第一章：技术选型'
+      const chap1 = tree.children.find((c) => c.text === "第一章：技术选型");
+      expect(chap1).toBeDefined();
+
+      // Rename section in mindmap
+      const renamedTree = updateNodeText(tree, chap1!.id, "第一章：前沿技术选型与论证");
+      const syncedDoc = syncMindmapToDocument(complexDoc, renamedTree);
+
+      // Verify title updated
+      expect(syncedDoc).toContain("## 第一章：前沿技术选型与论证");
+      // Verify prelude preserved 100%
+      expect(syncedDoc).toContain("这是指南的前言引言部分，包含了非常重要的整体背景。");
+      expect(syncedDoc).toContain("必须原封不动地保留！");
+      // Verify table preserved 100%
+      expect(syncedDoc).toContain("| React | 19 | 流式渲染 |");
+      // Verify code block preserved 100%
+      expect(syncedDoc).toContain("console.log(\"App ready\");");
+      // Verify sub-section preserved 100%
+      expect(syncedDoc).toContain("### 1.1 前端工程化");
+      expect(syncedDoc).toContain("- 自动化构建");
+      // Verify other chapters preserved 100%
+      expect(syncedDoc).toContain("## 第二章：架构设计");
+      expect(syncedDoc).toContain("## 第三章：运维部署");
+    });
+
+    it("adds a new section in mindmap and inserts clean heading in document without affecting existing content", () => {
+      const tree = parseMarkdownToMindmapTree(complexDoc);
+      const chap2 = tree.children.find((c) => c.text === "第二章：架构设计")!;
+
+      // Add a new sub-topic under Chapter 2
+      const { nextTree } = addChildNode(tree, chap2.id, "2.2 存储层设计");
+      const syncedDoc = syncMindmapToDocument(complexDoc, nextTree);
+
+      expect(syncedDoc).toContain("### 2.2 存储层设计");
+      // Existing sections remain intact
+      expect(syncedDoc).toContain("### 2.1 状态同步机");
+      expect(syncedDoc).toContain("状态机核心逻辑与数据流。");
+      expect(syncedDoc).toContain("## 第三章：运维部署");
+    });
+
+    it("deletes a section in mindmap and removes it from document while preserving all other sections", () => {
+      const tree = parseMarkdownToMindmapTree(complexDoc);
+      const chap3 = tree.children.find((c) => c.text === "第三章：运维部署")!;
+
+      const { nextTree } = deleteNode(tree, chap3.id);
+      const syncedDoc = syncMindmapToDocument(complexDoc, nextTree);
+
+      // Chapter 3 is removed
+      expect(syncedDoc).not.toContain("## 第三章：运维部署");
+      expect(syncedDoc).not.toContain("Docker 与 Kubernetes 自动化部署流程。");
+
+      // Chapters 1 and 2 and their full bodies remain
+      expect(syncedDoc).toContain("## 第一章：技术选型");
+      expect(syncedDoc).toContain("## 第二章：架构设计");
+      expect(syncedDoc).toContain("console.log(\"App ready\");");
+    });
+
+    it("reorders sections in mindmap and reflects the new section order in document with their bodies", () => {
+      const simpleDoc = `# 主题
+
+## 章节 A
+内容 A 段落。
+
+## 章节 B
+内容 B 段落。
+`;
+      const tree = parseMarkdownToMindmapTree(simpleDoc);
+      // Swap children: [B, A]
+      const reorderedTree = {
+        ...tree,
+        children: [tree.children[1], tree.children[0]],
+      };
+
+      const syncedDoc = syncMindmapToDocument(simpleDoc, reorderedTree);
+
+      const idxB = syncedDoc.indexOf("## 章节 B");
+      const idxA = syncedDoc.indexOf("## 章节 A");
+
+      expect(idxB).toBeLessThan(idxA);
+      expect(syncedDoc).toContain("内容 B 段落。");
+      expect(syncedDoc).toContain("内容 A 段落。");
+    });
+
+    it("falls back safely to outline serialization when document has only bullet lists", () => {
+      const listDoc = `- 项目 A\n  - 任务 1\n- 项目 B\n`;
+      const tree = parseMarkdownToMindmapTree(listDoc);
+      const { nextTree } = addChildNode(tree, tree.children[1].id, "任务 2");
+
+      const syncedDoc = syncMindmapToDocument(listDoc, nextTree);
+      expect(syncedDoc).toContain("- 项目 A");
+      expect(syncedDoc).toContain("  - 任务 1");
+      expect(syncedDoc).toContain("- 项目 B");
+      expect(syncedDoc).toContain("  - 任务 2");
     });
   });
 });

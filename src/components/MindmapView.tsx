@@ -19,6 +19,7 @@ import {
   Search,
   FoldVertical,
   UnfoldVertical,
+  RefreshCw,
 } from "lucide-react";
 import type { Heading, ThemeMode, MindmapNodeShape, MindmapLineStyle, MindmapTextAlign } from "../core/types";
 import {
@@ -27,6 +28,7 @@ import {
   layoutMindmap,
   parseMarkdownToMindmapTree,
   mindmapTreeToMarkdown,
+  syncMindmapToDocument,
   addChildNode,
   addSiblingNode,
   deleteNode,
@@ -207,13 +209,16 @@ export const MindmapView = memo(function MindmapView({
   }, [source, title, headings]);
 
   const [tree, setTree] = useState<MindmapNode>(initialTree);
+  const [hasUnsyncedChanges, setHasUnsyncedChanges] = useState(false);
 
-  // Keep tree in sync if external source changes, but prevent feedback loop echo
+  // Keep tree in sync if external document structure changes, while protecting active unsynced mindmap edits
   useEffect(() => {
     if (source && source.trim() && source !== lastEmittedSourceRef.current) {
-      setTree(parseMarkdownToMindmapTree(source, title));
+      if (!hasUnsyncedChanges) {
+        setTree(parseMarkdownToMindmapTree(source, title));
+      }
     }
-  }, [source, title]);
+  }, [source, title, hasUnsyncedChanges]);
 
   // Selected node(s), inline editing, and context menu states
   const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set([tree.id]));
@@ -397,20 +402,15 @@ export const MindmapView = memo(function MindmapView({
     return () => clearTimeout(timer);
   }, []);
 
-  // Tree mutation & Markdown synchronization
+  // Tree mutation & Non-destructive Markdown synchronization
   const applyTreeChange = useCallback(
     (nextTree: MindmapNode) => {
       undoStackRef.current.push(tree);
       redoStackRef.current = [];
       setTree(nextTree);
-
-      if (onSourceChange) {
-        const md = mindmapTreeToMarkdown(nextTree);
-        lastEmittedSourceRef.current = md;
-        onSourceChange(md);
-      }
+      setHasUnsyncedChanges(true);
     },
-    [tree, onSourceChange]
+    [tree]
   );
 
   const handleUndo = useCallback(() => {
@@ -418,24 +418,25 @@ export const MindmapView = memo(function MindmapView({
     const prev = undoStackRef.current.pop()!;
     redoStackRef.current.push(tree);
     setTree(prev);
-    if (onSourceChange) {
-      const md = mindmapTreeToMarkdown(prev);
-      lastEmittedSourceRef.current = md;
-      onSourceChange(md);
-    }
-  }, [tree, onSourceChange]);
+    setHasUnsyncedChanges(true);
+  }, [tree]);
 
   const handleRedo = useCallback(() => {
     if (redoStackRef.current.length === 0) return;
     const next = redoStackRef.current.pop()!;
     undoStackRef.current.push(tree);
     setTree(next);
-    if (onSourceChange) {
-      const md = mindmapTreeToMarkdown(next);
-      lastEmittedSourceRef.current = md;
-      onSourceChange(md);
-    }
-  }, [tree, onSourceChange]);
+    setHasUnsyncedChanges(true);
+  }, [tree]);
+
+  const handleSyncToDocument = useCallback(() => {
+    if (!onSourceChange) return;
+    const currentDoc = source || "";
+    const syncedMarkdown = syncMindmapToDocument(currentDoc, tree);
+    lastEmittedSourceRef.current = syncedMarkdown;
+    onSourceChange(syncedMarkdown);
+    setHasUnsyncedChanges(false);
+  }, [source, tree, onSourceChange]);
 
   // Interactive Topic Actions
   const handleAddChild = useCallback(
@@ -646,6 +647,12 @@ export const MindmapView = memo(function MindmapView({
         return;
       }
 
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        handleSyncToDocument();
+        return;
+      }
+
       if (e.key === "Tab" || e.key === "Insert") {
         e.preventDefault();
         handleAddChild();
@@ -706,6 +713,7 @@ export const MindmapView = memo(function MindmapView({
     handleNavigate,
     onClose,
     isSearchOpen,
+    handleSyncToDocument,
   ]);
 
   // Focus and select input on entering edit mode
@@ -1073,6 +1081,25 @@ export const MindmapView = memo(function MindmapView({
         </div>
 
         <div className="mindmap-toolbar-center">
+          {editable && onSourceChange && (
+            <>
+              <div className="mindmap-toolbar-btn-group">
+                <button
+                  type="button"
+                  className={`mindmap-tool-btn text-btn mindmap-sync-doc-btn ${hasUnsyncedChanges ? "is-dirty" : ""}`}
+                  onClick={handleSyncToDocument}
+                  title={hasUnsyncedChanges ? "检测到导图架构修改，点击将章节变更无损同步至文档 (Ctrl+S)" : "导图架构与文档内容保持一致"}
+                >
+                  <RefreshCw size={13} className={hasUnsyncedChanges ? "sync-icon-spin" : "text-muted"} />
+                  <span>{hasUnsyncedChanges ? "同步到文档" : "已同步"}</span>
+                  {hasUnsyncedChanges && <span className="sync-dirty-dot" />}
+                </button>
+              </div>
+
+              <div className="mindmap-toolbar-divider" />
+            </>
+          )}
+
           {editable && (
             <>
               <div className="mindmap-toolbar-btn-group">
@@ -1684,42 +1711,6 @@ export const MindmapView = memo(function MindmapView({
                     </g>
                   )}
 
-                  {/* Quick Add Subtopic Button on Hover/Selection (+ geometrically centered via SVG vector lines) */}
-                  {editable && (isHovered || isSelected) && (
-                    <g
-                      className="mindmap-node-add-btn"
-                      transform={`translate(${node.hasChildren ? node.width + 22 : node.width + 10}, ${node.height / 2})`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        handleAddChild(node.id);
-                      }}
-                    >
-                      <circle r={7.5} className="mindmap-add-circle" fill="#38bdf8" />
-                      {/* Cross lines of plus - guaranteed centered at (0, 0) */}
-                      <line
-                        x1={-3.2}
-                        y1={0}
-                        x2={3.2}
-                        y2={0}
-                        stroke="#ffffff"
-                        strokeWidth={1.6}
-                        strokeLinecap="round"
-                        pointerEvents="none"
-                      />
-                      <line
-                        x1={0}
-                        y1={-3.2}
-                        x2={0}
-                        y2={3.2}
-                        stroke="#ffffff"
-                        strokeWidth={1.6}
-                        strokeLinecap="round"
-                        pointerEvents="none"
-                      />
-                      <title>添加子主题 (Tab)</title>
-                    </g>
-                  )}
 
                   {/* Manual Resize Handle at bottom-right corner */}
                   {editable && (isHovered || isSelected) && (

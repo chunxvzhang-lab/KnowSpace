@@ -93,6 +93,7 @@ export function GraphViewPane({
   const [viewFilter, setViewFilter] = useState<"all" | "hubs" | "orphans">("all");
   const [clusterByFolder, setClusterByFolder] = useState(false);
   const [showFilterDrawer, setShowFilterDrawer] = useState(false);
+  const [crossFolderOnly, setCrossFolderOnly] = useState(false);
   const [selectedNode, setSelectedNode] = useState<{
     id: string;
     label: string;
@@ -101,6 +102,8 @@ export function GraphViewPane({
     inDegree: number;
     outDegree: number;
     isCurrent: boolean;
+    folderGroup?: string;
+    crossFolderCount?: number;
   } | null>(null);
 
   const [isSpacePanning, setIsSpacePanning] = useState(false);
@@ -113,31 +116,34 @@ export function GraphViewPane({
     if (Number.isFinite(val) && val >= 10 && val <= 500) {
       const clamped = Math.round(val);
       if (cyRef.current) {
-        const cy = cyRef.current;
-        cy.zoom({
+        cyRef.current.zoom({
           level: clamped / 100,
-          renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 },
+          renderedPosition: {
+            x: cyRef.current.width() / 2,
+            y: cyRef.current.height() / 2,
+          },
         });
+        setZoomPercent(clamped);
+        setZoomInputValue(`${clamped}%`);
       }
-      setZoomPercent(clamped);
-      setZoomInputValue(`${clamped}%`);
     } else {
       setZoomInputValue(`${zoomPercent}%`);
     }
   };
 
-  // Filtered graph elements with depth, MOC hubs, orphans, and cluster coloring
+  // Compute filtered dataset
   const filteredData = useMemo(() => {
     return filterGraphData(graphData, {
-      hideIsolates: viewFilter === "orphans" ? false : hideIsolates,
+      hideIsolates,
       query: searchQuery,
       typeFilter,
       depth: hopDepth,
       currentDocId,
       viewFilter,
       clusterByFolder,
+      crossFolderOnly,
     });
-  }, [graphData, hideIsolates, searchQuery, typeFilter, hopDepth, currentDocId, viewFilter, clusterByFolder]);
+  }, [graphData, hideIsolates, searchQuery, typeFilter, hopDepth, currentDocId, viewFilter, clusterByFolder, crossFolderOnly]);
 
   // Handle Spacebar panning mode inside graph pane
   useEffect(() => {
@@ -186,6 +192,7 @@ export function GraphViewPane({
     const normalBg = isEink ? "#444444" : isDark ? "#64748b" : "#94a3b8"; // Slate grey for regular notes
     const spaceBg = isEink ? "#777777" : "#f59e0b"; // Warm amber for space notes
     const edgeColor = isEink ? "rgba(0, 0, 0, 0.4)" : isDark ? "rgba(148, 163, 184, 0.22)" : "rgba(100, 116, 139, 0.2)";
+    const crossFolderEdgeColor = isEink ? "#000000" : isDark ? "#38bdf8" : "#0284c7"; // Cyan/sky blue for cross-folder links
     const nodeTextColor = isEink ? "#000000" : isDark ? "#f8fafc" : "#0f172a";
     const textOutlineColor = isEink ? "#ffffff" : isDark ? "#0b0f19" : "#ffffff";
 
@@ -196,14 +203,14 @@ export function GraphViewPane({
     const cy = cytoscape({
       container: containerRef.current,
       elements,
-      wheelSensitivity: 4.8,
-      minZoom: 0.1,
-      maxZoom: 5.0,
+      wheelSensitivity: 3.5,
+      minZoom: 0.15,
+      maxZoom: 4.5,
       textureOnViewport: false,
       motionBlur: false,
-      pixelRatio: "auto", // 高清视网膜渲染：跟随系统 DPR，消除文字与节点模糊
-      boxSelectionEnabled: false,
+      pixelRatio: "auto",
       // 完全禁用 Cytoscape 内建选中态（选中态会触发默认 :selected 样式与选中反馈绘制）
+      boxSelectionEnabled: false,
       autounselectify: true,
       style: [
         {
@@ -249,15 +256,17 @@ export function GraphViewPane({
               if (ele.data("type") === "space") return spaceBg;
               return normalBg;
             },
-            // Obsidian 极简无边框无选中环风格
+            // 极简风格与平滑过渡
             "border-width": 0,
             "border-opacity": 0,
             "border-style": "solid",
-            // 彻底禁用节点上的 overlay 与 active-bg 遮罩
             "overlay-opacity": 0,
             "overlay-padding": 0,
             "active-bg-opacity": 0,
             "active-bg-size": 0,
+            "transition-property": "opacity, border-width, border-color, background-color",
+            "transition-duration": "0.18s",
+            "transition-timing-function": "ease-out",
           },
         },
         {
@@ -271,22 +280,69 @@ export function GraphViewPane({
             "arrow-scale": 0.65,
             "line-style": isEink ? "dashed" : "solid",
             "overlay-opacity": 0,
+            "transition-property": "opacity, line-color, width, target-arrow-color",
+            "transition-duration": "0.18s",
+            "transition-timing-function": "ease-out",
           },
         },
         {
-          // 高亮规则必须只作用于边：此前 .highlighted 未限定 group，
-          // 导致 width:2 泄漏到节点上，点击后节点被压成 2px 宽的异形（视觉上出现突兀形状）
+          // 跨文件夹引用关系：采用虚线与专属青蓝主色调强化跨边界感知
+          selector: "edge[?isCrossFolder]",
+          style: {
+            "line-color": crossFolderEdgeColor,
+            "target-arrow-color": crossFolderEdgeColor,
+            "line-style": "dashed",
+            "line-dash-pattern": [5, 4],
+            width: 1.5,
+            opacity: 0.9,
+          },
+        },
+        {
+          // 鼠标悬停探灯连线点亮效果
+          selector: "node.hovered",
+          style: {
+            "z-index": 1000,
+            opacity: 1,
+            "border-width": 2,
+            "border-color": isEink ? "#000000" : isDark ? "#38bdf8" : "#0284c7",
+            "border-opacity": 0.85,
+          },
+        },
+        {
+          selector: "edge.hovered",
+          style: {
+            "line-color": isEink ? "#000000" : isDark ? "#38bdf8" : "#0284c7",
+            "target-arrow-color": isEink ? "#000000" : isDark ? "#38bdf8" : "#0284c7",
+            width: 2.0,
+            opacity: 1,
+            "z-index": 1000,
+          },
+        },
+        {
+          // 高亮规则必须只作用于边
           selector: "edge.highlighted",
           style: {
             "line-color": isEink ? "#000000" : "#818cf8",
             "target-arrow-color": isEink ? "#000000" : "#818cf8",
-            width: 2.0,
+            width: 2.2,
             opacity: 1,
             "z-index": 999,
           },
         },
         {
-          // 节点高亮只做“提亮/置顶”，不改动几何尺寸，保证圆形节点形态稳定
+          selector: "edge.highlighted[?isCrossFolder]",
+          style: {
+            "line-color": isEink ? "#000000" : "#06b6d4",
+            "target-arrow-color": isEink ? "#000000" : "#06b6d4",
+            "line-style": "dashed",
+            "line-dash-pattern": [6, 3],
+            width: 2.5,
+            opacity: 1,
+            "z-index": 999,
+          },
+        },
+        {
+          // 节点高亮置顶
           selector: "node.highlighted",
           style: {
             opacity: 1,
@@ -296,7 +352,7 @@ export function GraphViewPane({
           },
         },
         {
-          // 彻底关闭按下/激活态的一切附加绘制（overlay 圆晕、active-bg 灰圆、underlay）
+          // 彻底关闭按下/激活态的一切附加绘制
           selector: ":active",
           style: {
             "overlay-opacity": 0,
@@ -309,7 +365,6 @@ export function GraphViewPane({
           },
         },
         {
-          // 兜底：即便未来开启选中，也不绘制任何选中描边/光环
           selector: ":selected",
           style: {
             "overlay-opacity": 0,
@@ -335,17 +390,27 @@ export function GraphViewPane({
 
     cyRef.current = cy;
 
-    // Node Cursor Feedback
-    cy.on("mouseover", "node", () => {
+    // Node Cursor Feedback & Hover Headlight illumination
+    let activeSelectedId: string | null = null;
+
+    cy.on("mouseover", "node", (evt) => {
+      const node = evt.target;
       if (containerRef.current) {
         containerRef.current.style.cursor = "pointer";
       }
+      if (!activeSelectedId) {
+        node.addClass("hovered");
+        node.connectedEdges().addClass("hovered");
+      }
     });
 
-    cy.on("mouseout", "node", () => {
+    cy.on("mouseout", "node", (evt) => {
+      const node = evt.target;
       if (containerRef.current) {
         containerRef.current.style.cursor = isSpacePanningRef.current ? "grab" : "default";
       }
+      node.removeClass("hovered");
+      node.connectedEdges().removeClass("hovered");
     });
 
     cy.on("grab", "node", () => {
@@ -360,14 +425,40 @@ export function GraphViewPane({
       }
     });
 
-    // Node tap logic: clicking a node immediately loads it in the left editor!
-    let activeSelectedId: string | null = null;
+    let lastTapTime = 0;
+    let lastTapNodeId = "";
+    let lastOpenTime = 0;
+    let lastOpenNodeId = "";
 
+    const openNodeDoc = (nodeId: string) => {
+      const now = Date.now();
+      if (now - lastOpenTime < 400 && lastOpenNodeId === nodeId) {
+        return;
+      }
+      lastOpenTime = now;
+      lastOpenNodeId = nodeId;
+      onSelectNodeRef.current(nodeId);
+    };
+
+    // Node tap logic: single-click highlights node and connections; double-click opens document!
     cy.on("tap", "node", (evt) => {
       const node = evt.target;
       const nodeId = node.data("id");
+      const currentTime = Date.now();
+
+      // Double-click / double-tap detection (350ms window)
+      if (currentTime - lastTapTime < 350 && lastTapNodeId === nodeId) {
+        openNodeDoc(nodeId);
+        lastTapTime = 0;
+        lastTapNodeId = "";
+        return;
+      }
+      lastTapTime = currentTime;
+      lastTapNodeId = nodeId;
 
       activeSelectedId = nodeId;
+      const nodeEdges = node.connectedEdges();
+      const crossCount = nodeEdges.filter((e: any) => Boolean(e.data("isCrossFolder"))).length;
       setSelectedNode({
         id: node.data("id"),
         label: node.data("label"),
@@ -376,6 +467,8 @@ export function GraphViewPane({
         inDegree: node.data("inDegree") || 0,
         outDegree: node.data("outDegree") || 0,
         isCurrent: Boolean(node.data("isCurrent")),
+        folderGroup: node.data("folderGroup"),
+        crossFolderCount: crossCount,
       });
 
       // Highlight neighborhood cleanly
@@ -385,14 +478,22 @@ export function GraphViewPane({
         neighborhood.addClass("highlighted");
         cy.elements().difference(neighborhood).addClass("dimmed");
       });
+    });
 
-      // Immediately navigate/open note in the adjacent document workspace!
-      onSelectNodeRef.current(nodeId);
+    // Native dbltap event fallback
+    cy.on("dbltap", "node", (evt) => {
+      const node = evt.target;
+      const nodeId = node.data("id");
+      openNodeDoc(nodeId);
+      lastTapTime = 0;
+      lastTapNodeId = "";
     });
 
     // Click background: clear selection and highlights
     cy.on("tap", (evt) => {
       if (evt.target === cy) {
+        lastTapTime = 0;
+        lastTapNodeId = "";
         activeSelectedId = null;
         setSelectedNode(null);
         cy.batch(() => {
@@ -435,6 +536,9 @@ export function GraphViewPane({
       }
 
       if (liveTarget && liveTarget.length > 0) {
+        const crossCount = liveTarget.isNode()
+          ? (liveTarget as any).connectedEdges().filter((e: any) => Boolean(e.data("isCrossFolder"))).length
+          : 0;
         setSelectedNode({
           id: liveTarget.data("id"),
           label: liveTarget.data("label"),
@@ -443,6 +547,8 @@ export function GraphViewPane({
           inDegree: liveTarget.data("inDegree") || 0,
           outDegree: liveTarget.data("outDegree") || 0,
           isCurrent: Boolean(liveTarget.data("isCurrent")),
+          folderGroup: liveTarget.data("folderGroup"),
+          crossFolderCount: crossCount,
         });
         cyRef.current.batch(() => {
           cyRef.current!.elements().removeClass("highlighted dimmed");
@@ -548,6 +654,8 @@ export function GraphViewPane({
       },
     });
 
+    const targetEdges = targetNode.connectedEdges();
+    const targetCrossCount = targetEdges.filter((e: any) => Boolean(e.data("isCrossFolder"))).length;
     setSelectedNode({
       id: targetNode.data("id"),
       label: targetNode.data("label"),
@@ -556,6 +664,8 @@ export function GraphViewPane({
       inDegree: targetNode.data("inDegree") || 0,
       outDegree: targetNode.data("outDegree") || 0,
       isCurrent: Boolean(targetNode.data("isCurrent")),
+      folderGroup: targetNode.data("folderGroup"),
+      crossFolderCount: targetCrossCount,
     });
 
     cy.batch(() => {
@@ -848,6 +958,14 @@ export function GraphViewPane({
               </button>
               <button
                 type="button"
+                className={`graph-filter-pill ${crossFolderOnly ? "is-active" : ""}`}
+                onClick={() => setCrossFolderOnly(!crossFolderOnly)}
+                title="仅显示连接不同文件夹的跨目录双链连线"
+              >
+                🌐 跨文件夹关系
+              </button>
+              <button
+                type="button"
                 className={`graph-filter-pill ${hideIsolates && viewFilter !== "orphans" ? "is-active" : ""}`}
                 onClick={() => setHideIsolates(!hideIsolates)}
                 disabled={viewFilter === "orphans"}
@@ -868,38 +986,70 @@ export function GraphViewPane({
       {/* Selected Node Details Card — outside canvas-wrapper so overflow:hidden doesn't clip it */}
       {selectedNode && (
         <div className="graph-pane-inspector">
-          <div className="inspector-header">
-            <span className={`node-type-badge type-${selectedNode.type}`}>
-              {selectedNode.type === "space" ? "闪念 Space" : "文档"}
-            </span>
-            <span className="inspector-title" title={selectedNode.label}>
-              {selectedNode.label}
-            </span>
+          {/* Top row: Badges on left, Close button on right */}
+          <div className="inspector-meta-row">
+            <div className="inspector-badges">
+              <span className={`node-type-badge type-${selectedNode.type}`}>
+                {selectedNode.type === "space" ? "⚡ 闪念" : "📄 文档"}
+              </span>
+              {selectedNode.folderGroup && (
+                <span
+                  className="node-folder-badge"
+                  title={`所属文件夹: ${selectedNode.folderGroup}`}
+                >
+                  📁 {selectedNode.folderGroup}
+                </span>
+              )}
+              {selectedNode.isCurrent && (
+                <span className="node-current-badge">当前</span>
+              )}
+            </div>
             <button
               type="button"
               className="inspector-close-btn"
               onClick={() => setSelectedNode(null)}
               title="关闭详情卡片"
+              aria-label="关闭详情卡片"
             >
-              <X size={12} />
+              <X size={13} />
             </button>
           </div>
-          <div className="inspector-body">
-            <div className="inspector-metric">
-              <span className="metric-label">被引用 (In):</span>
-              <span className="metric-value">{selectedNode.inDegree}</span>
+
+          {/* Dedicated Title Row */}
+          <h4 className="inspector-card-title" title={selectedNode.label}>
+            {selectedNode.label}
+          </h4>
+
+          {/* Optional Path Subtitle */}
+          {selectedNode.path && (
+            <div className="inspector-card-path" title={selectedNode.path}>
+              {selectedNode.path}
             </div>
-            <div className="inspector-metric">
-              <span className="metric-label">引出 (Out):</span>
-              <span className="metric-value">{selectedNode.outDegree}</span>
+          )}
+
+          {/* 3-Column Metrics Grid */}
+          <div className="inspector-metrics-grid">
+            <div className="inspector-stat-cell" title="反向双链引用数 (入度)">
+              <span className="stat-num">{selectedNode.inDegree}</span>
+              <span className="stat-label">被引用</span>
+            </div>
+            <div className="inspector-stat-cell" title="正向引出双链数 (出度)">
+              <span className="stat-num">{selectedNode.outDegree}</span>
+              <span className="stat-label">引出</span>
+            </div>
+            <div className="inspector-stat-cell" title="跨越不同文件夹的双链连线数">
+              <span className="stat-num highlight-cyan">{selectedNode.crossFolderCount ?? 0}</span>
+              <span className="stat-label">跨目录</span>
             </div>
           </div>
+
+          {/* Open Document Action */}
           <button
             type="button"
             className="inspector-jump-btn"
             onClick={() => onSelectNodeRef.current(selectedNode.id)}
           >
-            <ExternalLink size={12} />
+            <ExternalLink size={13} />
             <span>在左侧打开文档</span>
           </button>
         </div>

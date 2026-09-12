@@ -241,12 +241,12 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   // 6. 知识连接
   {
     id: "wikilink",
-    title: "双向链接 [[文档]]",
+    title: "双向链接 [[]]",
     description: "链接工作区中的其他笔记与知识卡片",
     icon: "🔗",
     category: "知识连接",
     keywords: ["wikilink", "sl", "shuanglian", "link", "[[", "bi_link"],
-    template: "[[文档名称]] ",
+    template: "[[]]",
     cursorOffset: 2,
   },
   {

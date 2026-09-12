@@ -43,6 +43,13 @@ describe("Mind map node text alignment rendering", () => {
       expect(el.style.dominantBaseline).toBe("central");
     }
   });
+
+  it("does not render floating plus button next to expand/collapse button", () => {
+    const { container } = render(
+      <MindmapView title="Test" source={source} editable={true} />
+    );
+    expect(container.querySelector(".mindmap-node-add-btn")).toBeNull();
+  });
 });
 
 describe("measureTextWidth metrics", () => {

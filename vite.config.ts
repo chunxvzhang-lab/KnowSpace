@@ -35,6 +35,8 @@ export default defineConfig({
           ],
           "vendor-highlight": ["highlight.js"],
           "vendor-mermaid": ["mermaid"],
+          "vendor-katex": ["katex"],
+          "vendor-cytoscape": ["cytoscape"],
           "vendor-icons": ["lucide-react"],
         },
       },

@@ -1,5 +1,5 @@
 import { ChevronRight, FileText, Folder, FolderOpen, FolderMinus, Edit3, ListTree, Boxes } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import type { BookManifest, ChapterManifest } from "../core/types";
 
 type ChapterListProps = {
@@ -19,7 +19,7 @@ type TreeNode = {
   chapter?: ChapterManifest;
 };
 
-export function ChapterList({
+export const ChapterList = memo(function ChapterList({
   manifest,
   activeChapterId,
   isDirty = false,
@@ -119,7 +119,7 @@ export function ChapterList({
       </nav>
     </aside>
   );
-}
+});
 
 function TreeRow({
   node,

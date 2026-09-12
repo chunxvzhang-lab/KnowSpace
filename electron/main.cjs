@@ -2171,17 +2171,21 @@ ipcMain.handle("bookmd:print-to-pdf", async (event, request = {}) => {
     return { canceled: true };
   }
 
+  let prevBg = "#ffffff";
+  try {
+    if (targetWin && !targetWin.isDestroyed() && typeof targetWin.getBackgroundColor === "function") {
+      prevBg = targetWin.getBackgroundColor();
+      targetWin.setBackgroundColor("#ffffff");
+    }
+  } catch {}
+
   try {
     const pdfBuffer = await targetWin.webContents.printToPDF({
       printBackground: true,
       pageSize: pageSize || "A4",
       landscape: Boolean(landscape),
       margins: {
-        marginType: "custom",
-        top: 0.4,
-        bottom: 0.4,
-        left: 0.5,
-        right: 0.5,
+        marginType: "none",
       },
       preferCSSPageSize: true,
     });
@@ -2191,6 +2195,12 @@ ipcMain.handle("bookmd:print-to-pdf", async (event, request = {}) => {
   } catch (err) {
     console.error("Failed to generate PDF:", err);
     return { success: false, message: err.message };
+  } finally {
+    try {
+      if (targetWin && !targetWin.isDestroyed() && typeof targetWin.setBackgroundColor === "function") {
+        targetWin.setBackgroundColor(prevBg);
+      }
+    } catch {}
   }
 });
 

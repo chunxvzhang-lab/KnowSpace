@@ -69,6 +69,29 @@ function TablePickerPanel({
   const [hoveredRow, setHoveredRow] = useState<number | null>(null);
   const [hoveredCol, setHoveredCol] = useState<number | null>(null);
 
+  const [pos, setPos] = useState(anchorPos);
+
+  useIsomorphicLayoutEffect(() => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const vh = typeof window !== "undefined" ? window.innerHeight : 800;
+    const vw = typeof window !== "undefined" ? window.innerWidth : 1280;
+    let nextTop = anchorPos.top;
+    let nextLeft = anchorPos.left;
+
+    if (rect.bottom > vh - 12) {
+      const overflow = rect.bottom - (vh - 12);
+      nextTop = Math.max(12, anchorPos.top - overflow);
+    }
+    if (rect.right > vw - 12) {
+      const overflow = rect.right - (vw - 12);
+      nextLeft = Math.max(12, anchorPos.left - overflow);
+    }
+    if (nextTop !== pos.top || nextLeft !== pos.left) {
+      setPos({ left: nextLeft, top: nextTop });
+    }
+  }, [anchorPos.top, anchorPos.left, containerRef]);
+
   const effectiveRows = hoveredRow !== null ? hoveredRow : rows;
   const effectiveCols = hoveredCol !== null ? hoveredCol : cols;
 
@@ -85,13 +108,14 @@ function TablePickerPanel({
     { label: "3×3", r: 3, c: 3 },
     { label: "4×5", r: 4, c: 5 },
     { label: "5×5", r: 5, c: 5 },
+    { label: "8×4", r: 4, c: 8 },
   ];
 
   return (
     <div
       ref={containerRef}
-      className="portal-submenu table-picker-panel"
-      style={{ left: anchorPos.left, top: anchorPos.top }}
+      className="editor-context-menu portal-submenu table-picker-panel"
+      style={{ left: pos.left, top: pos.top }}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
       role="dialog"
@@ -99,12 +123,16 @@ function TablePickerPanel({
     >
       <div className="table-picker-header">
         <div className="table-picker-title">
-          <Table size={14} className="menu-icon" />
+          <Table size={15} style={{ color: "#38bdf8" }} />
           <span>自定义表格</span>
         </div>
         <span className="table-picker-badge">
           {effectiveRows} 行 × {effectiveCols} 列
         </span>
+      </div>
+
+      <div className="table-picker-desc">
+        {effectiveRows > 1 ? `1 行表头 + ${effectiveRows - 1} 行数据` : "1 行表头"}
       </div>
 
       {/* 8 cols x 6 rows visual matrix */}
@@ -139,7 +167,7 @@ function TablePickerPanel({
       {/* Steppers for rows and columns */}
       <div className="table-picker-controls">
         <div className="table-dimension-stepper">
-          <span className="table-dim-label">行:</span>
+          <span className="table-dim-label">行数:</span>
           <button
             type="button"
             className="table-step-btn"
@@ -173,7 +201,7 @@ function TablePickerPanel({
         </div>
 
         <div className="table-dimension-stepper">
-          <span className="table-dim-label">列:</span>
+          <span className="table-dim-label">列数:</span>
           <button
             type="button"
             className="table-step-btn"
@@ -209,7 +237,7 @@ function TablePickerPanel({
 
       {/* Preset pills */}
       <div className="table-presets-row">
-        <span style={{ fontSize: "11px", opacity: 0.65 }}>预设:</span>
+        <span style={{ fontSize: "11px", opacity: 0.65 }}>常用:</span>
         {presets.map((p) => (
           <button
             key={p.label}
@@ -254,19 +282,19 @@ export const EditorContextMenu = memo(function EditorContextMenu({
   const submenuRef = useRef<HTMLDivElement>(null);
   const tablePickerRef = useRef<HTMLDivElement>(null);
 
-  // Submenu states
-  const [activeSubmenu, setActiveSubmenu] = useState<string | null>(null);
-  const [submenuPos, setSubmenuPos] = useState<{ left: number; top: number } | null>(null);
-  const [tablePickerOpen, setTablePickerOpen] = useState(false);
-  const [tablePickerPos, setTablePickerPos] = useState<{ left: number; top: number } | null>(null);
+  type SubmenuType = "headings" | "lists" | "insert" | "tablePicker" | null;
 
-  // Initial estimate safe positioning
+  // Submenu states: single mutually-exclusive active submenu
+  const [activeSubmenu, setActiveSubmenu] = useState<SubmenuType>(null);
+  const [submenuPos, setSubmenuPos] = useState<{ left: number; top: number } | null>(null);
+
+  // Initial estimate safe positioning (compact height ~340px prevents clipping)
   const [adjustedPos, setAdjustedPos] = useState(() => {
     const defaultViewport = {
       width: typeof window !== "undefined" ? window.innerWidth : 1280,
       height: typeof window !== "undefined" ? window.innerHeight : 800,
     };
-    return clampMenuPosition(x, y, 260, 480, defaultViewport);
+    return clampMenuPosition(x, y, 260, 340, defaultViewport, 12);
   });
 
   const submenuCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -293,6 +321,31 @@ export const EditorContextMenu = memo(function EditorContextMenu({
     setAdjustedPos(clamped);
   }, [x, y]);
 
+  // Submenu dynamic viewport boundary clamping
+  useIsomorphicLayoutEffect(() => {
+    if (!submenuRef.current || !submenuPos) return;
+    const rect = submenuRef.current.getBoundingClientRect();
+    const vh = typeof window !== "undefined" ? window.innerHeight : 800;
+    const vw = typeof window !== "undefined" ? window.innerWidth : 1280;
+    let nextTop = submenuPos.top;
+    let nextLeft = submenuPos.left;
+    let changed = false;
+
+    if (rect.bottom > vh - 12) {
+      const overflow = rect.bottom - (vh - 12);
+      nextTop = Math.max(12, submenuPos.top - overflow);
+      changed = true;
+    }
+    if (rect.right > vw - 12) {
+      const overflow = rect.right - (vw - 12);
+      nextLeft = Math.max(12, submenuPos.left - overflow);
+      changed = true;
+    }
+    if (changed) {
+      setSubmenuPos({ left: nextLeft, top: nextTop });
+    }
+  }, [activeSubmenu]);
+
   // Click outside and Esc listener
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -308,10 +361,6 @@ export const EditorContextMenu = memo(function EditorContextMenu({
     };
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        if (tablePickerOpen) {
-          setTablePickerOpen(false);
-          return;
-        }
         if (activeSubmenu) {
           setActiveSubmenu(null);
           return;
@@ -328,11 +377,11 @@ export const EditorContextMenu = memo(function EditorContextMenu({
         clearTimeout(submenuCloseTimer.current);
       }
     };
-  }, [activeSubmenu, onClose, tablePickerOpen]);
+  }, [activeSubmenu, onClose]);
 
   // Helper: Open Submenu with smooth viewport coordinate calculation
   const handleOpenSubmenu = useCallback(
-    (name: string, anchorEl: HTMLElement, width = 190, height = 200) => {
+    (name: SubmenuType, anchorEl: HTMLElement, width = 190, height = 200) => {
       if (submenuCloseTimer.current) {
         clearTimeout(submenuCloseTimer.current);
         submenuCloseTimer.current = null;
@@ -344,9 +393,6 @@ export const EditorContextMenu = memo(function EditorContextMenu({
       });
       setSubmenuPos(pos);
       setActiveSubmenu(name);
-      if (name !== "insert") {
-        setTablePickerOpen(false);
-      }
     },
     []
   );
@@ -354,19 +400,9 @@ export const EditorContextMenu = memo(function EditorContextMenu({
   // Helper: Open Table Picker Panel
   const handleOpenTablePicker = useCallback(
     (anchorEl: HTMLElement) => {
-      if (submenuCloseTimer.current) {
-        clearTimeout(submenuCloseTimer.current);
-        submenuCloseTimer.current = null;
-      }
-      const anchorRect = anchorEl.getBoundingClientRect();
-      const pos = calculateSubmenuPosition(anchorRect, 230, 270, {
-        width: window.innerWidth,
-        height: window.innerHeight,
-      });
-      setTablePickerPos(pos);
-      setTablePickerOpen(true);
+      handleOpenSubmenu("tablePicker", anchorEl, 264, 310);
     },
-    []
+    [handleOpenSubmenu]
   );
 
   const handleScheduleClose = useCallback(() => {
@@ -375,7 +411,6 @@ export const EditorContextMenu = memo(function EditorContextMenu({
     }
     submenuCloseTimer.current = setTimeout(() => {
       setActiveSubmenu(null);
-      setTablePickerOpen(false);
       submenuCloseTimer.current = null;
     }, 220);
   }, []);
@@ -385,6 +420,14 @@ export const EditorContextMenu = memo(function EditorContextMenu({
       clearTimeout(submenuCloseTimer.current);
       submenuCloseTimer.current = null;
     }
+  }, []);
+
+  const handleImmediateCloseSubmenu = useCallback(() => {
+    if (submenuCloseTimer.current) {
+      clearTimeout(submenuCloseTimer.current);
+      submenuCloseTimer.current = null;
+    }
+    setActiveSubmenu(null);
   }, []);
 
   // Helper: Toggle wrapping
@@ -616,253 +659,251 @@ export const EditorContextMenu = memo(function EditorContextMenu({
 
   return (
     <>
-      <div
-        ref={menuRef}
-        className="editor-context-menu"
-        style={{ left: adjustedPos.left, top: adjustedPos.top }}
-        onContextMenu={(e) => e.preventDefault()}
-        role="menu"
-      >
-        {/* Scrollable Body: Prevents clipping on any screen or window height */}
-        <div className="editor-context-menu-scroll">
-          {/* Group 1: Knowledge Operations (Obsidian Powered) */}
-          <div className="menu-group">
-            <button
-              type="button"
-              className="context-menu-item"
-              onClick={() => wrapSelection("[[", "]]", "文档名称")}
-              title="将选中文本包装为双向链接"
-            >
-              <span className="menu-icon">🔗</span>
-              <span className="menu-label">{hasSelection ? "包装为双链 [[选区]]" : "插入双向链接"}</span>
-              <span className="menu-shortcut">[[</span>
-            </button>
-
-            <button
-              type="button"
-              className="context-menu-item"
-              onClick={handleExtractToNote}
-              title="将选中文本提取创建为独立的新笔记，并在原地替换为双链"
-            >
-              <FilePlus size={14} className="menu-icon" />
-              <span className="menu-label">提取选区为新笔记</span>
-              <span className="menu-shortcut">Extract</span>
-            </button>
-
-            <button
-              type="button"
-              className="context-menu-item"
-              onClick={handleCreateBlockRef}
-              title="为当前行生成块锚点指纹 (^block-id) 并复制引用链接"
-            >
-              <Anchor size={14} className="menu-icon" />
-              <span className="menu-label">创建段落块引用 (^block)</span>
-              <span className="menu-shortcut">#^</span>
-            </button>
-
-            <button
-              type="button"
-              className="context-menu-item"
-              onClick={handleSendToFlash}
-              title="将选中内容快速归档至 Space 闪念胶囊时间线"
-            >
-              <Zap size={14} className="menu-icon text-amber" />
-              <span className="menu-label">存入闪念收集箱 (Space)</span>
-              <span className="menu-shortcut">Alt+Space</span>
-            </button>
-          </div>
-
-          <div className="menu-divider" />
-
-          {/* Group 2: Clipboard Actions */}
-          <div className="menu-group">
-            {hasSelection && (
-              <button type="button" className="context-menu-item" onClick={handleCut}>
-                <Scissors size={14} className="menu-icon" />
-                <span className="menu-label">剪切</span>
-                <span className="menu-shortcut">Ctrl+X</span>
+      {typeof document !== "undefined" && createPortal(
+        <div
+          ref={menuRef}
+          className="editor-context-menu"
+          style={{ left: adjustedPos.left, top: adjustedPos.top }}
+          onContextMenu={(e) => e.preventDefault()}
+          role="menu"
+        >
+          {/* Scrollable Body: Prevents clipping on any screen or window height */}
+          <div className="editor-context-menu-scroll">
+            {/* Group 1: Knowledge Operations (Obsidian Powered) */}
+            <div className="menu-group" onMouseEnter={handleImmediateCloseSubmenu}>
+              <button
+                type="button"
+                className="context-menu-item"
+                onClick={() => wrapSelection("[[", "]]", "")}
+                title="将选中文本包装为双向链接"
+              >
+                <span className="menu-icon">🔗</span>
+                <span className="menu-label">{hasSelection ? "包装为双链 [[选区]]" : "插入双向链接"}</span>
+                <span className="menu-shortcut">[[</span>
               </button>
-            )}
-            <button
-              type="button"
-              className="context-menu-item"
-              onClick={handleCopy}
-              disabled={!hasSelection}
-            >
-              <Copy size={14} className="menu-icon" />
-              <span className="menu-label">复制</span>
-              <span className="menu-shortcut">Ctrl+C</span>
-            </button>
-            <button type="button" className="context-menu-item" onClick={handlePaste}>
-              <Clipboard size={14} className="menu-icon" />
-              <span className="menu-label">粘贴</span>
-              <span className="menu-shortcut">Ctrl+V</span>
-            </button>
-          </div>
 
-          <div className="menu-divider" />
+              <button
+                type="button"
+                className="context-menu-item"
+                onClick={handleExtractToNote}
+                title="将选中文本提取创建为独立的新笔记，并在原地替换为双链"
+              >
+                <FilePlus size={14} className="menu-icon" />
+                <span className="menu-label">提取选区为新笔记</span>
+                <span className="menu-shortcut">Extract</span>
+              </button>
 
-          {/* Group 3: Formatting */}
-          <div className="menu-group">
-            <button type="button" className="context-menu-item" onClick={() => wrapSelection("**")}>
-              <Bold size={14} className="menu-icon" />
-              <span className="menu-label">加粗</span>
-              <span className="menu-shortcut">Ctrl+B</span>
-            </button>
-            <button type="button" className="context-menu-item" onClick={() => wrapSelection("*")}>
-              <Italic size={14} className="menu-icon" />
-              <span className="menu-label">斜体</span>
-              <span className="menu-shortcut">Ctrl+I</span>
-            </button>
-            <button type="button" className="context-menu-item" onClick={() => wrapSelection("~~")}>
-              <Strikethrough size={14} className="menu-icon" />
-              <span className="menu-label">删除线</span>
-              <span className="menu-shortcut">~~</span>
-            </button>
-            <button type="button" className="context-menu-item" onClick={() => wrapSelection("`")}>
-              <Code size={14} className="menu-icon" />
-              <span className="menu-label">行内代码</span>
-              <span className="menu-shortcut">`</span>
-            </button>
-            <button type="button" className="context-menu-item" onClick={() => wrapSelection("==")}>
-              <Highlighter size={14} className="menu-icon" />
-              <span className="menu-label">文本高亮</span>
-              <span className="menu-shortcut">==</span>
-            </button>
-            <button
-              type="button"
-              className="context-menu-item"
-              onClick={() => wrapSelection("[", "](https://)", "链接文字")}
-            >
-              <Link size={14} className="menu-icon" />
-              <span className="menu-label">插入超链接</span>
-              <span className="menu-shortcut">Ctrl+K</span>
-            </button>
-          </div>
+              <button
+                type="button"
+                className="context-menu-item"
+                onClick={handleCreateBlockRef}
+                title="为当前行生成块锚点指纹 (^block-id) 并复制引用链接"
+              >
+                <Anchor size={14} className="menu-icon" />
+                <span className="menu-label">创建段落块引用 (^block)</span>
+                <span className="menu-shortcut">#^</span>
+              </button>
 
-          <div className="menu-divider" />
-
-          {/* Group 4: Line Transform & Insert Submenus */}
-          <div className="menu-group">
-            {/* Submenu: Paragraph Headings */}
-            <div
-              className={`context-menu-item has-submenu ${activeSubmenu === "headings" ? "active" : ""}`}
-              onMouseEnter={(e) => handleOpenSubmenu("headings", e.currentTarget, 170, 140)}
-              onMouseLeave={handleScheduleClose}
-            >
-              <Heading1 size={14} className="menu-icon" />
-              <span className="menu-label">转为标题</span>
-              <ChevronRight size={13} className="submenu-arrow" />
+              <button
+                type="button"
+                className="context-menu-item"
+                onClick={handleSendToFlash}
+                title="将选中内容快速归档至 Space 闪念胶囊时间线"
+              >
+                <Zap size={14} className="menu-icon text-amber" />
+                <span className="menu-label">存入闪念收集箱 (Space)</span>
+                <span className="menu-shortcut">Alt+Space</span>
+              </button>
             </div>
 
-            {/* List transformations */}
-            <button
-              type="button"
-              className="context-menu-item"
-              onClick={() => transformLinePrefix(/^(\s*)([-*+]|\d+\.)?\s*(\[[ xX]\]\s*)?/, "$1- [ ] ")}
-            >
-              <CheckSquare size={14} className="menu-icon" />
-              <span className="menu-label">转为待办清单</span>
-              <span className="menu-shortcut">- [ ]</span>
-            </button>
+            <div className="menu-divider" />
 
-            <button
-              type="button"
-              className="context-menu-item"
-              onClick={() => transformLinePrefix(/^(\s*)([-*+]|\d+\.)?\s*(\[[ xX]\]\s*)?/, "$1- ")}
-            >
-              <List size={14} className="menu-icon" />
-              <span className="menu-label">转为无序列表</span>
-              <span className="menu-shortcut">-</span>
-            </button>
+            {/* Group 2: Clipboard Actions */}
+            <div className="menu-group" onMouseEnter={handleImmediateCloseSubmenu}>
+              {hasSelection && (
+                <button type="button" className="context-menu-item" onClick={handleCut}>
+                  <Scissors size={14} className="menu-icon" />
+                  <span className="menu-label">剪切</span>
+                  <span className="menu-shortcut">Ctrl+X</span>
+                </button>
+              )}
+              <button
+                type="button"
+                className="context-menu-item"
+                onClick={handleCopy}
+                disabled={!hasSelection}
+              >
+                <Copy size={14} className="menu-icon" />
+                <span className="menu-label">复制</span>
+                <span className="menu-shortcut">Ctrl+C</span>
+              </button>
+              <button type="button" className="context-menu-item" onClick={handlePaste}>
+                <Clipboard size={14} className="menu-icon" />
+                <span className="menu-label">粘贴</span>
+                <span className="menu-shortcut">Ctrl+V</span>
+              </button>
+            </div>
 
-            <button
-              type="button"
-              className="context-menu-item"
-              onClick={() => transformLinePrefix(/^(\s*)([-*+]|\d+\.)?\s*(\[[ xX]\]\s*)?/, "$11. ")}
-            >
-              <ListOrdered size={14} className="menu-icon" />
-              <span className="menu-label">转为有序列表</span>
-              <span className="menu-shortcut">1.</span>
-            </button>
+            <div className="menu-divider" />
 
-            <button
-              type="button"
-              className="context-menu-item"
-              onClick={() => transformLinePrefix(/^(\s*)(>\s*)?/, "$1> ")}
-            >
-              <Quote size={14} className="menu-icon" />
-              <span className="menu-label">转为引用块</span>
-              <span className="menu-shortcut">&gt;</span>
-            </button>
+            {/* Group 3: Formatting Horizontal Ribbon (Height reduced from ~190px to 32px) */}
+            <div className="format-ribbon" role="toolbar" aria-label="文字格式工具栏" onMouseEnter={handleImmediateCloseSubmenu}>
+              <button
+                type="button"
+                className="format-ribbon-btn"
+                onClick={() => wrapSelection("**")}
+                title="加粗 (Ctrl+B)"
+              >
+                <Bold size={13} />
+              </button>
+              <button
+                type="button"
+                className="format-ribbon-btn"
+                onClick={() => wrapSelection("*")}
+                title="斜体 (Ctrl+I)"
+              >
+                <Italic size={13} />
+              </button>
+              <button
+                type="button"
+                className="format-ribbon-btn"
+                onClick={() => wrapSelection("~~")}
+                title="删除线 (~~)"
+              >
+                <Strikethrough size={13} />
+              </button>
+              <button
+                type="button"
+                className="format-ribbon-btn"
+                onClick={() => wrapSelection("`")}
+                title="行内代码 (`)"
+              >
+                <Code size={13} />
+              </button>
+              <button
+                type="button"
+                className="format-ribbon-btn"
+                onClick={() => wrapSelection("==")}
+                title="文本高亮 (==)"
+              >
+                <Highlighter size={13} />
+              </button>
+              <button
+                type="button"
+                className="format-ribbon-btn"
+                onClick={() => wrapSelection("[", "](https://)", "链接文字")}
+                title="插入超链接 (Ctrl+K)"
+              >
+                <Link size={13} />
+              </button>
+            </div>
 
-            {/* Submenu: Insert Rich Blocks & Tables */}
-            <div
-              className={`context-menu-item has-submenu ${activeSubmenu === "insert" ? "active" : ""}`}
-              onMouseEnter={(e) => handleOpenSubmenu("insert", e.currentTarget, 210, 240)}
-              onMouseLeave={handleScheduleClose}
-            >
-              <Table size={14} className="menu-icon" />
-              <span className="menu-label">插入内容与图表</span>
-              <ChevronRight size={13} className="submenu-arrow" />
+            <div className="menu-divider" />
+
+            {/* Group 4: Paragraph, Structure & Table Submenus */}
+            <div className="menu-group">
+              {/* Submenu: Paragraph Headings */}
+              <div
+                className={`context-menu-item has-submenu ${activeSubmenu === "headings" ? "active" : ""}`}
+                onMouseEnter={(e) => handleOpenSubmenu("headings", e.currentTarget, 170, 140)}
+                onMouseLeave={handleScheduleClose}
+              >
+                <Heading1 size={14} className="menu-icon" />
+                <span className="menu-label">转为标题</span>
+                <ChevronRight size={13} className="submenu-arrow" />
+              </div>
+
+              {/* Submenu: Lists & Blockquotes */}
+              <div
+                className={`context-menu-item has-submenu ${activeSubmenu === "lists" ? "active" : ""}`}
+                onMouseEnter={(e) => handleOpenSubmenu("lists", e.currentTarget, 180, 160)}
+                onMouseLeave={handleScheduleClose}
+              >
+                <List size={14} className="menu-icon" />
+                <span className="menu-label">列表与段落排版</span>
+                <ChevronRight size={13} className="submenu-arrow" />
+              </div>
+
+              {/* Direct First-Class Item: Custom Table (Row/Col Picker) */}
+              <div
+                className={`context-menu-item has-submenu ${activeSubmenu === "tablePicker" ? "active" : ""}`}
+                onMouseEnter={(e) => handleOpenTablePicker(e.currentTarget)}
+                onClick={(e) => handleOpenTablePicker(e.currentTarget)}
+              >
+                <Table size={14} className="menu-icon" style={{ color: "#38bdf8" }} />
+                <span className="menu-label">插入表格 (自定义行列)</span>
+                <ChevronRight size={13} className="submenu-arrow" />
+              </div>
+
+              {/* Submenu: Insert Rich Blocks & Diagrams */}
+              <div
+                className={`context-menu-item has-submenu ${activeSubmenu === "insert" ? "active" : ""}`}
+                onMouseEnter={(e) => handleOpenSubmenu("insert", e.currentTarget, 210, 200)}
+                onMouseLeave={handleScheduleClose}
+              >
+                <Code size={14} className="menu-icon" />
+                <span className="menu-label">插入内容与图表</span>
+                <ChevronRight size={13} className="submenu-arrow" />
+              </div>
+            </div>
+
+            <div className="menu-divider" />
+
+            {/* Group 5: Workflow & System Actions */}
+            <div className="menu-group" onMouseEnter={handleImmediateCloseSubmenu}>
+              {onPrint && (
+                <button type="button" className="context-menu-item" onClick={onPrint}>
+                  <Printer size={14} className="menu-icon" />
+                  <span className="menu-label">高保真 PDF 打印 / 导出</span>
+                  <span className="menu-shortcut">Ctrl+P</span>
+                </button>
+              )}
+              {onToggleMindmap && (
+                <button type="button" className="context-menu-item" onClick={onToggleMindmap}>
+                  <span className="menu-icon">🧠</span>
+                  <span className="menu-label">切换为思维导图</span>
+                  <span className="menu-shortcut">Ctrl+M</span>
+                </button>
+              )}
+              {onRevealInToc && (
+                <button type="button" className="context-menu-item" onClick={onRevealInToc}>
+                  <FileText size={14} className="menu-icon" />
+                  <span className="menu-label">在大纲中定位小节</span>
+                </button>
+              )}
+              <button
+                type="button"
+                className="context-menu-item"
+                onClick={() => {
+                  view.dispatch({ selection: { anchor: 0, head: view.state.doc.length } });
+                  view.focus();
+                  onClose();
+                }}
+              >
+                <span className="menu-icon">⬛</span>
+                <span className="menu-label">全选</span>
+                <span className="menu-shortcut">Ctrl+A</span>
+              </button>
             </div>
           </div>
 
-          <div className="menu-divider" />
-
-          {/* Group 5: Workflow & System Actions */}
-          <div className="menu-group">
-            {onPrint && (
-              <button type="button" className="context-menu-item" onClick={onPrint}>
-                <Printer size={14} className="menu-icon" />
-                <span className="menu-label">高保真 PDF 打印 / 导出</span>
-                <span className="menu-shortcut">Ctrl+P</span>
-              </button>
+          {/* Pinned Footer: Guaranteed visible and never cut off */}
+          <div className="context-menu-footer" onMouseEnter={handleImmediateCloseSubmenu}>
+            {hasSelection ? (
+              <span>已选 <strong>{selectedChars}</strong> 字符 · 全文 <strong>{totalWords}</strong> 词 ({totalChars} 字符)</span>
+            ) : (
+              <span>全文共 <strong>{totalWords}</strong> 词 · <strong>{totalChars}</strong> 字符</span>
             )}
-            {onToggleMindmap && (
-              <button type="button" className="context-menu-item" onClick={onToggleMindmap}>
-                <span className="menu-icon">🧠</span>
-                <span className="menu-label">切换为思维导图</span>
-                <span className="menu-shortcut">Ctrl+M</span>
-              </button>
-            )}
-            {onRevealInToc && (
-              <button type="button" className="context-menu-item" onClick={onRevealInToc}>
-                <FileText size={14} className="menu-icon" />
-                <span className="menu-label">在大纲中定位小节</span>
-              </button>
-            )}
-            <button
-              type="button"
-              className="context-menu-item"
-              onClick={() => {
-                view.dispatch({ selection: { anchor: 0, head: view.state.doc.length } });
-                view.focus();
-                onClose();
-              }}
-            >
-              <span className="menu-icon">⬛</span>
-              <span className="menu-label">全选</span>
-              <span className="menu-shortcut">Ctrl+A</span>
-            </button>
           </div>
-        </div>
-
-        {/* Pinned Footer: Guaranteed visible and never cut off */}
-        <div className="context-menu-footer">
-          {hasSelection ? (
-            <span>已选 <strong>{selectedChars}</strong> 字符 · 全文 <strong>{totalWords}</strong> 词 ({totalChars} 字符)</span>
-          ) : (
-            <span>全文共 <strong>{totalWords}</strong> 词 · <strong>{totalChars}</strong> 字符</span>
-          )}
-        </div>
-      </div>
+        </div>,
+        document.body
+      )}
 
       {/* Submenu Portal 1: Headings */}
       {activeSubmenu === "headings" && submenuPos && typeof document !== "undefined" && createPortal(
         <div
           ref={submenuRef}
-          className="portal-submenu"
+          className="editor-context-menu portal-submenu"
           style={{ left: submenuPos.left, top: submenuPos.top }}
           onMouseEnter={handleCancelClose}
           onMouseLeave={handleScheduleClose}
@@ -899,38 +940,66 @@ export const EditorContextMenu = memo(function EditorContextMenu({
         document.body
       )}
 
-      {/* Submenu Portal 2: Insert Content & Custom Table */}
-      {activeSubmenu === "insert" && submenuPos && typeof document !== "undefined" && createPortal(
+      {/* Submenu Portal: Lists & Blockquotes */}
+      {activeSubmenu === "lists" && submenuPos && typeof document !== "undefined" && createPortal(
         <div
           ref={submenuRef}
-          className="portal-submenu"
+          className="editor-context-menu portal-submenu"
           style={{ left: submenuPos.left, top: submenuPos.top }}
           onMouseEnter={handleCancelClose}
           onMouseLeave={handleScheduleClose}
           role="menu"
         >
-          {/* Custom Table with Row/Col Picker */}
-          <div
-            className={`context-menu-item has-submenu ${tablePickerOpen ? "active" : ""}`}
-            onMouseEnter={(e) => handleOpenTablePicker(e.currentTarget)}
-            onClick={(e) => handleOpenTablePicker(e.currentTarget)}
-          >
-            <Table size={14} className="menu-icon" />
-            <span className="menu-label">自定义表格 (行列数)</span>
-            <ChevronRight size={13} className="submenu-arrow" />
-          </div>
-
-          {/* 1-Click Fast Standard Table (3x3) */}
           <button
             type="button"
             className="context-menu-item"
-            onClick={() => handleInsertTableDimensions(3, 3)}
+            onClick={() => transformLinePrefix(/^(\s*)([-*+]|\d+\.)?\s*(\[[ xX]\]\s*)?/, "$1- [ ] ")}
           >
-            <Table size={14} className="menu-icon" />
-            <span className="menu-label">标准表格 (3×3)</span>
-            <span className="menu-shortcut">3×3</span>
+            <CheckSquare size={14} className="menu-icon" />
+            <span className="menu-label">转为待办清单</span>
+            <span className="menu-shortcut">- [ ]</span>
           </button>
+          <button
+            type="button"
+            className="context-menu-item"
+            onClick={() => transformLinePrefix(/^(\s*)([-*+]|\d+\.)?\s*(\[[ xX]\]\s*)?/, "$1- ")}
+          >
+            <List size={14} className="menu-icon" />
+            <span className="menu-label">转为无序列表</span>
+            <span className="menu-shortcut">-</span>
+          </button>
+          <button
+            type="button"
+            className="context-menu-item"
+            onClick={() => transformLinePrefix(/^(\s*)([-*+]|\d+\.)?\s*(\[[ xX]\]\s*)?/, "$11. ")}
+          >
+            <ListOrdered size={14} className="menu-icon" />
+            <span className="menu-label">转为有序列表</span>
+            <span className="menu-shortcut">1.</span>
+          </button>
+          <button
+            type="button"
+            className="context-menu-item"
+            onClick={() => transformLinePrefix(/^(\s*)(>\s*)?/, "$1> ")}
+          >
+            <Quote size={14} className="menu-icon" />
+            <span className="menu-label">转为引用块</span>
+            <span className="menu-shortcut">&gt;</span>
+          </button>
+        </div>,
+        document.body
+      )}
 
+      {/* Submenu Portal 2: Insert Content & Diagrams */}
+      {activeSubmenu === "insert" && submenuPos && typeof document !== "undefined" && createPortal(
+        <div
+          ref={submenuRef}
+          className="editor-context-menu portal-submenu"
+          style={{ left: submenuPos.left, top: submenuPos.top }}
+          onMouseEnter={handleCancelClose}
+          onMouseLeave={handleScheduleClose}
+          role="menu"
+        >
           <button
             type="button"
             className="context-menu-item"
@@ -980,10 +1049,10 @@ export const EditorContextMenu = memo(function EditorContextMenu({
       )}
 
       {/* Submenu Portal 3: Table Picker Panel (Visual matrix + numeric steppers + presets) */}
-      {tablePickerOpen && tablePickerPos && typeof document !== "undefined" && createPortal(
+      {activeSubmenu === "tablePicker" && submenuPos && typeof document !== "undefined" && createPortal(
         <TablePickerPanel
           containerRef={tablePickerRef}
-          anchorPos={tablePickerPos}
+          anchorPos={submenuPos}
           onInsert={handleInsertTableDimensions}
           onMouseEnter={handleCancelClose}
           onMouseLeave={handleScheduleClose}

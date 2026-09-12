@@ -21,6 +21,9 @@ export type GraphEdgeData = {
   source: string;
   target: string;
   label?: string;
+  isCrossFolder?: boolean;
+  sourceDir?: string;
+  targetDir?: string;
 };
 
 export type CytoscapeElement =
@@ -40,6 +43,17 @@ export type GraphData = {
 
 const stripDocExt = (str: string): string => str.replace(/\.(md|markdown|canvas)$/i, "");
 
+export function extractFolderGroup(path?: string, type?: GraphNodeType): string {
+  if (type === "space") return "闪念 Space";
+  if (!path) return "根目录";
+  const normalized = path.replace(/\\/g, "/").trim();
+  const parts = normalized.split("/").filter(Boolean);
+  if (parts.length <= 1) {
+    return "根目录";
+  }
+  return parts[0];
+}
+
 export function buildGraphDataFromIndex(
   manifest: BookManifest | null,
   index: BacklinkIndexData,
@@ -47,6 +61,24 @@ export function buildGraphDataFromIndex(
 ): GraphData {
   const nodesMap = new Map<string, GraphNodeData>();
   const normTitleToId = new Map<string, string>();
+  const normPathToId = new Map<string, string>();
+
+  const registerNode = (node: GraphNodeData) => {
+    nodesMap.set(node.id, node);
+    normTitleToId.set(node.id, node.id);
+    if (node.normTitle) {
+      normTitleToId.set(node.normTitle, node.id);
+    }
+    if (node.path) {
+      const p = node.path.trim().toLowerCase().replace(/\\/g, "/");
+      normPathToId.set(p, node.id);
+      const filename = stripDocExt(p.split("/").pop() || "");
+      if (filename) {
+        normTitleToId.set(filename, node.id);
+        normPathToId.set(filename, node.id);
+      }
+    }
+  };
 
   const isMatchCurrent = (id: string, path?: string, title?: string): boolean => {
     if (!currentDocId) return false;
@@ -79,16 +111,16 @@ export function buildGraphDataFromIndex(
     }
     if (path) {
       const p = path.trim().toLowerCase().replace(/\\/g, "/");
+      if (normPathToId.has(p)) {
+        return normPathToId.get(p)!;
+      }
       const filename = stripDocExt(p.split("/").pop() || "");
       if (filename && normTitleToId.has(filename)) {
         return normTitleToId.get(filename)!;
       }
-      for (const [existingId, node] of nodesMap.entries()) {
-        if (node.path) {
-          const np = node.path.trim().toLowerCase().replace(/\\/g, "/");
-          if (np === p || p.endsWith(np) || np.endsWith(p)) {
-            return existingId;
-          }
+      for (const [np, existingId] of normPathToId.entries()) {
+        if (p.endsWith(np) || np.endsWith(p)) {
+          return existingId;
         }
       }
     }
@@ -108,6 +140,7 @@ export function buildGraphDataFromIndex(
         (ch.src && (ch.src.toLowerCase().startsWith("space/") || ch.src.toLowerCase().startsWith("space\\"))) ||
         ch.id.startsWith("space-")
       );
+      const folder = extractFolderGroup(ch.src, isSpace ? "space" : "chapter");
       const node: GraphNodeData = {
         id: ch.id,
         label: ch.title,
@@ -117,14 +150,9 @@ export function buildGraphDataFromIndex(
         outDegree: 0,
         isCurrent: isMatchCurrent(ch.id, ch.src, ch.title),
         normTitle: norm,
+        folderGroup: folder,
       };
-      nodesMap.set(ch.id, node);
-      normTitleToId.set(ch.id, ch.id);
-      normTitleToId.set(norm, ch.id);
-      const filenameNorm = stripDocExt((ch.src?.split(/[\\/]/).pop() || "").toLowerCase());
-      if (filenameNorm) {
-        normTitleToId.set(filenameNorm, ch.id);
-      }
+      registerNode(node);
     }
   }
 
@@ -148,6 +176,7 @@ export function buildGraphDataFromIndex(
       docId.startsWith("space-")
     );
     const norm = stripDocExt(doc.title.trim().toLowerCase());
+    const folder = extractFolderGroup(doc.path, isSpace ? "space" : "chapter");
     const node: GraphNodeData = {
       id: docId,
       label: doc.title,
@@ -157,10 +186,9 @@ export function buildGraphDataFromIndex(
       outDegree: 0,
       isCurrent: isMatchCurrent(docId, doc.path, doc.title),
       normTitle: norm,
+      folderGroup: folder,
     };
-    nodesMap.set(docId, node);
-    normTitleToId.set(docId, docId);
-    normTitleToId.set(norm, docId);
+    registerNode(node);
   }
 
   const edges: GraphEdgeData[] = [];
@@ -178,14 +206,21 @@ export function buildGraphDataFromIndex(
       const edgeKey = `${canonicalSourceId}->${canonicalTargetId}`;
       if (!edgeSet.has(edgeKey)) {
         edgeSet.add(edgeKey);
+        const targetNode = nodesMap.get(canonicalTargetId);
+        const sourceFolder = sourceNode.folderGroup || extractFolderGroup(sourceNode.path, sourceNode.type);
+        const targetFolder = targetNode ? (targetNode.folderGroup || extractFolderGroup(targetNode.path, targetNode.type)) : undefined;
+        const isCrossFolder = Boolean(sourceFolder && targetFolder && sourceFolder !== targetFolder);
+
         edges.push({
           id: edgeKey,
           source: canonicalSourceId,
           target: canonicalTargetId,
+          isCrossFolder,
+          sourceDir: sourceFolder,
+          targetDir: targetFolder,
         });
 
         sourceNode.outDegree += 1;
-        const targetNode = nodesMap.get(canonicalTargetId);
         if (targetNode) {
           targetNode.inDegree += 1;
         }
@@ -277,17 +312,6 @@ export const CLUSTER_PALETTE = [
   "#94a3b8", // Slate
 ];
 
-export function extractFolderGroup(path?: string, type?: GraphNodeType): string {
-  if (type === "space") return "闪念 Space";
-  if (!path) return "根目录";
-  const normalized = path.replace(/\\/g, "/").trim();
-  const parts = normalized.split("/").filter(Boolean);
-  if (parts.length <= 1) {
-    return "根目录";
-  }
-  return parts[0];
-}
-
 export function computeDirectoryClusterColors(nodes: GraphNodeData[]): Map<string, string> {
   const groupToColor = new Map<string, string>();
   let colorIdx = 0;
@@ -320,6 +344,7 @@ export function filterGraphData(
     currentDocId?: string | null;
     viewFilter?: "all" | "hubs" | "orphans";
     clusterByFolder?: boolean;
+    crossFolderOnly?: boolean;
   }
 ): GraphData {
   const {
@@ -330,6 +355,7 @@ export function filterGraphData(
     currentDocId,
     viewFilter = "all",
     clusterByFolder = false,
+    crossFolderOnly = false,
   } = options;
 
   let baseData = graphData;
@@ -371,9 +397,19 @@ export function filterGraphData(
   }
 
   const allowedIds = new Set(filteredNodes.map((n) => n.id));
-  const filteredEdges = baseData.edges.filter(
+  let filteredEdges = baseData.edges.filter(
     (e) => allowedIds.has(e.source) && allowedIds.has(e.target)
   );
+
+  if (crossFolderOnly) {
+    filteredEdges = filteredEdges.filter((e) => e.isCrossFolder);
+    const connectedNodeIds = new Set<string>();
+    for (const e of filteredEdges) {
+      connectedNodeIds.add(e.source);
+      connectedNodeIds.add(e.target);
+    }
+    filteredNodes = filteredNodes.filter((n) => connectedNodeIds.has(n.id) || n.isCurrent);
+  }
 
   return {
     nodes: filteredNodes,

@@ -108,6 +108,15 @@ function sourceLineMappingPlugin(md: MarkdownIt) {
   };
 }
 
+const MAX_HIGHLIGHT_CACHE_SIZE = 250;
+const highlightCache = new Map<string, string>();
+
+const MAX_KATEX_CACHE_SIZE = 500;
+const katexCache = new Map<string, string>();
+
+const MAX_RENDER_CACHE_SIZE = 30;
+const renderedMarkdownCache = new Map<string, RenderedChapter>();
+
 const markdown: MarkdownIt = new MarkdownIt({
   html: true,
   linkify: true,
@@ -122,8 +131,17 @@ const markdown: MarkdownIt = new MarkdownIt({
     }
     const displayLang = languageName || "";
     if (source.length <= maxHighlightedCodeLength && languageName && hljs.getLanguage(languageName)) {
+      const hlKey = `${languageName}:${source}`;
+      const cached = highlightCache.get(hlKey);
+      if (cached !== undefined) return cached;
       try {
-        return `<pre class="hljs" data-language="${displayLang}"><code class="language-${displayLang}">${hljs.highlight(source, { language: languageName }).value}</code></pre>`;
+        const highlighted = `<pre class="hljs" data-language="${displayLang}"><code class="language-${displayLang}">${hljs.highlight(source, { language: languageName }).value}</code></pre>`;
+        if (highlightCache.size >= MAX_HIGHLIGHT_CACHE_SIZE) {
+          const firstKey = highlightCache.keys().next().value;
+          if (firstKey !== undefined) highlightCache.delete(firstKey);
+        }
+        highlightCache.set(hlKey, highlighted);
+        return highlighted;
       } catch {
         // Fall back to escaping below.
       }
@@ -187,6 +205,12 @@ export function renderCardMarkdown(source: string): string {
 }
 
 export async function renderMarkdown(source: string, baseUrl = window.location.href): Promise<RenderedChapter> {
+  const cacheKey = `${baseUrl}:::${source}`;
+  const cached = renderedMarkdownCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
   capturedFrontMatter = "";
   const checksumPromise = sha256(source);
   const raw = markdown.render(source);
@@ -227,7 +251,7 @@ export async function renderMarkdown(source: string, baseUrl = window.location.h
   const frontMatter = parseFrontMatter(capturedFrontMatter);
   const template = document.createElement("template");
   template.content.append(fragment);
-  return {
+  const result: RenderedChapter = {
     html: template.innerHTML,
     headings,
     frontMatter,
@@ -235,6 +259,13 @@ export async function renderMarkdown(source: string, baseUrl = window.location.h
     plainText,
     hasMermaid,
   };
+
+  if (renderedMarkdownCache.size >= MAX_RENDER_CACHE_SIZE) {
+    const firstKey = renderedMarkdownCache.keys().next().value;
+    if (firstKey !== undefined) renderedMarkdownCache.delete(firstKey);
+  }
+  renderedMarkdownCache.set(cacheKey, result);
+  return result;
 }
 
 type SourceBlock = {
@@ -812,13 +843,24 @@ function getLine(state: MarkdownBlockState, line: number): string {
 }
 
 function renderMath(source: string, displayMode: boolean): string {
-  return katex.renderToString(source, {
+  const cacheKey = `${displayMode ? 1 : 0}:${source}`;
+  const cached = katexCache.get(cacheKey);
+  if (cached !== undefined) return cached;
+
+  const result = katex.renderToString(source, {
     displayMode,
     output: "htmlAndMathml",
     strict: "ignore",
     throwOnError: false,
     trust: false,
   });
+
+  if (katexCache.size >= MAX_KATEX_CACHE_SIZE) {
+    const firstKey = katexCache.keys().next().value;
+    if (firstKey !== undefined) katexCache.delete(firstKey);
+  }
+  katexCache.set(cacheKey, result);
+  return result;
 }
 
 function normalizeMathEnvironment(source: string): string {
@@ -940,8 +982,25 @@ function blockAnchorPlugin(md: MarkdownIt): void {
   md.renderer.rules.block_anchor = (tokens, idx) => {
     const token = tokens[idx];
     const blockId = token.meta?.blockId || token.attrGet("data-block-id") || "";
-    return `<span id="^${blockId}" class="block-anchor" data-block-id="${blockId}" title="块引用指纹: ^${blockId}"><span class="block-anchor-symbol">^</span><span class="block-anchor-id">${blockId}</span></span>`;
+    return `<span id="^${blockId}" class="block-anchor" data-block-id="${blockId}" data-tooltip="点击复制段落引用 [[#^${blockId}]]"><span class="block-anchor-symbol">⚓</span></span>`;
   };
+}
+
+function formatBlockRefDisplayLabel(target: string, label: string): string {
+  if (label && label !== target) {
+    // User explicitly provided custom alias: [[target|alias]]
+    return label;
+  }
+  // Local block reference: [[#^blockId]] -> "段落引用"
+  if (target.startsWith("#^")) {
+    return "段落引用";
+  }
+  // Cross-doc block reference: [[doc#^blockId]] -> "doc > 段落引用"
+  if (target.includes("#^")) {
+    const [docPart] = target.split("#^");
+    return `${docPart} > 段落引用`;
+  }
+  return label || target;
 }
 
 function wikiLinkPlugin(md: MarkdownIt): void {
@@ -1004,7 +1063,9 @@ function wikiLinkPlugin(md: MarkdownIt): void {
     const encodedTarget = encodeURIComponent(target);
 
     if (isBlockRef) {
-      return `<a class="wikilink wikilink-block" href="#wikilink:${encodedTarget}" data-wikilink-target="${escapedTarget}" data-wikilink-label="${escapedLabel}" title="跳转至块引用: ${escapedTarget}"><span class="wikilink-bracket">[[</span><span class="wikilink-block-symbol">⚓ </span><span class="wikilink-text">${escapedLabel}</span><span class="wikilink-bracket">]]</span></a>`;
+      const displayLabel = formatBlockRefDisplayLabel(target, label);
+      const escapedDisplayLabel = md.utils.escapeHtml(displayLabel);
+      return `<a class="wikilink wikilink-block" href="#wikilink:${encodedTarget}" data-wikilink-target="${escapedTarget}" data-wikilink-label="${escapedLabel}" title="跳转至段落引用: ${escapedTarget}"><span class="wikilink-bracket">[[</span><span class="wikilink-block-symbol">⚓ </span><span class="wikilink-text">${escapedDisplayLabel}</span><span class="wikilink-bracket">]]</span></a>`;
     }
 
     return `<a class="wikilink" href="#wikilink:${encodedTarget}" data-wikilink-target="${escapedTarget}" data-wikilink-label="${escapedLabel}" title="跳转至: ${escapedTarget}"><span class="wikilink-bracket">[[</span><span class="wikilink-text">${escapedLabel}</span><span class="wikilink-bracket">]]</span></a>`;
@@ -1018,7 +1079,10 @@ function wikiLinkPlugin(md: MarkdownIt): void {
     const escapedLabel = md.utils.escapeHtml(label);
     const encodedTarget = encodeURIComponent(target);
 
-    return `<div class="wikilink-embed-card" data-embed-target="${escapedTarget}"><div class="embed-header"><span class="embed-tag">🔗 块级内联引用</span><a class="embed-source-link" href="#wikilink:${encodedTarget}" data-wikilink-target="${escapedTarget}" title="跳转至原出处">${escapedTarget}</a></div><div class="embed-content">${escapedLabel}</div></div>`;
+    const displaySource = formatBlockRefDisplayLabel(target, target);
+    const escapedDisplaySource = md.utils.escapeHtml(displaySource);
+
+    return `<div class="wikilink-embed-card" data-embed-target="${escapedTarget}"><div class="embed-header"><span class="embed-tag">🔗 块级内联引用</span><a class="embed-source-link" href="#wikilink:${encodedTarget}" data-wikilink-target="${escapedTarget}" title="跳转至原出处">${escapedDisplaySource}</a></div><div class="embed-content">${escapedLabel}</div></div>`;
   };
 }
 

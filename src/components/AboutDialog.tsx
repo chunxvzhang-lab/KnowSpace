@@ -121,7 +121,7 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
             <div>
               <div className="about-header-title-row">
                 <span className="about-app-name">KnowSpace</span>
-                <span className="about-version-badge">v2.1.0</span>
+                <span className="about-version-badge">v2.2.0</span>
               </div>
               <p className="about-tagline">Personal Knowledge Workspace · 个人知识工作台</p>
             </div>
@@ -138,7 +138,7 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
             <div className="about-slogan-title">Write. Read. Connect. Know.</div>
             <div className="about-slogan-sub">记录 · 阅读 · 连接 · 认知</div>
             <p className="about-description" style={{ marginTop: 6 }}>
-              <strong>KnowSpace</strong> 是一款本地优先（Local-First）、现代化高颜值的个人知识工作台。以私密、高效、纯粹为核心，融汇多模态空间白板、AABB 绕障避障寻路算法、F5 分镜全屏演示、时间旅行版本快照、毫秒混合检索、交互式思维导图、全景知识图谱与块级双向链接，助你构建立体多维的结构化思维空间。
+              <strong>KnowSpace</strong> 是一款本地优先（Local-First）、现代化高颜值的个人知识工作台。以私密、高效、纯粹为核心，融汇思维导图双端非破坏性同步体系、全景知识图谱与单双击解耦、多模态空间白板、AABB 绕障避障寻路算法、F5 分镜全屏演示、时间旅行版本快照、毫秒混合检索与块级双向链接，助你构建立体多维的结构化思维空间。
             </p>
           </div>
 
@@ -147,13 +147,29 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
             <div className="about-card-title">
               <History size={16} className="about-icon text-blue" />
               <span>版本更新日志 · What&apos;s New</span>
-              <span className="about-changelog-version-badge">v2.1.0</span>
+              <span className="about-changelog-version-badge">v2.2.0</span>
             </div>
             <div className="about-changelog-list">
-              {/* v2.1.0 */}
+              {/* v2.2.0 */}
               <div className="about-changelog-group">
                 <div className="about-changelog-group-label">
                   <Sparkles size={12} className="text-cyan" />
+                  <span>v2.2.0 思维导图双端无损同步、知识图谱美化与交互升级</span>
+                </div>
+                <ul className="about-changelog-items">
+                  <li>🧠 <strong>思维导图双端非破坏性同步体系 (Non-destructive Bidirectional Sync)</strong>：彻底告别导图调整覆盖抹杀正文段落的历史！核心无损同步算法 <code>syncMindmapToDocument</code> 基于 AST 区块映射进行增量标题结构同步，100% 完整保留段落文字、代码块、复杂表格、数学公式与块锚点；顶栏增设「🔄 同步到文档」按键、脏状态感知与呼吸脉冲圆点、支持 <code>Ctrl+S</code> 快捷同步与反向自动联动；移除节点旁冗余悬浮加号，视觉更纯粹。</li>
+                  <li>🌐 <strong>知识图谱单双击行为精准解耦</strong>：单击节点仅高亮 1-hop 邻域连线并在右下角展开详情卡片，绝不在左侧打开文件；双击节点（350ms 时间窗口）才在左侧平滑打开对应笔记；点击空白背景即刻清除高亮恢复全景。</li>
+                  <li>🖼️ <strong>知识图谱详情卡片重塑</strong>：卡片扩宽至 280px 并升级为分层结构（Meta 徽标行 + 专属标题行 + 代码字体路径行 + 3 列指标微型网格 + 快捷打开按钮），配合超高斯毛玻璃与投影，彻底消除换行挤压。</li>
+                  <li>✨ <strong>图谱悬停探灯连线与平滑补间过渡</strong>：注入 <code>0.18s ease-out</code> 补间动效；光标移经节点瞬间点亮相连的所有入度与出度连线（Hover Headlight），关系探索沉浸感跃升。</li>
+                  <li>⚓ <strong>段落块及引用智能优雅渲染</strong>：隐藏原始 <code>#^blockId</code> 裸露文本，智能转化为精致徽章与交互式链接。</li>
+                  <li>🚀 <strong>全局性能与低功耗优化</strong>：事件节流防抖，图谱按需局部渲染，降低设备性能与发热压力。</li>
+                </ul>
+              </div>
+
+              {/* v2.1.0 */}
+              <div className="about-changelog-group" style={{ marginTop: 10, opacity: 0.9 }}>
+                <div className="about-changelog-group-label">
+                  <Sparkles size={12} className="text-blue" />
                   <span>v2.1.0 多模态空间白板、AABB绕障寻路与F5分镜全屏演示</span>
                 </div>
                 <ul className="about-changelog-items">
@@ -380,7 +396,7 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
                 }}
                 title="下载最新安装包与便携版"
               >
-                <span>{repoUrl}/releases (下载 v2.1.0 安装包与便携版)</span>
+                <span>{repoUrl}/releases (下载 v2.2.0 安装包与便携版)</span>
                 <ExternalLink size={13} />
               </a>
             </div>

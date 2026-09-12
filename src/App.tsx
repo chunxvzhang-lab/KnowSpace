@@ -231,15 +231,17 @@ export function App() {
     }
   }, [chapterId]);
 
+  const isSearchActive = (sidebarOpen && sidebarTab === "search") || commandPaletteOpen;
   const searchResults = useMemo(() => {
-    if (!searchQuery.trim()) return [];
+    const trimmed = searchQuery.trim();
+    if (!trimmed || !isSearchActive) return [];
     if (searchScope === "vault") {
-      return searchVault(vaultSearchIndex, searchQuery);
+      return searchVault(vaultSearchIndex, trimmed);
     }
     return renderedChapter
-      ? findInChapter(searchQuery, renderedChapter.plainText, renderedChapter.headings, session?.source)
+      ? findInChapter(trimmed, renderedChapter.plainText, renderedChapter.headings, session?.source)
       : [];
-  }, [searchScope, vaultSearchIndex, searchQuery, renderedChapter, session?.source]);
+  }, [searchScope, vaultSearchIndex, searchQuery, isSearchActive, renderedChapter, session?.source]);
 
   const bookmarkedHeadingIds = useMemo(() => {
     const ids = new Set<string>();
@@ -396,6 +398,7 @@ export function App() {
       const container = readerRef.current;
       if (container) {
         const cleanBlockId = headingId.replace(/^[#^]+/, "");
+        const isBlockJump = headingId.startsWith("^") || headingId.includes("^") || cleanBlockId.length > 0;
         let target =
           container.querySelector<HTMLElement>(`[data-heading-id="${CSS.escape(headingId)}"]`) ||
           container.querySelector<HTMLElement>(`#${CSS.escape(headingId)}`) ||
@@ -424,22 +427,61 @@ export function App() {
         }
 
         if (target) {
+          const blockParent = target.closest<HTMLElement>(
+            "p, li, blockquote, tr, pre, .task-list-item, div.admonition, figure"
+          );
+          const scrollTarget = blockParent || target;
           const containerRect = container.getBoundingClientRect();
-          const targetRect = target.getBoundingClientRect();
+          const targetRect = scrollTarget.getBoundingClientRect();
           const targetTop = container.scrollTop + (targetRect.top - containerRect.top);
           container.scrollTo({
-            top: Math.max(0, targetTop - 24),
+            top: Math.max(0, targetTop - 32),
             behavior,
           });
 
           // Focus pulse glow animation only when explicitly requested (e.g. jumping to a block or wikilink anchor)
           // Never trigger on document open or silent reading position restoration
           if (highlight) {
-            target.classList.add("jump-target-pulse");
+            scrollTarget.classList.add("jump-target-pulse");
+            if (target !== scrollTarget) {
+              target.classList.add("jump-target-pulse");
+            }
             window.setTimeout(() => {
+              scrollTarget?.classList.remove("jump-target-pulse");
               target?.classList.remove("jump-target-pulse");
-            }, 1400);
+            }, 1600);
           }
+        } else if (isBlockJump) {
+          // DOM rendering delay fallback protection (e.g. during chapter switch)
+          window.setTimeout(() => {
+            if (!readerRef.current) return;
+            const retryContainer = readerRef.current;
+            const retryTarget =
+              retryContainer.querySelector<HTMLElement>(`[data-block-id="${CSS.escape(cleanBlockId)}"]`) ||
+              retryContainer.querySelector<HTMLElement>(`[id="^${CSS.escape(cleanBlockId)}"]`) ||
+              retryContainer.querySelector<HTMLElement>(`#${CSS.escape(cleanBlockId)}`);
+            if (retryTarget) {
+              const retryParent = retryTarget.closest<HTMLElement>(
+                "p, li, blockquote, tr, pre, .task-list-item, div.admonition, figure"
+              );
+              const retryScroll = retryParent || retryTarget;
+              const cRect = retryContainer.getBoundingClientRect();
+              const tRect = retryScroll.getBoundingClientRect();
+              const tTop = retryContainer.scrollTop + (tRect.top - cRect.top);
+              retryContainer.scrollTo({
+                top: Math.max(0, tTop - 32),
+                behavior,
+              });
+              if (highlight) {
+                retryScroll.classList.add("jump-target-pulse");
+                if (retryTarget !== retryScroll) retryTarget.classList.add("jump-target-pulse");
+                window.setTimeout(() => {
+                  retryScroll?.classList.remove("jump-target-pulse");
+                  retryTarget?.classList.remove("jump-target-pulse");
+                }, 1600);
+              }
+            }
+          }, 80);
         }
       }
 
@@ -451,9 +493,10 @@ export function App() {
           const content = editor.state.doc.toString();
           const idx = content.indexOf(`^${cleanBlockId}`);
           if (idx !== -1) {
+            const line = editor.state.doc.lineAt(idx);
             editor.dispatch({
-              selection: { anchor: idx, head: idx },
-              effects: EditorView.scrollIntoView(idx, { y: "center", yMargin: 40 }),
+              selection: { anchor: line.from, head: line.to },
+              effects: EditorView.scrollIntoView(line.from, { y: "center", yMargin: 40 }),
             });
             if (viewMode === "source") {
               editor.focus();
@@ -2046,6 +2089,13 @@ export function App() {
   }, [preferences]);
 
   const handlePrintDocument = useCallback(async () => {
+    if (renderPreviewNow) {
+      try {
+        await renderPreviewNow();
+      } catch {
+        // ignore
+      }
+    }
     const desktop = typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
     const title = activeChapter?.title || session?.fileName || "KnowSpace_文档";
     if (desktop?.printToPdf) {
@@ -2057,7 +2107,7 @@ export function App() {
     } else {
       window.print();
     }
-  }, [activeChapter?.title, session?.fileName]);
+  }, [activeChapter?.title, renderPreviewNow, session?.fileName]);
 
   const handleExtractSelectionToNote = useCallback(
     async (selectedText: string, suggestedTitle: string) => {
@@ -2546,7 +2596,7 @@ export function App() {
       if (!cleanTarget) {
         if (anchorPart) {
           jumpToHeading(anchorPart.trim(), "smooth", true);
-          setNotice(`已跳转至锚点/块引用：#${anchorPart.trim()}`);
+          setNotice(anchorPart.startsWith("^") ? "已跳转至指定段落引用" : `已跳转至章节锚点：#${anchorPart.trim()}`);
         }
         return;
       }
@@ -2574,7 +2624,8 @@ export function App() {
             }
             selectChapter(found.id);
           }
-          setNotice(`已跳转至双链文档：${found.title}${anchorPart ? ` #${anchorPart}` : ""}`);
+          const anchorLabel = anchorPart ? (anchorPart.startsWith("^") ? " (段落引用)" : ` #${anchorPart}`) : "";
+          setNotice(`已跳转至双链文档：${found.title}${anchorLabel}`);
           return;
         }
       }

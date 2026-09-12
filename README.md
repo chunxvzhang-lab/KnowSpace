@@ -10,12 +10,14 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-v2.1.0-1D9BF0?style=flat-square&logo=github" alt="Version 2.1.0" />
+  <img src="https://img.shields.io/badge/Version-v2.2.0-1D9BF0?style=flat-square&logo=github" alt="Version 2.2.0" />
+  <img src="https://img.shields.io/badge/Mind_Map-Non--Destructive_Sync-00BA7C?style=flat-square" alt="Non-Destructive Mindmap Sync" />
+  <img src="https://img.shields.io/badge/Graph-Decoupled_Interaction-8B5CF6?style=flat-square" alt="Decoupled Graph" />
   <img src="https://img.shields.io/badge/Multimodal-Canvas_Media_Cards-F59E0B?style=flat-square" alt="Multimodal Canvas" />
   <img src="https://img.shields.io/badge/Routing-AABB_Obstacle_Avoidance-00BA7C?style=flat-square" alt="AABB Obstacle Avoidance" />
   <img src="https://img.shields.io/badge/Presentation-F5_Cinematic_Slides-8B5CF6?style=flat-square" alt="F5 Presentation Mode" />
   <img src="https://img.shields.io/badge/Performance-120FPS_Instant_Load-00BA7C?style=flat-square" alt="120FPS Instant Load" />
-  <img src="https://img.shields.io/badge/Tests-347_Passing_100%25-00BA7C?style=flat-square" alt="347 Passing Tests" />
+  <img src="https://img.shields.io/badge/Tests-362_Passing_100%25-00BA7C?style=flat-square" alt="362 Passing Tests" />
   <img src="https://img.shields.io/badge/Canvas-JSON_Canvas_1.0-00BA7C?style=flat-square" alt="Infinite Canvas" />
   <img src="https://img.shields.io/badge/Snapshots-Ctrl%2BShift%2BH-1D9BF0?style=flat-square" alt="Version History" />
   <img src="https://img.shields.io/badge/Search-Hybrid_Vault_Index-8B5CF6?style=flat-square" alt="Hybrid Vault Search" />
@@ -57,16 +59,16 @@
 
 ## 🏛️ 核心能力体系
 
+- **🧠 Mind Map 2.2（思维导图双端非破坏性同步体系 · v2.2.0 重磅突破）**：Markdown 架构一键转化为交互式思维脑图（`Ctrl+M`），**核心无损同步算法 `syncMindmapToDocument`** 彻底攻克导图编辑抹杀正文段落的历史顽疾，基于 AST 章节区块映射进行增量标题结构同步，**100% 完整保全所有正文文字、代码块、表格与数学公式**；顶栏增设「🔄 同步到文档」按键、脏状态感知与绿色呼吸脉冲徽标、支持 `Ctrl+S` / `Cmd+S` 快捷同步与反向自动联动；移除节点旁冗余悬浮加号，界面清爽无杂音；支持**分支拖拽改变层级/同级重排（防环闭环保护）**、**导图内搜索与运镜聚焦**、**标准 OPML 2.0 / FreeMind (.mm) / Markdown / 视网膜级 PNG 透明底高清导出**。
+- **🌐 Graph & Backlinks 2.2（知识图谱深度、交互解耦与视觉升维 · v2.2.0 重构）**：60FPS 极速拓扑图谱，**单击与双击交互精准解耦**（单击节点仅高亮 1-hop 邻域并展示详情卡片，绝不在左侧打开文件；双击 350ms 内平滑打开对应笔记；点击空白背景清空高亮）；**重塑 280px 结构化毛玻璃文件夹详情卡片**（顶部 Meta 徽标行 + 专属标题行 + 路径行 + 3 列指标微型网格），彻底告别文字挤压与换行折叠；引入 **Cytoscape 0.18s 补间平滑过渡动效** 与 **悬停探灯连线点亮机制（Hover Headlight）**；支持 `1-Hop` 直接关联 / `2-Hop` 扩展网络局部深度控制、目录语义色彩聚类、MOC 核心枢纽节点挖掘与未链接孤岛发现。
 - **🎨 Infinite Canvas 2.1（空间多模态无限白板 · 兼容 JSON Canvas 1.0）**：标准开放的二维空间思维白板（`Ctrl+Shift+C`），**多模态媒体卡片自由挂载**（剪贴板截图 `Ctrl+V` 一键自动存入 `assets/` 落地为媒体卡片、桌面图片/音视频文件批量拖拽投放、富文本 Markdown、嵌入文档滚动预览、逻辑分组容器），**智能正交折线 AABB 绕障避障寻路算法**（自动检测卡片包围盒与 +14px 安全边距，5 段平滑正交绕行，彻底杜绝线条穿透遮挡卡片文字，标签中心点自适应吸附），**F5 沉浸式分镜全屏演示模式**（因果 DAG 拓扑镜头序、电影级平滑聚焦运镜、当前演播卡片脉冲呼吸发光光晕、背景优雅弱化、悬浮控制台全键盘调度与自动播放），**高精度 4 锚点几何中心对齐与贝塞尔/正交折线/直线矢量连线**，支持**环形对齐（Ring Layout · 真实平滑圆形弧线闭环）与矩形网格对齐（Rectangular Grid Layout）**、**交互式环半径与网格间距微调拉杆**、**折线手柄平移拖拽**、**防冲天平滑曲线**、**上下分层垂直优先路由**、**12 色专业调色盘与单条连线/批量卡片自定义 HEX 颜色拾取器**、**连线成环卡片视觉解耦（对外发射连线独立着色，消除视觉混淆）**、**一对多发起源全景识别（起点锚固圆点、发起源徽章、高亮辉光与多选动态标注）**、**连线多选与底部批量工具栏**、**多选卡片一键断开连线**、**120FPS 硬件栅格化与视口视锥剔除（Viewport Frustum Culling）**；配备右下角缩略雷达小地图与全景聚焦控制；**独创画布逆向拓扑萃取长文算法**，一键将白板因果关系逆向萃取为逻辑严密的 Markdown 专著。
 - **🚀 Instant Load & 120FPS Engine（秒开体验与工业级高刷引擎）**：彻底攻克大型知识库与包含数百篇笔记文件夹的打开性能瓶颈！引入**协作式空闲时间片调度器（Cooperative Idle-Sliced Background Indexer）**，首屏活动文档优先 <50ms 秒开呈现，后台全量索引 600ms 初始防抖与 20ms 退避分片让出时间片，保证 0 dropped frames；配合 **Electron 批量并发读取 IPC（`readMarkdownBatch`）**与 **32MB 内存 LRU 缓存（256 篇常驻）**，二次切换零磁盘 I/O。
 - **⏳ Local Version History（本地时间旅行与版本快照历史）**：运行在本地知识库根目录隐藏空间（`.knowspace/snapshots/`）的无感版本防丢卫士（`Ctrl+Shift+H`），**30秒去抖静默捕获与 SHA-256 哈希去重**，配备直观版本时间轴；**左右双栏 Side-by-Side 与统一 Unified 视图**，Myers LCS 逐行与行内字符微粒度高亮，**一键无损安全还原与手动里程碑快照**。
 - **🔍 Hybrid Vault Search（全库毫秒级混合检索引擎）**：全新文档级与段落级倒排索引（Inverted Index），万篇笔记键盘键入即刻（< 15ms）出结果。**深度支持结构化检索语法**：`tag:#架构`、`link:[[分布式协议]]`、`"严格短语"`、`-排除词`、时间范围过滤，提供「当前章节」与「全库检索」一键无缝切换、语法快捷辅助芯片与物理行微光脉冲联动。
 - **🎯 Command Palette & Quick Switcher（全能全局命令中枢）**：全局随时按下 `Ctrl+K`（或编辑区直接穿透触发），支持三模合一：**默认快速切换（MRU 访问历史、标题/路径/别名智能模糊过滤）**、**动作执行模式（`>` 前缀检索并执行系统功能，如主题切换、新建笔记、导出等）**、**大纲直达模式（`#` 前缀实时大纲小节检索，Enter 秒级跳入目标段落）**。
-- **🧠 Mind Map View（双向思维导图与多格式生态互通）**：Markdown 大纲一键转化为交互式多叉树脑图（`Ctrl+M`），**支持分支自由拖拽改变父子层级与同级重排（带自闭环防环保护与吸附光晕）**、**导图内实时搜索与平滑运镜聚焦**、**支持一键导出标准 OPML 2.0 (`.opml`)、FreeMind (`.mm`) XML 与 Markdown 大纲，无缝打通 XMind / MindNode / OmniOutliner 外部生态**，同时支持矢量 SVG/PNG 高清导出。
-- **🌐 Graph & Backlinks（知识图谱深度与聚类深化）**：60FPS 极速全景拓扑图谱，新增 **`1-Hop` 直接关联 / `2-Hop` 扩展网络局部深度控制**，消除大库视觉过载；新增**按笔记所在目录调和色彩聚类（Folder Cluster Coloring）**；提供 **MOC 核心枢纽节点挖掘**与**未链接孤岛笔记（Orphan）发现**。
 - **✍️ Editor & Slash Commands（编辑、斜杠命令与右键菜单）**：基于 CodeMirror 6 的现代编辑体验，毫秒级实时防抖渲染与零延迟双向同步滚动。**内置全键盘斜杠命令补全（`/`）与 Obsidian 级情境感知右键上下文菜单**，支持划词提取新笔记、块引用锚点生成、格式快速转换与文档字数统计。
 - **🖨️ High-Fidelity PDF Print（专业高保真打印）**：集成 Chromium 原生打印引擎，支持 `Ctrl+P` 全局快捷键与工具栏一键导出标准 A4 矢量 PDF，注入印刷级 `@media print` 样式，正文标题、表格、代码块与架构图跨页自动防截断。
-- **⚓ Block-Level Linking & Embedding（块级原子互联）**：`^block-id` 段落指纹标记、`[[doc#^block]]` 块引用跳转与 `![[doc#^block]]` 块级卡片内联嵌入，配合 CodeMirror 极速块补全。
+- **⚓ Block-Level Linking & Embedding（块级原子互联 · 纯净徽章渲染）**：`^block-id` 段落指纹标记、`[[doc#^block]]` 块引用跳转与 `![[doc#^block]]` 块级卡片内联嵌入，配合 CodeMirror 极速块补全，隐藏原始 `#^blockId` 裸露文本，智能渲染为美观小巧的交互徽章。
 - **⚡ Flash Capsule（闪念胶囊）**：全局热键秒级呼出毛玻璃微窗，随叫随到，原子归档落盘至 `Inbox/` 收集箱。
 - **📖 Reader（阅读）**：纯净沉浸的 Markdown 排版阅读引擎，支持正文源码行号自动映射与双侧联动高亮。
 - **📚 Library（知识库）**：多级文档目录树折叠展开、展开状态持久化记忆、单文档与多层级知识库智能载入。
@@ -218,6 +220,16 @@
   <img src="docs/manual-images/31-graph-depth-clustering.png" alt="知识图谱局部深度与目录色彩聚类" width="90%" style="border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);" />
 </p>
 
+- **🖱️ 单击高亮与双击打开交互精准解耦 (Decoupled Click & Double-Tap Navigation · v2.2.0 升级)**：
+  - **单击节点（Single Tap）**：仅高亮聚焦当前节点及其直接关联的 1-hop 邻域连线，其余无关节点柔和淡出为半透明背景，并在右下角弹出精致结构化详情卡片，**绝不在左侧编辑器中切换或加载文件**，彻底满足纯粹的关联关系探索诉求；
+  - **双击节点（Double Tap · 350ms 窗口）**：在节点上双击（或触控双连击）时，即刻在左侧编辑器中平滑打开该笔记文件；卡片底部亦常驻「在左侧打开文档」直达按钮；
+  - **点击画布空白背景**：即刻清空选中态与高亮，全图无缝恢复全景清晰视野。
+- **🗂️ 重塑 280px 结构化毛玻璃文件夹详情卡片 (Structured Glassmorphism Inspector Card · v2.2.0 升级)**：
+  - 彻底终结卡片狭窄挤压、“文档”二字垂直折叠与文件夹名错位的视觉痛点；
+  - 宽度扩充至 280px 并建立立体分层：顶部 Meta 徽标行（📄 文档 / ⚡ 闪念 + 📁 文件夹徽标 + 当前阅读标 + 独立关闭叉号）+ 独立大号标题行 + 等宽字体相对路径行 + **3 列微型指标网格（被引用数 / 引出数 / 跨目录青蓝高亮）** + 通栏打开操作条。
+- **✨ Cytoscape 0.18s 补间过渡与悬停探灯连线点亮动效 (Hover Headlight · v2.2.0 升级)**：
+  - 注入 `0.18s ease-out` 物理平滑过渡插值引擎，节点与连线高亮/变暗平滑渐变；
+  - 鼠标光标移经节点瞬间，相连的所有入度与出度双向连线（以及方向箭头）瞬间被点亮激活（Hover Headlight），移开后柔和隐退，探索链路丝滑灵动。
 - **🎯 1-Hop 邻近与 2-Hop 扩展局部视野控制 (Hop Depth Subgraphing)**：大型知识库专属减负神器，提供「`1-Hop 邻近`（仅直系双向关联）」、「`2-Hop 扩展`（二阶可达网络）」与「`全局`（宏观星系拓扑）」三档深度自由切换，彻底消除密密麻麻的“毛线球”认知过载；在局部视野下单选任意节点即刻重置为聚焦中心，带 300ms 平滑重构动效。
 - **🎨 顶级目录语义色彩聚类 (Folder Cluster Coloring)**：基于笔记根目录提取指纹哈希，采用 HSL 调和色相环算法自动为各知识板块赋予专属主题光环（翡翠绿、天空蓝、罗兰紫、珊瑚橙、琥珀黄等），统一节点边框、发光外晕与出入连接线色彩；悬浮卡片清晰标注聚类名称与完整路径，跨领域引用边界与交叉融合一目了然。
 - **🏛️ MOC 核心枢纽与未链接孤岛智能发现 (Hubs & Orphans)**：顶栏视图过滤快速切换：
@@ -233,13 +245,18 @@
 
 ---
 
-### 10. 🧠 交互式思维导图、多格式生态导出与块级互联 (Mind Map & Block-Level Linking)
+### 10. 🧠 交互式思维导图、双端无损同步与多格式生态 (Mind Map & Non-Destructive Sync)
 *结构化思维重构，将单线性文本升维为动态树状与原子块网，无缝打通外部主流脑图生态。*
 
 <p align="center">
   <img src="docs/manual-images/30-mindmap-export-modal.png" alt="思维导图多格式生态导出" width="90%" style="border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);" />
 </p>
 
+- **🔄 双端非破坏性同步体系 (Non-destructive Bidirectional Sync · v2.2.0 重磅突破)**：
+  - **核心无损同步算法 `syncMindmapToDocument`**：彻底告别导图调整粗暴抹杀整篇正文段落的历史！基于章节级 AST 区块映射进行增量标题结构同步，重命名、新增、删减或层级重排章节时，**100% 完整保留该章节下包含的所有段落文字、多行代码块、复杂表格、数学公式与块锚点**；
+  - **显式「同步到文档」按键与脏状态感知**：导图顶栏常驻同步控制按钮，导图有未保存修改时呈现翡翠绿渐变光晕与绿色呼吸脉冲标记点，支持 `Ctrl+S` / `Cmd+S` 快捷同步；
+  - **双向无缝流转**：左侧编辑器修改章节结构时，若导图处于已同步状态，导图自动实时响应刷新；
+  - **清爽纯粹交互**：彻底移除了节点折叠展开旁悬浮出来的多余加号按钮，仅保留精致内敛的边框展开折叠圆圈 `(+)` / `(-)`，杜绝视觉杂音与误触。
 - **📤 多格式生态导出与外部工具无缝流转 (Multi-Format Mindmap Export)**：
   - **📷 高清透明底 PNG 图片 (`.png`)**：基于 Canvas 2× 视网膜级超采样抗锯齿渲染，自动计算全脑图节点与连接线外接矩形（Bounding Box），边缘留白舒展不截断；默认透明背景，可直接拖入 PPT 演示胶片、Keynote、飞书或 Notion。
   - **📑 OPML 2.0 通用大纲交换格式 (`.opml`)**：开放信息处理大纲工业标准，生成标准 XML 结构与 `<outline>` 树状节点，完美兼容导入 **MindNode**、**OmniOutliner**、**Logseq**、**XMind**、**Dynalist** 等外部主流大纲与脑图工具。
@@ -272,13 +289,9 @@
 - **🎛️ 极简精炼工具栏与排版**：
   - **单行工整排版**：所有按键统一施加不换行保护与标准边距，彻底杜绝文字上下分割折行；
   - **功能聚焦**：右侧集成一键「导出导图 ▾」下拉菜单（PNG、OPML、FreeMind、Markdown），画布保留鼠标滚轮平滑缩放与拖拽漫游。
-- **⚡ 节点加号与折叠按钮排版优化**：
-  - **消除物理重合**：折叠按钮与悬浮加号按钮坐标动态分离，杜绝重叠；
-  - **消除乱闪**：采用确定性稳定路径 ID 与内部更新防回流校验，添加子节点毫秒级平滑响应，杜绝全树重绘闪烁。
 - **➕ 新建思维导图**：目录树顶部与空白首页直设「新建思维导图」入口，一键生成专用 `.mindmap.md` 脑图文件并立即进入编辑。
-- **📝 双向无损 Markdown 规范序列化**：导图实时双向序列化为自然易读的标准 Markdown 缩进层级列表（`# 中心主题`、`- 分支主题`），任何第三方编辑器均可顺畅阅读。
-- **⚓ 块级原子互联与嵌入**：
-  - `^block-id`：段落末尾键入即可生成专属块指纹锚点，点击一键复制引用链接。
+- **⚓ 块级原子互联与纯净徽章渲染 (Block-Level Linking & Badges · v2.2.0 升级)**：
+  - `^block-id`：段落末尾键入即可生成专属块指纹锚点，智能隐藏生硬的 `#^blockId` 字符串，呈现小巧精密的交互徽章，点击一键复制引用链接。
   - `[[doc#^block]]`：精准跳转至特定文档的目标段落并触发发光指示。
   - `![[doc#^block]]`：正文中以优雅卡片直接内联嵌入目标块内容，附带来源文档直达链接。
   - `#^`：CodeMirror 智能感知输入 `#^` 即时弹出块锚点联想补全。
@@ -491,20 +504,20 @@
 
 ## 📦 安装程序与便携版下载 (Downloads & Release Assets)
 
-本项目为 Windows 64 位系统深度优化，提供图形化安装程序、标准 MSI 安装包与免安装便携版，最新 `v2.1.0` 资产已发布：
+本项目为 Windows 64 位系统深度优化，提供图形化安装程序、标准 MSI 安装包与免安装便携版，最新 `v2.2.0` 资产已发布：
 
-> 🌐 **GitHub 官方发布主页**：[GitHub Releases · v2.1.0](https://github.com/chunxvzhang-lab/KnowSpace/releases/tag/v2.1.0)
+> 🌐 **GitHub 官方发布主页**：[GitHub Releases · v2.2.0](https://github.com/chunxvzhang-lab/KnowSpace/releases/tag/v2.2.0)
 
 ### 1. Windows 图形化安装程序（推荐）
-- **安装文件**：[`KnowSpace-Setup-2.1.0.exe`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.1.0/KnowSpace-Setup-2.1.0.exe)
+- **安装文件**：[`KnowSpace-Setup-2.2.0.exe`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.2.0/KnowSpace-Setup-2.2.0.exe)
 - **特点**：双击即可向导式安装，支持自定义安装目录，自动创建桌面快捷方式与开始菜单官方品牌图标，深度集成系统级 `.md` 与 `.canvas` 文件关联，内置标准卸载程序。
 
 ### 2. Windows MSI 标准安装包
-- **安装文件**：[`KnowSpace-2.1.0.msi`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.1.0/KnowSpace-2.1.0.msi)
+- **安装文件**：[`KnowSpace-2.2.0.msi`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.2.0/KnowSpace-2.2.0.msi)
 - **特点**：Windows Installer 官方格式，适合企业批量部署、组策略分发与企业级静默安装，支持标准控制面板卸载。
 
 ### 3. Windows 绿色免安装便携版
-- **便携文件**：[`KnowSpace-win-x64-portable.zip`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.1.0/KnowSpace-win-x64-portable.zip)
+- **便携文件**：[`KnowSpace-win-x64-portable.zip`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.2.0/KnowSpace-win-x64-portable.zip)
 - **直接运行**：解压后双击 `KnowSpace.exe` 即可直接使用完整功能。
 - **特点**：解压即用、随身携带（支持装入 U 盘或移动硬盘）；完全自包含 Electron 运行时与全套本地依赖，无需配置任何外部开发环境；支持右键「打开方式」关联 Markdown 与白板文档。
 
@@ -567,15 +580,20 @@
 - **🖨️ High-Fidelity Vector PDF Print & Export (`Ctrl + P`)**:
   - *Chromium Native Vector Print Engine*: Export standard A4 vector PDF directly or print via system dialog.
   - *Intelligent Page-Break Prevention*: Custom `@media print` rules prevent code blocks, LaTeX formulas, GFM tables, and Mermaid diagrams from being cut in half across pages.
-- **🧠 Interactive Mind Map & Multi-Format Ecosystem Export (`Ctrl + M`)**:
+- **🧠 Interactive Mind Map & Non-Destructive Bidirectional Sync (`Ctrl + M` · v2.2.0 Upgrade)**:
+  - *Non-Destructive Bidirectional Sync Engine*: AST-driven incremental chunk mapping (`syncMindmapToDocument`) 100% preserves text paragraphs, multi-line code blocks, GFM tables, math formulas, and block anchors during mindmap edits. Reorganizing sections in the mindmap never wipes out document bodies!
+  - *Explicit Sync Toolbar & Dirty Sensing*: Topbar `🔄 Sync to Document` button with emerald glow and breathing pulse indicator, `Ctrl+S` / `Cmd+S` keyboard sync, and automatic reverse sync when editing markdown headings.
+  - *Pure Minimalist UI*: Eliminated floating plus button next to node collapse/expand toggles, keeping clean native border circles `(+)` / `(-)`.
   - *Multi-Format Export*: Export 2× Retina transparent PNG diagrams, standard OPML 2.0 (`.opml`) for MindNode / OmniOutliner / Logseq, FreeMind 1.0.1 XML (`.mm`) for XMind / Freeplane with preserved node colors, and structured Markdown outlines.
   - *Drag-and-Drop Reparenting*: Intuitive reorganization with cycle detection and snap glow.
   - *In-Canvas Search & Smooth Focus*: Dynamic keyword highlight and viewport centering.
   - *Full Keyboard Flow*: `Tab` (add subtopic), `Enter` (add sibling), `Delete` (remove topic), `F2` / Double-Click (in-place rename with Chinese IME support), Arrow Keys (smooth navigation), `Ctrl+Z` / `Ctrl+Y` (undo / redo).
   - *Right-Click Appearance Customization*: 14 harmonic palettes, 4 node shapes (capsule, rounded, sharp rect, minimalist underline), 3 connector line styles (bezier, step, straight).
-  - *Two-way Markdown Synchronization*: Losslessly serializes into clean standard hierarchical lists with inline metadata comments (`<!-- style: ... -->`), universally compatible with third-party Markdown editors and Git.
-  - *Block-Level Atomic Linking*: Paragraph-level fingerprinting (`^block-id`), direct jumping (`[[doc#^block]]`), and elegant embed cards (`![[doc#^block]]`).
-- **🌐 60FPS Knowledge Graph, Local Subgraphs & Clustering (`Ctrl + G`)**:
+  - *Block-Level Atomic Linking & Clean Badges*: Paragraph-level fingerprinting (`^block-id`), direct jumping (`[[doc#^block]]`), elegant embed cards (`![[doc#^block]]`), and intelligent badge styling hiding raw anchor strings.
+- **🌐 60FPS Knowledge Graph, Decoupled Navigation & Visual Upgrade (`Ctrl + G` · v2.2.0 Upgrade)**:
+  - *Decoupled Click & Double-Click Navigation*: Single-clicking a node highlights its 1-hop connections and reveals the inspector card without opening the document in the left editor. Double-clicking (350ms window) opens the note. Canvas background click clears selection and restores the full view.
+  - *Structured 280px Glassmorphism Inspector Card*: Tiered layout with Meta badges, dedicated title, monospace path, 3-column metric cards (in-degree, out-degree, cross-folder), and direct jump bar.
+  - *Cytoscape Tween Transition & Hover Headlight*: Smooth 0.18s CSS transition on edge/node highlights, and Hover Headlight illumination on mouseover.
   - *Hop Depth Filtering*: Toggle between `1-Hop` direct neighbors, `2-Hop` extended subgraphs, and global galaxy to eliminate cognitive overload in large vaults. Click any node to dynamically re-center.
   - *Folder Cluster Coloring*: HSL harmonic palette automatically groups notes by their root folders with matched glow borders and links.
   - *MOC Hubs & Orphan Detection*: Filter degree $\ge 3$ core hubs or degree $= 0$ isolated notes for vault maintenance.
@@ -616,7 +634,7 @@
   - *Conflict Detection*: Automatic alert when files are modified externally.
 - **🧪 Sub-function Ecosystem & 100% Test Coverage**:
   - *Full Spectrum Granular Sub-functions*: Zoomable Media Lightbox (0.2×~6×, smooth pan, download, Esc), Typography Status Bar (word/char count, reading time estimation, dirty state, readonly lock), Backlinks & Unlinked Mentions with 1-click upgrade to `[[wikilinks]]`, External File Conflict Arbitrator (`FileConflictDialog`), Unsaved Changes Protector (`UnsavedChangesDialog`), Dynamic TOC & Cross-Chapter Bookmark Resolver, Space Flash Note Directory Isolation, Web Snapshot FIFO Pruning (30-cap), and Mermaid Base64 entity-safe SVG rendering with graceful error fallbacks.
-  - *Rock-Solid Reliability*: 42 test suites, **347** automated unit and integration tests passing with a 100% success rate!
+  - *Rock-Solid Reliability*: 43 test suites, **362** automated unit and integration tests passing with a 100% success rate!
 
 ---
 
