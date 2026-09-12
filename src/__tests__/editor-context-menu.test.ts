@@ -79,3 +79,87 @@ describe("editorContextMenu utilities & transformations", () => {
     expect(textReplaced).toBe(true);
   });
 });
+
+describe("tableGenerator and menu positioning algorithms", () => {
+  it("generates markdown table with custom rows and columns", async () => {
+    const { generateMarkdownTable } = await import("../services/tableGenerator");
+
+    // Test 3x3 table
+    const table3x3 = generateMarkdownTable(3, 3);
+    expect(table3x3.markdown).toContain("| 标题 1 | 标题 2 | 标题 3 |");
+    expect(table3x3.markdown).toContain("| :--- | :--- | :--- |");
+    expect(table3x3.markdown).toContain("| 内容 1-1 | 内容 1-2 | 内容 1-3 |");
+    expect(table3x3.markdown).toContain("| 内容 2-1 | 内容 2-2 | 内容 2-3 |");
+    expect(table3x3.cursorOffset).toBeGreaterThan(0);
+
+    // Test 2x4 table (2 rows total = 1 header + 1 data row, 4 columns)
+    const table2x4 = generateMarkdownTable(2, 4);
+    expect(table2x4.markdown).toContain("| 标题 1 | 标题 2 | 标题 3 | 标题 4 |");
+    expect(table2x4.markdown).toContain("| 内容 1-1 | 内容 1-2 | 内容 1-3 | 内容 1-4 |");
+    expect(table2x4.markdown).not.toContain("内容 2-1");
+
+    // Test 1x1 table
+    const table1x1 = generateMarkdownTable(1, 1);
+    expect(table1x1.markdown).toContain("| 标题 1 |");
+    expect(table1x1.markdown).toContain("| :--- |");
+    expect(table1x1.markdown).toContain("| 内容 1-1 |");
+  });
+
+  it("clamps invalid or out-of-range table dimensions safely", async () => {
+    const { generateMarkdownTable } = await import("../services/tableGenerator");
+
+    // Clamps negative / zero to 1
+    const clampedZero = generateMarkdownTable(0, -5);
+    expect(clampedZero.markdown).toContain("| 标题 1 |");
+    expect(clampedZero.markdown).toContain("| :--- |");
+
+    // Clamps excessive columns to 30
+    const clampedCols = generateMarkdownTable(2, 100);
+    expect(clampedCols.markdown).toContain("| 标题 30 |");
+    expect(clampedCols.markdown).not.toContain("| 标题 31 |");
+  });
+
+  it("clamps menu position within viewport bounds preventing bottom/right overflow", async () => {
+    const { clampMenuPosition } = await import("../services/tableGenerator");
+    const viewport = { width: 1000, height: 600 };
+
+    // Case 1: normal coordinates inside bounds
+    const normal = clampMenuPosition(100, 100, 260, 400, viewport, 12);
+    expect(normal).toEqual({ left: 100, top: 100 });
+
+    // Case 2: x overflows right boundary
+    const rightOverflow = clampMenuPosition(900, 100, 260, 400, viewport, 12);
+    expect(rightOverflow.left).toBe(1000 - 260 - 12); // 728
+    expect(rightOverflow.top).toBe(100);
+
+    // Case 3: y overflows bottom boundary
+    const bottomOverflow = clampMenuPosition(100, 500, 260, 400, viewport, 12);
+    expect(bottomOverflow.left).toBe(100);
+    expect(bottomOverflow.top).toBe(600 - 400 - 12); // 188
+
+    // Case 4: menu height larger than viewport height -> top clamped to padding
+    const hugeMenu = clampMenuPosition(100, 400, 260, 700, viewport, 12);
+    expect(hugeMenu.top).toBe(12);
+  });
+
+  it("calculates submenu coordinates with horizontal flip and vertical adjustment", async () => {
+    const { calculateSubmenuPosition } = await import("../services/tableGenerator");
+    const viewport = { width: 1000, height: 700 };
+
+    // Case 1: plenty of space on right
+    const anchor1 = { left: 200, right: 450, top: 300, bottom: 330, width: 250, height: 30 } as DOMRect;
+    const pos1 = calculateSubmenuPosition(anchor1, 200, 250, viewport, 12);
+    expect(pos1.left).toBe(454); // anchor.right + 4
+    expect(pos1.top).toBe(296); // anchor.top - 4
+
+    // Case 2: right edge would overflow -> flips to left
+    const anchor2 = { left: 850, right: 980, top: 200, bottom: 230, width: 130, height: 30 } as DOMRect;
+    const pos2 = calculateSubmenuPosition(anchor2, 200, 250, viewport, 12);
+    expect(pos2.left).toBe(850 - 200 - 4); // 646 (anchor.left - submenuWidth - 4)
+
+    // Case 3: bottom edge would overflow -> shifts up to fit inside viewport
+    const anchor3 = { left: 200, right: 450, top: 600, bottom: 630, width: 250, height: 30 } as DOMRect;
+    const pos3 = calculateSubmenuPosition(anchor3, 200, 250, viewport, 12);
+    expect(pos3.top).toBe(700 - 250 - 12); // 438
+  });
+});
