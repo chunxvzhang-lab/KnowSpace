@@ -20,6 +20,7 @@ import {
   FoldVertical,
   UnfoldVertical,
   RefreshCw,
+  MoreHorizontal,
 } from "lucide-react";
 import type { Heading, ThemeMode, MindmapNodeShape, MindmapLineStyle, MindmapTextAlign } from "../core/types";
 import {
@@ -228,6 +229,8 @@ export const MindmapView = memo(function MindmapView({
   const [menuPos, setMenuPos] = useState<{ left: number; top: number }>({ left: 0, top: 0 });
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement | null>(null);
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const moreMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!isExportMenuOpen) return;
@@ -239,6 +242,17 @@ export const MindmapView = memo(function MindmapView({
     window.addEventListener("mousedown", handleOutside);
     return () => window.removeEventListener("mousedown", handleOutside);
   }, [isExportMenuOpen]);
+
+  useEffect(() => {
+    if (!isMoreMenuOpen) return;
+    const handleOutside = (e: MouseEvent) => {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+        setIsMoreMenuOpen(false);
+      }
+    };
+    window.addEventListener("mousedown", handleOutside);
+    return () => window.removeEventListener("mousedown", handleOutside);
+  }, [isMoreMenuOpen]);
 
   // Safe boundary calculation for context menu to prevent bottom/right clipping
   useLayoutEffect(() => {
@@ -1036,8 +1050,10 @@ export const MindmapView = memo(function MindmapView({
 
   const isBatchMode = selectedNodeIds.size > 1;
 
+  const [isSemiCompact, setIsSemiCompact] = useState(false);
   const [isCompact, setIsCompact] = useState(false);
   const [isNarrow, setIsNarrow] = useState(false);
+  const [isUltraNarrow, setIsUltraNarrow] = useState(false);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -1045,8 +1061,10 @@ export const MindmapView = memo(function MindmapView({
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const w = entry.contentRect.width;
-        setIsCompact(w < 860);
-        setIsNarrow(w < 660);
+        setIsSemiCompact(w < 1220);
+        setIsCompact(w < 1000);
+        setIsNarrow(w < 820);
+        setIsUltraNarrow(w < 650);
       }
     });
     observer.observe(el);
@@ -1056,7 +1074,11 @@ export const MindmapView = memo(function MindmapView({
   return (
     <div
       ref={containerRef}
-      className={`mindmap-view-container ${isDragging ? "is-dragging" : ""} ${isCompact ? "is-compact" : ""} ${isNarrow ? "is-narrow" : ""}`}
+      className={`mindmap-view-container ${isDragging ? "is-dragging" : ""} ${
+        isSemiCompact ? "is-semi-compact" : ""
+      } ${isCompact ? "is-compact" : ""} ${isNarrow ? "is-narrow" : ""} ${
+        isUltraNarrow ? "is-ultra-narrow" : ""
+      }`}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
@@ -1124,62 +1146,150 @@ export const MindmapView = memo(function MindmapView({
               </div>
 
               <div className="mindmap-toolbar-divider" />
+            </>
+          )}
+
+          {!isUltraNarrow ? (
+            <>
+              {editable && (
+                <>
+                  <div className="mindmap-toolbar-btn-group">
+                    <button
+                      type="button"
+                      className="mindmap-tool-btn text-btn secondary-action"
+                      onClick={(e) => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const containerRect = containerRef.current?.getBoundingClientRect();
+                        setContextMenu({
+                          x: rect.left - (containerRect?.left ?? 0),
+                          y: rect.bottom - (containerRect?.top ?? 0) + 6,
+                          nodeId: primarySelectedId || tree.id,
+                        });
+                      }}
+                      title="自定义节点背景、边框、形状、字体及连线风格 (也可在节点上右键)"
+                    >
+                      <Palette size={14} className="text-cyan" />
+                      <span>{isBatchMode ? `批量样式 (${selectedNodeIds.size})` : "外观样式"}</span>
+                    </button>
+                  </div>
+
+                  <div className="mindmap-toolbar-divider" />
+                </>
+              )}
 
               <div className="mindmap-toolbar-btn-group">
                 <button
                   type="button"
                   className="mindmap-tool-btn text-btn secondary-action"
-                  onClick={(e) => {
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    const containerRect = containerRef.current?.getBoundingClientRect();
-                    setContextMenu({
-                      x: rect.left - (containerRect?.left ?? 0),
-                      y: rect.bottom - (containerRect?.top ?? 0) + 6,
-                      nodeId: primarySelectedId || tree.id,
-                    });
-                  }}
-                  title="自定义节点背景、边框、形状、字体及连线风格 (也可在节点上右键)"
+                  onClick={handleSelectAll}
+                  title="选中所有节点 (Ctrl+A)"
                 >
-                  <Palette size={14} className="text-cyan" />
-                  <span>{isBatchMode ? `批量样式 (${selectedNodeIds.size})` : "外观样式"}</span>
+                  <CheckSquare size={13} />
+                  <span>全选</span>
+                </button>
+                <button
+                  type="button"
+                  className="mindmap-tool-btn text-btn secondary-action"
+                  onClick={handleCollapseToLevel2}
+                  title="仅保留 1~2 级主题"
+                >
+                  <FoldVertical size={13} />
+                  <span>折叠至2级</span>
+                </button>
+                <button
+                  type="button"
+                  className="mindmap-tool-btn text-btn secondary-action"
+                  onClick={handleExpandAll}
+                  title="展开所有分支"
+                >
+                  <UnfoldVertical size={13} />
+                  <span>全部展开</span>
                 </button>
               </div>
 
               <div className="mindmap-toolbar-divider" />
             </>
+          ) : (
+            <>
+              {/* Ultra-narrow folded More Actions dropdown menu */}
+              <div className="mindmap-toolbar-btn-group">
+                <div className="mindmap-more-dropdown" ref={moreMenuRef}>
+                  <button
+                    type="button"
+                    className={`mindmap-tool-btn text-btn ${isMoreMenuOpen ? "highlight-btn active" : ""}`}
+                    onClick={() => setIsMoreMenuOpen((prev) => !prev)}
+                    title="更多导图样式与视图选项"
+                    aria-haspopup="true"
+                    aria-expanded={isMoreMenuOpen}
+                  >
+                    <MoreHorizontal size={14} />
+                  </button>
+                  {isMoreMenuOpen && (
+                    <div className="mindmap-more-menu" role="menu">
+                      {editable && (
+                        <button
+                          type="button"
+                          className="mindmap-more-menu-item"
+                          role="menuitem"
+                          onClick={(e) => {
+                            setIsMoreMenuOpen(false);
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            const containerRect = containerRef.current?.getBoundingClientRect();
+                            setContextMenu({
+                              x: rect.left - (containerRect?.left ?? 0),
+                              y: rect.bottom - (containerRect?.top ?? 0) + 6,
+                              nodeId: primarySelectedId || tree.id,
+                            });
+                          }}
+                        >
+                          <Palette size={13} className="text-cyan" />
+                          <span>{isBatchMode ? `批量样式 (${selectedNodeIds.size})` : "外观样式"}</span>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="mindmap-more-menu-item"
+                        role="menuitem"
+                        onClick={() => {
+                          setIsMoreMenuOpen(false);
+                          handleSelectAll();
+                        }}
+                      >
+                        <CheckSquare size={13} />
+                        <span>全选所有节点 (Ctrl+A)</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="mindmap-more-menu-item"
+                        role="menuitem"
+                        onClick={() => {
+                          setIsMoreMenuOpen(false);
+                          handleCollapseToLevel2();
+                        }}
+                      >
+                        <FoldVertical size={13} />
+                        <span>折叠至 2 级</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="mindmap-more-menu-item"
+                        role="menuitem"
+                        onClick={() => {
+                          setIsMoreMenuOpen(false);
+                          handleExpandAll();
+                        }}
+                      >
+                        <UnfoldVertical size={13} />
+                        <span>全部展开所有分支</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="mindmap-toolbar-divider" />
+            </>
           )}
-
-          <div className="mindmap-toolbar-btn-group">
-            <button
-              type="button"
-              className="mindmap-tool-btn text-btn secondary-action"
-              onClick={handleSelectAll}
-              title="选中所有节点 (Ctrl+A)"
-            >
-              <CheckSquare size={13} />
-              <span>全选</span>
-            </button>
-            <button
-              type="button"
-              className="mindmap-tool-btn text-btn secondary-action"
-              onClick={handleCollapseToLevel2}
-              title="仅保留 1~2 级主题"
-            >
-              <FoldVertical size={13} />
-              <span>折叠至2级</span>
-            </button>
-            <button
-              type="button"
-              className="mindmap-tool-btn text-btn secondary-action"
-              onClick={handleExpandAll}
-              title="展开所有分支"
-            >
-              <UnfoldVertical size={13} />
-              <span>全部展开</span>
-            </button>
-          </div>
-
-          <div className="mindmap-toolbar-divider" />
 
           {/* In-Canvas Search Toolbar Group */}
           <div className="mindmap-toolbar-btn-group mindmap-search-group">

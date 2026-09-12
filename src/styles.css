@@ -8241,13 +8241,14 @@ body:has(.flash-capsule-overlay) {
 /* Mindmap Top Floating Toolbar */
 .mindmap-toolbar {
   position: absolute;
-  top: 14px;
-  left: 14px;
-  right: 14px;
-  height: 46px;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  height: 44px;
   display: flex;
   align-items: center;
-  padding: 0 12px;
+  justify-content: space-between;
+  padding: 0 10px;
   background: color-mix(in srgb, var(--surface) 92%, transparent);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
@@ -8256,7 +8257,7 @@ body:has(.flash-capsule-overlay) {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
   z-index: 50;
   box-sizing: border-box;
-  max-width: calc(100% - 28px);
+  max-width: calc(100% - 24px);
   overflow: visible;
 }
 
@@ -8275,7 +8276,7 @@ body:has(.flash-capsule-overlay) {
   font-size: 13px;
   color: var(--text);
   white-space: nowrap;
-  max-width: 220px;
+  max-width: 200px;
   min-width: 0;
 }
 
@@ -8300,15 +8301,25 @@ body:has(.flash-capsule-overlay) {
 .mindmap-toolbar-center {
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex-shrink: 1;
-  margin: 0 12px;
+  gap: 5px;
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0 8px;
+  overflow-x: auto;
+  overflow-y: visible;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.mindmap-toolbar-center::-webkit-scrollbar {
+  display: none;
 }
 
 .mindmap-toolbar-btn-group {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
 .mindmap-tool-btn {
@@ -8346,7 +8357,7 @@ body:has(.flash-capsule-overlay) {
 }
 
 .mindmap-tool-btn.text-btn {
-  padding: 0 10px;
+  padding: 0 9px;
 }
 
 .mindmap-tool-btn:hover {
@@ -8366,6 +8377,12 @@ body:has(.flash-capsule-overlay) {
   border-color: #38bdf8;
 }
 
+.mindmap-tool-btn.highlight-btn.active {
+  background: color-mix(in srgb, #38bdf8 20%, var(--surface-2));
+  border-color: #38bdf8;
+  color: #38bdf8;
+}
+
 .mindmap-tool-btn.delete-btn:hover:not(:disabled) {
   color: #f43f5e;
   border-color: color-mix(in srgb, #f43f5e 40%, var(--border));
@@ -8377,6 +8394,7 @@ body:has(.flash-capsule-overlay) {
   height: 16px;
   background: var(--border);
   margin: 0 3px;
+  flex-shrink: 0;
 }
 
 .mindmap-toolbar-right {
@@ -8385,87 +8403,186 @@ body:has(.flash-capsule-overlay) {
   gap: 6px;
   flex-shrink: 0;
   margin-left: auto;
+  position: relative;
+  z-index: 2;
+}
+
+/* More Actions Dropdown in Mindmap Toolbar */
+.mindmap-more-dropdown {
+  position: relative;
+  display: inline-flex;
+}
+
+.mindmap-more-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 175px;
+  background: var(--surface-elevated, var(--surface));
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 5px;
+  box-shadow: var(--shadow-modal, 0 10px 30px rgba(0, 0, 0, 0.2));
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: contextMenuFadeIn 0.15s ease-out;
+}
+
+.mindmap-more-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  transition: background 0.15s ease, color 0.15s ease;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.mindmap-more-menu-item:hover {
+  background: var(--surface-2, rgba(0, 0, 0, 0.05));
+  color: var(--accent);
+}
+
+.mindmap-more-menu-item svg {
+  flex-shrink: 0;
 }
 
 /* ==========================================================================
    Responsive Modes for Mindmap Toolbar
-   1. Compact Mode (width < 1180px): Collapse secondary actions into icon-only
-   2. Narrow Mode (width < 820px): Collapse primary creation buttons as well
+   1. Semi-Compact (width < 1220px): Collapse secondary actions into icon-only
+   2. Compact Mode (width < 1000px): Collapse primary actions into icon-only
+   3. Narrow Mode (width < 820px): Collapse sync text, hide badges, slim margins
+   4. Ultra-Narrow Mode (width < 650px): Fold secondary tools into More (···) menu
    ========================================================================== */
 
-.mindmap-view-container.is-compact .mindmap-toolbar {
+/* 1. Semi-Compact Mode (w < 1220px) - When dual sidebars (folder + outline) are open */
+.mindmap-view-container.is-semi-compact .mindmap-toolbar {
   left: 10px;
   right: 10px;
   padding: 0 8px;
 }
 
-.mindmap-view-container.is-compact .mindmap-toolbar-title {
-  max-width: 160px;
+.mindmap-view-container.is-semi-compact .mindmap-toolbar-title {
+  max-width: 140px;
 }
 
-.mindmap-view-container.is-compact .mindmap-toolbar-center {
-  gap: 5px;
-}
-
-.mindmap-view-container.is-compact .mindmap-toolbar-btn-group {
-  gap: 3px;
-}
-
-.mindmap-view-container.is-compact .mindmap-tool-btn {
-  padding: 0 8px;
+.mindmap-view-container.is-semi-compact .mindmap-toolbar-center {
   gap: 4px;
+  margin: 0 6px;
 }
 
-.mindmap-view-container.is-compact .mindmap-tool-btn.secondary-action span {
+.mindmap-view-container.is-semi-compact .mindmap-tool-btn.secondary-action {
+  padding: 0 8px;
+}
+
+.mindmap-view-container.is-semi-compact .mindmap-tool-btn.secondary-action span {
   display: none !important;
 }
 
+/* 2. Compact Mode (w < 1000px) - When user starts resizing the left sidebar */
+.mindmap-view-container.is-compact .mindmap-toolbar-title {
+  max-width: 110px;
+}
+
+.mindmap-view-container.is-compact .mindmap-tool-btn.highlight-btn {
+  padding: 0 8px;
+}
+
+.mindmap-view-container.is-compact .mindmap-tool-btn.highlight-btn span {
+  display: none !important;
+}
+
+.mindmap-view-container.is-compact .mindmap-search-group .mindmap-tool-btn span {
+  display: none !important;
+}
+
+.mindmap-view-container.is-compact .mindmap-search-group .mindmap-tool-btn {
+  padding: 0 8px;
+}
+
+/* 3. Narrow Mode (w < 820px) - Moderately squeezed workspace */
 .mindmap-view-container.is-narrow .mindmap-toolbar {
   left: 6px;
   right: 6px;
   padding: 0 6px;
-  gap: 4px;
-}
-
-.mindmap-view-container.is-narrow .mindmap-toolbar-left {
-  gap: 4px;
 }
 
 .mindmap-view-container.is-narrow .mindmap-toolbar-title {
-  max-width: 90px;
+  max-width: 80px;
   font-size: 12px;
 }
 
 .mindmap-view-container.is-narrow .mindmap-node-count-badge {
-  display: none;
+  display: none !important;
+}
+
+.mindmap-view-container.is-narrow .mindmap-sync-doc-btn span {
+  display: none !important;
+}
+
+.mindmap-view-container.is-narrow .mindmap-sync-doc-btn {
+  padding: 0 8px;
 }
 
 .mindmap-view-container.is-narrow .mindmap-toolbar-center {
   gap: 3px;
+  margin: 0 4px;
 }
 
 .mindmap-view-container.is-narrow .mindmap-toolbar-btn-group {
   gap: 2px;
 }
 
-.mindmap-view-container.is-narrow .mindmap-tool-btn {
-  padding: 0 6px;
-}
-
-.mindmap-view-container.is-narrow .mindmap-tool-btn.text-btn span {
-  display: none !important;
-}
-
-.mindmap-view-container.is-narrow .mindmap-tool-btn.export-btn span {
-  display: inline !important;
-}
-
 .mindmap-view-container.is-narrow .mindmap-toolbar-divider {
-  margin: 0 1px;
+  margin: 0 2px;
 }
 
 .mindmap-view-container.is-narrow .mindmap-search-box {
-  width: 120px;
+  margin-left: 3px;
+  padding: 2px 4px;
+}
+
+.mindmap-view-container.is-narrow .mindmap-search-input {
+  width: 90px;
+  font-size: 11px;
+}
+
+/* 4. Ultra-Narrow Mode (w < 650px) - Severely squeezed workspace */
+.mindmap-view-container.is-ultra-narrow .mindmap-toolbar {
+  left: 4px;
+  right: 4px;
+  padding: 0 4px;
+  height: 40px;
+}
+
+.mindmap-view-container.is-ultra-narrow .mindmap-toolbar-title {
+  max-width: 60px;
+}
+
+.mindmap-view-container.is-ultra-narrow .mindmap-toolbar-center {
+  gap: 2px;
+  margin: 0 2px;
+}
+
+.mindmap-view-container.is-ultra-narrow .mindmap-tool-btn {
+  height: 28px;
+  padding: 0 6px;
+}
+
+.mindmap-view-container.is-ultra-narrow .mindmap-tool-btn.export-btn span {
+  font-size: 11px;
 }
 
 /* SVG Canvas & Node Elements */

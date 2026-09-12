@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react";
+import { render, fireEvent, act } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { MindmapView } from "../components/MindmapView";
 import { measureTextWidth } from "../services/mindmapService";
@@ -62,3 +62,46 @@ describe("measureTextWidth metrics", () => {
     expect(measureTextWidth("m", 13)).toBeCloseTo(13 * 1.05 * 0.75, 1);
   });
 });
+
+describe("Mindmap responsive toolbar layout and boundaries", () => {
+  it("renders toolbar with left, center, and right anchored export button", () => {
+    const { container } = render(
+      <MindmapView title="架构方案" source={source} editable={true} />
+    );
+
+    const toolbar = container.querySelector(".mindmap-toolbar");
+    expect(toolbar).toBeTruthy();
+
+    const left = toolbar?.querySelector(".mindmap-toolbar-left");
+    expect(left).toBeTruthy();
+
+    const center = toolbar?.querySelector(".mindmap-toolbar-center");
+    expect(center).toBeTruthy();
+
+    const right = toolbar?.querySelector(".mindmap-toolbar-right");
+    expect(right).toBeTruthy();
+
+    // Export button must be securely anchored inside .mindmap-toolbar-right
+    const exportBtn = right?.querySelector(".mindmap-tool-btn.export-btn");
+    expect(exportBtn).toBeTruthy();
+    expect(exportBtn?.textContent).toContain("导出");
+  });
+
+  it("toggles export menu correctly when clicked", async () => {
+    const { container } = render(
+      <MindmapView title="架构方案" source={source} editable={true} />
+    );
+
+    const exportBtn = container.querySelector(".mindmap-tool-btn.export-btn") as HTMLButtonElement;
+    expect(exportBtn).toBeTruthy();
+
+    expect(container.querySelector(".mindmap-export-menu")).toBeNull();
+    act(() => {
+      fireEvent.click(exportBtn);
+    });
+    expect(container.querySelector(".mindmap-export-menu")).toBeTruthy();
+    expect(container.querySelector(".mindmap-export-menu")?.textContent).toContain("导出 PNG 图片");
+    expect(container.querySelector(".mindmap-export-menu")?.textContent).toContain("导出 OPML 2.0");
+  });
+});
+
