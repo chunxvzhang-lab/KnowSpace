@@ -49,6 +49,8 @@ import {
   ChevronRight,
   Music,
   Video,
+  Film,
+  List,
 } from "lucide-react";
 import type { ThemeMode } from "../core/types";
 import type {
@@ -113,6 +115,7 @@ import {
   isMediaFile,
   isImageFile,
   buildPresentationSequence,
+  findContainerForNode,
 } from "../services/canvasService";
 import { renderCardMarkdown } from "../services/markdown";
 import { getCanvasThemeColors } from "../services/canvasTheme";
@@ -409,6 +412,9 @@ export const CanvasView = memo(function CanvasView({
   const [isPresentationMode, setIsPresentationMode] = useState(false);
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(false);
+  const [showSlideDrawer, setShowSlideDrawer] = useState(false);
+  const [isPresentationFullscreen, setIsPresentationFullscreen] = useState(false);
+  const slideDrawerRef = useRef<HTMLDivElement>(null);
   const savedViewportBeforePresentationRef = useRef<CanvasViewport | null>(null);
 
   // Mouse marquee box selection
@@ -1087,6 +1093,21 @@ export const CanvasView = memo(function CanvasView({
     // If a card or group was being edited, commit edits
     if (editingNodeIdRef.current) {
       handleSaveNodeEdit();
+    }
+
+    if (isPresentationMode) {
+      if (showSlideDrawer) setShowSlideDrawer(false);
+      if (e.button === 0 || e.button === 1) {
+        isDraggingCanvasRef.current = true;
+        canvasDragStartRef.current = {
+          x: e.clientX,
+          y: e.clientY,
+          panX: viewport.panX,
+          panY: viewport.panY,
+          hasMoved: false,
+        };
+      }
+      return;
     }
 
     const isModifier = e.shiftKey || e.ctrlKey || e.metaKey;
@@ -2450,13 +2471,17 @@ export const CanvasView = memo(function CanvasView({
       const containerW = rect.width || 1000;
       const containerH = rect.height || 700;
 
+      // Available vertical height clearing the bottom floating presentation bar (~80px)
+      const usableH = Math.max(300, containerH - 90);
       const targetZoom = Math.min(
-        1.3,
-        Math.max(0.55, Math.min((containerW - 200) / targetNode.width, (containerH - 160) / targetNode.height))
+        1.35,
+        Math.max(0.35, Math.min((containerW - 160) / targetNode.width, (usableH - 120) / targetNode.height))
       );
 
+      // Target center slightly shifted upward to give clearance to the bottom presentation controller
+      const visualCenterY = usableH / 2 + 10;
       const targetPanX = Math.round(containerW / 2 - (targetNode.x + targetNode.width / 2) * targetZoom);
-      const targetPanY = Math.round(containerH / 2 - (targetNode.y + targetNode.height / 2) * targetZoom);
+      const targetPanY = Math.round(visualCenterY - (targetNode.y + targetNode.height / 2) * targetZoom);
 
       setViewport({ panX: targetPanX, panY: targetPanY, zoom: targetZoom });
       setSelectedNodeIds(new Set([targetId]));
@@ -2465,10 +2490,20 @@ export const CanvasView = memo(function CanvasView({
     [presentationSequence, nodeMap]
   );
 
+  const handleJumpToSlide = useCallback(
+    (index: number) => {
+      if (index < 0 || index >= presentationSequence.length) return;
+      setCurrentSlideIndex(index);
+      focusSlide(index);
+    },
+    [presentationSequence.length, focusSlide]
+  );
+
   const handleTogglePresentation = useCallback(() => {
     if (isPresentationMode) {
       setIsPresentationMode(false);
       setIsAutoPlaying(false);
+      setShowSlideDrawer(false);
       if (savedViewportBeforePresentationRef.current) {
         setViewport(savedViewportBeforePresentationRef.current);
       }
@@ -2479,24 +2514,66 @@ export const CanvasView = memo(function CanvasView({
       }
       savedViewportBeforePresentationRef.current = { ...viewport };
       setIsPresentationMode(true);
-      setCurrentSlideIndex(0);
-      focusSlide(0);
+      setShowSlideDrawer(false);
+
+      // "就近开播": Check if currently selected node is in presentation sequence
+      const currentSelected = selectedNodeId || Array.from(selectedNodeIds)[0];
+      const targetIndex = currentSelected ? presentationSequence.indexOf(currentSelected) : -1;
+      const startIndex = targetIndex >= 0 ? targetIndex : 0;
+
+      setCurrentSlideIndex(startIndex);
+      focusSlide(startIndex);
     }
-  }, [isPresentationMode, presentationSequence, viewport, focusSlide, showToast]);
+  }, [isPresentationMode, presentationSequence, viewport, selectedNodeId, selectedNodeIds, focusSlide, showToast]);
 
   const handleNextSlide = useCallback(() => {
     if (presentationSequence.length === 0) return;
     const nextIdx = (currentSlideIndex + 1) % presentationSequence.length;
     setCurrentSlideIndex(nextIdx);
     focusSlide(nextIdx);
-  }, [currentSlideIndex, presentationSequence, focusSlide]);
+  }, [currentSlideIndex, presentationSequence.length, focusSlide]);
 
   const handlePrevSlide = useCallback(() => {
     if (presentationSequence.length === 0) return;
     const prevIdx = (currentSlideIndex - 1 + presentationSequence.length) % presentationSequence.length;
     setCurrentSlideIndex(prevIdx);
     focusSlide(prevIdx);
-  }, [currentSlideIndex, presentationSequence, focusSlide]);
+  }, [currentSlideIndex, presentationSequence.length, focusSlide]);
+
+  const handleToggleFullscreen = useCallback(async () => {
+    const desktopWin = (window as unknown as { bookMDDesktop?: { toggleFullScreen?: () => Promise<boolean> } }).bookMDDesktop;
+    if (desktopWin?.toggleFullScreen) {
+      const next = await desktopWin.toggleFullScreen();
+      setIsPresentationFullscreen(Boolean(next));
+    } else if (typeof document !== "undefined") {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen?.().catch(() => {});
+        setIsPresentationFullscreen(true);
+      } else {
+        await document.exitFullscreen?.().catch(() => {});
+        setIsPresentationFullscreen(false);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleFsChange = () => {
+      setIsPresentationFullscreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener("fullscreenchange", handleFsChange);
+    return () => document.removeEventListener("fullscreenchange", handleFsChange);
+  }, []);
+
+  useEffect(() => {
+    if (!showSlideDrawer) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (slideDrawerRef.current && !slideDrawerRef.current.contains(e.target as Node)) {
+        setShowSlideDrawer(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showSlideDrawer]);
 
   useEffect(() => {
     if (!isPresentationMode || !isAutoPlaying) return;
@@ -2518,28 +2595,47 @@ export const CanvasView = memo(function CanvasView({
 
       if (e.key === "Escape") {
         e.preventDefault();
-        handleTogglePresentation();
-      } else if (e.key === "ArrowRight" || e.key === " " || e.key === "PageDown") {
+        if (showSlideDrawer) {
+          setShowSlideDrawer(false);
+        } else {
+          handleTogglePresentation();
+        }
+      } else if (e.key === "ArrowRight" || e.key === " " || e.key === "PageDown" || e.key === "Enter") {
         e.preventDefault();
         handleNextSlide();
-      } else if (e.key === "ArrowLeft" || e.key === "PageUp") {
+      } else if (e.key === "ArrowLeft" || e.key === "PageUp" || e.key === "Backspace") {
         e.preventDefault();
         handlePrevSlide();
       } else if (e.key === "Home") {
         e.preventDefault();
-        setCurrentSlideIndex(0);
-        focusSlide(0);
+        handleJumpToSlide(0);
       } else if (e.key === "End") {
         e.preventDefault();
-        const last = presentationSequence.length - 1;
-        setCurrentSlideIndex(last);
-        focusSlide(last);
+        handleJumpToSlide(presentationSequence.length - 1);
+      } else if (e.key === "f" || e.key === "F") {
+        e.preventDefault();
+        handleToggleFullscreen();
+      } else if (e.key === "l" || e.key === "L") {
+        e.preventDefault();
+        setShowSlideDrawer((prev) => !prev);
+      } else if (e.key === "p" || e.key === "P") {
+        e.preventDefault();
+        setIsAutoPlaying((prev) => !prev);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isPresentationMode, handleTogglePresentation, handleNextSlide, handlePrevSlide, presentationSequence, focusSlide]);
+  }, [
+    isPresentationMode,
+    showSlideDrawer,
+    handleTogglePresentation,
+    handleNextSlide,
+    handlePrevSlide,
+    handleJumpToSlide,
+    handleToggleFullscreen,
+    presentationSequence.length,
+  ]);
 
   // Global Clipboard Paste listener for media cards (Ctrl+V / Cmd+V)
   useEffect(() => {
@@ -2593,6 +2689,7 @@ export const CanvasView = memo(function CanvasView({
 
   const handleContextMenuCanvas = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
+    if (isPresentationMode) return;
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     const localX = e.clientX - rect.left;
@@ -2608,11 +2705,12 @@ export const CanvasView = memo(function CanvasView({
       canvasX,
       canvasY,
     });
-  }, []);
+  }, [isPresentationMode]);
 
   const handleContextMenuNode = useCallback((e: React.MouseEvent, node: CanvasNode) => {
     e.preventDefault();
     e.stopPropagation();
+    if (isPresentationMode) return;
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     const localX = e.clientX - rect.left;
@@ -2631,11 +2729,12 @@ export const CanvasView = memo(function CanvasView({
       canvasY,
       targetNodeId: node.id,
     });
-  }, [selectedNodeIds]);
+  }, [isPresentationMode, selectedNodeIds]);
 
   const handleContextMenuEdge = useCallback((e: React.MouseEvent, edge: CanvasEdge) => {
     e.preventDefault();
     e.stopPropagation();
+    if (isPresentationMode) return;
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     const localX = e.clientX - rect.left;
@@ -2673,7 +2772,7 @@ export const CanvasView = memo(function CanvasView({
 
   // Node Dragging: when dragging nodes, move all selected nodes together
   const handleNodeDragStart = (e: React.MouseEvent, node: CanvasNode) => {
-    if (e.button !== 0) return;
+    if (isPresentationMode || e.button !== 0) return;
 
     // Do not initiate drag if user is clicking on interactive controls inside the card
     const target = e.target as HTMLElement | null;
@@ -2880,7 +2979,7 @@ export const CanvasView = memo(function CanvasView({
 
   // Node Resizing
   const handleNodeResizeStart = (e: React.MouseEvent, node: CanvasNode) => {
-    if (e.button !== 0) return;
+    if (isPresentationMode || e.button !== 0) return;
     e.stopPropagation();
     resizeDragRef.current = {
       nodeId: node.id,
@@ -2893,7 +2992,7 @@ export const CanvasView = memo(function CanvasView({
 
   // Edge Anchor Dragging
   const handleAnchorMouseDown = (e: React.MouseEvent, nodeId: string, side: CanvasNodeSide) => {
-    if (e.button !== 0 || !editable) return;
+    if (isPresentationMode || e.button !== 0 || !editable) return;
     e.stopPropagation();
     const node = data.nodes.find((n) => n.id === nodeId);
     if (!node) return;
@@ -3502,8 +3601,10 @@ export const CanvasView = memo(function CanvasView({
         }
         isDraggingCanvasRef.current = false;
         if (!canvasDragStartRef.current.hasMoved) {
-          setSelectedNodeIds(new Set());
-          setSelectedEdgeIds(new Set());
+          if (!isPresentationMode) {
+            setSelectedNodeIds(new Set());
+            setSelectedEdgeIds(new Set());
+          }
         }
       }
       latestPanPosRef.current = null;
@@ -4041,7 +4142,7 @@ export const CanvasView = memo(function CanvasView({
   return (
     <div
       ref={containerRef}
-      className={`knowspace-canvas-view theme-${theme} ${isNarrow ? "is-narrow" : ""}`}
+      className={`knowspace-canvas-view theme-${theme} ${isNarrow ? "is-narrow" : ""} ${isPresentationMode ? "presentation-active" : ""}`}
       style={{
         position: "relative",
         width: "100%",
@@ -4607,7 +4708,7 @@ export const CanvasView = memo(function CanvasView({
           height: "100%",
           transform: `translate3d(${viewport.panX}px, ${viewport.panY}px, 0) scale(${viewport.zoom})`,
           transformOrigin: "0 0",
-          transition: isPresentationMode ? "transform 0.45s cubic-bezier(0.25, 1, 0.5, 1)" : undefined,
+          transition: isPresentationMode ? "transform 0.5s cubic-bezier(0.2, 0.9, 0.3, 1)" : undefined,
           backgroundImage: `radial-gradient(${colors.dotColor} 1.2px, transparent 1.2px)`,
           backgroundSize: "28px 28px",
           backfaceVisibility: "hidden",
@@ -4950,6 +5051,20 @@ export const CanvasView = memo(function CanvasView({
 
           // Render Group Container (z-index: 2)
           if (node.type === "group") {
+            const currentSlideNodeId = isPresentationMode ? presentationSequence[currentSlideIndex] : null;
+            const currentSlideNode = currentSlideNodeId ? nodeMap.get(currentSlideNodeId) : null;
+            const isCurrentGroupSlide = isPresentationMode && currentSlideNodeId === node.id;
+            const isGroupContainingCurrentSlide =
+              isPresentationMode && currentSlideNode ? isNodeInsideGroup(currentSlideNode, node as CanvasGroupNode) : false;
+
+            const groupOpacity = isPresentationMode
+              ? isCurrentGroupSlide
+                ? 1
+                : isGroupContainingCurrentSlide
+                ? 0.85
+                : 0.16
+              : 1;
+
             const isGroupConnectingTarget =
               connectingState !== null && connectingState.fromNodeId !== node.id;
             const groupOutgoingInfo = nodeOutgoingMap.get(node.id);
@@ -4958,16 +5073,21 @@ export const CanvasView = memo(function CanvasView({
             return (
               <div
                 key={node.id}
-                className={`canvas-node canvas-group ${isSelected ? "selected" : ""} ${isGroupConnectingTarget ? "connecting-target" : ""}`}
+                className={`canvas-node canvas-group ${isSelected ? "selected" : ""} ${isGroupConnectingTarget ? "connecting-target" : ""} ${isCurrentGroupSlide ? "current-slide" : ""} ${isGroupContainingCurrentSlide ? "group-active-context" : ""}`}
                 style={{
                   position: "absolute",
                   left: node.x,
                   top: node.y,
                   width: node.width,
                   height: node.height,
-                  zIndex: 2,
+                  zIndex: isCurrentGroupSlide ? 60 : isGroupContainingCurrentSlide ? 4 : 2,
+                  opacity: groupOpacity,
                   borderRadius: 16,
-                  border: isSelected
+                  border: isCurrentGroupSlide
+                    ? "2px solid #8b5cf6"
+                    : isGroupContainingCurrentSlide
+                    ? "2px solid rgba(139, 92, 246, 0.65)"
+                    : isSelected
                     ? "2px solid #f59e0b"
                     : isGroupConnectingTarget && isHovered
                     ? "2px solid #0284c7"
@@ -4977,14 +5097,19 @@ export const CanvasView = memo(function CanvasView({
                     ? `2px dashed ${palette.stroke}`
                     : `2px dashed ${colors.groupBorder}`,
                   backgroundColor: palette ? palette.bg : colors.groupBg,
-                  boxShadow: isSelected
+                  boxShadow: isCurrentGroupSlide
+                    ? "0 0 0 4px rgba(139, 92, 246, 0.45), 0 16px 48px rgba(139, 92, 246, 0.4)"
+                    : isGroupContainingCurrentSlide
+                    ? "0 0 24px rgba(139, 92, 246, 0.22)"
+                    : isSelected
                     ? "0 0 16px rgba(245,158,11,0.3)"
                     : isGroupConnectingTarget && isHovered
                     ? "0 0 0 3px rgba(2, 132, 199, 0.4), 0 0 16px rgba(2, 132, 199, 0.3)"
                     : undefined,
                   display: "flex",
                   flexDirection: "column",
-                  cursor: isGroupConnectingTarget ? "crosshair" : "move",
+                  cursor: isPresentationMode ? "pointer" : isGroupConnectingTarget ? "crosshair" : "move",
+                  transition: "opacity 0.3s ease, border-color 0.2s ease, box-shadow 0.25s ease",
                 }}
                 onMouseEnter={() => setHoveredNodeId(node.id)}
                 onMouseLeave={() => setHoveredNodeId((prev) => (prev === node.id ? null : prev))}
@@ -4997,6 +5122,13 @@ export const CanvasView = memo(function CanvasView({
                 onContextMenu={(e) => handleContextMenuNode(e, node)}
                 onClick={(e) => {
                   e.stopPropagation();
+                  if (isPresentationMode) {
+                    const idx = presentationSequence.indexOf(node.id);
+                    if (idx !== -1) {
+                      handleJumpToSlide(idx);
+                    }
+                    return;
+                  }
                   if (e.shiftKey || e.ctrlKey || e.metaKey || hasDraggedRef.current) return;
                   setSelectedNodeId(node.id);
                   setSelectedEdgeId(null);
@@ -5068,13 +5200,14 @@ export const CanvasView = memo(function CanvasView({
                     borderTopRightRadius: 14,
                     fontSize: 13,
                     fontWeight: 600,
-                    cursor: "grab",
+                    cursor: isPresentationMode ? "pointer" : "grab",
                   }}
                   onMouseDown={(e) => handleNodeDragStart(e, node)}
                 >
                   {isEditing ? (
                     <input
                       type="text"
+                      aria-label="编辑分组标题"
                       value={editingText}
                       onChange={(e) => setEditingText(e.target.value)}
                       onMouseDown={(e) => e.stopPropagation()}
@@ -5099,10 +5232,11 @@ export const CanvasView = memo(function CanvasView({
                       <span
                         onDoubleClick={(e) => {
                           e.stopPropagation();
+                          if (isPresentationMode) return;
                           setEditingNodeId(node.id);
                           setEditingText(node.label || "");
                         }}
-                        title="双击重命名 | 拖动移动分组"
+                        title={isPresentationMode ? node.label || "分组" : "双击重命名 | 拖动移动分组"}
                         style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
                       >
                         📁 {node.label || "未命名分组"}
@@ -5114,23 +5248,21 @@ export const CanvasView = memo(function CanvasView({
                             display: "inline-flex",
                             alignItems: "center",
                             gap: 3,
-                            fontSize: 10,
-                            fontWeight: 700,
+                            backgroundColor: "rgba(0,0,0,0.2)",
                             padding: "1px 6px",
                             borderRadius: 8,
-                            backgroundColor: "rgba(255, 255, 255, 0.25)",
-                            color: "#ffffff",
-                            border: "1px solid rgba(255, 255, 255, 0.5)",
-                            marginLeft: 4,
-                            whiteSpace: "nowrap",
+                            fontSize: 11,
+                            fontWeight: 500,
+                            flexShrink: 0,
                           }}
                         >
-                          🌱 发起源 · {groupOutgoingInfo.count}
+                          <Share2 size={10} />
+                          <span>{groupOutgoingInfo.count} 分支</span>
                         </span>
                       )}
                     </div>
                   )}
-                  {isSelected && editable && (
+                  {isSelected && editable && !isPresentationMode && (
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                       <button
                         onMouseDown={(e) => e.stopPropagation()}
@@ -5149,6 +5281,7 @@ export const CanvasView = memo(function CanvasView({
 
                 {/* 4 Connection Anchors on Group Container */}
                 {editable &&
+                  !isPresentationMode &&
                   (isSelected || isHovered || connectingState !== null) &&
                   SIDES.map((side) => {
                     const dotStyle = getAnchorDotStyle(side, colors);
@@ -5168,7 +5301,7 @@ export const CanvasView = memo(function CanvasView({
                   })}
 
                 {/* Resize Handle */}
-                {isSelected && editable && (
+                {isSelected && editable && !isPresentationMode && (
                   <div
                     style={resizeHandleStyle}
                     onMouseDown={(e) => handleNodeResizeStart(e, node)}
@@ -5229,7 +5362,7 @@ export const CanvasView = memo(function CanvasView({
                 display: "flex",
                 flexDirection: "column",
                 color: colors.cardText,
-                cursor: isConnectingTarget ? "crosshair" : isEditing ? "text" : "move",
+                cursor: isPresentationMode ? "pointer" : isConnectingTarget ? "crosshair" : isEditing ? "text" : "move",
                 transition: "border-color 0.15s ease, box-shadow 0.15s ease, opacity 0.3s ease",
               }}
               onMouseEnter={() => setHoveredNodeId(node.id)}
@@ -5243,12 +5376,20 @@ export const CanvasView = memo(function CanvasView({
               onContextMenu={(e) => handleContextMenuNode(e, node)}
               onClick={(e) => {
                 e.stopPropagation();
+                if (isPresentationMode) {
+                  const idx = presentationSequence.indexOf(node.id);
+                  if (idx !== -1) {
+                    handleJumpToSlide(idx);
+                  }
+                  return;
+                }
                 if (e.shiftKey || e.ctrlKey || e.metaKey || hasDraggedRef.current) return;
                 setSelectedNodeId(node.id);
                 setSelectedEdgeId(null);
               }}
               onDoubleClick={(e) => {
                 e.stopPropagation();
+                if (isPresentationMode) return;
                 if (editable && node.type === "text") {
                   setEditingNodeId(node.id);
                   setEditingText(node.text);
@@ -5679,6 +5820,7 @@ export const CanvasView = memo(function CanvasView({
 
               {/* 4 Connection Anchors (Only shown on Hover / Select / Connecting) */}
               {editable &&
+                !isPresentationMode &&
                 (isSelected || isHovered || connectingState !== null) &&
                 SIDES.map((side) => {
                   const style = getAnchorDotStyle(side, colors);
@@ -5695,7 +5837,7 @@ export const CanvasView = memo(function CanvasView({
                 })}
 
               {/* Resize Handle */}
-              {isSelected && editable && (
+              {isSelected && editable && !isPresentationMode && (
                 <div
                   style={resizeHandleStyle}
                   onMouseDown={(e) => handleNodeResizeStart(e, node)}
@@ -8315,133 +8457,228 @@ export const CanvasView = memo(function CanvasView({
         </div>
       )}
 
-      {/* 10. Presentation Mode Floating Controls */}
+      {/* 10. Presentation Mode Floating Controls & Slide Drawer */}
       {isPresentationMode && presentationSequence.length > 0 && (
-        <div
-          className="canvas-presentation-bar"
-          style={{
-            position: "absolute",
-            bottom: 28,
-            left: "50%",
-            transform: "translateX(-50%)",
-            backgroundColor: isDark ? "rgba(15, 23, 42, 0.94)" : "rgba(255, 255, 255, 0.96)",
-            backdropFilter: "blur(16px)",
-            border: `1px solid ${isDark ? "rgba(255, 255, 255, 0.15)" : "rgba(0, 0, 0, 0.12)"}`,
-            borderRadius: 36,
-            padding: "8px 18px",
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            zIndex: 1000,
-            boxShadow: "0 12px 36px rgba(0, 0, 0, 0.35)",
-            color: colors.cardText,
-            userSelect: "none",
-          }}
-          onClick={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
-        >
-          <span
-            style={{
-              fontSize: 12,
-              fontWeight: 700,
-              color: "#8b5cf6",
-              display: "flex",
-              alignItems: "center",
-              gap: 4,
-            }}
-          >
-            🪐 演示模式
-          </span>
+        <>
+          {/* Slide Overview Drawer / Popover */}
+          {showSlideDrawer && (
+            <div
+              ref={slideDrawerRef}
+              className="canvas-slide-drawer"
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <div className="canvas-slide-drawer-header">
+                <div className="canvas-slide-drawer-title">
+                  <Film size={14} color="#8b5cf6" />
+                  <span>分镜大纲 (共 {presentationSequence.length} 幕)</span>
+                </div>
+                <button
+                  type="button"
+                  className="canvas-slide-drawer-close"
+                  onClick={() => setShowSlideDrawer(false)}
+                  title="关闭分镜大纲 (Esc / L)"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+              <div className="canvas-slide-drawer-list">
+                {presentationSequence.map((nodeId, idx) => {
+                  const n = nodeMap.get(nodeId);
+                  if (!n) return null;
+                  const isActive = idx === currentSlideIndex;
+                  const parentContainer = findContainerForNode(n, data.nodes);
+                  let icon = <FileText size={13} />;
+                  let title = "";
+                  if (n.type === "text") {
+                    icon = <FileText size={13} color={isActive ? "#8b5cf6" : colors.cardText} />;
+                    title = n.text.trim().split("\n")[0] || "文本卡片";
+                  } else if (n.type === "file") {
+                    icon = <ImageIcon size={13} color="#0284c7" />;
+                    title = n.file ? n.file.split(/[/\\]/).pop() || n.file : "文件卡片";
+                  } else if (n.type === "link") {
+                    icon = <ExternalLink size={13} color="#10b981" />;
+                    title = n.url || "网页卡片";
+                  } else if (n.type === "group") {
+                    icon = <Boxes size={13} color="#f59e0b" />;
+                    title = (n as CanvasGroupNode).label || "独立分组帧";
+                  }
 
-          <div style={{ width: 1, height: 18, background: colors.cardBorder }} />
+                  return (
+                    <button
+                      key={nodeId}
+                      type="button"
+                      className={`canvas-slide-drawer-item ${isActive ? "active" : ""}`}
+                      onClick={() => {
+                        handleJumpToSlide(idx);
+                      }}
+                    >
+                      <span className="canvas-slide-index">{String(idx + 1).padStart(2, "0")}</span>
+                      <span className="canvas-slide-icon">{icon}</span>
+                      <span className="canvas-slide-name" title={title}>
+                        {title}
+                      </span>
+                      {parentContainer && parentContainer.label && (
+                        <span className="canvas-slide-group-tag" title={`所属分组: ${parentContainer.label}`}>
+                          {parentContainer.label}
+                        </span>
+                      )}
+                      {isActive && <span className="canvas-slide-playing-badge">演播中</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
-          <button
-            onClick={handlePrevSlide}
-            title="上一张 (← / PageUp)"
+          <div
+            className="canvas-presentation-bar"
             style={{
-              background: "none",
-              border: "none",
+              backgroundColor: isDark ? "rgba(15, 23, 42, 0.94)" : "rgba(255, 255, 255, 0.96)",
+              backdropFilter: "blur(16px)",
+              border: `1px solid ${isDark ? "rgba(255, 255, 255, 0.15)" : "rgba(0, 0, 0, 0.12)"}`,
               color: colors.cardText,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              padding: 4,
-              borderRadius: 6,
             }}
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
           >
-            <ChevronLeft size={18} />
-          </button>
+            <span
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: "#8b5cf6",
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
+              🪐 演示模式
+            </span>
 
-          <span style={{ fontSize: 13, fontWeight: 600, minWidth: 54, textAlign: "center" }}>
-            {currentSlideIndex + 1} / {presentationSequence.length}
-          </span>
+            <div style={{ width: 1, height: 18, background: colors.cardBorder }} />
 
-          <button
-            onClick={handleNextSlide}
-            title="下一张 (→ / 空格 / PageDown)"
-            style={{
-              background: "none",
-              border: "none",
-              color: colors.cardText,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              padding: 4,
-              borderRadius: 6,
-            }}
-          >
-            <ChevronRight size={18} />
-          </button>
+            <button
+              onClick={handlePrevSlide}
+              title="上一张 (← / PageUp)"
+              style={{
+                background: "none",
+                border: "none",
+                color: colors.cardText,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                padding: 4,
+                borderRadius: 6,
+              }}
+            >
+              <ChevronLeft size={18} />
+            </button>
 
-          <div style={{ width: 1, height: 18, background: colors.cardBorder }} />
+            <button
+              type="button"
+              className={`canvas-presentation-counter-btn ${showSlideDrawer ? "active" : ""}`}
+              onClick={() => setShowSlideDrawer((prev) => !prev)}
+              title="点击展开分镜大纲抽屉 (快捷键 L)"
+            >
+              <List size={13} style={{ opacity: 0.8 }} />
+              <span>
+                {currentSlideIndex + 1} / {presentationSequence.length}
+              </span>
+            </button>
 
-          <button
-            onClick={() => setIsAutoPlaying((prev) => !prev)}
-            title={isAutoPlaying ? "暂停自动放映" : "自动放映 (每 3.5 秒切换)"}
-            style={{
-              background: isAutoPlaying
-                ? isDark
-                  ? "rgba(139, 92, 246, 0.3)"
-                  : "rgba(139, 92, 246, 0.15)"
-                : "none",
-              border: "none",
-              color: isAutoPlaying ? "#8b5cf6" : colors.cardText,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: 4,
-              fontSize: 12,
-              fontWeight: 500,
-              padding: "4px 8px",
-              borderRadius: 6,
-            }}
-          >
-            {isAutoPlaying ? <Pause size={14} /> : <Play size={14} />}
-            <span>{isAutoPlaying ? "暂停" : "自动"}</span>
-          </button>
+            <button
+              onClick={handleNextSlide}
+              title="下一张 (→ / 空格 / PageDown)"
+              style={{
+                background: "none",
+                border: "none",
+                color: colors.cardText,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                padding: 4,
+                borderRadius: 6,
+              }}
+            >
+              <ChevronRight size={18} />
+            </button>
 
-          <button
-            onClick={handleTogglePresentation}
-            title="退出演示模式 (Esc)"
-            style={{
-              background: "rgba(239, 68, 68, 0.12)",
-              border: "none",
-              color: "#ef4444",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: 4,
-              fontSize: 12,
-              fontWeight: 600,
-              padding: "4px 10px",
-              borderRadius: 16,
-              marginLeft: 4,
-            }}
-          >
-            <X size={13} />
-            <span>退出</span>
-          </button>
-        </div>
+            <div style={{ width: 1, height: 18, background: colors.cardBorder }} />
+
+            <button
+              onClick={() => setIsAutoPlaying((prev) => !prev)}
+              title={isAutoPlaying ? "暂停自动放映 (P)" : "自动放映 (每 3.5 秒切换, 快捷键 P)"}
+              style={{
+                background: isAutoPlaying
+                  ? isDark
+                    ? "rgba(139, 92, 246, 0.3)"
+                    : "rgba(139, 92, 246, 0.15)"
+                  : "none",
+                border: "none",
+                color: isAutoPlaying ? "#8b5cf6" : colors.cardText,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+                fontSize: 12,
+                fontWeight: 500,
+                padding: "4px 8px",
+                borderRadius: 6,
+              }}
+            >
+              {isAutoPlaying ? <Pause size={14} /> : <Play size={14} />}
+              <span>{isAutoPlaying ? "暂停" : "自动"}</span>
+            </button>
+
+            <button
+              onClick={handleToggleFullscreen}
+              title={isPresentationFullscreen ? "退出全屏 (F / F11)" : "全屏沉浸演示 (F / F11)"}
+              style={{
+                background: "none",
+                border: "none",
+                color: isPresentationFullscreen ? "#8b5cf6" : colors.cardText,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                padding: 4,
+                borderRadius: 6,
+              }}
+            >
+              {isPresentationFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+            </button>
+
+            <button
+              onClick={handleTogglePresentation}
+              title="退出演示模式 (Esc)"
+              style={{
+                background: "rgba(239, 68, 68, 0.12)",
+                border: "none",
+                color: "#ef4444",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+                fontSize: 12,
+                fontWeight: 600,
+                padding: "4px 10px",
+                borderRadius: 16,
+                marginLeft: 4,
+              }}
+            >
+              <X size={13} />
+              <span>退出</span>
+            </button>
+
+            {isAutoPlaying && (
+              <div className="canvas-presentation-progress-track">
+                <div
+                  key={`${currentSlideIndex}-${isAutoPlaying}`}
+                  className="canvas-presentation-progress-bar"
+                />
+              </div>
+            )}
+          </div>
+        </>
       )}
     </div>
   );

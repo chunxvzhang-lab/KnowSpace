@@ -1864,6 +1864,133 @@ describe("CanvasView Component", () => {
     expect(container.querySelector(".canvas-presentation-bar")).toBeNull();
   });
 
+  it("starts presentation directly from the currently selected card (就近开播)", () => {
+    const data: CanvasData = {
+      nodes: [
+        { id: "node-1", type: "text", text: "第一幕：背景", x: 100, y: 100, width: 200, height: 100 },
+        { id: "node-2", type: "text", text: "第二幕：方案", x: 400, y: 100, width: 200, height: 100 },
+        { id: "node-3", type: "text", text: "第三幕：总结", x: 700, y: 100, width: 200, height: 100 },
+      ],
+      edges: [
+        { id: "e-1", fromNode: "node-1", toNode: "node-2" },
+        { id: "e-2", fromNode: "node-2", toNode: "node-3" },
+      ],
+    };
+
+    const { container } = render(
+      <CanvasView
+        title="就近开播测试"
+        source={JSON.stringify(data)}
+        onSourceChange={vi.fn()}
+        editable={true}
+        theme="twitter"
+      />
+    );
+
+    // Select node-2 before entering presentation
+    const card2 = screen.getByText("第二幕：方案").closest(".canvas-node")!;
+    fireEvent.click(card2);
+
+    // Enter presentation mode
+    const presBtn = screen.getByTitle("进入白板分镜演示模式 (F5)");
+    fireEvent.click(presBtn);
+
+    // Presentation must start at slide 2!
+    expect(screen.getByText("2 / 3")).toBeDefined();
+    expect(card2.classList.contains("current-slide")).toBe(true);
+  });
+
+  it("toggles slide drawer overview and jumps directly to a clicked slide", () => {
+    const data: CanvasData = {
+      nodes: [
+        { id: "node-1", type: "text", text: "开场介绍", x: 100, y: 100, width: 200, height: 100 },
+        { id: "node-2", type: "text", text: "架构设计核心", x: 400, y: 100, width: 200, height: 100 },
+        { id: "node-3", type: "text", text: "实施路线图", x: 700, y: 100, width: 200, height: 100 },
+      ],
+      edges: [
+        { id: "e-1", fromNode: "node-1", toNode: "node-2" },
+        { id: "e-2", fromNode: "node-2", toNode: "node-3" },
+      ],
+    };
+
+    const { container } = render(
+      <CanvasView
+        title="分镜抽屉测试"
+        source={JSON.stringify(data)}
+        onSourceChange={vi.fn()}
+        editable={true}
+        theme="twitter"
+      />
+    );
+
+    // Enter presentation
+    fireEvent.click(screen.getByTitle("进入白板分镜演示模式 (F5)"));
+
+    // Initial slide is 1
+    expect(screen.getByText("1 / 3")).toBeDefined();
+    expect(container.querySelector(".canvas-slide-drawer")).toBeNull();
+
+    // Click counter button to open slide drawer
+    const counterBtn = screen.getByTitle("点击展开分镜大纲抽屉 (快捷键 L)");
+    fireEvent.click(counterBtn);
+
+    // Drawer is now open
+    expect(container.querySelector(".canvas-slide-drawer")).not.toBeNull();
+    expect(screen.getByText("分镜大纲 (共 3 幕)")).toBeDefined();
+
+    // Click on slide 3 in the drawer
+    const drawerItems = container.querySelectorAll(".canvas-slide-drawer-item");
+    expect(drawerItems.length).toBe(3);
+    fireEvent.click(drawerItems[2]);
+
+    // Presentation jumped to slide 3!
+    expect(screen.getByText("3 / 3")).toBeDefined();
+    const slide3 = screen.getAllByText("实施路线图").find((el) => el.closest(".canvas-node"))?.closest(".canvas-node")!;
+    expect(slide3.classList.contains("current-slide")).toBe(true);
+  });
+
+  it("locks editing in presentation mode and focuses slide on click", () => {
+    const data: CanvasData = {
+      nodes: [
+        { id: "node-1", type: "text", text: "主题一", x: 100, y: 100, width: 200, height: 100 },
+        { id: "node-2", type: "text", text: "主题二", x: 400, y: 100, width: 200, height: 100 },
+      ],
+      edges: [{ id: "e-1", fromNode: "node-1", toNode: "node-2" }],
+    };
+
+    const { container } = render(
+      <CanvasView
+        title="防误触测试"
+        source={JSON.stringify(data)}
+        onSourceChange={vi.fn()}
+        editable={true}
+        theme="twitter"
+      />
+    );
+
+    // Before presentation: anchor dots exist when hovered/selected
+    const card1 = screen.getByText("主题一").closest(".canvas-node")!;
+    fireEvent.mouseEnter(card1);
+    expect(container.querySelectorAll(".canvas-anchor-dot").length).toBeGreaterThan(0);
+
+    // Enter presentation
+    fireEvent.click(screen.getByTitle("进入白板分镜演示模式 (F5)"));
+
+    // In presentation: anchor dots and resize handles must be hidden
+    expect(container.querySelectorAll(".canvas-anchor-dot").length).toBe(0);
+    expect(container.querySelectorAll(".canvas-resize-handle").length).toBe(0);
+
+    // Double clicking should not open edit textarea in presentation mode
+    fireEvent.doubleClick(card1);
+    expect(card1.querySelector("textarea")).toBeNull();
+
+    // Clicking card 2 on canvas jumps to slide 2
+    const card2 = screen.getByText("主题二").closest(".canvas-node")!;
+    fireEvent.click(card2);
+    expect(screen.getByText("2 / 2")).toBeDefined();
+    expect(card2.classList.contains("current-slide")).toBe(true);
+  });
+
   it("renders multimodal image card with img preview and dedicated header icon", () => {
     const data: CanvasData = {
       nodes: [

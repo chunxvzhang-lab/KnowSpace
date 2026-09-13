@@ -2191,10 +2191,50 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
       };
 
       const sequence = buildPresentationSequence(canvasData);
-      // Groups are skipped so presentation focuses strictly on content cards
+      // Groups containing cards are skipped as slides so presentation focuses strictly on content cards
       expect(sequence).not.toContain("grp-1");
       // Topological order: node-a -> node-b -> node-c
       expect(sequence).toEqual(["node-a", "node-b", "node-c"]);
+    });
+
+    it("clusters presentation sequence by groups and propagates group-level connections", () => {
+      // Group 1 on the left with two cards
+      const grp1: CanvasGroupNode = { id: "grp-1", type: "group", label: "Phase 1", x: 0, y: 0, width: 300, height: 400 };
+      const cardA1: CanvasTextNode = { id: "card-a1", type: "text", text: "Step 1.1", x: 20, y: 20, width: 100, height: 50 };
+      const cardA2: CanvasTextNode = { id: "card-a2", type: "text", text: "Step 1.2", x: 20, y: 150, width: 100, height: 50 };
+
+      // Group 2 on the right with two cards
+      const grp2: CanvasGroupNode = { id: "grp-2", type: "group", label: "Phase 2", x: 500, y: 0, width: 300, height: 400 };
+      const cardB1: CanvasTextNode = { id: "card-b1", type: "text", text: "Step 2.1", x: 520, y: 20, width: 100, height: 50 };
+      const cardB2: CanvasTextNode = { id: "card-b2", type: "text", text: "Step 2.2", x: 520, y: 150, width: 100, height: 50 };
+
+      // Edge from Group 1 container to Group 2 container
+      const groupEdge: CanvasEdge = { id: "e-grp", fromNode: "grp-1", toNode: "grp-2" };
+
+      const canvasData: CanvasData = {
+        nodes: [cardB2, grp2, cardA2, grp1, cardB1, cardA1],
+        edges: [groupEdge],
+      };
+
+      const sequence = buildPresentationSequence(canvasData);
+      // All cards of Group 1 must precede Group 2
+      expect(sequence.indexOf("card-a1")).toBeLessThan(sequence.indexOf("card-b1"));
+      expect(sequence.indexOf("card-a2")).toBeLessThan(sequence.indexOf("card-b1"));
+      expect(sequence.indexOf("card-a1")).toBeLessThan(sequence.indexOf("card-b2"));
+      expect(sequence.indexOf("card-a2")).toBeLessThan(sequence.indexOf("card-b2"));
+    });
+
+    it("includes empty group containers as independent framing slides", () => {
+      const emptyGrp: CanvasGroupNode = { id: "empty-slide", type: "group", label: "Chapter Intro Frame", x: 100, y: 100, width: 600, height: 400 };
+      const standaloneCard: CanvasTextNode = { id: "card-1", type: "text", text: "Detail Card", x: 800, y: 100, width: 200, height: 100 };
+
+      const canvasData: CanvasData = {
+        nodes: [emptyGrp, standaloneCard],
+        edges: [{ id: "e1", fromNode: "empty-slide", toNode: "card-1" }],
+      };
+
+      const sequence = buildPresentationSequence(canvasData);
+      expect(sequence).toEqual(["empty-slide", "card-1"]);
     });
 
     it("exports image cards with img tags and media badges in SVG export", () => {

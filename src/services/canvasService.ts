@@ -850,13 +850,25 @@ export function computeEdgeMidpoint(
 
 /**
  * Builds the topological / spatial presentation slide sequence for Canvas Presentation Mode.
- * Prioritizes directed edges (causal/flow order), and orders unlinked cards spatially.
+ * - Prioritizes directed edges (causal/flow order) and DAG dependencies.
+ * - Respects group containment: cards inside the same container remain clustered in logical sequence.
+ * - Propagates group-level incoming and outgoing edges to member cards.
+ * - Allows standalone empty groups (used as framing slides or section headers) to be presented.
+ * - Orders unlinked cards spatially (group cluster aware: top-to-bottom, left-to-right).
  */
 export function buildPresentationSequence(data: CanvasData): string[] {
-  const presentableNodes = data.nodes.filter((n) => n.type !== "group");
+  if (!data.nodes || data.nodes.length === 0) return [];
+
+  const groups = data.nodes.filter((n): n is CanvasGroupNode => n.type === "group");
+  const contentNodes = data.nodes.filter((n) => n.type !== "group");
+
+  // A group is presentable as an independent slide if it contains no child nodes
+  const emptyGroups = groups.filter((g) => getNodesInsideGroup(data.nodes, g).length === 0);
+  const presentableNodes = [...contentNodes, ...emptyGroups];
   if (presentableNodes.length === 0) return [];
 
   const nodeIds = new Set(presentableNodes.map((n) => n.id));
+  const nodeMap = new Map(presentableNodes.map((n) => [n.id, n]));
   const adj = new Map<string, string[]>();
   const inDegree = new Map<string, number>();
 
@@ -865,27 +877,73 @@ export function buildPresentationSequence(data: CanvasData): string[] {
     inDegree.set(id, 0);
   }
 
+  // Helper to resolve an edge endpoint: if it's a group, expand to all its contained nodes
+  const resolveEndpoint = (id: string): string[] => {
+    if (nodeIds.has(id)) return [id];
+    const grp = groups.find((g) => g.id === id);
+    if (grp) {
+      const inside = getNodesInsideGroup(data.nodes, grp);
+      if (inside.length > 0) return inside.map((n) => n.id);
+      return [grp.id];
+    }
+    return [];
+  };
+
+  const addedEdges = new Set<string>();
+  const addDependency = (from: string, to: string) => {
+    if (from === to || !nodeIds.has(from) || !nodeIds.has(to)) return;
+    const key = `${from}->${to}`;
+    if (addedEdges.has(key)) return;
+    addedEdges.add(key);
+    adj.get(from)!.push(to);
+    inDegree.set(to, (inDegree.get(to) || 0) + 1);
+  };
+
   for (const edge of data.edges) {
-    if (nodeIds.has(edge.fromNode) && nodeIds.has(edge.toNode) && edge.fromNode !== edge.toNode) {
-      adj.get(edge.fromNode)!.push(edge.toNode);
-      inDegree.set(edge.toNode, (inDegree.get(edge.toNode) || 0) + 1);
+    const fromNodes = resolveEndpoint(edge.fromNode);
+    const toNodes = resolveEndpoint(edge.toNode);
+    for (const f of fromNodes) {
+      for (const t of toNodes) {
+        addDependency(f, t);
+      }
     }
   }
 
-  const result: string[] = [];
-  const visited = new Set<string>();
-  const nodeMap = new Map(presentableNodes.map((n) => [n.id, n]));
+  // Pre-calculate cluster coordinates for each node
+  // If a node is inside a group, its cluster bounding box starts at the group position.
+  const clusterMap = new Map<string, { x: number; y: number; clusterId: string }>();
+  for (const node of presentableNodes) {
+    const container = findContainerForNode(node, data.nodes);
+    if (container) {
+      clusterMap.set(node.id, { x: container.x, y: container.y, clusterId: container.id });
+    } else {
+      clusterMap.set(node.id, { x: node.x, y: node.y, clusterId: node.id });
+    }
+  }
 
   const spatialSort = (aId: string, bId: string) => {
+    const ca = clusterMap.get(aId)!;
+    const cb = clusterMap.get(bId)!;
+
+    // If they belong to different clusters/groups, compare cluster positions
+    if (ca.clusterId !== cb.clusterId) {
+      if (Math.abs(ca.y - cb.y) > 80) return ca.y - cb.y;
+      return ca.x - cb.x;
+    }
+
+    // Inside the same cluster/group, compare node coordinates
     const na = nodeMap.get(aId)!;
     const nb = nodeMap.get(bId)!;
-    if (Math.abs(na.y - nb.y) > 60) return na.y - nb.y;
+    if (Math.abs(na.y - nb.y) > 50) return na.y - nb.y;
     return na.x - nb.x;
   };
 
   const roots = Array.from(nodeIds).filter((id) => (inDegree.get(id) || 0) === 0).sort(spatialSort);
 
+  const result: string[] = [];
+  const visited = new Set<string>();
   const queue: string[] = [...roots];
+
   while (queue.length > 0) {
     const curr = queue.shift()!;
     if (visited.has(curr)) continue;
