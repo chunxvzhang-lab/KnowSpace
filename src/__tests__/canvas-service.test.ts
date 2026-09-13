@@ -2237,6 +2237,157 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
       expect(sequence).toEqual(["empty-slide", "card-1"]);
     });
 
+    it("plays circular ring cycles in clockwise order starting from the entry node", () => {
+      // 4 cards in a diamond / ring:
+      // Top (100, 0), Right (200, 100), Bottom (100, 200), Left (0, 100)
+      const topNode: CanvasTextNode = { id: "node-top", type: "text", text: "Top", x: 100, y: 0, width: 60, height: 40 };
+      const rightNode: CanvasTextNode = { id: "node-right", type: "text", text: "Right", x: 200, y: 100, width: 60, height: 40 };
+      const bottomNode: CanvasTextNode = { id: "node-bottom", type: "text", text: "Bottom", x: 100, y: 200, width: 60, height: 40 };
+      const leftNode: CanvasTextNode = { id: "node-left", type: "text", text: "Left", x: 0, y: 100, width: 60, height: 40 };
+
+      // Loop edges connecting in a cycle
+      const edges: CanvasEdge[] = [
+        { id: "e1", fromNode: "node-top", toNode: "node-right" },
+        { id: "e2", fromNode: "node-right", toNode: "node-bottom" },
+        { id: "e3", fromNode: "node-bottom", toNode: "node-left" },
+        { id: "e4", fromNode: "node-left", toNode: "node-top" },
+      ];
+
+      const canvasData: CanvasData = {
+        nodes: [bottomNode, leftNode, topNode, rightNode],
+        edges,
+      };
+
+      const sequence = buildPresentationSequence(canvasData);
+      // Starts from top-left initiator (node-top) and traverses clockwise: Top -> Right -> Bottom -> Left
+      expect(sequence).toEqual(["node-top", "node-right", "node-bottom", "node-left"]);
+    });
+
+    it("ensures cycle is traversed clockwise even if edges are drawn counter-clockwise", () => {
+      // 3 nodes forming a triangle:
+      // Top (100, 0), Bottom-Right (180, 150), Bottom-Left (20, 150)
+      const topNode: CanvasTextNode = { id: "tri-top", type: "text", text: "Top", x: 100, y: 0, width: 60, height: 40 };
+      const brNode: CanvasTextNode = { id: "tri-br", type: "text", text: "BR", x: 180, y: 150, width: 60, height: 40 };
+      const blNode: CanvasTextNode = { id: "tri-bl", type: "text", text: "BL", x: 20, y: 150, width: 60, height: 40 };
+
+      // Counter-clockwise edges: Top -> Bottom-Left -> Bottom-Right -> Top
+      const edges: CanvasEdge[] = [
+        { id: "e1", fromNode: "tri-top", toNode: "tri-bl" },
+        { id: "e2", fromNode: "tri-bl", toNode: "tri-br" },
+        { id: "e3", fromNode: "tri-br", toNode: "tri-top" },
+      ];
+
+      const canvasData: CanvasData = {
+        nodes: [blNode, brNode, topNode],
+        edges,
+      };
+
+      const sequence = buildPresentationSequence(canvasData);
+      // Clockwise order from top: Top -> Bottom-Right -> Bottom-Left
+      expect(sequence).toEqual(["tri-top", "tri-br", "tri-bl"]);
+    });
+
+    it("plays grid perimeter loop in clockwise order", () => {
+      // 2x2 grid loop: Top-Left (0,0), Top-Right (200,0), Bottom-Right (200,200), Bottom-Left (0,200)
+      const tl: CanvasTextNode = { id: "tl", type: "text", text: "Top-Left", x: 0, y: 0, width: 80, height: 50 };
+      const tr: CanvasTextNode = { id: "tr", type: "text", text: "Top-Right", x: 200, y: 0, width: 80, height: 50 };
+      const br: CanvasTextNode = { id: "br", type: "text", text: "Bottom-Right", x: 200, y: 200, width: 80, height: 50 };
+      const bl: CanvasTextNode = { id: "bl", type: "text", text: "Bottom-Left", x: 0, y: 200, width: 80, height: 50 };
+
+      const edges: CanvasEdge[] = [
+        { id: "e1", fromNode: "tl", toNode: "tr", gridPath: true },
+        { id: "e2", fromNode: "tr", toNode: "br", gridPath: true },
+        { id: "e3", fromNode: "br", toNode: "bl", gridPath: true },
+        { id: "e4", fromNode: "bl", toNode: "tl", gridPath: true },
+      ];
+
+      const canvasData: CanvasData = {
+        nodes: [bl, br, tl, tr],
+        edges,
+      };
+
+      const sequence = buildPresentationSequence(canvasData);
+      expect(sequence).toEqual(["tl", "tr", "br", "bl"]);
+    });
+
+    it("enters cycle from an upstream initiator and delays external connections until the entire cycle finishes", () => {
+      // Initiator (root) outside cycle
+      const rootNode: CanvasTextNode = { id: "root", type: "text", text: "Root Initiator", x: 100, y: -100, width: 60, height: 40 };
+
+      // Cycle: Top -> Right -> Bottom -> Left -> Top
+      const topNode: CanvasTextNode = { id: "c-top", type: "text", text: "Cycle Top", x: 100, y: 0, width: 60, height: 40 };
+      const rightNode: CanvasTextNode = { id: "c-right", type: "text", text: "Cycle Right", x: 200, y: 100, width: 60, height: 40 };
+      const bottomNode: CanvasTextNode = { id: "c-bottom", type: "text", text: "Cycle Bottom", x: 100, y: 200, width: 60, height: 40 };
+      const leftNode: CanvasTextNode = { id: "c-left", type: "text", text: "Cycle Left", x: 0, y: 100, width: 60, height: 40 };
+
+      // External exit branch from c-right
+      const out1: CanvasTextNode = { id: "out-1", type: "text", text: "Branch 1", x: 350, y: 100, width: 60, height: 40 };
+      const out2: CanvasTextNode = { id: "out-2", type: "text", text: "Branch 1 Sub", x: 450, y: 100, width: 60, height: 40 };
+
+      // External exit branch from c-bottom
+      const out3: CanvasTextNode = { id: "out-3", type: "text", text: "Branch 2", x: 100, y: 350, width: 60, height: 40 };
+
+      const edges: CanvasEdge[] = [
+        // root connects to c-top
+        { id: "e-root", fromNode: "root", toNode: "c-top" },
+        // cycle edges
+        { id: "e1", fromNode: "c-top", toNode: "c-right" },
+        { id: "e2", fromNode: "c-right", toNode: "c-bottom" },
+        { id: "e3", fromNode: "c-bottom", toNode: "c-left" },
+        { id: "e4", fromNode: "c-left", toNode: "c-top" },
+        // exit edges
+        { id: "e-out1", fromNode: "c-right", toNode: "out-1" },
+        { id: "e-out2", fromNode: "out-1", toNode: "out-2" },
+        { id: "e-out3", fromNode: "c-bottom", toNode: "out-3" },
+      ];
+
+      const canvasData: CanvasData = {
+        nodes: [out3, bottomNode, out2, leftNode, rootNode, rightNode, out1, topNode],
+        edges,
+      };
+
+      const sequence = buildPresentationSequence(canvasData);
+
+      // 1. root plays first (initiator source)
+      // 2. Enters cycle at node-top, plays ALL 4 cycle nodes clockwise: node-top, node-right, node-bottom, node-left
+      // 3. ONLY THEN plays external connections: out-1 -> out-2 (from right), then out-3 (from bottom)
+      expect(sequence).toEqual([
+        "root",
+        "c-top",
+        "c-right",
+        "c-bottom",
+        "c-left",
+        "out-1",
+        "out-2",
+        "out-3",
+      ]);
+    });
+
+    it("prioritizes same container and plays entire container to completion before transitioning", () => {
+      const grpA: CanvasGroupNode = { id: "grp-a", type: "group", label: "Container A", x: 0, y: 0, width: 400, height: 300 };
+      const cardA1: CanvasTextNode = { id: "card-a1", type: "text", text: "A1", x: 20, y: 20, width: 80, height: 50 };
+      const cardA2: CanvasTextNode = { id: "card-a2", type: "text", text: "A2", x: 20, y: 150, width: 80, height: 50 };
+
+      const grpB: CanvasGroupNode = { id: "grp-b", type: "group", label: "Container B", x: 500, y: 0, width: 400, height: 300 };
+      const cardB1: CanvasTextNode = { id: "card-b1", type: "text", text: "B1", x: 520, y: 20, width: 80, height: 50 };
+      const cardB2: CanvasTextNode = { id: "card-b2", type: "text", text: "B2", x: 520, y: 150, width: 80, height: 50 };
+
+      // Card inside Group A points to Card inside Group B
+      const crossEdge: CanvasEdge = { id: "e-cross", fromNode: "card-a1", toNode: "card-b1" };
+      const internalAEdge: CanvasEdge = { id: "e-a", fromNode: "card-a1", toNode: "card-a2" };
+      const internalBEdge: CanvasEdge = { id: "e-b", fromNode: "card-b1", toNode: "card-b2" };
+
+      const canvasData: CanvasData = {
+        nodes: [cardB2, grpB, cardA2, grpA, cardB1, cardA1],
+        edges: [crossEdge, internalAEdge, internalBEdge],
+      };
+
+      const sequence = buildPresentationSequence(canvasData);
+
+      // Even though card-a1 connects to card-b1, all cards of Container A must finish first!
+      expect(sequence).toEqual(["card-a1", "card-a2", "card-b1", "card-b2"]);
+    });
+
     it("exports image cards with img tags and media badges in SVG export", () => {
       const imgNode: CanvasFileNode = {
         id: "img-1",

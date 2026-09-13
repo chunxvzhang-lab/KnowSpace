@@ -849,12 +849,312 @@ export function computeEdgeMidpoint(
 }
 
 /**
+ * Internal helper to order cards within a single cluster (group container or standalone component)
+ * using topological dependency order, Tarjan's SCC cycle detection, clockwise ring traversal,
+ * and delayed exit traversal ("环外连接在环的最后播放").
+ */
+function orderClusterCards(
+  nodeIds: string[],
+  nodeMap: Map<string, CanvasNode>,
+  allEdges: CanvasEdge[],
+  incomingEntryNodes: string[] = []
+): string[] {
+  if (nodeIds.length <= 1) return [...nodeIds];
+
+  const nodeSet = new Set(nodeIds);
+  // Relevant edges strictly within this cluster
+  const internalEdges = allEdges.filter(
+    (e) => nodeSet.has(e.fromNode) && nodeSet.has(e.toNode) && e.fromNode !== e.toNode
+  );
+
+  const adj = new Map<string, string[]>();
+  const inDegree = new Map<string, number>();
+  for (const id of nodeIds) {
+    adj.set(id, []);
+    inDegree.set(id, 0);
+  }
+
+  const addedKeys = new Set<string>();
+  for (const e of internalEdges) {
+    const key = `${e.fromNode}->${e.toNode}`;
+    if (!addedKeys.has(key)) {
+      addedKeys.add(key);
+      adj.get(e.fromNode)!.push(e.toNode);
+      inDegree.set(e.toNode, (inDegree.get(e.toNode) || 0) + 1);
+    }
+  }
+
+  // Tarjan's Strongly Connected Components algorithm to identify directed cycles
+  let index = 0;
+  const indices = new Map<string, number>();
+  const lowlink = new Map<string, number>();
+  const onStack = new Set<string>();
+  const stack: string[] = [];
+  const sccs: string[][] = [];
+
+  function strongconnect(v: string) {
+    indices.set(v, index);
+    lowlink.set(v, index);
+    index++;
+    stack.push(v);
+    onStack.add(v);
+
+    for (const w of adj.get(v) || []) {
+      if (!indices.has(w)) {
+        strongconnect(w);
+        lowlink.set(v, Math.min(lowlink.get(v)!, lowlink.get(w)!));
+      } else if (onStack.has(w)) {
+        lowlink.set(v, Math.min(lowlink.get(v)!, indices.get(w)!));
+      }
+    }
+
+    if (lowlink.get(v) === indices.get(v)) {
+      const scc: string[] = [];
+      let w: string;
+      do {
+        w = stack.pop()!;
+        onStack.delete(w);
+        scc.push(w);
+      } while (w !== v);
+      sccs.push(scc);
+    }
+  }
+
+  for (const id of nodeIds) {
+    if (!indices.has(id)) {
+      strongconnect(id);
+    }
+  }
+
+  // Map each node to its SCC index
+  const nodeToScc = new Map<string, number>();
+  sccs.forEach((scc, idx) => {
+    for (const id of scc) {
+      nodeToScc.set(id, idx);
+    }
+  });
+
+  // Condensation DAG of SCCs
+  const sccAdj = new Map<number, number[]>();
+  const sccInDegree = new Map<number, number>();
+  // Outgoing edges from each SCC, mapped by the specific source card ID in the SCC
+  // fromNode -> array of target SCC indices
+  const sccNodeOutgoingMap = new Map<number, Map<string, number[]>>();
+
+  for (let i = 0; i < sccs.length; i++) {
+    sccAdj.set(i, []);
+    sccInDegree.set(i, 0);
+    sccNodeOutgoingMap.set(i, new Map());
+  }
+
+  const addedSccEdges = new Set<string>();
+  for (let fromScc = 0; fromScc < sccs.length; fromScc++) {
+    const nodeOutMap = sccNodeOutgoingMap.get(fromScc)!;
+    for (const u of sccs[fromScc]) {
+      if (!nodeOutMap.has(u)) nodeOutMap.set(u, []);
+      for (const v of adj.get(u) || []) {
+        const toScc = nodeToScc.get(v)!;
+        if (fromScc !== toScc) {
+          nodeOutMap.get(u)!.push(toScc);
+          const edgeKey = `${fromScc}->${toScc}`;
+          if (!addedSccEdges.has(edgeKey)) {
+            addedSccEdges.add(edgeKey);
+            sccAdj.get(fromScc)!.push(toScc);
+            sccInDegree.set(toScc, (sccInDegree.get(toScc) || 0) + 1);
+          }
+        }
+      }
+    }
+  }
+
+  // Spatial comparison for SCCs
+  const getSccSpatial = (sccIdx: number) => {
+    let minY = Infinity;
+    let minX = Infinity;
+    for (const id of sccs[sccIdx]) {
+      const n = nodeMap.get(id);
+      if (n) {
+        if (n.y < minY) minY = n.y;
+        if (n.x < minX) minX = n.x;
+      }
+    }
+    return { x: minX, y: minY };
+  };
+
+  const sccSpatialSort = (aIdx: number, bIdx: number) => {
+    const sa = getSccSpatial(aIdx);
+    const sb = getSccSpatial(bIdx);
+    if (Math.abs(sa.y - sb.y) > 40) return sa.y - sb.y;
+    return sa.x - sb.x;
+  };
+
+  // Helper: sort cycle nodes clockwise around centroid starting from entry node
+  const sortCycleClockwise = (cycleNodeIds: string[], entryId?: string): string[] => {
+    if (cycleNodeIds.length <= 2) {
+      if (entryId && cycleNodeIds.includes(entryId)) {
+        return [entryId, ...cycleNodeIds.filter((id) => id !== entryId)];
+      }
+      return [...cycleNodeIds].sort((a, b) => {
+        const na = nodeMap.get(a)!;
+        const nb = nodeMap.get(b)!;
+        if (Math.abs(na.y - nb.y) > 40) return na.y - nb.y;
+        return na.x - nb.x;
+      });
+    }
+
+    const nodes = cycleNodeIds.map((id) => nodeMap.get(id)!).filter(Boolean);
+    const cx = nodes.reduce((sum, n) => sum + (n.x + n.width / 2), 0) / nodes.length;
+    const cy = nodes.reduce((sum, n) => sum + (n.y + n.height / 2), 0) / nodes.length;
+
+    // Determine entry node (initiator of the cycle)
+    let startNodeId = entryId;
+    if (!startNodeId || !cycleNodeIds.includes(startNodeId)) {
+      // Pick top-left node as initiator
+      const sortedByPos = [...nodes].sort((a, b) => {
+        if (Math.abs(a.y - b.y) > 40) return a.y - b.y;
+        return a.x - b.x;
+      });
+      startNodeId = sortedByPos[0].id;
+    }
+
+    const startNode = nodeMap.get(startNodeId)!;
+    const startAngle = Math.atan2(
+      startNode.y + startNode.height / 2 - cy,
+      startNode.x + startNode.width / 2 - cx
+    );
+
+    return [...nodes]
+      .sort((a, b) => {
+        if (a.id === startNodeId) return -1;
+        if (b.id === startNodeId) return 1;
+        const angleA = Math.atan2(a.y + a.height / 2 - cy, a.x + a.width / 2 - cx);
+        const angleB = Math.atan2(b.y + b.height / 2 - cy, b.x + b.width / 2 - cx);
+        const offsetA = (angleA - startAngle + 2 * Math.PI) % (2 * Math.PI);
+        const offsetB = (angleB - startAngle + 2 * Math.PI) % (2 * Math.PI);
+        if (Math.abs(offsetA - offsetB) > 0.001) {
+          return offsetA - offsetB;
+        }
+        return a.id.localeCompare(b.id);
+      })
+      .map((n) => n.id);
+  };
+
+  // Track which card in an SCC was targeted from upstream
+  const sccEntryNodeMap = new Map<number, string>();
+  for (const entryId of incomingEntryNodes) {
+    const sccIdx = nodeToScc.get(entryId);
+    if (sccIdx !== undefined && !sccEntryNodeMap.has(sccIdx)) {
+      sccEntryNodeMap.set(sccIdx, entryId);
+    }
+  }
+
+  // Identify root SCCs (in-degree === 0)
+  const rootSccs: number[] = [];
+  const entrySccSet = new Set<number>();
+  for (const entryNode of incomingEntryNodes) {
+    const sccIdx = nodeToScc.get(entryNode);
+    if (sccIdx !== undefined && !entrySccSet.has(sccIdx)) {
+      entrySccSet.add(sccIdx);
+      if ((sccInDegree.get(sccIdx) || 0) === 0) {
+        rootSccs.push(sccIdx);
+      }
+    }
+  }
+
+  const otherRoots: number[] = [];
+  for (let i = 0; i < sccs.length; i++) {
+    if ((sccInDegree.get(i) || 0) === 0 && !rootSccs.includes(i)) {
+      otherRoots.push(i);
+    }
+  }
+  otherRoots.sort(sccSpatialSort);
+  rootSccs.push(...otherRoots);
+
+  const clusterResult: string[] = [];
+  const visitedSccs = new Set<number>();
+  const sccQueue: number[] = [...rootSccs];
+
+  while (sccQueue.length > 0) {
+    const currScc = sccQueue.shift()!;
+    if (visitedSccs.has(currScc)) continue;
+    visitedSccs.add(currScc);
+
+    const sccNodes = sccs[currScc];
+    let orderedSccNodes: string[];
+
+    if (sccNodes.length === 1) {
+      orderedSccNodes = sccNodes;
+    } else {
+      // Multiple nodes form a Cycle / Ring / Grid Loop!
+      const entryId = sccEntryNodeMap.get(currScc);
+      orderedSccNodes = sortCycleClockwise(sccNodes, entryId);
+    }
+
+    // Step: Emit all nodes of this SCC FIRST!
+    // This ensures that for a cycle, all ring nodes play clockwise before any exit connection
+    clusterResult.push(...orderedSccNodes);
+
+    // Step: "环外连接在环的最后播放"
+    // Iterate through the emitted nodes in clockwise order to trigger outgoing connections
+    const nodeOutMap = sccNodeOutgoingMap.get(currScc)!;
+    const readySccs: number[] = [];
+    for (const sourceNodeId of orderedSccNodes) {
+      const targetSccs = nodeOutMap.get(sourceNodeId) || [];
+      for (const targetScc of targetSccs) {
+        if (!sccEntryNodeMap.has(targetScc)) {
+          const targetNode = (adj.get(sourceNodeId) || []).find(
+            (id) => nodeToScc.get(id) === targetScc
+          );
+          if (targetNode) {
+            sccEntryNodeMap.set(targetScc, targetNode);
+          }
+        }
+
+        sccInDegree.set(targetScc, (sccInDegree.get(targetScc) || 0) - 1);
+        if (sccInDegree.get(targetScc)! <= 0 && !visitedSccs.has(targetScc) && !readySccs.includes(targetScc)) {
+          readySccs.push(targetScc);
+        }
+      }
+    }
+
+    // Depth-first branch continuation: explore current branch to completion before parallel branches
+    if (readySccs.length > 0) {
+      sccQueue.splice(0, 0, ...readySccs);
+    }
+  }
+
+  // Handle any remaining disconnected SCCs
+  const remainingSccs: number[] = [];
+  for (let i = 0; i < sccs.length; i++) {
+    if (!visitedSccs.has(i)) {
+      remainingSccs.push(i);
+    }
+  }
+  remainingSccs.sort(sccSpatialSort);
+
+  for (const remScc of remainingSccs) {
+    if (!visitedSccs.has(remScc)) {
+      visitedSccs.add(remScc);
+      const sccNodes = sccs[remScc];
+      if (sccNodes.length === 1) {
+        clusterResult.push(...sccNodes);
+      } else {
+        const ordered = sortCycleClockwise(sccNodes, sccEntryNodeMap.get(remScc));
+        clusterResult.push(...ordered);
+      }
+    }
+  }
+
+  return clusterResult;
+}
+
+/**
  * Builds the topological / spatial presentation slide sequence for Canvas Presentation Mode.
- * - Prioritizes directed edges (causal/flow order) and DAG dependencies.
- * - Respects group containment: cards inside the same container remain clustered in logical sequence.
- * - Propagates group-level incoming and outgoing edges to member cards.
- * - Allows standalone empty groups (used as framing slides or section headers) to be presented.
- * - Orders unlinked cards spatially (group cluster aware: top-to-bottom, left-to-right).
+ * - Prioritizes container containment: cards inside the same container remain clustered in logical sequence ("以同一容器为优先按顺序播放").
+ * - Follows directed topological dependencies starting from initiator source nodes ("按照卡片的拓扑关系进行播放，从发起端开始").
+ * - Detects closed loops (cycles) and plays ring / grid perimeters in clockwise order ("环形和网格行布局按顺时针播放").
+ * - Delays external branches leaving a cycle until the cycle has completed ("环外连接在环的最后播放").
+ * - Allows standalone empty groups (framing slides or section headers) to be presented.
  */
 export function buildPresentationSequence(data: CanvasData): string[] {
   if (!data.nodes || data.nodes.length === 0) return [];
@@ -862,108 +1162,221 @@ export function buildPresentationSequence(data: CanvasData): string[] {
   const groups = data.nodes.filter((n): n is CanvasGroupNode => n.type === "group");
   const contentNodes = data.nodes.filter((n) => n.type !== "group");
 
-  // A group is presentable as an independent slide if it contains no child nodes
+  // An empty group acts as a standalone framing slide
   const emptyGroups = groups.filter((g) => getNodesInsideGroup(data.nodes, g).length === 0);
   const presentableNodes = [...contentNodes, ...emptyGroups];
   if (presentableNodes.length === 0) return [];
 
-  const nodeIds = new Set(presentableNodes.map((n) => n.id));
-  const nodeMap = new Map(presentableNodes.map((n) => [n.id, n]));
-  const adj = new Map<string, string[]>();
-  const inDegree = new Map<string, number>();
+  const nodeMap = new Map<string, CanvasNode>(presentableNodes.map((n) => [n.id, n]));
 
-  for (const id of nodeIds) {
-    adj.set(id, []);
-    inDegree.set(id, 0);
+  // Partition presentable nodes into Clusters:
+  // 1. Group containers (with 1+ child nodes)
+  // 2. Empty group containers (framing slide)
+  // 3. Standalone connected components (cards not inside any group)
+  interface Cluster {
+    id: string;
+    type: "group" | "empty-group" | "standalone";
+    nodeIds: string[];
+    x: number;
+    y: number;
+    width: number;
+    height: number;
   }
 
-  // Helper to resolve an edge endpoint: if it's a group, expand to all its contained nodes
-  const resolveEndpoint = (id: string): string[] => {
-    if (nodeIds.has(id)) return [id];
-    const grp = groups.find((g) => g.id === id);
-    if (grp) {
-      const inside = getNodesInsideGroup(data.nodes, grp);
-      if (inside.length > 0) return inside.map((n) => n.id);
-      return [grp.id];
-    }
-    return [];
-  };
+  const clusters: Cluster[] = [];
+  const nodeToClusterId = new Map<string, string>();
 
-  const addedEdges = new Set<string>();
-  const addDependency = (from: string, to: string) => {
-    if (from === to || !nodeIds.has(from) || !nodeIds.has(to)) return;
-    const key = `${from}->${to}`;
-    if (addedEdges.has(key)) return;
-    addedEdges.add(key);
-    adj.get(from)!.push(to);
-    inDegree.set(to, (inDegree.get(to) || 0) + 1);
-  };
-
-  for (const edge of data.edges) {
-    const fromNodes = resolveEndpoint(edge.fromNode);
-    const toNodes = resolveEndpoint(edge.toNode);
-    for (const f of fromNodes) {
-      for (const t of toNodes) {
-        addDependency(f, t);
+  // Process non-empty groups
+  for (const grp of groups) {
+    const inside = getNodesInsideGroup(contentNodes, grp);
+    if (inside.length > 0) {
+      const ids = inside.map((n) => n.id);
+      clusters.push({
+        id: grp.id,
+        type: "group",
+        nodeIds: ids,
+        x: grp.x,
+        y: grp.y,
+        width: grp.width,
+        height: grp.height,
+      });
+      nodeToClusterId.set(grp.id, grp.id);
+      for (const id of ids) {
+        nodeToClusterId.set(id, grp.id);
       }
     }
   }
 
-  // Pre-calculate cluster coordinates for each node
-  // If a node is inside a group, its cluster bounding box starts at the group position.
-  const clusterMap = new Map<string, { x: number; y: number; clusterId: string }>();
-  for (const node of presentableNodes) {
-    const container = findContainerForNode(node, data.nodes);
-    if (container) {
-      clusterMap.set(node.id, { x: container.x, y: container.y, clusterId: container.id });
-    } else {
-      clusterMap.set(node.id, { x: node.x, y: node.y, clusterId: node.id });
+  // Process empty groups
+  for (const grp of emptyGroups) {
+    clusters.push({
+      id: grp.id,
+      type: "empty-group",
+      nodeIds: [grp.id],
+      x: grp.x,
+      y: grp.y,
+      width: grp.width,
+      height: grp.height,
+    });
+    nodeToClusterId.set(grp.id, grp.id);
+  }
+
+  // Standalone content nodes: group into connected components
+  const standaloneNodes = contentNodes.filter((n) => !nodeToClusterId.has(n.id));
+  if (standaloneNodes.length > 0) {
+    const standaloneSet = new Set(standaloneNodes.map((n) => n.id));
+    const parent = new Map<string, string>();
+    const find = (x: string): string => {
+      let r = parent.get(x) ?? x;
+      while (r !== (parent.get(r) ?? r)) {
+        r = parent.get(r) ?? r;
+      }
+      let curr = x;
+      while (curr !== r) {
+        const next = parent.get(curr) ?? curr;
+        parent.set(curr, r);
+        curr = next;
+      }
+      return r;
+    };
+    const union = (a: string, b: string) => {
+      const ra = find(a);
+      const rb = find(b);
+      if (ra !== rb) parent.set(ra, rb);
+    };
+
+    for (const n of standaloneNodes) {
+      parent.set(n.id, n.id);
+    }
+
+    for (const e of data.edges) {
+      if (standaloneSet.has(e.fromNode) && standaloneSet.has(e.toNode)) {
+        union(e.fromNode, e.toNode);
+      }
+    }
+
+    const componentMap = new Map<string, CanvasNode[]>();
+    for (const n of standaloneNodes) {
+      const root = find(n.id);
+      const list = componentMap.get(root) || [];
+      list.push(n);
+      componentMap.set(root, list);
+    }
+
+    for (const [rootId, members] of componentMap.entries()) {
+      const minX = Math.min(...members.map((n) => n.x));
+      const minY = Math.min(...members.map((n) => n.y));
+      const maxX = Math.max(...members.map((n) => n.x + n.width));
+      const maxY = Math.max(...members.map((n) => n.y + n.height));
+      const clusterId = `comp-${rootId}`;
+
+      clusters.push({
+        id: clusterId,
+        type: "standalone",
+        nodeIds: members.map((n) => n.id),
+        x: minX,
+        y: minY,
+        width: maxX - minX,
+        height: maxY - minY,
+      });
+
+      for (const n of members) {
+        nodeToClusterId.set(n.id, clusterId);
+      }
     }
   }
 
-  const spatialSort = (aId: string, bId: string) => {
+  // Inter-cluster dependency graph
+  const clusterMap = new Map<string, Cluster>(clusters.map((c) => [c.id, c]));
+  const clusterAdj = new Map<string, string[]>();
+  const clusterInDegree = new Map<string, number>();
+  const incomingTargetsPerCluster = new Map<string, string[]>();
+
+  for (const c of clusters) {
+    clusterAdj.set(c.id, []);
+    clusterInDegree.set(c.id, 0);
+    incomingTargetsPerCluster.set(c.id, []);
+  }
+
+  const addedClusterEdges = new Set<string>();
+  for (const edge of data.edges) {
+    const fromCluster = nodeToClusterId.get(edge.fromNode);
+    const toCluster = nodeToClusterId.get(edge.toNode);
+    if (!fromCluster || !toCluster) continue;
+
+    if (fromCluster !== toCluster) {
+      const key = `${fromCluster}->${toCluster}`;
+      if (!addedClusterEdges.has(key)) {
+        addedClusterEdges.add(key);
+        clusterAdj.get(fromCluster)!.push(toCluster);
+        clusterInDegree.set(toCluster, (clusterInDegree.get(toCluster) || 0) + 1);
+      }
+      if (nodeMap.has(edge.toNode)) {
+        incomingTargetsPerCluster.get(toCluster)!.push(edge.toNode);
+      }
+    }
+  }
+
+  const clusterSpatialSort = (aId: string, bId: string) => {
     const ca = clusterMap.get(aId)!;
     const cb = clusterMap.get(bId)!;
-
-    // If they belong to different clusters/groups, compare cluster positions
-    if (ca.clusterId !== cb.clusterId) {
-      if (Math.abs(ca.y - cb.y) > 80) return ca.y - cb.y;
-      return ca.x - cb.x;
-    }
-
-    // Inside the same cluster/group, compare node coordinates
-    const na = nodeMap.get(aId)!;
-    const nb = nodeMap.get(bId)!;
-    if (Math.abs(na.y - nb.y) > 50) return na.y - nb.y;
-    return na.x - nb.x;
+    if (Math.abs(ca.y - cb.y) > 60) return ca.y - cb.y;
+    return ca.x - cb.x;
   };
 
-  const roots = Array.from(nodeIds).filter((id) => (inDegree.get(id) || 0) === 0).sort(spatialSort);
+  // Macro topological sort of clusters
+  const orderedClusters: Cluster[] = [];
+  const visitedClusters = new Set<string>();
+  const clusterQueue = clusters
+    .map((c) => c.id)
+    .filter((id) => (clusterInDegree.get(id) || 0) === 0)
+    .sort(clusterSpatialSort);
 
-  const result: string[] = [];
-  const visited = new Set<string>();
-  const queue: string[] = [...roots];
+  while (clusterQueue.length > 0) {
+    const currId = clusterQueue.shift()!;
+    if (visitedClusters.has(currId)) continue;
+    visitedClusters.add(currId);
+    orderedClusters.push(clusterMap.get(currId)!);
 
-  while (queue.length > 0) {
-    const curr = queue.shift()!;
-    if (visited.has(curr)) continue;
-    visited.add(curr);
-    result.push(curr);
+    const downstream = (clusterAdj.get(currId) || [])
+      .filter((id) => !visitedClusters.has(id))
+      .sort(clusterSpatialSort);
 
-    const children = (adj.get(curr) || []).filter((id) => !visited.has(id)).sort(spatialSort);
-    for (const child of children) {
-      inDegree.set(child, inDegree.get(child)! - 1);
-      if (inDegree.get(child)! <= 0) {
-        queue.push(child);
+    for (const nextId of downstream) {
+      clusterInDegree.set(nextId, (clusterInDegree.get(nextId) || 0) - 1);
+      if (clusterInDegree.get(nextId)! <= 0) {
+        clusterQueue.push(nextId);
       }
     }
   }
 
-  const remaining = Array.from(nodeIds).filter((id) => !visited.has(id)).sort(spatialSort);
-  for (const id of remaining) {
-    if (!visited.has(id)) {
-      visited.add(id);
-      result.push(id);
+  // Append any remaining clusters (e.g. cyclic dependencies between groups)
+  const remainingClusters = clusters
+    .map((c) => c.id)
+    .filter((id) => !visitedClusters.has(id))
+    .sort(clusterSpatialSort);
+
+  for (const remId of remainingClusters) {
+    if (!visitedClusters.has(remId)) {
+      visitedClusters.add(remId);
+      orderedClusters.push(clusterMap.get(remId)!);
+    }
+  }
+
+  // For each cluster, order its cards and append to result sequence
+  const result: string[] = [];
+  for (const cluster of orderedClusters) {
+    if (cluster.type === "empty-group") {
+      result.push(cluster.id);
+    } else {
+      const incomingTargets = incomingTargetsPerCluster.get(cluster.id) || [];
+      const orderedCards = orderClusterCards(
+        cluster.nodeIds,
+        nodeMap,
+        data.edges,
+        incomingTargets
+      );
+      result.push(...orderedCards);
     }
   }
 
