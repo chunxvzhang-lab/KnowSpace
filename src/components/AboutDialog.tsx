@@ -121,7 +121,7 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
             <div>
               <div className="about-header-title-row">
                 <span className="about-app-name">KnowSpace</span>
-                <span className="about-version-badge">v2.2.0</span>
+                <span className="about-version-badge">v2.3.0</span>
               </div>
               <p className="about-tagline">Personal Knowledge Workspace · 个人知识工作台</p>
             </div>
@@ -147,13 +147,34 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
             <div className="about-card-title">
               <History size={16} className="about-icon text-blue" />
               <span>版本更新日志 · What&apos;s New</span>
-              <span className="about-changelog-version-badge">v2.2.0</span>
+              <span className="about-changelog-version-badge">v2.3.0</span>
             </div>
             <div className="about-changelog-list">
-              {/* v2.2.0 */}
+              {/* v2.3.0 */}
               <div className="about-changelog-group">
                 <div className="about-changelog-group-label">
                   <Sparkles size={12} className="text-cyan" />
+                  <span>v2.3.0 空间白板分镜演播深度升级（顺时针闭环、容器优先与上下文复现）</span>
+                </div>
+                <ul className="about-changelog-items">
+                  <li>📽️ <strong>F5 分镜演播 2.3 深度拓扑演进 (Presentation Mode 2.3)</strong>：
+                    <ul>
+                      <li><strong>同一容器优先演播</strong>：卡片优先遵循所在容器归属按拓扑顺序演播，保障模块化与分组推演节奏。</li>
+                      <li><strong>深入子例程推演与自然归栈</strong>：演播到引出外部卡片的发起点时，依因果拓扑深入演播其指向的目标卡片子树，演播完毕后平滑回归发起点所在容器继续演播后续卡片。</li>
+                      <li><strong>先单卡后成环推演策略</strong>：当发起卡片同时引出「单独卡片」与「环形结构」时，优先完整演播独立分支，再演播成环卡片组，避免演示认知割裂。</li>
+                      <li><strong>顺时针环形完整演播</strong>：基于几何重心极角排序与并查集回路识别，顺时针演播闭环内所有卡片，成环完毕后演播环外延伸分支，保证环形回路 100% 完整呈现。</li>
+                      <li><strong>跨容器上下文感知复现</strong>：作为被指向节点播放过的卡片或在首组容器中作为普通卡片播放过的卡片，进入其专属容器后可再次演播，兼顾因果穿透与容器完整性。</li>
+                    </ul>
+                  </li>
+                  <li>🧠 <strong>思维导图响应式工具栏 (Mindmap Responsive Toolbar)</strong>：顶栏按钮组自适应换行排版，在较小窗口或高系统缩放比例下不挤压、不溢出截断，视觉与交互极致优雅。</li>
+                  <li>🧪 <strong>全面自动化测试守护</strong>：43 个测试套件、379 项单元与集成测试 100% 通过，为知识工作台保驾护航。</li>
+                </ul>
+              </div>
+
+              {/* v2.2.0 */}
+              <div className="about-changelog-group" style={{ marginTop: 10, opacity: 0.9 }}>
+                <div className="about-changelog-group-label">
+                  <Sparkles size={12} className="text-blue" />
                   <span>v2.2.0 思维导图双端无损同步、知识图谱美化与交互升级</span>
                 </div>
                 <ul className="about-changelog-items">
@@ -396,7 +417,7 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
                 }}
                 title="下载最新安装包与便携版"
               >
-                <span>{repoUrl}/releases (下载 v2.2.0 安装包与便携版)</span>
+                <span>{repoUrl}/releases (下载 v2.3.0 安装包与便携版)</span>
                 <ExternalLink size={13} />
               </a>
             </div>

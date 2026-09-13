@@ -110,6 +110,7 @@ describe("Dialogs Sub-function Tests", () => {
       render(<AboutDialog isOpen={true} onClose={onClose} />);
 
       expect(screen.getAllByText("KnowSpace").length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/v2\.3\.0/).length).toBeGreaterThan(0);
       expect(screen.getAllByText(/v2\.0\./).length).toBeGreaterThan(0);
       expect(screen.getByText(/Personal Knowledge Workspace/)).toBeDefined();
 

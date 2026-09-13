@@ -10,14 +10,14 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-v2.2.0-1D9BF0?style=flat-square&logo=github" alt="Version 2.2.0" />
+  <img src="https://img.shields.io/badge/Version-v2.3.0-1D9BF0?style=flat-square&logo=github" alt="Version 2.3.0" />
+  <img src="https://img.shields.io/badge/Presentation-Mode_2.3_Clockwise_Cycles-8B5CF6?style=flat-square" alt="Presentation Mode 2.3" />
   <img src="https://img.shields.io/badge/Mind_Map-Non--Destructive_Sync-00BA7C?style=flat-square" alt="Non-Destructive Mindmap Sync" />
   <img src="https://img.shields.io/badge/Graph-Decoupled_Interaction-8B5CF6?style=flat-square" alt="Decoupled Graph" />
   <img src="https://img.shields.io/badge/Multimodal-Canvas_Media_Cards-F59E0B?style=flat-square" alt="Multimodal Canvas" />
   <img src="https://img.shields.io/badge/Routing-AABB_Obstacle_Avoidance-00BA7C?style=flat-square" alt="AABB Obstacle Avoidance" />
-  <img src="https://img.shields.io/badge/Presentation-F5_Cinematic_Slides-8B5CF6?style=flat-square" alt="F5 Presentation Mode" />
   <img src="https://img.shields.io/badge/Performance-120FPS_Instant_Load-00BA7C?style=flat-square" alt="120FPS Instant Load" />
-  <img src="https://img.shields.io/badge/Tests-362_Passing_100%25-00BA7C?style=flat-square" alt="362 Passing Tests" />
+  <img src="https://img.shields.io/badge/Tests-379_Passing_100%25-00BA7C?style=flat-square" alt="379 Passing Tests" />
   <img src="https://img.shields.io/badge/Canvas-JSON_Canvas_1.0-00BA7C?style=flat-square" alt="Infinite Canvas" />
   <img src="https://img.shields.io/badge/Snapshots-Ctrl%2BShift%2BH-1D9BF0?style=flat-square" alt="Version History" />
   <img src="https://img.shields.io/badge/Search-Hybrid_Vault_Index-8B5CF6?style=flat-square" alt="Hybrid Vault Search" />
@@ -59,9 +59,9 @@
 
 ## 🏛️ 核心能力体系
 
-- **🧠 Mind Map 2.2（思维导图双端非破坏性同步体系 · v2.2.0 重磅突破）**：Markdown 架构一键转化为交互式思维脑图（`Ctrl+M`），**核心无损同步算法 `syncMindmapToDocument`** 彻底攻克导图编辑抹杀正文段落的历史顽疾，基于 AST 章节区块映射进行增量标题结构同步，**100% 完整保全所有正文文字、代码块、表格与数学公式**；顶栏增设「🔄 同步到文档」按键、脏状态感知与绿色呼吸脉冲徽标、支持 `Ctrl+S` / `Cmd+S` 快捷同步与反向自动联动；移除节点旁冗余悬浮加号，界面清爽无杂音；支持**分支拖拽改变层级/同级重排（防环闭环保护）**、**导图内搜索与运镜聚焦**、**标准 OPML 2.0 / FreeMind (.mm) / Markdown / 视网膜级 PNG 透明底高清导出**。
+- **🧠 Mind Map 2.3（思维导图双端非破坏性同步体系与响应式工具栏 · v2.3.0 升级）**：Markdown 架构一键转化为交互式思维脑图（`Ctrl+M`），**核心无损同步算法 `syncMindmapToDocument`** 彻底攻克导图编辑抹杀正文段落的历史顽疾，基于 AST 章节区块映射进行增量标题结构同步，**100% 完整保全所有正文文字、代码块、表格与数学公式**；顶栏增设「🔄 同步到文档」按键、脏状态感知与绿色呼吸脉冲徽标、支持 `Ctrl+S` / `Cmd+S` 快捷同步与反向自动联动；移除节点旁冗余悬浮加号，界面清爽无杂音；**顶栏按钮自适应换行排版（Responsive Wrapped Toolbar）**，小窗口或高系统缩放比例下功能按钮不溢出、不被截断；支持**分支拖拽改变层级/同级重排（防环闭环保护）**、**导图内搜索与运镜聚焦**、**标准 OPML 2.0 / FreeMind (.mm) / Markdown / 视网膜级 PNG 透明底高清导出**。
 - **🌐 Graph & Backlinks 2.2（知识图谱深度、交互解耦与视觉升维 · v2.2.0 重构）**：60FPS 极速拓扑图谱，**单击与双击交互精准解耦**（单击节点仅高亮 1-hop 邻域并展示详情卡片，绝不在左侧打开文件；双击 350ms 内平滑打开对应笔记；点击空白背景清空高亮）；**重塑 280px 结构化毛玻璃文件夹详情卡片**（顶部 Meta 徽标行 + 专属标题行 + 路径行 + 3 列指标微型网格），彻底告别文字挤压与换行折叠；引入 **Cytoscape 0.18s 补间平滑过渡动效** 与 **悬停探灯连线点亮机制（Hover Headlight）**；支持 `1-Hop` 直接关联 / `2-Hop` 扩展网络局部深度控制、目录语义色彩聚类、MOC 核心枢纽节点挖掘与未链接孤岛发现。
-- **🎨 Infinite Canvas 2.1（空间多模态无限白板 · 兼容 JSON Canvas 1.0）**：标准开放的二维空间思维白板（`Ctrl+Shift+C`），**多模态媒体卡片自由挂载**（剪贴板截图 `Ctrl+V` 一键自动存入 `assets/` 落地为媒体卡片、桌面图片/音视频文件批量拖拽投放、富文本 Markdown、嵌入文档滚动预览、逻辑分组容器），**智能正交折线 AABB 绕障避障寻路算法**（自动检测卡片包围盒与 +14px 安全边距，5 段平滑正交绕行，彻底杜绝线条穿透遮挡卡片文字，标签中心点自适应吸附），**F5 沉浸式分镜全屏演示模式**（因果 DAG 拓扑镜头序、电影级平滑聚焦运镜、当前演播卡片脉冲呼吸发光光晕、背景优雅弱化、悬浮控制台全键盘调度与自动播放），**高精度 4 锚点几何中心对齐与贝塞尔/正交折线/直线矢量连线**，支持**环形对齐（Ring Layout · 真实平滑圆形弧线闭环）与矩形网格对齐（Rectangular Grid Layout）**、**交互式环半径与网格间距微调拉杆**、**折线手柄平移拖拽**、**防冲天平滑曲线**、**上下分层垂直优先路由**、**12 色专业调色盘与单条连线/批量卡片自定义 HEX 颜色拾取器**、**连线成环卡片视觉解耦（对外发射连线独立着色，消除视觉混淆）**、**一对多发起源全景识别（起点锚固圆点、发起源徽章、高亮辉光与多选动态标注）**、**连线多选与底部批量工具栏**、**多选卡片一键断开连线**、**120FPS 硬件栅格化与视口视锥剔除（Viewport Frustum Culling）**；配备右下角缩略雷达小地图与全景聚焦控制；**独创画布逆向拓扑萃取长文算法**，一键将白板因果关系逆向萃取为逻辑严密的 Markdown 专著。
+- **🎨 Infinite Canvas 2.3（空间多模态无限白板 · F5 拓扑因果分镜演播 2.3 · v2.3.0 重磅升级）**：标准开放的二维空间思维白板（`Ctrl+Shift+C`），**多模态媒体卡片自由挂载**（剪贴板截图 `Ctrl+V` 一键自动存入 `assets/` 落地为媒体卡片、桌面图片/音视频文件批量拖拽投放、富文本 Markdown、嵌入文档滚动预览、逻辑分组容器），**智能正交折线 AABB 绕障避障寻路算法**（自动检测卡片包围盒与 +14px 安全边距，5 段平滑正交绕行，彻底杜绝线条穿透遮挡卡片文字，标签中心点自适应吸附），**F5 沉浸式分镜全屏演示模式 2.3**（**同一容器优先顺序演播**、**深入子例程推演与自然归栈**、**先单卡后环形分支演播策略**、**成环卡片组顺时针完整演播与环外延伸分支演播**、**跨容器上下文感知复现**、电影级平滑聚焦运镜、当前演播卡片脉冲呼吸发光光晕、背景优雅弱化、悬浮控制台全键盘调度与自动播放），**高精度 4 锚点几何中心对齐与贝塞尔/正交折线/直线矢量连线**，支持**环形对齐（Ring Layout · 真实平滑圆形弧线闭环）与矩形网格对齐（Rectangular Grid Layout）**、**交互式环半径与网格间距微调拉杆**、**折线手柄平移拖拽**、**防冲天平滑曲线**、**上下分层垂直优先路由**、**12 色专业调色盘与单条连线/批量卡片自定义 HEX 颜色拾取器**、**连线成环卡片视觉解耦（对外发射连线独立着色，消除视觉混淆）**、**一对多发起源全景识别（起点锚固圆点、发起源徽章、高亮辉光与多选动态标注）**、**连线多选与底部批量工具栏**、**多选卡片一键断开连线**、**120FPS 硬件栅格化与视口视锥剔除（Viewport Frustum Culling）**；配备右下角缩略雷达小地图与全景聚焦控制；**独创画布逆向拓扑萃取长文算法**，一键将白板因果关系逆向萃取为逻辑严密的 Markdown 专著。
 - **🚀 Instant Load & 120FPS Engine（秒开体验与工业级高刷引擎）**：彻底攻克大型知识库与包含数百篇笔记文件夹的打开性能瓶颈！引入**协作式空闲时间片调度器（Cooperative Idle-Sliced Background Indexer）**，首屏活动文档优先 <50ms 秒开呈现，后台全量索引 600ms 初始防抖与 20ms 退避分片让出时间片，保证 0 dropped frames；配合 **Electron 批量并发读取 IPC（`readMarkdownBatch`）**与 **32MB 内存 LRU 缓存（256 篇常驻）**，二次切换零磁盘 I/O。
 - **⏳ Local Version History（本地时间旅行与版本快照历史）**：运行在本地知识库根目录隐藏空间（`.knowspace/snapshots/`）的无感版本防丢卫士（`Ctrl+Shift+H`），**30秒去抖静默捕获与 SHA-256 哈希去重**，配备直观版本时间轴；**左右双栏 Side-by-Side 与统一 Unified 视图**，Myers LCS 逐行与行内字符微粒度高亮，**一键无损安全还原与手动里程碑快照**。
 - **🔍 Hybrid Vault Search（全库毫秒级混合检索引擎）**：全新文档级与段落级倒排索引（Inverted Index），万篇笔记键盘键入即刻（< 15ms）出结果。**深度支持结构化检索语法**：`tag:#架构`、`link:[[分布式协议]]`、`"严格短语"`、`-排除词`、时间范围过滤，提供「当前章节」与「全库检索」一键无缝切换、语法快捷辅助芯片与物理行微光脉冲联动。
@@ -286,8 +286,9 @@
   - **3 种分支连接线形态**：平滑贝塞尔曲线 (`bezier`)、90° 直角阶梯折线 (`step`)、笔直直线 (`straight`)。
   - **连接线颜色定制**：可为特定分支流出的连线独立指定色彩或自动继承。
   - **标准行内注释持久化**：所有样式以标准 Markdown 注释（如 `<!-- style: color=#10b981,shape=capsule,align=center,width=280 -->`）保真保存，在第三方编辑器和 Git 中零侵入、纯净透明。
-- **🎛️ 极简精炼工具栏与排版**：
-  - **单行工整排版**：所有按键统一施加不换行保护与标准边距，彻底杜绝文字上下分割折行；
+- **🎛️ 极简精炼响应式工具栏 (Responsive Mindmap Toolbar · v2.3.0 升级)**：
+  - **自适应换行排版 (Responsive Wrapped Toolbar)**：顶栏按钮与操作菜单支持自适应换行流式布局，在低分辨率屏幕、小窗口分屏或高系统 DPI 缩放比例下，各个功能按钮自动优雅换行排版，彻底杜绝按钮溢出被截断的困扰；
+  - **单行工整保护**：各按钮文字与图标统一施加不换行保护与标准间距，告别文字上下断行；
   - **功能聚焦**：右侧集成一键「导出导图 ▾」下拉菜单（PNG、OPML、FreeMind、Markdown），画布保留鼠标滚轮平滑缩放与拖拽漫游。
 - **➕ 新建思维导图**：目录树顶部与空白首页直设「新建思维导图」入口，一键生成专用 `.mindmap.md` 脑图文件并立即进入编辑。
 - **⚓ 块级原子互联与纯净徽章渲染 (Block-Level Linking & Badges · v2.2.0 升级)**：
@@ -298,8 +299,8 @@
 
 ---
 
-### 11. 🎨 空间多模态无限可视化白板 (Infinite Canvas 2.1 · JSON Canvas 1.0 兼容 · `Ctrl + Shift + C`)
-*标准开放的二维空间思维白板，融合多模态媒体、AABB 避障连线与 F5 分镜演示，打通从灵感卡片、拓扑因果到专著产出的完整飞跃。*
+### 11. 🎨 空间多模态无限可视化白板 (Infinite Canvas 2.3 · JSON Canvas 1.0 兼容 · `Ctrl + Shift + C`)
+*标准开放的二维空间思维白板，融合多模态媒体、AABB 避障连线与 F5 拓扑分镜演示 2.3，打通从灵感卡片、拓扑因果到专著产出的完整飞跃。*
 
 <p align="center">
   <img src="docs/manual-images/32-infinite-canvas.png" alt="无限空间可视化白板与多模态卡片" width="90%" style="border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);" />
@@ -315,8 +316,12 @@
   - **包围盒碰撞与穿透检测**：针对正交折线（Step Line），实时检测源卡片与目标卡片之间的中间障碍卡片包围盒（AABB），并附加 14px 安全避让边距；
   - **5 段平滑正交绕障路径规划**：当发现连线直接穿过非关联卡片时，寻路引擎自动向上/下或向左/右生成 5 段正交折线绕行路径，彻底解决正交连线穿心遮挡卡片文字内容的痛点；
   - **关系说明标签中心自适应吸附**：连线关系说明徽章（Label Badge）与几何中心点同步偏移至绕障路径段中点，杜绝标签与障碍卡片重叠。
-- **📽️ F5 白板分镜全屏演示模式 (Presentation Mode · `F5` · v2.1.0 升级)**：
-  - **因果 DAG 拓扑镜头序算法 (`buildPresentationSequence`)**：自动分析画板上有向连线构建的有向无环因果链路，上游排在先、下游排在后，辅以从左至右、从上到下的阅读序生成逻辑分镜序列，智能排除概念分组容器；
+- **📽️ F5 白板分镜全屏演示模式 2.3 (Presentation Mode 2.3 · `F5` · v2.3.0 深度升级)**：
+  - **同一容器优先顺序演播 (Container-First Ordering)**：按照卡片所在容器归属优先顺序演播，严密保障模块化、分组化的演讲与推演节奏；
+  - **深入子例程推演与自然归栈 (Drill-down Subroutine & Return)**：当播放到引出外部卡片的发起点卡片时，依因果拓扑深入演播其指向的目标卡片子树，演播完成后平滑返回原容器的发起点卡片，继续演播原容器的后续卡片；
+  - **先单卡后成环推演策略 (Single Cards Before Ring Cycles)**：当发起点卡片同时引出「单独卡片」与「环形结构」时，优先完整演播独立分支链，再演播成环卡片组，避免逻辑认知割裂；
+  - **成环卡片组顺时针完整演播 (Clockwise Full Cycle Traversal)**：基于几何重心极角排序与并查集回路识别，顺时针完整演播闭环内所有卡片，并在成环完毕后演播环外延伸分支，保证环形回路 100% 完整呈现；
+  - **跨容器上下文感知复现 (Context-Aware Cross-Container Replay)**：被其他容器作为引出目标播放过的卡片，或在首组容器中作为普通卡片播放过的卡片，在进入其自身所属容器后可再次作为完整卡片进行上下文演播，兼顾因果穿透与分组完整性；
   - **电影级平滑聚焦运镜**：采用 `cubic-bezier(0.25, 1, 0.5, 1)` 缓动曲线，平滑平移并缩放画板摄像机，使当前演播卡片精准居中呈现；
   - **脉冲呼吸发光与背景弱化**：当前演播卡片激发专属光晕呼吸发光，非演播卡片与非关联连线透明度降至 `0.18 ~ 0.22`，最大化聚焦听众注意力；
   - **全键盘调度与悬浮控制台**：支持 `F5` / 顶部「演示」按钮一键进入/退出、`→` / `空格` / `PageDown` 下一张、`←` / `PageUp` 上一张、`Home` / `End` 跳转首尾、`Esc` 退出；底部常驻半透明悬浮控制台，集成张数指示器、3.5 秒自动播放开关与退出按钮。
@@ -504,20 +509,20 @@
 
 ## 📦 安装程序与便携版下载 (Downloads & Release Assets)
 
-本项目为 Windows 64 位系统深度优化，提供图形化安装程序、标准 MSI 安装包与免安装便携版，最新 `v2.2.0` 资产已发布：
+本项目为 Windows 64 位系统深度优化，提供图形化安装程序、标准 MSI 安装包与免安装便携版，最新 `v2.3.0` 资产已发布：
 
-> 🌐 **GitHub 官方发布主页**：[GitHub Releases · v2.2.0](https://github.com/chunxvzhang-lab/KnowSpace/releases/tag/v2.2.0)
+> 🌐 **GitHub 官方发布主页**：[GitHub Releases · v2.3.0](https://github.com/chunxvzhang-lab/KnowSpace/releases/tag/v2.3.0)
 
 ### 1. Windows 图形化安装程序（推荐）
-- **安装文件**：[`KnowSpace-Setup-2.2.0.exe`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.2.0/KnowSpace-Setup-2.2.0.exe)
+- **安装文件**：[`KnowSpace-Setup-2.3.0.exe`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.3.0/KnowSpace-Setup-2.3.0.exe)
 - **特点**：双击即可向导式安装，支持自定义安装目录，自动创建桌面快捷方式与开始菜单官方品牌图标，深度集成系统级 `.md` 与 `.canvas` 文件关联，内置标准卸载程序。
 
 ### 2. Windows MSI 标准安装包
-- **安装文件**：[`KnowSpace-2.2.0.msi`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.2.0/KnowSpace-2.2.0.msi)
+- **安装文件**：[`KnowSpace-2.3.0.msi`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.3.0/KnowSpace-2.3.0.msi)
 - **特点**：Windows Installer 官方格式，适合企业批量部署、组策略分发与企业级静默安装，支持标准控制面板卸载。
 
 ### 3. Windows 绿色免安装便携版
-- **便携文件**：[`KnowSpace-win-x64-portable.zip`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.2.0/KnowSpace-win-x64-portable.zip)
+- **便携文件**：[`KnowSpace-win-x64-portable.zip`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.3.0/KnowSpace-win-x64-portable.zip)
 - **直接运行**：解压后双击 `KnowSpace.exe` 即可直接使用完整功能。
 - **特点**：解压即用、随身携带（支持装入 U 盘或移动硬盘）；完全自包含 Electron 运行时与全套本地依赖，无需配置任何外部开发环境；支持右键「打开方式」关联 Markdown 与白板文档。
 
@@ -548,10 +553,16 @@
   - *Cooperative Idle-Sliced Background Indexer*: Eliminates UI freezing when opening large directories or switching files. Active document renders immediately (<50ms), while full-vault indexing is deferred and chunked in the background with cooperative 20ms yields. Zero dropped frames!
   - *Batch IPC File Content Reader (`readMarkdownBatch`)*: High-throughput parallel reads in Node.js worker threads bypass redundant sequential IPC calls, delivering >10× faster disk reads.
   - *32MB Expanded LRU Cache (256 Docs)*: Common workspace documents remain resident in memory; tab switching requires zero disk I/O.
-- **🎨 Infinite Canvas 2.1 (Multimodal Spatial Canvas · JSON Canvas 1.0 Compatible · `Ctrl + Shift + C`)**:
+- **🎨 Infinite Canvas 2.3 & Presentation Mode 2.3 (Multimodal Spatial Canvas · JSON Canvas 1.0 Compatible · `Ctrl + Shift + C` · v2.3.0 Upgrade)**:
   - *Multimodal Media Cards (v2.1.0 Upgrade)*: Instant clipboard screenshot paste (`Ctrl + V`) directly saves timestamped images into local `assets/` and mounts cards at the current viewport center; drag-and-drop media files (images, audio, video) from desktop; native audio/video playback controls in card; offscreen 1:1 SVG/PNG export fidelity.
   - *AABB Obstacle Avoidance Routing (v2.1.0 Upgrade)*: Smart 5-segment orthogonal step line routing engine detects intervening card bounding boxes with +14px safety boundary, eliminating unsightly lines cutting through card text and dynamically attaching edge label badges to the midpoint.
-  - *F5 Cinematic Fullscreen Presentation Mode (`F5` · v2.1.0 Upgrade)*: Algorithmic DAG topological causality ordering (`buildPresentationSequence`) focuses on upstream sources before downstream cards; cinematic smooth camera transitions; active slide pulse glow illumination; background dimming overlay; full keyboard flow (`F5`, `Arrows`, `Space`, `PageUp/Down`, `Home/End`, `Esc`) and floating auto-play controller.
+  - *F5 Presentation Mode 2.3 (Topological Causality Engine · v2.3.0 Upgrade)*:
+    - *Container-First Ordering*: Sequentially prioritizes cards by container groupings to ensure structured, modular presentation narratives.
+    - *Drill-down Subroutines & Smooth Return*: When playing an initiator card that links to external cards, deeply traverses target branches according to causal topology, then smoothly returns to the initiator's container to resume next cards.
+    - *Single Cards Before Cyclic Groups*: Prioritizes standalone linear branch cards before entering cyclic ring groups to prevent cognitive disruption.
+    - *Clockwise Full Cycle Traversal*: Union-Find loop detection and centroid polar angle sorting play every card in a closed cycle clockwise, followed by external outgoing branch exploration.
+    - *Context-Aware Cross-Container Replay*: Cards referenced earlier by external branches or visited in early containers are gracefully replayed when navigating through their own parent container.
+    - *Cinematic Camera Transitions*: Soft cubic-bezier camera focus, pulse glow illumination on active cards, background dimming overlay, full keyboard flow, and floating auto-play controller.
   - *Open Standard Compatibility*: Full support for JSON Canvas 1.0 (`.canvas`), seamlessly interoperable with Obsidian Canvas and third-party spatial tools.
   - *Ring Layout & True Circular Arcs*: One-click circular alignment of multiple cards with true inward circular arc connectors and real-time interactive radius slider.
   - *Rectangular Grid Layout*: Neatly arrange cards into rectangular matrices with envelope connector styling and real-time interactive gap adjustment.
@@ -580,8 +591,9 @@
 - **🖨️ High-Fidelity Vector PDF Print & Export (`Ctrl + P`)**:
   - *Chromium Native Vector Print Engine*: Export standard A4 vector PDF directly or print via system dialog.
   - *Intelligent Page-Break Prevention*: Custom `@media print` rules prevent code blocks, LaTeX formulas, GFM tables, and Mermaid diagrams from being cut in half across pages.
-- **🧠 Interactive Mind Map & Non-Destructive Bidirectional Sync (`Ctrl + M` · v2.2.0 Upgrade)**:
+- **🧠 Interactive Mind Map & Non-Destructive Bidirectional Sync (`Ctrl + M` · v2.3.0 Upgrade)**:
   - *Non-Destructive Bidirectional Sync Engine*: AST-driven incremental chunk mapping (`syncMindmapToDocument`) 100% preserves text paragraphs, multi-line code blocks, GFM tables, math formulas, and block anchors during mindmap edits. Reorganizing sections in the mindmap never wipes out document bodies!
+  - *Responsive Wrapped Toolbar (v2.3.0 Upgrade)*: Fluid responsive button bar wraps automatically on narrow displays, split-screen views, or high DPI scaling, eliminating button clipping or horizontal overflowing.
   - *Explicit Sync Toolbar & Dirty Sensing*: Topbar `🔄 Sync to Document` button with emerald glow and breathing pulse indicator, `Ctrl+S` / `Cmd+S` keyboard sync, and automatic reverse sync when editing markdown headings.
   - *Pure Minimalist UI*: Eliminated floating plus button next to node collapse/expand toggles, keeping clean native border circles `(+)` / `(-)`.
   - *Multi-Format Export*: Export 2× Retina transparent PNG diagrams, standard OPML 2.0 (`.opml`) for MindNode / OmniOutliner / Logseq, FreeMind 1.0.1 XML (`.mm`) for XMind / Freeplane with preserved node colors, and structured Markdown outlines.
@@ -634,7 +646,7 @@
   - *Conflict Detection*: Automatic alert when files are modified externally.
 - **🧪 Sub-function Ecosystem & 100% Test Coverage**:
   - *Full Spectrum Granular Sub-functions*: Zoomable Media Lightbox (0.2×~6×, smooth pan, download, Esc), Typography Status Bar (word/char count, reading time estimation, dirty state, readonly lock), Backlinks & Unlinked Mentions with 1-click upgrade to `[[wikilinks]]`, External File Conflict Arbitrator (`FileConflictDialog`), Unsaved Changes Protector (`UnsavedChangesDialog`), Dynamic TOC & Cross-Chapter Bookmark Resolver, Space Flash Note Directory Isolation, Web Snapshot FIFO Pruning (30-cap), and Mermaid Base64 entity-safe SVG rendering with graceful error fallbacks.
-  - *Rock-Solid Reliability*: 43 test suites, **362** automated unit and integration tests passing with a 100% success rate!
+  - *Rock-Solid Reliability*: 43 test suites, **379** automated unit and integration tests passing with a 100% success rate!
 
 ---
 

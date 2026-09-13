@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-v2.2.0-1D9BF0?style=flat-square" alt="Version 2.2.0" />
+  <img src="https://img.shields.io/badge/Version-v2.3.0-1D9BF0?style=flat-square" alt="Version 2.3.0" />
   <img src="https://img.shields.io/badge/Platform-Windows%20x64-blue?style=flat-square" alt="Platform" />
   <img src="https://img.shields.io/badge/Team-%E6%91%B8%E9%B1%BCLab-orange?style=flat-square" alt="摸鱼Lab" />
   <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License" />
@@ -1228,7 +1228,7 @@ KnowSpace 语法解析器全面支持针对知识资产多维属性的高级检�
 
 KnowSpace 为 Windows 用户提供企业级标准安装包与免安装便携绿色版两种交付形态，完全覆盖正式桌面工作站与移动 U 盘办公场景。
 
-### 19.1 Windows MSI 标准安装包 (`KnowSpace-2.2.0.msi`)
+### 19.1 Windows MSI 标准安装包 (`KnowSpace-2.3.0.msi`)
 - **适用场景**：个人常用生产力电脑、企业研发团队桌面标准化统一交付。
 - **产品特性**：
   - 自动在 Windows 开始菜单与桌面建立官方高分辨率品牌图标；
