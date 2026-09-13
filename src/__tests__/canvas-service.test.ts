@@ -2384,8 +2384,8 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
 
       const sequence = buildPresentationSequence(canvasData);
 
-      // Even though card-a1 connects to card-b1, all cards of Container A must finish first!
-      expect(sequence).toEqual(["card-a1", "card-a2", "card-b1", "card-b2"]);
+      // A1 initiates drill-down to B1, finishes container next card A2, then Container B replays B1 in its context
+      expect(sequence).toEqual(["card-a1", "card-b1", "card-a2", "card-b1", "card-b2"]);
     });
 
     it("plays container cards in order, drills into initiator targets (single cards first then cycles), and returns to container next card", () => {
@@ -2440,6 +2440,177 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
         "card-r2",
         "card-r3",
         "card-a3",
+      ]);
+    });
+
+    it("plays single cards first and complete clockwise cycle when an initiator points to both, even if single card connects to cycle", () => {
+      const initiator: CanvasTextNode = { id: "init", type: "text", text: "Initiator", x: 100, y: 100, width: 80, height: 50 };
+      const singleCard: CanvasTextNode = { id: "single", type: "text", text: "Single Card", x: 300, y: 50, width: 80, height: 50 };
+
+      // Cycle nodes in diamond: Top, Right, Bottom, Left
+      const rTop: CanvasTextNode = { id: "r-top", type: "text", text: "Ring Top", x: 400, y: 150, width: 80, height: 50 };
+      const rRight: CanvasTextNode = { id: "r-right", type: "text", text: "Ring Right", x: 550, y: 250, width: 80, height: 50 };
+      const rBottom: CanvasTextNode = { id: "r-bottom", type: "text", text: "Ring Bottom", x: 400, y: 350, width: 80, height: 50 };
+      const rLeft: CanvasTextNode = { id: "r-left", type: "text", text: "Ring Left", x: 250, y: 250, width: 80, height: 50 };
+
+      const edges: CanvasEdge[] = [
+        { id: "e-init-single", fromNode: "init", toNode: "single" },
+        { id: "e-init-ring", fromNode: "init", toNode: "r-top" },
+        // single card also has a secondary reference to r-right
+        { id: "e-single-ring", fromNode: "single", toNode: "r-right" },
+        // cycle edges
+        { id: "e-r1", fromNode: "r-top", toNode: "r-right" },
+        { id: "e-r2", fromNode: "r-right", toNode: "r-bottom" },
+        { id: "e-r3", fromNode: "r-bottom", toNode: "r-left" },
+        { id: "e-r4", fromNode: "r-left", toNode: "r-top" },
+      ];
+
+      const canvasData: CanvasData = {
+        nodes: [initiator, singleCard, rTop, rRight, rBottom, rLeft],
+        edges,
+      };
+
+      const sequence = buildPresentationSequence(canvasData);
+
+      // Order:
+      // 1. initiator
+      // 2. single card plays first ("先播放单独的卡片")
+      // 3. ring plays in full clockwise starting from r-top: r-top -> r-right -> r-bottom -> r-left ("播放成环卡片组", 完整成环)
+      expect(sequence).toEqual([
+        "init",
+        "single",
+        "r-top",
+        "r-right",
+        "r-bottom",
+        "r-left",
+      ]);
+    });
+
+    it("allows cards in different containers to play again when their container is presented (even if previously played as pointed node)", () => {
+      // Container 1: [A1, A2, A3]
+      const grp1: CanvasGroupNode = { id: "grp-1", type: "group", label: "Container 1", x: 0, y: 0, width: 400, height: 500 };
+      const a1: CanvasTextNode = { id: "a1", type: "text", text: "A1", x: 20, y: 20, width: 80, height: 50 };
+      const a2: CanvasTextNode = { id: "a2", type: "text", text: "A2 Initiator", x: 20, y: 150, width: 80, height: 50 };
+      const a3: CanvasTextNode = { id: "a3", type: "text", text: "A3", x: 20, y: 300, width: 80, height: 50 };
+
+      // Container 2: [B1, B2]
+      const grp2: CanvasGroupNode = { id: "grp-2", type: "group", label: "Container 2", x: 600, y: 0, width: 400, height: 500 };
+      const b1: CanvasTextNode = { id: "b1", type: "text", text: "B1", x: 620, y: 20, width: 80, height: 50 };
+      const b2: CanvasTextNode = { id: "b2", type: "text", text: "B2", x: 620, y: 150, width: 80, height: 50 };
+
+      // A2 points to B1
+      const edges: CanvasEdge[] = [
+        { id: "e-a1-a2", fromNode: "a1", toNode: "a2" },
+        { id: "e-a2-b1", fromNode: "a2", toNode: "b1" },
+        { id: "e-a2-a3", fromNode: "a2", toNode: "a3" },
+        { id: "e-b1-b2", fromNode: "b1", toNode: "b2" },
+      ];
+
+      const canvasData: CanvasData = {
+        nodes: [grp1, a1, a2, a3, grp2, b1, b2],
+        edges,
+      };
+
+      const sequence = buildPresentationSequence(canvasData);
+
+      // Order:
+      // 1. Container 1 plays: a1 -> a2
+      // 2. a2 drills into b1 (as a pointed-to node): b1
+      // 3. Drill-down finishes, returns to Container 1: a3
+      // 4. Container 1 completes!
+      // 5. Container 2 starts: b1 (plays AGAIN in its container context!) -> b2
+      expect(sequence).toEqual([
+        "a1",
+        "a2",
+        "b1",
+        "a3",
+        "b1",
+        "b2",
+      ]);
+    });
+
+    it("allows cards played as normal cards in the first container to play again when pointed to from a subsequent container", () => {
+      // First Container: [C1, C2]
+      const grp1: CanvasGroupNode = { id: "grp-1", type: "group", label: "First Container", x: 0, y: 0, width: 400, height: 300 };
+      const c1: CanvasTextNode = { id: "c1", type: "text", text: "C1 Overview", x: 20, y: 20, width: 80, height: 50 };
+      const c2: CanvasTextNode = { id: "c2", type: "text", text: "C2 Summary", x: 20, y: 150, width: 80, height: 50 };
+
+      // Second Container: [D1, D2]
+      const grp2: CanvasGroupNode = { id: "grp-2", type: "group", label: "Second Container", x: 500, y: 0, width: 400, height: 300 };
+      const d1: CanvasTextNode = { id: "d1", type: "text", text: "D1 Review", x: 520, y: 20, width: 80, height: 50 };
+      const d2: CanvasTextNode = { id: "d2", type: "text", text: "D2 Next Steps", x: 520, y: 150, width: 80, height: 50 };
+
+      // D1 points back to C1 (cross-referencing first container's card)
+      const edges: CanvasEdge[] = [
+        { id: "e-c", fromNode: "c1", toNode: "c2" },
+        { id: "e-macro", fromNode: "grp-1", toNode: "grp-2" },
+        { id: "e-d1-c1", fromNode: "d1", toNode: "c1" },
+        { id: "e-d1-d2", fromNode: "d1", toNode: "d2" },
+      ];
+
+      const canvasData: CanvasData = {
+        nodes: [grp2, d2, d1, grp1, c2, c1],
+        edges,
+      };
+
+      const sequence = buildPresentationSequence(canvasData);
+
+      // Order:
+      // 1. Container 1 plays: c1 -> c2
+      // 2. Container 2 plays: d1
+      // 3. d1 drills back to c1 (played AGAIN as a pointed-to node): c1
+      // 4. Returns to Container 2: d2
+      expect(sequence).toEqual([
+        "c1",
+        "c2",
+        "d1",
+        "c1",
+        "d2",
+      ]);
+    });
+
+    it("plays complete cycle again in full clockwise order when referenced from another container", () => {
+      // Container 1 has a ring cycle: [R1, R2, R3]
+      const grp1: CanvasGroupNode = { id: "grp-1", type: "group", label: "Ring Container", x: 0, y: 0, width: 400, height: 400 };
+      const r1: CanvasTextNode = { id: "r1", type: "text", text: "Ring Top", x: 150, y: 50, width: 80, height: 50 };
+      const r2: CanvasTextNode = { id: "r2", type: "text", text: "Ring Right", x: 250, y: 200, width: 80, height: 50 };
+      const r3: CanvasTextNode = { id: "r3", type: "text", text: "Ring Left", x: 50, y: 200, width: 80, height: 50 };
+
+      // Container 2 has [X1, X2], where X1 points to R1
+      const grp2: CanvasGroupNode = { id: "grp-2", type: "group", label: "Follow-up Container", x: 600, y: 0, width: 400, height: 400 };
+      const x1: CanvasTextNode = { id: "x1", type: "text", text: "X1", x: 620, y: 50, width: 80, height: 50 };
+      const x2: CanvasTextNode = { id: "x2", type: "text", text: "X2", x: 620, y: 200, width: 80, height: 50 };
+
+      const edges: CanvasEdge[] = [
+        { id: "e-r1", fromNode: "r1", toNode: "r2" },
+        { id: "e-r2", fromNode: "r2", toNode: "r3" },
+        { id: "e-r3", fromNode: "r3", toNode: "r1" },
+        { id: "e-macro", fromNode: "grp-1", toNode: "grp-2" },
+        { id: "e-x1-r1", fromNode: "x1", toNode: "r1" },
+        { id: "e-x1-x2", fromNode: "x1", toNode: "x2" },
+      ];
+
+      const canvasData: CanvasData = {
+        nodes: [grp2, x2, x1, grp1, r3, r2, r1],
+        edges,
+      };
+
+      const sequence = buildPresentationSequence(canvasData);
+
+      // Order:
+      // 1. Container 1 plays complete ring: r1 -> r2 -> r3
+      // 2. Container 2 starts: x1
+      // 3. x1 points to ring: plays complete ring clockwise: r1 -> r2 -> r3
+      // 4. Returns to Container 2: x2
+      expect(sequence).toEqual([
+        "r1",
+        "r2",
+        "r3",
+        "x1",
+        "r1",
+        "r2",
+        "r3",
+        "x2",
       ]);
     });
 

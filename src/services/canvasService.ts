@@ -915,7 +915,8 @@ export function buildPresentationSequence(data: CanvasData): string[] {
     }
   }
 
-  // 3. Tarjan's SCC to detect cycles
+  // 3. Cycle & Ring Detection
+  // A. Tarjan's SCC to detect strongly connected components (size >= 2)
   let sccIndex = 0;
   const indices = new Map<string, number>();
   const lowlink = new Map<string, number>();
@@ -957,43 +958,75 @@ export function buildPresentationSequence(data: CanvasData): string[] {
     }
   }
 
-  // Identify cycles (SCCs with size >= 2)
-  const nodeCycleMap = new Map<string, number>(); // nodeId -> sccIdx
-  const cycleNodesMap = new Map<number, string[]>(); // sccIdx -> cycle node IDs
-  sccs.forEach((scc, idx) => {
-    if (scc.length >= 2) {
-      cycleNodesMap.set(idx, scc);
-      for (const id of scc) {
-        nodeCycleMap.set(id, idx);
-      }
-    }
-  });
-
-  // Also support loop edges that may have been created as bidirectional loops
+  // B. Loop edge detection via getLoopEdgeIds
   const loopEdgeIds = getLoopEdgeIds(data.edges);
-  if (loopEdgeIds.size > 0) {
-    const loopNodes = new Set<string>();
-    for (const e of data.edges) {
-      if (loopEdgeIds.has(e.id) && nodeMap.has(e.fromNode) && nodeMap.has(e.toNode)) {
-        loopNodes.add(e.fromNode);
-        loopNodes.add(e.toNode);
+
+  // C. Disjoint-Set (Union-Find) to partition cycle nodes into isolated, independent cycle components
+  const parent = new Map<string, string>();
+  const find = (x: string): string => {
+    let root = parent.get(x) ?? x;
+    while (root !== (parent.get(root) ?? root)) {
+      root = parent.get(root) ?? root;
+    }
+    let cur = x;
+    while (cur !== root) {
+      const next = parent.get(cur) ?? cur;
+      parent.set(cur, root);
+      cur = next;
+    }
+    return root;
+  };
+  const union = (a: string, b: string) => {
+    const ra = find(a);
+    const rb = find(b);
+    if (ra !== rb) parent.set(ra, rb);
+  };
+
+  const cycleNodesSet = new Set<string>();
+
+  // Add SCCs with length >= 2
+  for (const scc of sccs) {
+    if (scc.length >= 2) {
+      for (const id of scc) {
+        cycleNodesSet.add(id);
+        if (!parent.has(id)) parent.set(id, id);
+      }
+      for (let i = 1; i < scc.length; i++) {
+        union(scc[0], scc[i]);
       }
     }
-    if (loopNodes.size >= 3) {
-      let existingIdx = -1;
-      for (const nid of loopNodes) {
-        if (nodeCycleMap.has(nid)) {
-          existingIdx = nodeCycleMap.get(nid)!;
-          break;
-        }
+  }
+
+  // Add loop edge endpoints (size >= 3)
+  for (const edge of data.edges) {
+    if (loopEdgeIds.has(edge.id) && nodeMap.has(edge.fromNode) && nodeMap.has(edge.toNode)) {
+      cycleNodesSet.add(edge.fromNode);
+      cycleNodesSet.add(edge.toNode);
+      if (!parent.has(edge.fromNode)) parent.set(edge.fromNode, edge.fromNode);
+      if (!parent.has(edge.toNode)) parent.set(edge.toNode, edge.toNode);
+      union(edge.fromNode, edge.toNode);
+    }
+  }
+
+  // Group into separate cycle components
+  const cycleComponents = new Map<string, string[]>();
+  for (const id of cycleNodesSet) {
+    const root = find(id);
+    const list = cycleComponents.get(root) || [];
+    list.push(id);
+    cycleComponents.set(root, list);
+  }
+
+  const nodeCycleMap = new Map<string, number>();
+  const cycleNodesMap = new Map<number, string[]>();
+  let nextCycleIdx = 0;
+  for (const comp of cycleComponents.values()) {
+    if (comp.length >= 2) {
+      const cIdx = nextCycleIdx++;
+      cycleNodesMap.set(cIdx, comp);
+      for (const id of comp) {
+        nodeCycleMap.set(id, cIdx);
       }
-      const targetIdx = existingIdx >= 0 ? existingIdx : sccs.length + 1;
-      const list = cycleNodesMap.get(targetIdx) || [];
-      for (const nid of loopNodes) {
-        if (!list.includes(nid)) list.push(nid);
-        nodeCycleMap.set(nid, targetIdx);
-      }
-      cycleNodesMap.set(targetIdx, list);
     }
   }
 
@@ -1096,21 +1129,36 @@ export function buildPresentationSequence(data: CanvasData): string[] {
 
   // 6. Presentation sequencing engine
   const sequence: string[] = [];
-  const visited = new Set<string>();
-  const activeStack = new Set<string>(); // recursion protection
+  const activeStack = new Set<string>(); // recursion protection against infinite loops
+
+  // Helper to emit a slide with immediate consecutive debounce
+  function emitSlide(id: string) {
+    if (sequence.length > 0 && sequence[sequence.length - 1] === id) {
+      return;
+    }
+    sequence.push(id);
+  }
 
   // Function to play an entire cycle in clockwise order
-  function playCycle(cycleIdx: number, entryNodeId?: string) {
+  function playCycle(
+    cycleIdx: number,
+    entryNodeId?: string,
+    containerVisited?: Set<string>
+  ) {
     const cycleNodeIds = cycleNodesMap.get(cycleIdx) || [];
-    const unvisitedNodes = cycleNodeIds.filter((id) => !visited.has(id));
-    if (unvisitedNodes.length === 0) return;
+    if (cycleNodeIds.length === 0) return;
 
-    const orderedCycle = sortCycleClockwise(cycleNodeIds, entryNodeId).filter((id) => !visited.has(id));
+    // Avoid recursing if all nodes in this cycle are currently in activeStack
+    if (cycleNodeIds.every((id) => activeStack.has(id))) return;
 
-    // Emit all cycle nodes first (Clockwise traversal)
+    const orderedCycle = sortCycleClockwise(cycleNodeIds, entryNodeId);
+
+    // Emit ALL cycle nodes first (Complete clockwise circle - never truncated!)
     for (const id of orderedCycle) {
-      visited.add(id);
-      sequence.push(id);
+      if (containerVisited && cardToContainerId.get(id) === cardToContainerId.get(entryNodeId || "")) {
+        containerVisited.add(id);
+      }
+      emitSlide(id);
     }
 
     // "环外连接在环的最后播放":
@@ -1118,82 +1166,111 @@ export function buildPresentationSequence(data: CanvasData): string[] {
     // in clockwise order of the source cards in the cycle
     for (const cycleCardId of orderedCycle) {
       const outEdges = (adj.get(cycleCardId) || []).filter(
-        (targetId) => !visited.has(targetId) && !cycleNodeIds.includes(targetId)
+        (targetId) => !cycleNodeIds.includes(targetId) && !activeStack.has(targetId)
       );
       if (outEdges.length > 0) {
-        playOutgoingTargets(outEdges, cardToContainerId.get(cycleCardId));
+        playOutgoingTargets(outEdges, cardToContainerId.get(cycleCardId), containerVisited);
       }
     }
   }
 
   // Function to partition outgoing targets into single cards and cycle groups,
   // playing single cards first, then cycle groups ("现播放单独的卡片，播放成环卡片组")
-  function playOutgoingTargets(targetIds: string[], currentContainerId?: string) {
-    const unvisitedTargets = targetIds.filter((id) => !visited.has(id) && nodeMap.has(id));
-    if (unvisitedTargets.length === 0) return;
+  function playOutgoingTargets(
+    targetIds: string[],
+    currentContainerId?: string,
+    containerVisited?: Set<string>,
+    parentDeferredCycleIds?: Set<number>
+  ) {
+    const validTargets = targetIds.filter((id) => nodeMap.has(id) && !activeStack.has(id));
+    if (validTargets.length === 0) return;
 
     const sameContainerTargets: string[] = [];
     const singleTargets: string[] = [];
     const cycleTargetMap = new Map<number, string>(); // cycleIdx -> entryId
 
-    for (const tid of unvisitedTargets) {
+    for (const tid of validTargets) {
       const targetContainerId = cardToContainerId.get(tid);
       const cycleIdx = nodeCycleMap.get(tid);
 
-      if (currentContainerId && targetContainerId === currentContainerId) {
-        sameContainerTargets.push(tid);
-      } else if (cycleIdx !== undefined) {
+      if (cycleIdx !== undefined) {
+        // Belong to a cycle: always group as cycle target (whether in container or not)
+        if (parentDeferredCycleIds?.has(cycleIdx)) continue;
         if (!cycleTargetMap.has(cycleIdx)) {
           cycleTargetMap.set(cycleIdx, tid);
+        }
+      } else if (currentContainerId && targetContainerId === currentContainerId) {
+        if (!containerVisited || !containerVisited.has(tid)) {
+          sameContainerTargets.push(tid);
         }
       } else {
         singleTargets.push(tid);
       }
     }
 
-    // 1. Same container targets continue current container context
-    sameContainerTargets.sort(spatialSort);
-    for (const tid of sameContainerTargets) {
-      playCard(tid);
-    }
+    // Cycles to defer during single card branch traversal so single cards don't prematurely fire them
+    const deferredForSingles = new Set<number>([
+      ...(parentDeferredCycleIds || []),
+      ...cycleTargetMap.keys(),
+    ]);
 
-    // 2. "先播放单独的卡片"
+    // 1. "先播放单独的卡片"
     singleTargets.sort(spatialSort);
     for (const tid of singleTargets) {
-      playCard(tid);
+      playCard(tid, undefined, deferredForSingles);
     }
 
-    // 3. "再播放成环卡片组"
+    // 2. "再播放成环卡片组"
     for (const [cIdx, entryId] of cycleTargetMap.entries()) {
-      playCycle(cIdx, entryId);
+      playCycle(cIdx, entryId, containerVisited);
+    }
+
+    // 3. "播放完成后继续播放发起点卡片所在的容器的下一个卡片"
+    sameContainerTargets.sort(spatialSort);
+    for (const tid of sameContainerTargets) {
+      playCard(tid, containerVisited);
     }
   }
 
+  // Active presenting container ID
+  let activeContainerId: string | null = null;
+
   // Function to play a single card and its drill-down branches
-  function playCard(cardId: string) {
-    if (visited.has(cardId) || activeStack.has(cardId)) return;
+  function playCard(
+    cardId: string,
+    containerVisited?: Set<string>,
+    deferredCycleIds?: Set<number>
+  ) {
+    if (activeStack.has(cardId)) return;
     activeStack.add(cardId);
 
-    // If this card is part of an unvisited cycle, play the cycle clockwise!
-    const cycleIdx = nodeCycleMap.get(cardId);
-    if (cycleIdx !== undefined) {
-      const cycleNodes = cycleNodesMap.get(cycleIdx) || [];
-      if (cycleNodes.some((id) => !visited.has(id))) {
-        playCycle(cycleIdx, cardId);
-        activeStack.delete(cardId);
-        return;
-      }
+    if (containerVisited) {
+      containerVisited.add(cardId);
     }
 
-    visited.add(cardId);
-    sequence.push(cardId);
+    // If this card is part of a cycle, play the full cycle clockwise
+    const cycleIdx = nodeCycleMap.get(cardId);
+    if (cycleIdx !== undefined && !deferredCycleIds?.has(cycleIdx)) {
+      playCycle(cycleIdx, cardId, containerVisited);
+      activeStack.delete(cardId);
+      return;
+    }
+
+    emitSlide(cardId);
 
     const containerId = cardToContainerId.get(cardId);
 
-    // "当播放到做为发起点的卡片，按顺序播放其指向的卡片"
-    const targets = adj.get(cardId) || [];
-    if (targets.length > 0) {
-      playOutgoingTargets(targets, containerId);
+    // If this card belongs to a different container than the active presenting container,
+    // it acts as a cross-container reference slide; do not recursively play that other container's internal cards.
+    const isCrossContainerReference =
+      Boolean(activeContainerId && containerId && containerId !== activeContainerId);
+
+    if (!isCrossContainerReference) {
+      // "当播放到做为发起点的卡片，按顺序播放其指向的卡片"
+      const targets = adj.get(cardId) || [];
+      if (targets.length > 0) {
+        playOutgoingTargets(targets, containerId, containerVisited, deferredCycleIds);
+      }
     }
 
     activeStack.delete(cardId);
@@ -1202,14 +1279,20 @@ export function buildPresentationSequence(data: CanvasData): string[] {
   // Function to play an entire container in order
   function playContainer(grpId: string) {
     const cardIds = containerOrder.get(grpId) || [];
+    const containerVisited = new Set<string>();
+    const prevActiveContainerId = activeContainerId;
+    activeContainerId = grpId;
+
     for (const cardId of cardIds) {
-      if (!visited.has(cardId)) {
-        playCard(cardId);
+      if (!containerVisited.has(cardId)) {
+        playCard(cardId, containerVisited);
         // "播放完成后继续播放发起点卡片所在的容器的下一个卡片":
         // Once playCard(cardId) finishes expanding cardId's drill-down targets,
         // this loop naturally advances to the next unvisited card in this container!
       }
     }
+
+    activeContainerId = prevActiveContainerId;
   }
 
   // 7. Top-level sequencing across containers, empty groups, and standalone cards
@@ -1342,17 +1425,14 @@ export function buildPresentationSequence(data: CanvasData): string[] {
     if (te.type === "container") {
       playContainer(te.id);
     } else if (te.type === "empty-group") {
-      if (!visited.has(te.id)) {
-        visited.add(te.id);
-        sequence.push(te.id);
-        const outs = adj.get(te.id) || [];
-        if (outs.length > 0) {
-          playOutgoingTargets(outs);
-        }
+      emitSlide(te.id);
+      const outs = adj.get(te.id) || [];
+      if (outs.length > 0) {
+        playOutgoingTargets(outs);
       }
     } else {
-      // Standalone card
-      if (!visited.has(te.id)) {
+      // Standalone card: if not already played anywhere in sequence, play it
+      if (!sequence.includes(te.id)) {
         playCard(te.id);
       }
     }
