@@ -2388,6 +2388,61 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
       expect(sequence).toEqual(["card-a1", "card-a2", "card-b1", "card-b2"]);
     });
 
+    it("plays container cards in order, drills into initiator targets (single cards first then cycles), and returns to container next card", () => {
+      // Container 1 with cards A1, A2, A3
+      const grp1: CanvasGroupNode = { id: "grp-1", type: "group", label: "Main Flow", x: 0, y: 0, width: 400, height: 600 };
+      const cardA1: CanvasTextNode = { id: "card-a1", type: "text", text: "A1 Intro", x: 20, y: 20, width: 80, height: 50 };
+      const cardA2: CanvasTextNode = { id: "card-a2", type: "text", text: "A2 Initiator", x: 20, y: 150, width: 80, height: 50 };
+      const cardA3: CanvasTextNode = { id: "card-a3", type: "text", text: "A3 Next in Container", x: 20, y: 400, width: 80, height: 50 };
+
+      // Single cards S1 -> S2
+      const cardS1: CanvasTextNode = { id: "card-s1", type: "text", text: "S1 Single Detail", x: 500, y: 50, width: 80, height: 50 };
+      const cardS2: CanvasTextNode = { id: "card-s2", type: "text", text: "S2 Single Sub", x: 650, y: 50, width: 80, height: 50 };
+
+      // Cycle group R1 -> R2 -> R3 -> R1
+      // Top (600, 200), Right (700, 300), Left (500, 300)
+      const cardR1: CanvasTextNode = { id: "card-r1", type: "text", text: "R1 Ring Top", x: 600, y: 200, width: 80, height: 50 };
+      const cardR2: CanvasTextNode = { id: "card-r2", type: "text", text: "R2 Ring Right", x: 700, y: 300, width: 80, height: 50 };
+      const cardR3: CanvasTextNode = { id: "card-r3", type: "text", text: "R3 Ring Left", x: 500, y: 300, width: 80, height: 50 };
+
+      const edges: CanvasEdge[] = [
+        // A2 points to single card S1
+        { id: "e-to-s", fromNode: "card-a2", toNode: "card-s1" },
+        // S1 points to S2
+        { id: "e-s", fromNode: "card-s1", toNode: "card-s2" },
+        // A2 ALSO points to cycle node R1
+        { id: "e-to-r", fromNode: "card-a2", toNode: "card-r1" },
+        // Cycle edges
+        { id: "e-r1", fromNode: "card-r1", toNode: "card-r2" },
+        { id: "e-r2", fromNode: "card-r2", toNode: "card-r3" },
+        { id: "e-r3", fromNode: "card-r3", toNode: "card-r1" },
+      ];
+
+      const canvasData: CanvasData = {
+        nodes: [cardR3, cardA3, cardS2, grp1, cardR1, cardA1, cardS1, cardR2, cardA2],
+        edges,
+      };
+
+      const sequence = buildPresentationSequence(canvasData);
+
+      // Expected order:
+      // 1. A1 (container card 1)
+      // 2. A2 (container card 2, initiator)
+      // 3. Drill-down: single cards first (card-s1 -> card-s2)
+      // 4. Drill-down: then cycle group clockwise (card-r1 -> card-r2 -> card-r3)
+      // 5. Drill-down finished! Return to container next card: A3!
+      expect(sequence).toEqual([
+        "card-a1",
+        "card-a2",
+        "card-s1",
+        "card-s2",
+        "card-r1",
+        "card-r2",
+        "card-r3",
+        "card-a3",
+      ]);
+    });
+
     it("exports image cards with img tags and media badges in SVG export", () => {
       const imgNode: CanvasFileNode = {
         id: "img-1",
