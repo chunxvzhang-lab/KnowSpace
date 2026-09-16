@@ -508,11 +508,97 @@ export function isImageFile(filePathOrUrl?: string): boolean {
   return getMediaFileType(filePathOrUrl) === "image";
 }
 
+/**
+ * Resolves a canvas media reference into a URL the renderer's <img>/<video>/
+ * <audio> elements can actually load.
+ *
+ * Media cards store `assets/<file>` **relative to the .canvas file's folder**
+ * (JSON Canvas convention, keeps boards portable). Feeding that relative path
+ * straight into `<img src>` makes the browser resolve it against the HTML
+ * page's own URL (`.../dist/index.html`), which points nowhere — the card then
+ * renders a broken-image placeholder instead of the picture.
+ *
+ * Resolution rules:
+ * 1. `data:` / `http(s):` / `blob:` / `file:` → returned untouched.
+ * 2. Absolute filesystem path (e.g. `C:\vault\assets\a.png` or `/vault/a.png`)
+ *    → converted to a `file://` URL.
+ * 3. Relative path → joined against the directory of `canvasFilePath`, then
+ *    converted to a `file://` URL.
+ * 4. Relative path with no known canvas file → returned untouched (best
+ *    effort; the image simply cannot be located yet).
+ *
+ * `canvasFilePath` is the absolute path of the `.canvas` document itself.
+ */
+export function resolveMediaSrc(file: string, canvasFilePath?: string): string {
+  if (!file) return "";
+  const value = file.trim();
+  if (!value) return "";
+  if (/^(data:|https?:|blob:|file:)/i.test(value)) return value;
+
+  const isWinAbsolute = /^[a-zA-Z]:[\\/]/.test(value);
+  const isUnixAbsolute = value.startsWith("/") && !value.startsWith("//");
+  const isAbsolute = isWinAbsolute || isUnixAbsolute;
+  if (!isAbsolute && !canvasFilePath) return value;
+
+  const normalized = value.replace(/\\/g, "/");
+  const canvasNorm = (canvasFilePath ?? "").replace(/\\/g, "/");
+
+  let combined: string;
+  if (isAbsolute) {
+    combined = normalized;
+  } else {
+    const dirEnd = canvasNorm.lastIndexOf("/");
+    const dir = dirEnd >= 0 ? canvasNorm.slice(0, dirEnd + 1) : "";
+    combined = `${dir}${normalized.replace(/^\/+/, "")}`;
+  }
+
+  // Build a file:// URL: /C:/vault/assets/a.png → file:///C:/vault/assets/a.png
+  let urlPath = combined.startsWith("/") ? combined : `/${combined}`;
+  try {
+    urlPath = encodeURI(urlPath).replace(/#/g, "%23").replace(/\?/g, "%3F");
+  } catch {
+    // Malformed sequence — keep the raw path, still better than a broken img.
+  }
+  return `file://${urlPath}`;
+}
+
 export interface AABBBox {
   minX: number;
   minY: number;
   maxX: number;
   maxY: number;
+}
+
+/**
+ * Gathers every obstacle the given orthogonal polyline pierces (each expanded
+ * by `margin`) and merges them into one envelope box.
+ *
+ * Bypassing the merged envelope instead of only the first hit matters: with a
+ * chain of adjacent cards, detouring around just the first one still crossed
+ * the rest of the chain.
+ */
+export function collectCollidingEnvelope(
+  points: Array<{ x: number; y: number }>,
+  obstacles: CanvasObstacle[],
+  margin: number
+): AABBBox | null {
+  const boxes: AABBBox[] = [];
+  for (const obs of obstacles) {
+    const box: AABBBox = {
+      minX: obs.x - margin,
+      minY: obs.y - margin,
+      maxX: obs.x + obs.width + margin,
+      maxY: obs.y + obs.height + margin,
+    };
+    if (pathIntersectsBox(points, box)) boxes.push(box);
+  }
+  if (boxes.length === 0) return null;
+  return {
+    minX: Math.min(...boxes.map((b) => b.minX)),
+    minY: Math.min(...boxes.map((b) => b.minY)),
+    maxX: Math.max(...boxes.map((b) => b.maxX)),
+    maxY: Math.max(...boxes.map((b) => b.maxY)),
+  };
 }
 
 export function horizontalSegmentIntersectsBox(x1: number, x2: number, y: number, box: AABBBox): boolean {
@@ -623,24 +709,11 @@ export function computeEdgePath(
           { x: p2.x, y: p2.y },
         ];
 
-        const colliding = obstacles.find((obs) => {
-          const box: AABBBox = {
-            minX: obs.x - MARGIN,
-            minY: obs.y - MARGIN,
-            maxX: obs.x + obs.width + MARGIN,
-            maxY: obs.y + obs.height + MARGIN,
-          };
-          return pathIntersectsBox(defaultPts, box);
-        });
+        // Merge EVERY obstacle the default path pierces into one envelope, so
+        // a chain of adjacent cards is bypassed in a single detour.
+        const box = collectCollidingEnvelope(defaultPts, obstacles, MARGIN);
 
-        if (colliding) {
-          const box: AABBBox = {
-            minX: colliding.x - MARGIN,
-            minY: colliding.y - MARGIN,
-            maxX: colliding.x + colliding.width + MARGIN,
-            maxY: colliding.y + colliding.height + MARGIN,
-          };
-
+        if (box) {
           const routeAbove = Math.abs(p1.y - box.minY) < Math.abs(p1.y - box.maxY);
           const bypassY = routeAbove ? box.minY - MARGIN : box.maxY + MARGIN;
           const seg1X = p1.x < p2.x ? Math.min(p1.x + 24, box.minX - 6) : Math.max(p1.x - 24, box.maxX + 6);
@@ -657,24 +730,10 @@ export function computeEdgePath(
           { x: p2.x, y: p2.y },
         ];
 
-        const colliding = obstacles.find((obs) => {
-          const box: AABBBox = {
-            minX: obs.x - MARGIN,
-            minY: obs.y - MARGIN,
-            maxX: obs.x + obs.width + MARGIN,
-            maxY: obs.y + obs.height + MARGIN,
-          };
-          return pathIntersectsBox(defaultPts, box);
-        });
+        // Same merged-envelope strategy for the vertical orientation.
+        const box = collectCollidingEnvelope(defaultPts, obstacles, MARGIN);
 
-        if (colliding) {
-          const box: AABBBox = {
-            minX: colliding.x - MARGIN,
-            minY: colliding.y - MARGIN,
-            maxX: colliding.x + colliding.width + MARGIN,
-            maxY: colliding.y + colliding.height + MARGIN,
-          };
-
+        if (box) {
           const routeLeft = Math.abs(p1.x - box.minX) < Math.abs(p1.x - box.maxX);
           const bypassX = routeLeft ? box.minX - MARGIN : box.maxX + MARGIN;
           const seg1Y = p1.y < p2.y ? Math.min(p1.y + 24, box.minY - 6) : Math.max(p1.y - 24, box.maxY + 6);
@@ -771,22 +830,8 @@ export function computeEdgeMidpoint(
           { x: midX, y: p2.y },
           { x: p2.x, y: p2.y },
         ];
-        const colliding = obstacles.find((obs) => {
-          const box: AABBBox = {
-            minX: obs.x - MARGIN,
-            minY: obs.y - MARGIN,
-            maxX: obs.x + obs.width + MARGIN,
-            maxY: obs.y + obs.height + MARGIN,
-          };
-          return pathIntersectsBox(defaultPts, box);
-        });
-        if (colliding) {
-          const box: AABBBox = {
-            minX: colliding.x - MARGIN,
-            minY: colliding.y - MARGIN,
-            maxX: colliding.x + colliding.width + MARGIN,
-            maxY: colliding.y + colliding.height + MARGIN,
-          };
+        const box = collectCollidingEnvelope(defaultPts, obstacles, MARGIN);
+        if (box) {
           const routeAbove = Math.abs(p1.y - box.minY) < Math.abs(p1.y - box.maxY);
           const bypassY = routeAbove ? box.minY - MARGIN : box.maxY + MARGIN;
           const seg1X = p1.x < p2.x ? Math.min(p1.x + 24, box.minX - 6) : Math.max(p1.x - 24, box.maxX + 6);
@@ -801,22 +846,8 @@ export function computeEdgeMidpoint(
           { x: p2.x, y: midY },
           { x: p2.x, y: p2.y },
         ];
-        const colliding = obstacles.find((obs) => {
-          const box: AABBBox = {
-            minX: obs.x - MARGIN,
-            minY: obs.y - MARGIN,
-            maxX: obs.x + obs.width + MARGIN,
-            maxY: obs.y + obs.height + MARGIN,
-          };
-          return pathIntersectsBox(defaultPts, box);
-        });
-        if (colliding) {
-          const box: AABBBox = {
-            minX: colliding.x - MARGIN,
-            minY: colliding.y - MARGIN,
-            maxX: colliding.x + colliding.width + MARGIN,
-            maxY: colliding.y + colliding.height + MARGIN,
-          };
+        const box = collectCollidingEnvelope(defaultPts, obstacles, MARGIN);
+        if (box) {
           const routeLeft = Math.abs(p1.x - box.minX) < Math.abs(p1.x - box.maxX);
           const bypassX = routeLeft ? box.minX - MARGIN : box.maxX + MARGIN;
           const seg1Y = p1.y < p2.y ? Math.min(p1.y + 24, box.minY - 6) : Math.max(p1.y - 24, box.maxY + 6);

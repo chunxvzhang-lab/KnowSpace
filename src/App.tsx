@@ -3048,11 +3048,14 @@ export function App() {
     [session, manifest, backlinkIndex, updateSource, openSession]
   );
 
+  const isCanvasActive = Boolean((viewMode === "canvas" || session?.fileName?.toLowerCase().endsWith(".canvas")) && session);
+  const isCanvasFullscreen = isCanvasActive && isFullscreen;
+
   return (
     <div
-      className={`app-shell theme-${preferences.theme} ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}${directoryOpen ? "" : " directory-closed"}${manifest ? "" : " empty-source"}${isFullscreen ? " is-fullscreen" : ""}${isDualSplitMode ? " is-dual-split-mode" : ""}`}
+      className={`app-shell theme-${preferences.theme} ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}${directoryOpen ? "" : " directory-closed"}${manifest ? "" : " empty-source"}${isFullscreen ? " is-fullscreen" : ""}${isCanvasFullscreen ? " is-canvas-fullscreen" : ""}${isDualSplitMode ? " is-dual-split-mode" : ""}`}
     >
-      {!isDualSplitMode && (
+      {!isDualSplitMode && !isCanvasFullscreen && (
         <ActivityBar
           directoryOpen={directoryOpen}
           onToggleDirectory={() => setDirectoryOpen((open) => !open)}
@@ -3077,7 +3080,7 @@ export function App() {
       )}
 
       <div className="main-viewport-container">
-        {!isDualSplitMode && (
+        {!isDualSplitMode && !isCanvasFullscreen && (
           <Toolbar
             title={manifest?.title ?? "Markdown Viewer"}
             chapterTitle={activeChapter?.title ?? "打开 Markdown 文件或目录"}
@@ -3126,7 +3129,7 @@ export function App() {
         )}
 
       <div className="workspace">
-        {!isDualSplitMode && directoryOpen ? (
+        {!isDualSplitMode && !isCanvasFullscreen && directoryOpen ? (
           manifest ? (
             <div style={{ width: directoryWidth, flex: `0 0 ${directoryWidth}px` }} className="chapter-list-container">
               <ChapterList
@@ -3147,7 +3150,7 @@ export function App() {
           )
         ) : null}
 
-        {!isDualSplitMode && directoryOpen && (
+        {!isDualSplitMode && !isCanvasFullscreen && directoryOpen && (
           <div
             className={`layout-resizer ${resizingType === "dir" ? "is-active" : ""}`}
             onMouseDown={handleDirResizeMouseDown}
@@ -3158,7 +3161,7 @@ export function App() {
           />
         )}
 
-        {!isDualSplitMode && sidebarOpen && (manifest || sidebarTab === "space") ? (
+        {!isDualSplitMode && !isCanvasFullscreen && sidebarOpen && (manifest || sidebarTab === "space") ? (
           <>
             <aside className="side-panel" style={{ width: sidebarWidth, flex: `0 0 ${sidebarWidth}px` }}>
               {sidebarTab === "space" ? (
@@ -3283,7 +3286,7 @@ export function App() {
         ) : null}
 
         <section className="reader-frame">
-          {tabs.length > 0 && (
+          {!isCanvasFullscreen && tabs.length > 0 && (
             <TabBar
               tabs={tabs}
               activeTabId={chapterId}
@@ -3377,6 +3380,8 @@ export function App() {
                 isDirty={isDirty}
                 isSaving={isSaving}
                 currentFilePath={session.absolutePath || session.fileName}
+                isFullscreen={isFullscreen}
+                onToggleFullscreen={toggleFullscreen}
               />
             ) : session ? (
               <DocumentWorkspace
@@ -3482,16 +3487,18 @@ export function App() {
         </section>
       </div>
 
-      <StatusBar
-        fileName={session?.fileName}
-        chapterTitle={activeChapter?.title}
-        source={session?.source}
-        isDirty={isDirty}
-        writable={session?.writable}
-        lineEnding={session?.lineEnding}
-        viewMode={viewMode}
-        isLargeDocument={isLargeDocument}
-      />
+      {!isCanvasFullscreen && (
+        <StatusBar
+          fileName={session?.fileName}
+          chapterTitle={activeChapter?.title}
+          source={session?.source}
+          isDirty={isDirty}
+          writable={session?.writable}
+          lineEnding={session?.lineEnding}
+          viewMode={viewMode}
+          isLargeDocument={isLargeDocument}
+        />
+      )}
     </div>
 
       {/* Media Lightbox Modal */}

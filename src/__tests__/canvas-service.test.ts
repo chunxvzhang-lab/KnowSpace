@@ -54,6 +54,7 @@ import {
   getMediaFileType,
   isMediaFile,
   isImageFile,
+  resolveMediaSrc,
   pathIntersectsBox,
   buildPresentationSequence,
 } from "../services/canvasService";
@@ -2107,6 +2108,38 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
       expect(isImageFile("clip.mp4")).toBe(false);
     });
 
+    it("resolves relative media paths against the canvas file folder", () => {
+      const canvasFile = "C:\\vault\\boards\\my.canvas";
+
+      // Relative → file:// URL under the canvas document's own folder.
+      // This is the fix for media cards rendering a broken-image placeholder:
+      // the relative path used to be resolved against the HTML page URL.
+      expect(resolveMediaSrc("assets/pic.png", canvasFile)).toBe(
+        "file:///C:/vault/boards/assets/pic.png"
+      );
+
+      // Absolute filesystem paths convert to file URLs too
+      expect(resolveMediaSrc("C:\\vault\\assets\\a.png", canvasFile)).toBe(
+        "file:///C:/vault/assets/a.png"
+      );
+      expect(resolveMediaSrc("/vault/assets/a.png", canvasFile)).toBe(
+        "file:///vault/assets/a.png"
+      );
+
+      // Self-contained URLs pass through untouched
+      expect(resolveMediaSrc("data:image/png;base64,AAA")).toBe("data:image/png;base64,AAA");
+      expect(resolveMediaSrc("https://example.com/a.png")).toBe("https://example.com/a.png");
+      expect(resolveMediaSrc("blob:https://x/y")).toBe("blob:https://x/y");
+      expect(resolveMediaSrc("file:///already/a.png")).toBe("file:///already/a.png");
+
+      // Without a canvas file path a relative reference cannot be resolved
+      expect(resolveMediaSrc("assets/a.png")).toBe("assets/a.png");
+
+      // Special characters are escaped so the URL stays parseable
+      expect(resolveMediaSrc("assets/a#b.png", canvasFile)).toContain("%23");
+      expect(resolveMediaSrc("assets/a b.png", canvasFile)).toContain("a%20b.png");
+    });
+
     it("detects path intersection with bounding box (AABB)", () => {
       const box = { minX: 100, minY: 100, maxX: 200, maxY: 200 };
       // Horizontal segment piercing through the box
@@ -2173,6 +2206,64 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
       const directMid = computeEdgeMidpoint(p1, "right", p2, "left", "step");
       const bypassedMid = computeEdgeMidpoint(p1, "right", p2, "left", "step", 0, undefined, [obstacle]);
       expect(bypassedMid.y).not.toEqual(directMid.y);
+    });
+
+    it("bypasses a chain of adjacent obstacles in one detour, not just the first", () => {
+      const p1 = { x: 50, y: 150 };
+      const p2 = { x: 850, y: 150 };
+
+      // Two adjacent obstacle cards spanning x: 200-600. The old
+      // first-hit-only detour went around the left card but then cut straight
+      // through the right one.
+      const obstacles = [
+        { id: "o1", x: 200, y: 100, width: 200, height: 100 },
+        { id: "o2", x: 400, y: 100, width: 200, height: 100 },
+      ];
+
+      const path = computeEdgePath(p1, "right", p2, "left", "step", 0, undefined, obstacles);
+
+      // Rebuild the visited point list from the path and assert that NEITHER
+      // obstacle is crossed by any segment.
+      const coords = [...path.matchAll(/L\s+(-?[\d.]+)\s+(-?[\d.]+)/g)].map((m) => ({
+        x: parseFloat(m[1]),
+        y: parseFloat(m[2]),
+      }));
+      const points = [{ x: p1.x, y: p1.y }, ...coords];
+
+      for (const obs of obstacles) {
+        const box = {
+          minX: obs.x,
+          minY: obs.y,
+          maxX: obs.x + obs.width,
+          maxY: obs.y + obs.height,
+        };
+        expect(pathIntersectsBox(points, box)).toBe(false);
+      }
+
+      // The detour must have actually happened: the merged-envelope bypass is
+      // 6 segments (5 "L" hops), vs 3 for the straight-through step line.
+      expect(coords.length).toBeGreaterThanOrEqual(5);
+    });
+
+    it("keeps the label midpoint clear of a chain of obstacles too", () => {
+      const p1 = { x: 50, y: 150 };
+      const p2 = { x: 850, y: 150 };
+      const obstacles = [
+        { id: "o1", x: 200, y: 100, width: 200, height: 100 },
+        { id: "o2", x: 400, y: 100, width: 200, height: 100 },
+      ];
+
+      const mid = computeEdgeMidpoint(p1, "right", p2, "left", "step", 0, undefined, obstacles);
+
+      // The midpoint must not sit inside either obstacle
+      for (const obs of obstacles) {
+        const inside =
+          mid.x > obs.x &&
+          mid.x < obs.x + obs.width &&
+          mid.y > obs.y &&
+          mid.y < obs.y + obs.height;
+        expect(inside).toBe(false);
+      }
     });
 
     it("builds a presentation sequence ordered by topological links and spatial coordinates", () => {

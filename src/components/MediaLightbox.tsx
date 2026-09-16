@@ -2,7 +2,7 @@ import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { downloadSvgAsPng, rasterizeRenderedSvgToPng, triggerDownload } from "../services/svgExport";
 
 export type LightboxMedia = {
-  type: "image" | "mermaid";
+  type: "image" | "mermaid" | "video" | "audio";
   src?: string;
   svgHtml?: string;
   alt?: string;
@@ -215,6 +215,35 @@ export const MediaLightbox = memo(function MediaLightbox({
         >
           {media.type === "image" && media.src ? (
             <img src={media.src} alt={media.alt || ""} draggable={false} className="lightbox-img" />
+          ) : null}
+          {media.type === "video" && media.src ? (
+            <video
+              src={media.src}
+              controls
+              autoPlay
+              draggable={false}
+              style={{ maxWidth: "92vw", maxHeight: "82vh", borderRadius: 8, boxShadow: "0 12px 48px rgba(0,0,0,0.5)" }}
+            />
+          ) : null}
+          {media.type === "audio" && media.src ? (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 18,
+                padding: "40px 60px",
+                borderRadius: 12,
+                background: "rgba(15, 20, 25, 0.92)",
+                border: "1px solid rgba(255,255,255,0.14)",
+              }}
+            >
+              <div style={{ fontSize: 44 }}>🎵</div>
+              <div style={{ color: "#f7f9f9", fontSize: 14, fontWeight: 600 }}>
+                {media.title || media.alt || "音频播放"}
+              </div>
+              <audio src={media.src} controls autoPlay style={{ width: 360 }} />
+            </div>
           ) : null}
           {media.type === "mermaid" && media.svgHtml ? (
             <div

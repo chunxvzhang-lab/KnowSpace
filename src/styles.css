@@ -4147,6 +4147,69 @@ body.is-resizing-col * {
   height: 100vh;
 }
 
+/* ==========================================================================
+   v2.3.1: Canvas Pure Fullscreen System: Whiteboard Area Only
+   ========================================================================== */
+.app-shell.is-canvas-fullscreen {
+  width: 100vw !important;
+  height: 100vh !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+.app-shell.is-canvas-fullscreen .activity-bar,
+.app-shell.is-canvas-fullscreen .toolbar,
+.app-shell.is-canvas-fullscreen .chapter-list-container,
+.app-shell.is-canvas-fullscreen .chapter-list,
+.app-shell.is-canvas-fullscreen .side-panel,
+.app-shell.is-canvas-fullscreen .layout-resizer,
+.app-shell.is-canvas-fullscreen .tab-bar,
+.app-shell.is-canvas-fullscreen .status-bar {
+  display: none !important;
+}
+
+.app-shell.is-canvas-fullscreen .main-viewport-container {
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: 100vw !important;
+  max-height: 100vh !important;
+  flex: 1 1 100% !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.app-shell.is-canvas-fullscreen .workspace {
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: 100vw !important;
+  max-height: 100vh !important;
+  flex: 1 1 100% !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.app-shell.is-canvas-fullscreen .reader-frame {
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: 100vw !important;
+  max-height: 100vh !important;
+  flex: 1 1 100% !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+}
+
+.app-shell.is-canvas-fullscreen .knowspace-canvas-view {
+  width: 100vw !important;
+  height: 100vh !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+}
+
 .app-shell.is-fullscreen .main-viewport-container {
   width: 100%;
   max-width: 100%;
@@ -10964,6 +11027,15 @@ body:has(.flash-capsule-overlay) {
   transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
+.knowspace-canvas-view.presentation-active .canvas-node {
+  will-change: transform, opacity, filter;
+  backface-visibility: hidden;
+}
+
+.canvas-group.group-active-context {
+  transition: opacity 0.4s cubic-bezier(0.2, 0.9, 0.3, 1), border-color 0.25s ease, box-shadow 0.25s ease !important;
+}
+
 .canvas-presentation-bar {
   position: absolute;
   bottom: 28px;
@@ -10975,7 +11047,7 @@ body:has(.flash-capsule-overlay) {
   align-items: center;
   gap: 10px;
   z-index: 1000;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.32), 0 0 0 1px rgba(139, 92, 246, 0.25);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.32), 0 0 0 1px rgba(129, 140, 248, 0.22);
   user-select: none;
   overflow: hidden;
   transition: all 0.2s ease;
@@ -11005,8 +11077,8 @@ body:has(.flash-capsule-overlay) {
 }
 .canvas-presentation-counter-btn:hover,
 .canvas-presentation-counter-btn.active {
-  background: rgba(139, 92, 246, 0.15);
-  color: #8b5cf6 !important;
+  background: rgba(129, 140, 248, 0.15);
+  color: #818cf8 !important;
 }
 
 .canvas-presentation-progress-track {
@@ -11015,7 +11087,7 @@ body:has(.flash-capsule-overlay) {
   right: 16px;
   bottom: 0;
   height: 3px;
-  background: rgba(139, 92, 246, 0.15);
+  background: rgba(129, 140, 248, 0.15);
   border-radius: 2px;
   overflow: hidden;
 }
@@ -11023,7 +11095,7 @@ body:has(.flash-capsule-overlay) {
 .canvas-presentation-progress-bar {
   height: 100%;
   width: 0;
-  background: linear-gradient(90deg, #8b5cf6, #ec4899);
+  background: linear-gradient(90deg, #818cf8, #a78bfa);
   border-radius: 2px;
   animation: presentationProgressBar 3.5s linear infinite;
 }
@@ -11049,7 +11121,7 @@ body:has(.flash-capsule-overlay) {
   background: color-mix(in srgb, var(--surface, #1e293b) 94%, transparent);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid color-mix(in srgb, var(--border, #334155) 70%, #8b5cf6 30%);
+  border: 1px solid color-mix(in srgb, var(--border, #334155) 70%, #818cf8 30%);
   border-radius: 16px;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
   z-index: 1001;
@@ -11121,15 +11193,15 @@ body:has(.flash-capsule-overlay) {
   background: var(--surface-2, rgba(255, 255, 255, 0.06));
 }
 .canvas-slide-drawer-item.active {
-  background: rgba(139, 92, 246, 0.15);
-  border-color: rgba(139, 92, 246, 0.4);
+  background: rgba(129, 140, 248, 0.15);
+  border-color: rgba(129, 140, 248, 0.4);
 }
 
 .canvas-slide-index {
   font-size: 11px;
   font-weight: 700;
   font-family: monospace;
-  color: #8b5cf6;
+  color: #818cf8;
   min-width: 18px;
 }
 
@@ -11165,21 +11237,39 @@ body:has(.flash-capsule-overlay) {
 .canvas-slide-playing-badge {
   font-size: 10px;
   font-weight: 700;
-  color: #8b5cf6;
-  background: rgba(139, 92, 246, 0.2);
+  color: #818cf8;
+  background: rgba(129, 140, 248, 0.2);
   padding: 2px 6px;
   border-radius: 4px;
   white-space: nowrap;
 }
 
 .canvas-node.current-slide {
-  animation: presentationPulse 2.4s ease-in-out infinite alternate;
+  animation: presentationPulse 2.8s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
 }
 @keyframes presentationPulse {
   0% {
-    box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.5), 0 16px 48px rgba(139, 92, 246, 0.35);
+    box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.3),
+                0 0 0 4px rgba(var(--slide-glow-rgb, 129, 140, 248), 0.35),
+                0 10px 28px rgba(var(--slide-glow-rgb, 129, 140, 248), 0.25),
+                0 16px 45px rgba(0, 0, 0, var(--slide-elevation-alpha, 0.45));
   }
   100% {
-    box-shadow: 0 0 0 6px rgba(139, 92, 246, 0.75), 0 20px 56px rgba(139, 92, 246, 0.55);
+    box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.45),
+                0 0 0 6px rgba(var(--slide-glow-rgb, 129, 140, 248), 0.58),
+                0 16px 42px rgba(var(--slide-glow-rgb, 129, 140, 248), 0.42),
+                0 24px 60px rgba(0, 0, 0, var(--slide-elevation-alpha, 0.55));
+  }
+}
+
+.knowspace-canvas-view.theme-eink .canvas-node.current-slide {
+  animation: presentationPulseEink 2.8s ease-in-out infinite alternate;
+}
+@keyframes presentationPulseEink {
+  0% {
+    box-shadow: 0 0 0 3px rgba(30, 41, 59, 0.3), 0 10px 25px rgba(0, 0, 0, 0.15);
+  }
+  100% {
+    box-shadow: 0 0 0 5px rgba(30, 41, 59, 0.45), 0 14px 35px rgba(0, 0, 0, 0.22);
   }
 }

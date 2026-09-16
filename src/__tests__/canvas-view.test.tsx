@@ -1991,6 +1991,52 @@ describe("CanvasView Component", () => {
     expect(card2.classList.contains("current-slide")).toBe(true);
   });
 
+  it("applies depth-of-field blur and dimming to inactive cards and groups while active slide has crisp focus", () => {
+    const data: CanvasData = {
+      nodes: [
+        { id: "grp-1", type: "group", label: "研发组", x: 50, y: 50, width: 400, height: 300 },
+        { id: "node-1", type: "text", text: "第一幕：容器内卡片", x: 80, y: 80, width: 200, height: 100, color: "#10b981" },
+        { id: "node-2", type: "text", text: "第二幕：容器外卡片", x: 550, y: 80, width: 200, height: 100 },
+      ],
+      edges: [
+        { id: "edge-1", fromNode: "node-1", toNode: "node-2", label: "递进" },
+      ],
+    };
+
+    render(
+      <CanvasView
+        title="深度模糊与光晕测试"
+        source={JSON.stringify(data)}
+        onSourceChange={vi.fn()}
+        editable={true}
+        theme="twitter"
+      />
+    );
+
+    // Enter presentation mode
+    const presBtn = screen.getByTitle("进入白板分镜演示模式 (F5)");
+    fireEvent.click(presBtn);
+
+    const card1 = screen.getByText("第一幕：容器内卡片").closest(".canvas-node") as HTMLElement;
+    const card2 = screen.getByText("第二幕：容器外卡片").closest(".canvas-node") as HTMLElement;
+    const group1 = screen.getByText(/研发组/).closest(".canvas-group") as HTMLElement;
+
+    // Slide 1 is active: opacity 1, filter none
+    expect(card1.classList.contains("current-slide")).toBe(true);
+    expect(card1.style.opacity).toBe("1");
+    expect(card1.style.filter).toBe("none");
+
+    // Inactive card2: dimmed to 0.18, blurred with 3.5px
+    expect(card2.classList.contains("current-slide")).toBe(false);
+    expect(card2.style.opacity).toBe("0.18");
+    expect(card2.style.filter).toContain("blur(3.5px)");
+
+    // Parent group containing active slide 1: retains clear context, no blur, opacity 0.88
+    expect(group1.classList.contains("group-active-context")).toBe(true);
+    expect(group1.style.opacity).toBe("0.88");
+    expect(group1.style.filter).toBe("none");
+  });
+
   it("renders multimodal image card with img preview and dedicated header icon", () => {
     const data: CanvasData = {
       nodes: [
@@ -2022,6 +2068,57 @@ describe("CanvasView Component", () => {
     const imgEl = container.querySelector("img[alt='canvas image']");
     expect(imgEl).not.toBeNull();
     expect(imgEl?.getAttribute("src")).toContain("data:image/png;base64");
+  });
+
+  it("renders dedicated fullscreen button on toolbar and handles fullscreen toggling and shortcuts", () => {
+    const onToggleFullscreen = vi.fn();
+    const { rerender } = render(
+      <CanvasView
+        title="白板全屏测试"
+        source=""
+        onSourceChange={vi.fn()}
+        editable={true}
+        theme="twitter"
+        isFullscreen={false}
+        onToggleFullscreen={onToggleFullscreen}
+      />
+    );
+
+    // Initial windowed state: button title is "全屏沉浸白板 (F11)"
+    const fsBtn = screen.getByTitle("全屏沉浸白板 (F11)");
+    expect(fsBtn).toBeDefined();
+
+    // Click to toggle fullscreen
+    fireEvent.click(fsBtn);
+    expect(onToggleFullscreen).toHaveBeenCalledTimes(1);
+
+    // F11 must NOT be handled here: App.tsx owns the global F11 listener, and
+    // a previous dual handler toggled fullscreen twice per keypress, which
+    // made the key look completely dead to users.
+    fireEvent.keyDown(window, { key: "F11" });
+    expect(onToggleFullscreen).toHaveBeenCalledTimes(1);
+
+    // Rerender as isFullscreen={true}
+    rerender(
+      <CanvasView
+        title="白板全屏测试"
+        source=""
+        onSourceChange={vi.fn()}
+        editable={true}
+        theme="twitter"
+        isFullscreen={true}
+        onToggleFullscreen={onToggleFullscreen}
+      />
+    );
+
+    // Button updates to exit title
+    const exitFsBtn = screen.getByTitle("退出全屏 (F11 / Esc)");
+    expect(exitFsBtn).toBeDefined();
+
+    // Press Escape to exit fullscreen (1 click + 1 Esc = 2 total; F11 no
+    // longer counts because App.tsx owns that shortcut now)
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(onToggleFullscreen).toHaveBeenCalledTimes(2);
   });
 });
 
