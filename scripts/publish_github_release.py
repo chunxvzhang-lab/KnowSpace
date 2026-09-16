@@ -35,8 +35,8 @@ def main():
     
     owner = "chunxvzhang-lab"
     repo = "KnowSpace"
-    tag = "v2.3.0"
-    title = "KnowSpace v2.3.0 - 空间白板分镜演播2.3(顺时针闭环/容器优先/上下文复现)与思维导图响应式顶栏"
+    tag = "v2.4.0"
+    title = "KnowSpace v2.4.0 - 交互式排布间距调校(环形半径/网格间距拖拽)与多模态媒体插入、导出链路工业级加固"
     
     # 1. Create and push git tag
     print("1. Ensuring git tag exists and is pushed...")
@@ -75,36 +75,55 @@ def main():
             time.sleep(2)
 
     # 3. Create Release Body
-    body_md = r"""# 🚀 KnowSpace v2.3.0
+    body_md = r"""# 🚀 KnowSpace v2.4.0
 
 **KnowSpace · Personal Knowledge Workspace (现代化个人知识工作台)**  
 > **Write. Read. Connect. Know.（记录 · 阅读 · 连接 · 认知）**
 
-**KnowSpace v2.3.0 正式发布！**
-本次 v2.3.0 带来两大维度深度升级：
-1. **📽️ 空间白板分镜全屏演播 2.3 拓扑引擎（顺时针完整闭环、同一容器优先演播、深入子例程推演与自然归栈、先单卡后成环推演、跨容器上下文感知复现）**
-2. **🧠 思维导图响应式多行折行顶栏（彻底杜绝高缩放与窄窗口下的截断与溢出）**
-3. **🧪 43 个全量测试套件、379 项自动化单元与集成测试 100% 满分通过！**
+**KnowSpace v2.4.0 正式发布！**
+
+本次更新聚焦三件事：**让白板排布真正可调**、**让多模态媒体插入顺手**、**让导出与显示完全一致**，并修掉一批长期存在的稳定性问题。
+
+1. **🎛️ 交互式排布间距调校** —— 环形半径滑块 + 拖拽卡片实时调距；网格行列间距拖拽微调；多选组中心空白区整体平移
+2. **🖼️ 多模态媒体插入与预览** —— 右键一键插入图片/视频/音频、双击全屏预览（视频播放 / 音频播放器）
+3. **🛡️ 导出链路工业级加固** —— 离屏渲染兜底（PNG 请求必定得到 PNG）、原生剪贴板直写、导出配色与屏幕主题 1:1 一致
+4. **🧪 43 个全量测试套件、384 项自动化单元与集成测试 100% 满分通过！**
 
 ---
 
-### ✨ v2.3.0 核心更新亮点
+### ✨ v2.4.0 核心更新亮点
 
-#### 1. 📽️ F5 白板分镜全屏演示模式 2.3 (Presentation Mode 2.3)
-- **同一容器优先演播 (Container-First Ordering)**：按照卡片所在容器归属优先顺序演播，严密保障模块化、分组化的演讲与推演节奏；
-- **深入子例程推演与自然归栈 (Drill-down Subroutine & Return)**：当播放到引出外部卡片的发起点卡片时，依因果拓扑深入演播其指向的目标卡片子树，演播完成后平滑返回原容器的发起点卡片，继续演播原容器的后续卡片；
-- **先单卡后成环推演策略 (Single Cards Before Ring Cycles)**：当发起点卡片同时引出「单独卡片」与「环形结构」时，优先完整演播独立分支链，再演播成环卡片组，避免逻辑认知割裂；
-- **成环卡片组顺时针完整演播 (Clockwise Full Cycle Traversal)**：基于几何重心极角排序与并查集回路识别，顺时针完整演播闭环内所有卡片，并在成环完毕后演播环外延伸分支，保证环形回路 100% 完整呈现；
-- **跨容器上下文感知复现 (Context-Aware Cross-Container Replay)**：被其他容器作为引出目标播放过的卡片，或在首组容器中作为普通卡片播放过的卡片，在进入其自身所属容器后可再次作为完整卡片进行上下文演播，兼顾因果穿透与分组完整性；
-- **电影级平滑聚焦运镜与呼吸高亮**：平滑平移并缩放画板摄像机精准居中呈现，当前演播卡片柔和呼吸发光，非演播卡片弱化遮罩。
+#### 1. 🎛️ 交互式排布间距调校 (Interactive Layout Spacing)
+- **环形半径调整**：对齐菜单内的半径滑块，或**直接拖动环上任意卡片**，其余卡片围绕被拖动卡片实时重排，间距所见即所得；
+- **网格间距拖拽**：拖动网格内任意卡片即可实时改变行列间距；
+- **防重叠保护**：环半径具备基于卡片对角线自动计算的下限，拖到底也不会塌成一堆；
+- **整体平移**：多选后拖动**选中组中间的空白区域**可整体平移，间距保持不变，且不会误拖画布背景；
+- **单条历史**：整段手势只记录一条撤销，不会刷爆历史栈。
 
-#### 2. 🧠 思维导图响应式多行顶栏 (Responsive Mindmap Toolbar)
-- **自适应换行排版 (Responsive Wrapped Toolbar)**：顶栏按钮组自适应换行排版，在较小窗口或高系统缩放比例下不挤压、不溢出截断；
-- **单行工整排版保护**：各个按钮文字与图标施加不换行保护与标准边距；
-- **双端无损同步体系**：`syncMindmapToDocument` 增量标题同步 100% 完整保全代码块、公式与表格。
+#### 2. 🖼️ 多模态媒体插入与全屏预览 (Multimodal Media Insertion)
+- **右键一键插入**图片 / 视频 / 音频，文件对话框已按类型预过滤，卡片**落在右键点击位置**；
+- **双击媒体卡片全屏预览**：图片缩放平移、视频自动播放、音频播放器；`✕` 或 `Esc` 关闭；
+- **修复图片卡片破图**：媒体路径改为按画布文件目录解析，不再被当作相对 HTML 页面路径。
 
-#### 3. 🧪 工业级高可靠性与测试保障
-- **43 个测试套件，379 项单元与集成测试 100% 全绿通过**，覆盖思维导图、无限白板演播拓扑、AABB 避障连线、版本快照与全库混合检索。
+#### 3. 🛡️ 导出与剪贴板彻底修复 (Export Pipeline Hardening)
+- **离屏渲染兜底**：渲染进程 canvas 栅格化被浏览器安全策略否决时，自动改用主进程离屏 `capturePage()` 渲染，**PNG 请求必定得到 PNG**，不再静默降级为 SVG；
+- **剪贴板改走系统原生 API**：`navigator.clipboard` 需要窗口聚焦与用户手势，在 Electron 中极易失效，现直接调用原生剪贴板；
+- **导出配色与屏幕主题 1:1 一致**：浅色 / 墨屏 / 暗黑三套主题的导出背景与点阵此前与屏幕不符，现已统一配色来源；
+- **SVG 导出 XML 合法化**：修复未自闭合标签与无值布尔属性，保存的 `.svg` 可在浏览器 / Illustrator 正常打开；
+- **尺寸钳制**：单边 ≤16384px、总量 ≤24MP，大画布不会因内存峰值崩溃。
+
+#### 4. 🎨 12 色专业调色板与自定义取色 (Extended Palette)
+- 调色盘由 6 色扩展至 **12 色**（键 1-6 保持 JSON Canvas 标准色以确保互通，7-12 为扩展色）；
+- 批量卡片 / 批量连线新增**自定义 HEX 取色器**，拖动实时预览、停手提交单条历史；
+- **修复拖动取色时闪退**（原生对话框高频 onChange 引发的历史栈与内存风暴）。
+
+#### 5. 🔗 绕障寻路与图层优化 (Routing & Layers)
+- **多障碍链式绕行**：所有被路径穿透的障碍合并为单一包络，一串相邻卡片一次绕开，不再只绕第一个；
+- **连线图层下沉**：连线始终位于卡片之下，线条永不遮挡卡片文字。
+
+#### 6. 🧩 侧边栏自适应 (Adaptive Sidebar)
+- 修复**全屏 / 矮窗口下底部按钮消失**：侧边栏改为可滚动，并按窗口高度三级收紧（隐藏 Logo、缩小按钮）；
+- Tooltip 改用 portal 渲染，不被滚动容器裁切。
 
 ---
 
@@ -112,9 +131,9 @@ def main():
 
 | 资产文件 | 类型 | 适用场景 |
 | :--- | :--- | :--- |
-| [`KnowSpace-Setup-2.3.0.exe`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.3.0/KnowSpace-Setup-2.3.0.exe) | **Windows 向导安装程序（推荐）** | 桌面快捷方式、开始菜单图标、`.md` / `.canvas` 文件关联 |
-| [`KnowSpace-2.3.0.msi`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.3.0/KnowSpace-2.3.0.msi) | **Windows MSI 标准安装包** | 企业 IT 批量分发、组策略静默安装 |
-| [`KnowSpace-win-x64-portable.zip`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.3.0/KnowSpace-win-x64-portable.zip) | **Windows 免安装绿色便携版** | 解压即用，支持放入 U 盘，随身携带 |
+| [`KnowSpace-Setup-2.4.0.exe`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.4.0/KnowSpace-Setup-2.4.0.exe) | **Windows 向导安装程序（推荐）** | 桌面快捷方式、开始菜单图标、`.md` / `.canvas` 文件关联 |
+| [`KnowSpace-2.4.0.msi`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.4.0/KnowSpace-2.4.0.msi) | **Windows MSI 标准安装包** | 企业 IT 批量分发、组策略静默安装 |
+| [`KnowSpace-win-x64-portable.zip`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.4.0/KnowSpace-win-x64-portable.zip) | **Windows 免安装绿色便携版** | 解压即用，支持放入 U 盘，随身携带 |
 
 ---
 
@@ -165,19 +184,19 @@ def main():
 
     # 4. Upload Assets
     release_dir = r"C:\Users\chunxvzhang\Desktop\codex\release"
-    msi_path = os.path.join(release_dir, "KnowSpace-2.3.0.msi")
-    setup_exe_path = os.path.join(release_dir, "KnowSpace-Setup-2.3.0.exe")
+    msi_path = os.path.join(release_dir, "KnowSpace-2.4.0.msi")
+    setup_exe_path = os.path.join(release_dir, "KnowSpace-Setup-2.4.0.exe")
     portable_zip_path = os.path.join(release_dir, "KnowSpace-win-x64-portable.zip")
 
     assets_to_upload = [
         (
             setup_exe_path,
-            "KnowSpace-Setup-2.3.0.exe",
+            "KnowSpace-Setup-2.4.0.exe",
             "application/x-msdownload"
         ),
         (
             msi_path,
-            "KnowSpace-2.3.0.msi",
+            "KnowSpace-2.4.0.msi",
             "application/x-msi"
         ),
         (
