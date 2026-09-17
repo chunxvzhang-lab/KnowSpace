@@ -243,7 +243,32 @@ export const MindmapView = memo(function MindmapView({
   const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set([tree.id]));
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState<string>("");
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; nodeId: string } | null>(null);
+  /**
+   * The open context menu, and what it is about.
+   *
+   * `isCanvas` marks a menu opened on empty canvas. The canvas menu is a
+   * different menu rather than the node menu without a subject: it creates,
+   * pastes and folds the whole map, none of which need a node.
+   *
+   * A flag rather than a nullable `nodeId`, because the node menu reads
+   * `nodeId` as a plain string in a dozen places. Making it nullable would have
+   * forced a narrowing guard into every one of them to describe a state none of
+   * them can be in.
+   */
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    nodeId: string;
+    isCanvas?: boolean;
+  } | null>(null);
+
+  /** Marquee selection, in canvas coordinates, while dragging on empty space. */
+  const [marquee, setMarquee] = useState<{
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+  } | null>(null);
   const [menuPos, setMenuPos] = useState<{ left: number; top: number }>({ left: 0, top: 0 });
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement | null>(null);
@@ -588,6 +613,142 @@ export const MindmapView = memo(function MindmapView({
     setSelectedNodeIds(new Set([result.newNodeId]));
   }, [applyTreeChange, selectedNodeIds, tree]);
 
+  /**
+   * Whether an event landed on bare canvas.
+   *
+   * The svg receives everything, including events from the nodes inside it, so
+   * every canvas-level gesture has to ask this first. Without it a double-click
+   * on a node would both edit that node and create a new one.
+   */
+  const isBlankCanvasTarget = useCallback((target: EventTarget | null): boolean => {
+    const element = target as HTMLElement | SVGElement | null;
+    if (!element || typeof element.closest !== "function") return true;
+    return !(
+      element.closest(".mindmap-node-interactive") ||
+      element.closest(".mindmap-toolbar") ||
+      element.closest(".mindmap-inline-edit-input") ||
+      element.closest(".mindmap-context-menu")
+    );
+  }, []);
+
+  /**
+   * Reaches startEditing, which is declared further down.
+   *
+   * A ref rather than a direct call because the two are in the other order, and
+   * moving either would drag a sixty-line block with it. The same indirection
+   * App uses for selectChapter. Assigned in an effect once startEditing exists.
+   */
+  const startEditingRef = useRef<(nodeId?: string) => void>(() => {});
+
+  /** Double-clicking empty canvas adds a branch under the root, ready to name. */
+  const handleCanvasDoubleClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (!editable || !isBlankCanvasTarget(e.target)) return;
+      e.preventDefault();
+
+      const { nextTree, newNodeId } = addChildNode(tree, tree.id, "新建子主题");
+      applyTreeChange(nextTree);
+      setSelectedNodeIds(new Set([newNodeId]));
+      startEditingRef.current(newNodeId);
+    },
+    [applyTreeChange, editable, isBlankCanvasTarget, tree]
+  );
+
+  /**
+   * Right-clicking empty canvas opens the canvas menu.
+   *
+   * Reported with a null nodeId rather than the root's, because the canvas menu
+   * offers actions with no subject — paste, expand all, fit to screen — and
+   * quietly addressing the root would put "delete" one mis-click away from a
+   * gesture aimed at nothing.
+   */
+  const handleCanvasContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      if (!isBlankCanvasTarget(e.target)) return;
+      e.preventDefault();
+
+      const containerRect = containerRef.current?.getBoundingClientRect();
+      setContextMenu({
+        x: containerRect ? e.clientX - containerRect.left : e.clientX,
+        y: containerRect ? e.clientY - containerRect.top : e.clientY,
+        nodeId: tree.id,
+        isCanvas: true,
+      });
+    },
+    [isBlankCanvasTarget]
+  );
+
+  /** Marquee selection: press on empty canvas, drag a box, release to select. */
+  const marqueeStartRef = useRef<{ x: number; y: number } | null>(null);
+  const marqueeRectRef = useRef<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+  const isMarqueeSelecting = marquee !== null;
+
+  const handleCanvasMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      // Left button only, and only on bare canvas: the pan drag starts on the
+      // same surface, so anything looser would fight it.
+      if (e.button !== 0 || !isBlankCanvasTarget(e.target)) return;
+      const containerRect = containerRef.current?.getBoundingClientRect();
+      if (!containerRect) return;
+
+      const x = (e.clientX - containerRect.left - transform.x) / transform.scale;
+      const y = (e.clientY - containerRect.top - transform.y) / transform.scale;
+      marqueeStartRef.current = { x, y };
+      marqueeRectRef.current = { x1: x, y1: y, x2: x, y2: y };
+      setMarquee(marqueeRectRef.current);
+    },
+    [isBlankCanvasTarget, transform.scale, transform.x, transform.y]
+  );
+
+  useEffect(() => {
+    if (!isMarqueeSelecting) return;
+
+    const handleMove = (e: MouseEvent) => {
+      const start = marqueeStartRef.current;
+      const containerRect = containerRef.current?.getBoundingClientRect();
+      if (!start || !containerRect) return;
+
+      const rect = {
+        x1: start.x,
+        y1: start.y,
+        x2: (e.clientX - containerRect.left - transform.x) / transform.scale,
+        y2: (e.clientY - containerRect.top - transform.y) / transform.scale,
+      };
+      marqueeRectRef.current = rect;
+      setMarquee(rect);
+    };
+
+    const handleUp = () => {
+      const rect = marqueeRectRef.current;
+      if (rect && layout) {
+        const left = Math.min(rect.x1, rect.x2);
+        const right = Math.max(rect.x1, rect.x2);
+        const top = Math.min(rect.y1, rect.y2);
+        const bottom = Math.max(rect.y1, rect.y2);
+
+        // Intersection, not containment: requiring a node to be fully inside
+        // means a box drawn across a row of branches selects nothing, which is
+        // the opposite of what drawing it feels like.
+        const hit = layout.nodes
+          .filter(
+            (n) => n.x < right && n.x + n.width > left && n.y < bottom && n.y + n.height > top
+          )
+          .map((n) => n.id);
+        if (hit.length) setSelectedNodeIds(new Set(hit));
+      }
+      marqueeStartRef.current = null;
+      marqueeRectRef.current = null;
+      setMarquee(null);
+    };
+
+    window.addEventListener("mousemove", handleMove);
+    window.addEventListener("mouseup", handleUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMove);
+      window.removeEventListener("mouseup", handleUp);
+    };
+  }, [isMarqueeSelecting, layout, transform.scale, transform.x, transform.y]);
+
   const handleUndo = useCallback(() => {
     if (undoStackRef.current.length === 0) return;
     const prev = undoStackRef.current.pop()!;
@@ -688,6 +849,11 @@ export const MindmapView = memo(function MindmapView({
     },
     [editable, primarySelectedId, tree]
   );
+
+  // Keeps the indirection above pointing at the current startEditing. Assigning
+  // during render is safe here because nothing reads it until the next
+  // interaction, which is always after this line has run.
+  startEditingRef.current = startEditing;
 
   const handleCommitEdit = useCallback(() => {
     if (!editingNodeId) return;
@@ -1716,6 +1882,11 @@ export const MindmapView = memo(function MindmapView({
         className="mindmap-svg-canvas"
         width="100%"
         height="100%"
+        // Canvas-level gestures. Each one asks isBlankCanvasTarget first, so
+        // a click on a node does not also count as a click on the canvas.
+        onMouseDown={handleCanvasMouseDown}
+        onDoubleClick={handleCanvasDoubleClick}
+        onContextMenu={handleCanvasContextMenu}
       >
         <defs>
           <filter id="node-glow" x="-20%" y="-20%" width="140%" height="140%">
@@ -1723,6 +1894,24 @@ export const MindmapView = memo(function MindmapView({
             <feComposite in="SourceGraphic" in2="blur" operator="over" />
           </filter>
         </defs>
+
+        {/* Marquee box. Inside the viewport group so its coordinates are the
+            same canvas coordinates the nodes are laid out in — drawing it
+            outside would mean converting by hand on every frame. */}
+        {marquee && (
+          <rect
+            className="mindmap-marquee"
+            x={Math.min(marquee.x1, marquee.x2)}
+            y={Math.min(marquee.y1, marquee.y2)}
+            width={Math.abs(marquee.x2 - marquee.x1)}
+            height={Math.abs(marquee.y2 - marquee.y1)}
+            fill="rgba(56, 189, 248, 0.12)"
+            stroke="#38bdf8"
+            strokeWidth={1.5}
+            strokeDasharray="4 3"
+            pointerEvents="none"
+          />
+        )}
 
         <g
           className="mindmap-viewport"
@@ -2228,8 +2417,98 @@ export const MindmapView = memo(function MindmapView({
         />
       )}
 
+      {/* Canvas menu, for a right-click on empty space.
+          A separate menu rather than the node one with a missing subject:
+          these are the whole-map actions, and none of them need a node. */}
+      {contextMenu?.isCanvas && (
+        <div
+          ref={menuRef}
+          className="mindmap-context-menu mindmap-canvas-menu"
+          style={{ left: menuPos.left, top: menuPos.top }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="mindmap-ctx-header">
+            <span className="mindmap-ctx-title">
+              <ListTree size={13} className="text-cyan" />
+              画布
+            </span>
+            <button
+              type="button"
+              className="mindmap-ctx-close"
+              onClick={() => setContextMenu(null)}
+              title="关闭"
+            >
+              <X size={13} />
+            </button>
+          </div>
+
+          <button
+            type="button"
+            className="mindmap-ctx-item"
+            onClick={() => {
+              setContextMenu(null);
+              handleAddChild(tree.id);
+            }}
+          >
+            <PlusCircle size={13} />
+            <span>新建主题</span>
+          </button>
+
+          <button
+            type="button"
+            className="mindmap-ctx-item"
+            onClick={() => {
+              setContextMenu(null);
+              handlePasteNode();
+            }}
+            disabled={!clipboardRef.current}
+          >
+            <CornerDownRight size={13} />
+            <span>粘贴</span>
+          </button>
+
+          <div className="mindmap-ctx-divider" />
+
+          <button
+            type="button"
+            className="mindmap-ctx-item"
+            onClick={() => {
+              setContextMenu(null);
+              handleExpandAll();
+            }}
+          >
+            <UnfoldVertical size={13} />
+            <span>全部展开</span>
+          </button>
+
+          <button
+            type="button"
+            className="mindmap-ctx-item"
+            onClick={() => {
+              setContextMenu(null);
+              handleCollapseToLevel2();
+            }}
+          >
+            <FoldVertical size={13} />
+            <span>折叠至 2 级</span>
+          </button>
+
+          <button
+            type="button"
+            className="mindmap-ctx-item"
+            onClick={() => {
+              setContextMenu(null);
+              handleFitToScreen();
+            }}
+          >
+            <Maximize2 size={13} />
+            <span>适应画布</span>
+          </button>
+        </div>
+      )}
+
       {/* Right Click Appearance & Typography Customization Context Menu */}
-      {contextMenu && (
+      {contextMenu && !contextMenu.isCanvas && (
         <div
           ref={menuRef}
           className="mindmap-context-menu"
