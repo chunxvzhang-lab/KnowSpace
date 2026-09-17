@@ -42,12 +42,13 @@ import { useVaultOpening } from "./hooks/useVaultOpening";
 import { useSearch } from "./hooks/useSearch";
 import { useBacklinkIndex } from "./hooks/useBacklinkIndex";
 import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
+import { useBookmarks } from "./hooks/useBookmarks";
 import { useDocumentSession } from "./hooks/useDocumentSession";
 import { useReadingTracker } from "./hooks/useReadingTracker";
-import { createBookmark, resolveBookmark } from "./services/bookmarks";
+import { resolveBookmark } from "./services/bookmarks";
 import { loadChapterMarkdown } from "./services/bookSource";
 import { renderMermaid, type MermaidTheme } from "./services/mermaid";
-import { extractExcerpt, extractHeadingsFromSource, renderMarkdown } from "./services/markdown";
+import { extractHeadingsFromSource, renderMarkdown } from "./services/markdown";
 
 import {
   loadPreferences,
@@ -263,15 +264,8 @@ export function App() {
     if (chapterId) rememberVisitedDoc(chapterId);
   }, [chapterId, rememberVisitedDoc]);
 
-  const bookmarkedHeadingIds = useMemo(() => {
-    const ids = new Set<string>();
-    for (const bookmark of bookmarks) {
-      if (bookmark.chapterId === chapterId && bookmark.headingId) {
-        ids.add(bookmark.headingId);
-      }
-    }
-    return ids;
-  }, [bookmarks, chapterId]);
+  // bookmarkedHeadingIds lives in useBookmarks with the rest of the bookmark
+  // logic; see the call below.
 
   // Bookmark writes moved into the store with the bookmark list. Keeping the
   // replacement and the disk write in one action is what stops them drifting
@@ -716,42 +710,22 @@ export function App() {
     [manifest, openSession]
   );
 
-  const jumpBookmark = useCallback(
-    (bookmark: Bookmark) => {
-      if (bookmark.chapterId !== chapterId) {
-        pendingBookmarkRef.current = bookmark;
-        selectChapter(bookmark.chapterId);
-        return;
-      }
-      pendingBookmarkRef.current = null;
-      if (!renderedChapter) return;
-      const resolution = resolveBookmark(bookmark, renderedChapter.headings, renderedChapter.checksum);
-      if (resolution.message) setNotice(resolution.message);
-      if (resolution.targetHeadingId) {
-        jumpToHeading(resolution.targetHeadingId, "smooth", true);
-      } else {
-        jumpToRatio(resolution.scrollRatio);
-      }
-    },
-    [renderedChapter, chapterId, jumpToHeading, jumpToRatio, selectChapter],
-  );
-
-  const addBookmark = useCallback(() => {
-    if (!manifest || !renderedChapter || !chapterId || !readerRef.current) return;
-    const bookmark = createBookmark({
-      bookId: manifest.id,
-      chapterId,
-      chapterSrc: activeChapter?.src,
-      activeHeading,
-      scrollRatio: scrollRatioRef.current,
-      excerpt: extractExcerpt(readerRef.current, activeHeading?.id),
-      chapterChecksum: renderedChapter.checksum,
-    });
-    persistBookmarks([bookmark, ...bookmarks]);
-    setSidebarOpen(true);
-    setSidebarTab("toc");
-    setNotice("书签已保存。");
-  }, [activeChapter?.src, activeHeading, bookmarks, chapterId, manifest, persistBookmarks, renderedChapter]);
+  // ── Bookmarks (R1 batch B3b-7) ────────────────────────────────────────────
+  //
+  // The two names the JSX and the outline need come back out. pendingBookmarkRef
+  // travels in because a bookmark pointing at another chapter cannot be resolved
+  // until that chapter loads, and the reading-position restore below picks it up.
+  const { bookmarkedHeadingIds, jumpBookmark, addBookmark } = useBookmarks({
+    renderedChapter,
+    activeChapter,
+    activeHeading,
+    selectChapter,
+    jumpToHeading,
+    jumpToRatio,
+    readerRef,
+    scrollRatioRef,
+    pendingBookmarkRef,
+  });
 
   const focusSearch = useCallback(() => {
     setSidebarOpen(true);
