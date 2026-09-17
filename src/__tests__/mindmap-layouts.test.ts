@@ -1,15 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import {
-  layoutMindmap,
-  parseMarkdownToMindmapTree,
-  updateNodeStyle,
-  type MindmapLayoutResult,
-} from "../services/mindmapService";
+import { parseMarkdownToMindmapTree, updateNodeStyle } from "../services/mindmapService";
 import {
   DEFAULT_LAYOUT_ID,
   MINDMAP_LAYOUT_LIST,
+  layoutMindmap,
   resolveLayoutId,
-} from "../core/mindmapLayouts";
+  type MindmapLayoutResult,
+} from "../services/mindmapLayout";
 import { loadMindmapLayout, saveMindmapLayout } from "../services/storage";
 import type { MindmapNode } from "../core/types";
 

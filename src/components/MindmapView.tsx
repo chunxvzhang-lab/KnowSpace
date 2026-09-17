@@ -17,7 +17,6 @@ import {
 import type { Heading, ThemeMode, MindmapNodeShape, MindmapLineStyle, MindmapTextAlign } from "../core/types";
 import {
   buildMindmapTree,
-  layoutMindmap,
   parseMarkdownToMindmapTree,
   mindmapTreeToMarkdown,
   syncMindmapToDocument,
@@ -39,7 +38,6 @@ import {
   exportMindmapToOpml,
   exportMindmapToFreeMind,
   exportMindmapToMarkdownOutline,
-  type MindmapLayoutNode,
 } from "../services/mindmapService";
 import type { MindmapNode } from "../core/types";
 import {
@@ -60,7 +58,12 @@ import {
   resolveThemeId,
   type MindmapTheme,
 } from "../core/mindmapThemes";
-import { DEFAULT_LAYOUT_ID, resolveLayoutId } from "../core/mindmapLayouts";
+import {
+  DEFAULT_LAYOUT_ID,
+  layoutMindmap,
+  resolveLayoutId,
+  type MindmapLayoutNode,
+} from "../services/mindmapLayout";
 
 export type MindmapViewProps = {
   title: string;

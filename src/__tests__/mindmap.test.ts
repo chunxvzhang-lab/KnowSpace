@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Heading } from "../core/types";
-import { buildMindmapTree, layoutMindmap, parseMarkdownToMindmapTree, mindmapTreeToMarkdown, addChildNode, addSiblingNode, deleteNode, updateNodeText, updateNodeStyle, updateNodesStyle, parseStyleComment, syncMindmapToDocument } from "../services/mindmapService";
+import { buildMindmapTree, parseMarkdownToMindmapTree, mindmapTreeToMarkdown, addChildNode, addSiblingNode, deleteNode, updateNodeText, updateNodeStyle, updateNodesStyle, parseStyleComment, syncMindmapToDocument } from "../services/mindmapService";
+import { layoutMindmap } from "../services/mindmapLayout";
 
 describe("mindmapService", () => {
   it("builds multi-way tree from linear headings correctly", () => {

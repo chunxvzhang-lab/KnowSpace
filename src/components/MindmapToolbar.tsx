@@ -15,7 +15,7 @@ import { MindmapExportMenu } from "./MindmapExportMenu";
 import { MindmapSearchGroup, type MindmapSearchGroupProps } from "./MindmapSearchGroup";
 import { MindmapZoomGroup } from "./MindmapZoomGroup";
 import { MINDMAP_THEME_LIST } from "../core/mindmapThemes";
-import { MINDMAP_LAYOUT_LIST } from "../core/mindmapLayouts";
+import { MINDMAP_LAYOUT_LIST } from "../services/mindmapLayout";
 
 /**
  * The floating control bar above the canvas.
