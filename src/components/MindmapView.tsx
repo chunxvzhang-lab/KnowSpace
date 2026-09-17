@@ -55,6 +55,7 @@ import {
 } from "../services/mindmapService";
 import type { MindmapNode } from "../core/types";
 import { loadMindmapCollapsed, saveMindmapCollapsed } from "../services/storage";
+import { MindmapCanvasMenu } from "./MindmapCanvasMenu";
 
 export type MindmapViewProps = {
   title: string;
@@ -2417,94 +2418,35 @@ export const MindmapView = memo(function MindmapView({
         />
       )}
 
-      {/* Canvas menu, for a right-click on empty space.
-          A separate menu rather than the node one with a missing subject:
-          these are the whole-map actions, and none of them need a node. */}
+      {/* Canvas menu, for a right-click on empty space. */}
       {contextMenu?.isCanvas && (
-        <div
-          ref={menuRef}
-          className="mindmap-context-menu mindmap-canvas-menu"
-          style={{ left: menuPos.left, top: menuPos.top }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="mindmap-ctx-header">
-            <span className="mindmap-ctx-title">
-              <ListTree size={13} className="text-cyan" />
-              画布
-            </span>
-            <button
-              type="button"
-              className="mindmap-ctx-close"
-              onClick={() => setContextMenu(null)}
-              title="关闭"
-            >
-              <X size={13} />
-            </button>
-          </div>
-
-          <button
-            type="button"
-            className="mindmap-ctx-item"
-            onClick={() => {
-              setContextMenu(null);
-              handleAddChild(tree.id);
-            }}
-          >
-            <PlusCircle size={13} />
-            <span>新建主题</span>
-          </button>
-
-          <button
-            type="button"
-            className="mindmap-ctx-item"
-            onClick={() => {
-              setContextMenu(null);
-              handlePasteNode();
-            }}
-            disabled={!clipboardRef.current}
-          >
-            <CornerDownRight size={13} />
-            <span>粘贴</span>
-          </button>
-
-          <div className="mindmap-ctx-divider" />
-
-          <button
-            type="button"
-            className="mindmap-ctx-item"
-            onClick={() => {
-              setContextMenu(null);
-              handleExpandAll();
-            }}
-          >
-            <UnfoldVertical size={13} />
-            <span>全部展开</span>
-          </button>
-
-          <button
-            type="button"
-            className="mindmap-ctx-item"
-            onClick={() => {
-              setContextMenu(null);
-              handleCollapseToLevel2();
-            }}
-          >
-            <FoldVertical size={13} />
-            <span>折叠至 2 级</span>
-          </button>
-
-          <button
-            type="button"
-            className="mindmap-ctx-item"
-            onClick={() => {
-              setContextMenu(null);
-              handleFitToScreen();
-            }}
-          >
-            <Maximize2 size={13} />
-            <span>适应画布</span>
-          </button>
-        </div>
+        <MindmapCanvasMenu
+          left={menuPos.left}
+          top={menuPos.top}
+          menuRef={menuRef}
+          canPaste={Boolean(clipboardRef.current)}
+          onClose={() => setContextMenu(null)}
+          onNewTopic={() => {
+            setContextMenu(null);
+            handleAddChild(tree.id);
+          }}
+          onPaste={() => {
+            setContextMenu(null);
+            handlePasteNode();
+          }}
+          onExpandAll={() => {
+            setContextMenu(null);
+            handleExpandAll();
+          }}
+          onCollapseToLevel2={() => {
+            setContextMenu(null);
+            handleCollapseToLevel2();
+          }}
+          onFitToScreen={() => {
+            setContextMenu(null);
+            handleFitToScreen();
+          }}
+        />
       )}
 
       {/* Right Click Appearance & Typography Customization Context Menu */}
