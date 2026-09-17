@@ -1,4 +1,5 @@
 import type { RefObject } from "react";
+import type { MindmapTextAlign } from "../core/types";
 
 /**
  * The textarea that edits a node in place.
@@ -25,7 +26,12 @@ export type MindmapInlineEditorProps = {
     height: number;
     fontSize?: number;
     fontWeight?: "normal" | "bold";
-    textAlign?: string;
+    /**
+     * Typed as the model's own union rather than `string`: the callers hand over
+     * a layout node, and a plain string here is what let a mismatch through —
+     * the value is written straight into a CSS property whose type is narrower.
+     */
+    textAlign?: MindmapTextAlign;
   };
   /** The canvas pan and zoom, so the editor sits exactly over its node. */
   transform: { x: number; y: number; scale: number };
