@@ -2,7 +2,7 @@
 
 > **文档性质**：重构安全网的权威口径（release plan R3 交付物）
 > **生成时间**：2026-09-17
-> **应用版本**：`2.4.0`
+> **应用版本**：`2.5.0`
 > **生成方式**：`node scripts/capture-test-baseline.cjs`（自动生成，请勿手工编辑）
 
 ---
@@ -11,9 +11,9 @@
 
 | 项目 | 数值 |
 | :--- | ---: |
-| 测试文件 | **54** |
-| 用例总数 | **614** |
-| 通过 | 614 |
+| 测试文件 | **55** |
+| 用例总数 | **619** |
+| 通过 | 619 |
 | 失败 | 0 |
 | 跳过 | 0 |
 | 通过率 | 100.0% |
@@ -55,6 +55,7 @@
 | `src/__tests__/space-timeline.test.ts` | 6 | ✅ |
 | `src/__tests__/sync-selection.test.ts` | 6 | ✅ |
 | `src/__tests__/blocklink.test.ts` | 5 | ✅ |
+| `src/__tests__/global-shortcuts-hook.test.ts` | 5 | ✅ |
 | `src/__tests__/media-lightbox.test.tsx` | 5 | ✅ |
 | `src/__tests__/mindmap-alignment.test.tsx` | 5 | ✅ |
 | `src/__tests__/mindmap-reparent.test.ts` | 5 | ✅ |
@@ -91,7 +92,7 @@
 | 文件 | 当前行数 | 目标 |
 | :--- | ---: | :--- |
 | `src/components/CanvasView.tsx` | 6416 | R2 待拆分: 目标各模块 < 2500 行 |
-| `src/App.tsx` | 2383 | R1: < 500 行 |
+| `src/App.tsx` | 2145 | R1: < 500 行 |
 | `src/services/canvasGraph.ts` | 1152 | R2 已拆分 ✅ |
 | `src/services/canvasExport.ts` | 1081 | R2 已拆分 ✅ |
 | `src/services/canvasGeometry.ts` | 1027 | R2 已拆分 ✅ |
@@ -106,7 +107,7 @@
 
 任何重构都必须满足：
 
-1. 用例总数 **不低于 614**（删除测试需在 PR 说明中论证）
+1. 用例总数 **不低于 619**（删除测试需在 PR 说明中论证）
 2. 通过率 **100%**
 3. 单文件用例数**不得下降**（防止测试被静默删除）
 
