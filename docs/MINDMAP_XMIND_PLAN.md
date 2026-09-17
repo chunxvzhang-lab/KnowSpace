@@ -338,12 +338,20 @@ theme?: ThemeMode;
 | :--- | ---: |
 | `src/components/MindmapView.tsx` | 2539（抽出工具栏前为 2742） |
 | `src/components/MindmapToolbar.tsx` | 396 |
-| `src/services/mindmapService.ts` | 1821（四个布局都在这里） |
-| `src/core/mindmapLayouts.ts` | 62 |
+| `src/services/mindmapLayout.ts` | 718（布局引擎，本次迁出） |
+| `src/services/mindmapService.ts` | 1180（迁移前为 1821） |
 
 **工具栏抽出只削掉了约 200 行净额**，因为同一批又补进了布局状态与折叠按钮的落点计算。**节点右键菜单（约 300 行）仍未抽出** —— 「文件已大到不该继续加」这个理由**依然成立**。
 
-**service 已到 1821 行**：若再进一个径向布局，**布局函数应当先迁到独立模块**，否则这个文件会变成第二个巨石。
+### 布局引擎已迁出（原记录里的先决条件）
+
+坐标、连线、度量、节点装配与三个布局都在 `services/mindmapLayout.ts`；`core/mindmapLayouts.ts` 的 **id 表并入其中**。
+
+**为什么合并**：表、标签与分发是同一份清单的三种视图。分在两个文件里的典型错误是「加进了选择器、忘了加分发」—— 而 `default` 分支会把它**悄悄画成默认布局**，**不会有任何测试失败**。
+
+**依赖只有一个方向**：布局模块读 service 的 `calculateNodeDimensions` 与调色板，service 不知道它存在。
+
+**迁移方式**：`scripts/extract-mindmap-layout.cjs`（**按内容定位而不是行号**，写入前先打印边界供核对，默认 dry-run），沿用本仓库已有的迁移脚本写法。**验证靠默认布局的黄金快照** —— 迁移前后逐项一致。
 
 **死代码扫描**（`scripts/find-dead-code.cjs`）：0 处未用导入、0 处未用样式。
 
