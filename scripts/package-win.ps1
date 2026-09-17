@@ -21,8 +21,41 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $repoRoot
 
-$env:ELECTRON_BUILDER_BINARIES_MIRROR = "https://npmmirror.com/mirrors/electron-builder-binaries/"
-$env:ELECTRON_MIRROR = "https://npmmirror.com/mirrors/electron/"
+# ── Refuse to run twice at once ─────────────────────────────────────────────
+#
+# electron-builder packages into release\win-unpacked, and it empties that
+# directory first. Two concurrent runs therefore fight over the same files: one
+# renames electron.exe to KnowSpace.exe while the other is mid-scan, and the
+# loser reports
+#
+#   ENOENT: no such file or directory, rename '...\electron.exe' -> '...\KnowSpace.exe'
+#
+# which says nothing about the actual cause. Clearing the half-built directory
+# by hand afterwards does not help either — a second run then fails on
+# `safe-delete`, because the first still holds handles inside it.
+#
+# A lock file turns that into one clear message.
+$lockFile = Join-Path $repoRoot "release\.packaging.lock"
+
+if (Test-Path $lockFile) {
+  $holder = Get-Content $lockFile -ErrorAction SilentlyContinue
+  $alive = $false
+  if ($holder) {
+    $alive = [bool](Get-Process -Id $holder -ErrorAction SilentlyContinue)
+  }
+  if ($alive) {
+    throw "Another packaging run is already in progress (pid $holder). Wait for it to finish, or stop that process first."
+  }
+  Write-Host "removing a stale lock left by pid $holder, which is no longer running"
+  Remove-Item -Force $lockFile -ErrorAction SilentlyContinue
+}
+
+New-Item -ItemType Directory -Force -Path (Split-Path -Parent $lockFile) | Out-Null
+$PID | Out-File -FilePath $lockFile -Encoding ascii
+
+try {
+  $env:ELECTRON_BUILDER_BINARIES_MIRROR = "https://npmmirror.com/mirrors/electron-builder-binaries/"
+  $env:ELECTRON_MIRROR = "https://npmmirror.com/mirrors/electron/"
 
 Write-Host "packaging with npmmirror mirrors..."
 
@@ -44,4 +77,10 @@ if (Test-Path $exe) {
   Write-Host "built: $($info.LastWriteTime)"
 } else {
   throw "packaging reported success but $exe is missing"
+}
+
+} finally {
+  # Removed on every path, including a failure, or a single bad run would block
+  # every subsequent one until someone found the file by hand.
+  Remove-Item -Force $lockFile -ErrorAction SilentlyContinue
 }
