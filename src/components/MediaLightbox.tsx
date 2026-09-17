@@ -1,13 +1,10 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { downloadSvgAsPng, rasterizeRenderedSvgToPng, triggerDownload } from "../services/svgExport";
 
-export type LightboxMedia = {
-  type: "image" | "mermaid" | "video" | "audio";
-  src?: string;
-  svgHtml?: string;
-  alt?: string;
-  title?: string;
-};
+// Moved to core/types so the UI store can reference it without importing from
+// components/. Re-exported here so existing import sites are unaffected.
+import type { LightboxMedia } from "../core/types";
+export type { LightboxMedia };
 
 type MediaLightboxProps = {
   media: LightboxMedia | null;

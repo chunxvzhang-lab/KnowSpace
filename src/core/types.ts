@@ -153,3 +153,21 @@ export type FlashNoteSaveResult = {
   dateStr?: string;
   error?: string;
 };
+
+/**
+ * Payload for the full-screen media lightbox.
+ *
+ * Lives here rather than beside the component so the UI store can hold it
+ * without depending on `components/` — the store sits below the components in
+ * the dependency order, not above them. `MediaLightbox` re-exports it, so
+ * existing imports keep working.
+ *
+ * `type: "mermaid"` carries `svgHtml` instead of `src`.
+ */
+export type LightboxMedia = {
+  type: "image" | "mermaid" | "video" | "audio";
+  src?: string;
+  svgHtml?: string;
+  alt?: string;
+  title?: string;
+};
