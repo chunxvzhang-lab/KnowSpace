@@ -214,11 +214,42 @@ CanvasView（组合根，目标 < 800 行）
 
 | 批次 | 内容 | 窗口 | 出口标准 |
 | :---: | :--- | :--- | :--- |
-| **B1** | canvasService 拆分（含门面） | 10/06 – 10/16 | 全量测试绿 + 65 符号调用方零改动 |
+| **B1** ✅ | canvasService 拆分（含门面） | 09/17 | ✅ **已完成** —— tsc 0 错误 / 454 测试 100% / 构建成功 / 调用方零改动 |
 | **B2** | CanvasView 低耦合层（Toast / Modals / Minimap / EdgeBatchToolbar） | 10/06 – 10/12 | 同上 + 手动回归（小地图/导出/右键） |
 | **B3** | 连线层 + 标签层 + EdgeContextMenu | 10/13 – 10/20 | 同上 + 连线回归（绕障/环色/折点） |
 | **B4** | 卡片层 + NodeContextMenu | 10/20 – 10/28 | 同上 + 卡片回归（拖拽/调距/分组/媒体） |
 | **B5** | 演示层 + 工具栏 + hooks 抽取 | 10/28 – 11/02 | 同上 + F5 演播回归 + 性能对照 |
+
+### 3.1.1 B1 执行结果（2026-09-17 实测）
+
+| 文件 | 行数 | 状态 |
+| :--- | ---: | :---: |
+| `canvasGraph.ts` | 1152 | ✅ |
+| `canvasExport.ts` | 1081 | ✅ |
+| `canvasGeometry.ts` | 1027 | ✅ |
+| `canvasColor.ts` | 684 | ✅ |
+| `canvasEdges.ts` | 486 | ✅ |
+| `canvasRouting.ts` | 309 | ✅ |
+| `canvasSerialization.ts` | 238 | ✅ |
+| `canvasPrimitives.ts` | 208 | ✅ |
+| **`canvasService.ts`（门面）** | **127** | ✅ |
+
+**原 5060 行 → 最大模块 1152 行**，全部 < 2500 目标 ✅
+
+**执行方式**：`scripts/split-canvas-service.cjs` **单次遍历完成**。
+逐模块搬移会让每次提取都改变其下方所有行号，需反复重算区间；一次性按顶层符号切分则无此问题，且**切片而非重打**保证搬移代码与原文件逐字节一致。脚本在写入前校验 98 个声明各自唯一归属，并先备份原文件。
+
+**关键耦合处理结果**（与 §1.4 设计一致）：
+
+| 耦合点 | 实测归属 | ✅ |
+| :--- | :--- | :---: |
+| `getLoopEdgeIdsCached` + 缓存变量 | `canvasGraph`（并导出供 color 使用） | ✅ |
+| `syncGridEdges` / `syncRingEdges` / `syncLoopEdgeGeometry` | `canvasGraph`（未落入 geometry，避免双向依赖） | ✅ |
+| `projectPointOntoRing` | `canvasGeometry`（routing 单向依赖它） | ✅ |
+| 全部 DOM / Electron 桥调用 | `canvasExport` | ✅ |
+
+**门面策略**：转发**原本导出的全部符号**（3 个调用方零改动），**不转发**从未导出的私有辅助（路径相交探针、SVG 清洗内部函数、拓扑指纹及其缓存变量）。
+`tsc` 在验证中额外发现 5 处缺失类型导入与 1 处需导出符号，已修正。
 
 ### 3.2 每批的固定动作
 
