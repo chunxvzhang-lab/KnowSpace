@@ -1,6 +1,6 @@
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BookOpen, FilePlus2, FileText, FolderOpen, Zap, X, ListTree, Boxes } from "lucide-react";
-import { AboutDialog } from "./components/AboutDialog";
+
 import { ActivityBar } from "./components/ActivityBar";
 import { BookmarkPanel } from "./components/BookmarkPanel";
 import { BacklinksPanel } from "./components/BacklinksPanel";
@@ -9,6 +9,7 @@ import { DocumentWorkspace } from "./components/DocumentWorkspace";
 import { DualDocumentWorkspace } from "./components/DualDocumentWorkspace";
 import type { WikiLinkTarget } from "./components/EditorPane";
 import { GraphWorkspaceLayout } from "./components/GraphWorkspaceLayout";
+import { AppOverlays } from "./components/AppOverlays";
 import {
   updateDocumentInIndex,
   getLinkedReferences,
@@ -18,8 +19,6 @@ import {
   type UnlinkedMention,
 } from "./services/backlinkIndex";
 import { buildGraphDataFromIndex } from "./services/graphService";
-import { FileConflictDialog } from "./components/FileConflictDialog";
-import { MediaLightbox } from "./components/MediaLightbox";
 import { MindmapView } from "./components/MindmapView";
 import { CanvasView } from "./components/CanvasView";
 import { createDefaultCanvas } from "./services/canvasService";
@@ -29,9 +28,7 @@ import { StatusBar } from "./components/StatusBar";
 import { TabBar } from "./components/TabBar";
 import { TocPanel } from "./components/TocPanel";
 import { Toolbar } from "./components/Toolbar";
-import { UnsavedChangesDialog } from "./components/UnsavedChangesDialog";
-import { VersionHistoryDialog } from "./components/VersionHistoryDialog";
-import { CommandPalette, type CommandAction } from "./components/CommandPalette";
+import type { CommandAction } from "./components/CommandPalette";
 import type {
   BookManifest,
   Bookmark,
@@ -165,8 +162,6 @@ export function App() {
   const lightboxMedia = useUiStore((s) => s.lightboxMedia);
   const notice = useUiStore((s) => s.notice);
   const preferences = useUiStore((s) => s.preferences);
-  const unsavedDialogOpen = useUiStore((s) => s.unsavedDialogOpen);
-  const aboutOpen = useUiStore((s) => s.aboutOpen);
   const commandPaletteOpen = useUiStore((s) => s.commandPaletteOpen);
   const versionHistoryOpen = useUiStore((s) => s.versionHistoryOpen);
   const isGraphPaneOpen = useUiStore((s) => s.isGraphPaneOpen);
@@ -201,10 +196,6 @@ export function App() {
 
   const handleOpenCommandPalette = useCallback(() => {
     setCommandPaletteOpen(true);
-  }, []);
-
-  const handleCloseCommandPalette = useCallback(() => {
-    setCommandPaletteOpen(false);
   }, []);
 
   // isGraphPaneOpen defaults to false in the store: the app launches on a pure
@@ -3466,53 +3457,25 @@ export function App() {
       )}
     </div>
 
-      {/* Media Lightbox Modal */}
-      <MediaLightbox
-        media={lightboxMedia}
-        onClose={() => setLightboxMedia(null)}
-      />
-
-      {/* Unsaved Changes Guard Dialog */}
-      <UnsavedChangesDialog
-        isOpen={unsavedDialogOpen}
-        fileName={session?.fileName ?? "当前文件"}
-        onSave={handleDialogSave}
-        onDiscard={handleDialogDiscard}
-        onCancel={handleDialogCancel}
-      />
-
-      {/* File Conflict Dialog */}
-      <FileConflictDialog
-        isOpen={Boolean(conflict)}
-        fileName={session?.fileName ?? "当前文件"}
-        onReload={reloadFromDisk}
+      {/* Floating surfaces — lightbox, guard dialogs, palette, history, about, toast.
+          They read the lightbox, open flags, notice and preferences from the
+          stores themselves; only the editing session and the actions this
+          component orchestrates are passed in. */}
+      <AppOverlays
+        session={session}
+        conflict={conflict}
+        activeChapter={activeChapter}
+        renderedChapter={renderedChapter}
+        commandActions={commandActions}
+        onSelectChapter={selectChapter}
+        onJumpToHeading={(id) => jumpToHeading(id, "smooth", true)}
+        onSavePending={handleDialogSave}
+        onDiscardPending={handleDialogDiscard}
+        onCancelPending={handleDialogCancel}
+        onReloadFromDisk={reloadFromDisk}
         onOverwrite={() => saveSession({ force: true })}
         onSaveAs={saveSessionAs}
-        onCancel={clearConflict}
-      />
-
-      {/* Global Command Palette & Quick Switcher */}
-      <CommandPalette
-        isOpen={commandPaletteOpen}
-        onClose={handleCloseCommandPalette}
-        manifest={manifest}
-        currentChapterId={chapterId}
-        onSelectChapter={selectChapter}
-        headings={renderedChapter?.headings}
-        onJumpToHeading={(id) => jumpToHeading(id, "smooth", true)}
-        recentChapterIds={recentVisitedDocIds}
-        actions={commandActions}
-      />
-
-      {/* Local Version History & Time Travel Dialog */}
-      <VersionHistoryDialog
-        isOpen={versionHistoryOpen}
-        onClose={() => setVersionHistoryOpen(false)}
-        fileName={activeChapter?.title ?? session?.fileName}
-        filePath={session?.absolutePath || undefined}
-        rootPath={manifest?.rootPath}
-        currentContent={session?.source || ""}
-        theme={preferences.theme}
+        onClearConflict={clearConflict}
         onRevertToContent={async (revertedContent) => {
           updateSource(revertedContent);
           await saveSession({ force: true });
@@ -3521,17 +3484,6 @@ export function App() {
         }}
       />
 
-      {/* About Application Dialog */}
-      <AboutDialog
-        isOpen={aboutOpen}
-        onClose={() => setAboutOpen(false)}
-      />
-
-      {notice ? (
-        <div className="toast" role="status" aria-live="polite">
-          {notice}
-        </div>
-      ) : null}
     </div>
   );
 }

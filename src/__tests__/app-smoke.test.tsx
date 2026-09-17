@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import App from "../App";
 import { useUiStore } from "../store/useUiStore";
 import { useTabStore } from "../store/useTabStore";
@@ -140,6 +140,33 @@ describe("App - shell smoke tests", () => {
     // ensureTab runs from an effect keyed on the active chapter, so a tab for
     // it must exist without anything having called setTabs explicitly.
     expect(tabs.some((tab) => tab.id === activeTabId)).toBe(true);
+  });
+
+  it("renders floating surfaces straight from the store", async () => {
+    render(<App />);
+
+    act(() => useUiStore.getState().setNotice("测试通知"));
+
+    // The toast moved into AppOverlays during B3. It has no props at all, so
+    // this rendering is only possible if the component reads the store.
+    expect(await screen.findByText("测试通知")).toBeTruthy();
+  });
+
+  it("opens and closes the command palette through the store", async () => {
+    render(<App />);
+
+    act(() => useUiStore.getState().setCommandPaletteOpen(true));
+    const palette = await screen.findByRole("dialog", { name: "全局命令面板" });
+
+    // The close path used to be an App callback passed down as a prop; it is
+    // now handled inside AppOverlays. Clicking the backdrop is how the palette
+    // reads as dismissed, so it exercises exactly that wiring.
+    fireEvent.click(palette);
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "全局命令面板" })).toBeNull();
+    });
+    expect(useUiStore.getState().commandPaletteOpen).toBe(false);
   });
 
   it("applies store preferences to the document without going through props", async () => {
