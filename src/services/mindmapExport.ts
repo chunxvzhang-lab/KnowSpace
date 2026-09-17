@@ -59,7 +59,10 @@ ${bodyContent}  </body>
  * Exports a Mindmap tree as standard FreeMind 1.0.1 (.mm) XML format.
  * Supported by XMind, FreeMind, Mindjet MindManager, Freeplane.
  */
-export function exportMindmapToFreeMind(root: MindmapNode): string {
+export function exportMindmapToFreeMind(
+  root: MindmapNode,
+  collapsedIds?: ReadonlySet<string>
+): string {
   let counter = 1;
 
   function serializeNode(node: MindmapNode, indentLevel: number): string {
@@ -67,9 +70,17 @@ export function exportMindmapToFreeMind(root: MindmapNode): string {
     const id = `ID_${counter++}`;
     const escapedText = escapeXml(node.text || "主题");
     const colorAttr = node.color && node.color !== "transparent" ? ` COLOR="${escapeXml(node.color)}"` : "";
-    const foldedAttr = node.collapsed ? ` FOLDED="true"` : "";
 
-    if (!node.children || node.children.length === 0) {
+    const hasChildren = Boolean(node.children && node.children.length > 0);
+    // FOLDED belongs to a node that can be folded. It was read off the model's
+    // own `collapsed` field, which nothing ever writes — the view keeps its
+    // collapsed state in a separate set of ids — so this attribute was silently
+    // always absent. The set is now the primary source and the field the
+    // fallback, for a caller that sets it directly.
+    const isFolded = Boolean(collapsedIds?.has(node.id) || node.collapsed) && hasChildren;
+    const foldedAttr = isFolded ? ` FOLDED="true"` : "";
+
+    if (!hasChildren) {
       return `${indent}<node ID="${id}" TEXT="${escapedText}"${colorAttr}${foldedAttr} />\n`;
     }
 

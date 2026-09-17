@@ -1120,18 +1120,20 @@ export const MindmapView = memo(function MindmapView({
   }, [tree, title]);
 
   const handleExportFreeMind = useCallback(() => {
-    const xml = exportMindmapToFreeMind(tree);
+    // Collapsed state lives here, not on the tree, so the exporter has to be
+    // told about it — without this the FOLDED attribute was never written.
+    const xml = exportMindmapToFreeMind(tree, collapsedIds);
     const blob = new Blob([xml], { type: "application/x-freemind;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = `${title || "mindmap"}.mm`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    setIsExportMenuOpen(false);
-  }, [tree, title]);
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setIsExportMenuOpen(false);
+    }, [tree, title, collapsedIds]);
 
   const handleExportMarkdownOutline = useCallback(() => {
     const md = exportMindmapToMarkdownOutline(tree);
