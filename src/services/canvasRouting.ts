@@ -5,12 +5,7 @@
  * docs/CANVAS_SPLIT_DESIGN.md. Code is byte-identical to the original.
  */
 
-import type {
-  CanvasEdgeLineStyle,
-  CanvasNode,
-  CanvasNodeSide,
-  CanvasObstacle,
-} from "../types/canvasTypes";
+import type { CanvasEdgeLineStyle, CanvasNodeSide, CanvasObstacle } from "../types/canvasTypes";
 import { computeBezierControlPoints, projectPointOntoRing } from "./canvasGeometry";
 
 export interface AABBBox {

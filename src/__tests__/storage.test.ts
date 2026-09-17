@@ -1,10 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import {
-  loadBookmarks,
-  saveBookmarks,
-  loadReadingPosition,
-  saveReadingPosition,
-} from "../services/storage";
+import { loadBookmarks, saveBookmarks, loadReadingPosition } from "../services/storage";
 import type { Bookmark, ChapterManifest, ReadingPosition } from "../core/types";
 
 describe("src/services/storage.ts", () => {

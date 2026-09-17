@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { renderHook } from "@testing-library/react";
-import { useVaultOpening } from "../hooks/useVaultOpening";
-import { useUiStore } from "../store/useUiStore";
+import { useVaultOpening } from "../hooks/useVaultOpening";
 import { useTabStore } from "../store/useTabStore";
 import { useVaultStore } from "../store/useVaultStore";
 import {

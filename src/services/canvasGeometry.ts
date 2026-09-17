@@ -6,13 +6,7 @@
  * docs/CANVAS_SPLIT_DESIGN.md. Code is byte-identical to the original.
  */
 
-import type {
-  CanvasNode,
-  CanvasNodeSide,
-  CanvasTextNode,
-  CanvasGroupNode,
-  CanvasEdge,
-} from "../types/canvasTypes";
+import type { CanvasNode, CanvasNodeSide } from "../types/canvasTypes";
 
 /**
  * Bounding box calculation for nodes

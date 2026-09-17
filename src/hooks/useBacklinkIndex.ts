@@ -1,13 +1,6 @@
 import { useCallback, useEffect, useMemo } from "react";
-import { loadChapterMarkdown } from "../services/bookSource";
-import {
-  convertUnlinkedMentionInText,
-  getLinkedReferences,
-  getUnlinkedMentions,
-  refactorWikiLinksInContent,
-  updateDocumentInIndex,
-  type UnlinkedMention,
-} from "../services/backlinkIndex";
+
+import { convertUnlinkedMentionInText, getLinkedReferences, getUnlinkedMentions, updateDocumentInIndex, type UnlinkedMention } from "../services/backlinkIndex";
 import { buildGraphDataFromIndex } from "../services/graphService";
 import { updateVaultSearchIndexForDocument } from "../services/searchIndexService";
 import { useTabStore } from "../store/useTabStore";

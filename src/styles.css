@@ -9089,13 +9089,6 @@ body:has(.flash-capsule-overlay) {
   filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.18));
 }
 
-.mindmap-collapse-symbol {
-  font-size: 11px;
-  font-weight: bold;
-  dominant-baseline: middle;
-  user-select: none;
-}
-
 /* XMind Interactive Selection & Focus */
 .mindmap-node-selection-ring {
   pointer-events: none;
@@ -9120,15 +9113,6 @@ body:has(.flash-capsule-overlay) {
   cursor: pointer;
 }
 
-.mindmap-add-circle {
-  transition: fill 0.15s ease, filter 0.15s ease;
-}
-
-.mindmap-node-add-btn:hover .mindmap-add-circle {
-  fill: #0284c7;
-  filter: drop-shadow(0 2px 6px rgba(2, 132, 199, 0.5));
-}
-
 /* Node Resize Handle */
 .mindmap-node-resize-handle {
   cursor: nwse-resize;
@@ -9146,17 +9130,6 @@ body:has(.flash-capsule-overlay) {
 
 .mindmap-resize-hitarea {
   cursor: nwse-resize;
-}
-
-.mindmap-add-symbol,
-.mindmap-collapse-symbol {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  font-size: 13px;
-  font-weight: 700;
-  dominant-baseline: central;
-  text-anchor: middle;
-  user-select: none;
-  pointer-events: none;
 }
 
 /* Mindmap Toolbar Buttons */

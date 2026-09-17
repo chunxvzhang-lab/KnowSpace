@@ -1,28 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Search,
-  FileText,
-  Command,
-  Hash,
-  ArrowRight,
-  Clock,
-  Sparkles,
-  CornerDownLeft,
-  X,
-  Printer,
-  ListTree,
-  Network,
-  FolderOpen,
-  Maximize2,
-  FilePlus,
-  Save,
-  Type,
-  Sun,
-  Moon,
-  Feather,
-  Columns,
-} from "lucide-react";
-import type { BookManifest, Heading, ThemeMode } from "../core/types";
+import { Search, FileText, Command, Hash, Clock, CornerDownLeft, X } from "lucide-react";
+import type { BookManifest, Heading } from "../core/types";
 
 export interface CommandAction {
   id: string;

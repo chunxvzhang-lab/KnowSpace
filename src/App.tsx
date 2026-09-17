@@ -1,5 +1,5 @@
-import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BookOpen, FilePlus2, FileText, FolderOpen, Zap, X, ListTree, Boxes } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FilePlus2, FileText, FolderOpen, Zap, X, ListTree, Boxes } from "lucide-react";
 
 import { ActivityBar } from "./components/ActivityBar";
 import { BookmarkPanel } from "./components/BookmarkPanel";
@@ -24,17 +24,7 @@ import { TabBar } from "./components/TabBar";
 import { TocPanel } from "./components/TocPanel";
 import { Toolbar } from "./components/Toolbar";
 import type { CommandAction } from "./components/CommandPalette";
-import type {
-  BookManifest,
-  Bookmark,
-  ChapterManifest,
-  ChapterSource,
-  EditorViewMode,
-  RenderedChapter,
-  SearchResult,
-  SidebarTab,
-  ThemeMode,
-} from "./core/types";
+import type { BookManifest, Bookmark, ChapterSource, RenderedChapter, SearchResult, SidebarTab, ThemeMode } from "./core/types";
 import { EditorView } from "@codemirror/view";
 import { useColumnResize } from "./hooks/useColumnResize";
 import { useDocumentCreation } from "./hooks/useDocumentCreation";
@@ -47,7 +37,7 @@ import { useDocumentSession } from "./hooks/useDocumentSession";
 import { useReadingTracker } from "./hooks/useReadingTracker";
 import { resolveBookmark } from "./services/bookmarks";
 import { loadChapterMarkdown } from "./services/bookSource";
-import { renderMermaid, type MermaidTheme } from "./services/mermaid";
+import { type MermaidTheme } from "./services/mermaid";
 import { extractHeadingsFromSource, renderMarkdown } from "./services/markdown";
 
 import {

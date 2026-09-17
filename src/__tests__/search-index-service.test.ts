@@ -1,15 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  parseSearchQuery,
-  extractTagsFromMarkdown,
-  extractLinksFromMarkdown,
-  tokenizeText,
-  buildVaultSearchIndex,
-  updateVaultSearchIndexForDocument,
-  searchVault,
-  normalizeTag,
-  normalizeLinkTarget,
-} from "../services/searchIndexService";
+import { parseSearchQuery, extractTagsFromMarkdown, extractLinksFromMarkdown, tokenizeText, buildVaultSearchIndex, updateVaultSearchIndexForDocument, searchVault } from "../services/searchIndexService";
 
 describe("searchIndexService - Structured Search Syntax Parser", () => {
   it("parses empty and whitespace queries safely", () => {

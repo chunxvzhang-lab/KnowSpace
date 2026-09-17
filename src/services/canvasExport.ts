@@ -8,13 +8,7 @@
  * docs/CANVAS_SPLIT_DESIGN.md. Code is byte-identical to the original.
  */
 
-import type {
-  CanvasData,
-  CanvasEdge,
-  CanvasGroupNode,
-  CanvasNode,
-  CanvasNodeSide,
-} from "../types/canvasTypes";
+import type { CanvasData, CanvasGroupNode, CanvasNode } from "../types/canvasTypes";
 import { renderCardMarkdown } from "./markdown";
 import { serializeSvgForExport } from "./svgExport";
 import { getCanvasThemeColors, normalizeExportTheme } from "./canvasTheme";

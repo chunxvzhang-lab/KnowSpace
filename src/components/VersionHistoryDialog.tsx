@@ -1,18 +1,5 @@
 import { memo, useEffect, useMemo, useState, useCallback } from "react";
-import {
-  Clock,
-  RotateCcw,
-  Copy,
-  Check,
-  X,
-  Columns,
-  ListFilter,
-  Plus,
-  ArrowLeft,
-  AlertTriangle,
-  History,
-  FileText,
-} from "lucide-react";
+import { RotateCcw, Copy, Check, X, Columns, ListFilter, Plus, AlertTriangle, History } from "lucide-react";
 import type { ThemeMode } from "../core/types";
 import type { SnapshotItem, SnapshotDetail } from "../types/desktop";
 import {

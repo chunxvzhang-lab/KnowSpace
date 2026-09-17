@@ -1,27 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import {
-  Zap,
-  Settings,
-  X,
-  Check,
-  Hash,
-  Link,
-  Clock,
-  Lightbulb,
-  Keyboard,
-  AlertCircle,
-  FileText,
-  Pin,
-  PinOff,
-  Folder,
-  RotateCcw,
-  Copy,
-  StickyNote,
-  Sparkles,
-  Trash2,
-  Bookmark,
-  ArrowRight,
-} from "lucide-react";
+import { Zap, Settings, X, Check, Hash, Link, Clock, Lightbulb, Keyboard, AlertCircle, FileText, Pin, PinOff, Folder, RotateCcw, Copy, StickyNote, Sparkles, Trash2 } from "lucide-react";
 import { loadPreferences, savePreferences } from "../services/storage";
 import type { ThemeMode } from "../core/types";
 
