@@ -28,7 +28,7 @@ import { createDefaultCanvas } from "./services/canvasService";
 import { SearchPanel } from "./components/SearchPanel";
 import { SpaceTimelinePanel } from "./components/SpaceTimelinePanel";
 import { StatusBar } from "./components/StatusBar";
-import { TabBar, type TabItem } from "./components/TabBar";
+import { TabBar } from "./components/TabBar";
 import { TocPanel } from "./components/TocPanel";
 import { Toolbar } from "./components/Toolbar";
 import { UnsavedChangesDialog } from "./components/UnsavedChangesDialog";
@@ -66,6 +66,13 @@ import {
   saveReadingPosition,
 } from "./services/storage";
 import { useUiStore } from "./store/useUiStore";
+import {
+  useTabStore,
+  tabsWithDirtyFlags,
+  nextActiveAfterClose,
+  tabsAfterClosingRight,
+  type TabMeta,
+} from "./store/useTabStore";
 
 type PendingAction =
   | { type: "select-chapter"; chapterId: string }
@@ -95,11 +102,31 @@ export function App() {
   const manifestRef = useRef<BookManifest | null>(manifest);
   manifestRef.current = manifest;
 
-  const [chapterId, setChapterId] = useState<string>("");
-  const [tabs, setTabs] = useState<TabItem[]>([]);
-  const tabsRef = useRef<TabItem[]>(tabs);
+  // ── Tabs (useTabStore · R1 batch B1) ──────────────────────────────────────
+  //
+  // Same technique as the UI store: these aliases keep the identifiers the
+  // useState calls used, so roughly ninety reads of `chapterId` and fifteen
+  // `setTabs` call sites needed no change.
+  //
+  // What did change is that a tab no longer carries a dirty flag. Only the
+  // active tab can be dirty — there is a single editing session — so it is
+  // derived at render instead (see tabsForDisplay). That removes the effect
+  // which used to mirror `isDirty` into this array, and with it the last path
+  // by which a keystroke reached tab state.
+  const tabs = useTabStore((s) => s.tabs);
+  const setTabs = useTabStore((s) => s.setTabs);
+  const ensureTab = useTabStore((s) => s.ensureTab);
+  const chapterId = useTabStore((s) => s.activeTabId);
+  const setChapterId = useTabStore((s) => s.setActiveTabId);
+  const dualSplitTabId = useTabStore((s) => s.dualSplitTabId);
+  const setDualSplitTabId = useTabStore((s) => s.setDualSplitTabId);
+  const recentVisitedDocIds = useTabStore((s) => s.recentVisitedDocIds);
+  const rememberVisitedDoc = useTabStore((s) => s.rememberVisitedDoc);
+
+  const tabsRef = useRef<TabMeta[]>(tabs);
   tabsRef.current = tabs;
-  const [dualSplitTabId, setDualSplitTabId] = useState<string | null>(null);
+  // The comparison pane's rendered content stays here: it is a view artefact
+  // produced by loading a second document, not part of what tabs are.
   const [secondaryRenderedChapter, setSecondaryRenderedChapter] = useState<RenderedChapter | null>(null);
   const secondaryReaderRef = useRef<HTMLElement | null>(null);
   const isDualSplitMode = Boolean(dualSplitTabId && tabs.some((t) => t.id === dualSplitTabId));
@@ -161,7 +188,6 @@ export function App() {
     buildVaultSearchIndex([])
   );
   const [activeSearchMatchId, setActiveSearchMatchId] = useState<string | null>(null);
-  const [recentVisitedDocIds, setRecentVisitedDocIds] = useState<string[]>([]);
 
   const handleOpenCommandPalette = useCallback(() => {
     setCommandPaletteOpen(true);
@@ -213,6 +239,13 @@ export function App() {
   sessionRef.current = session;
 
   const activeTab = useMemo(() => tabs.find((item) => item.id === chapterId), [tabs, chapterId]);
+  // Applying the dirty flag here rather than storing it means typing in a saved
+  // document changes this memo and nothing else — no tab array, no effect, no
+  // second render pass to settle the tab bar.
+  const tabsForDisplay = useMemo(
+    () => tabsWithDirtyFlags(tabs, chapterId, isDirty),
+    [tabs, chapterId, isDirty]
+  );
   const activeChapter = useMemo(() => {
     const fromManifest = manifest?.chapters.find((item) => item.id === chapterId);
     if (fromManifest) return fromManifest;
@@ -229,14 +262,11 @@ export function App() {
   const activeHeading = renderedChapter?.headings.find((heading) => heading.id === activeHeadingId);
   const activeIndex = manifest?.chapters.findIndex((item) => item.id === chapterId) ?? -1;
 
+  // Recording a visit belongs to the store now, which owns the de-duplication
+  // and the cap as well.
   useEffect(() => {
-    if (chapterId) {
-      setRecentVisitedDocIds((prev) => {
-        const filtered = prev.filter((id) => id !== chapterId);
-        return [chapterId, ...filtered].slice(0, 15);
-      });
-    }
-  }, [chapterId]);
+    if (chapterId) rememberVisitedDoc(chapterId);
+  }, [chapterId, rememberVisitedDoc]);
 
   const isSearchActive = (sidebarOpen && sidebarTab === "search") || commandPaletteOpen;
   const searchResults = useMemo(() => {
@@ -728,7 +758,6 @@ export function App() {
                   title: targetChap.title,
                   relativePath: targetChap.src,
                   absolutePath: targetChap.absolutePath,
-                  isDirty: false,
                 },
               ];
             });
@@ -839,56 +868,27 @@ export function App() {
   );
   selectChapterRef.current = selectChapter;
 
-  // Sync active chapter to tabs list
+  // Keep the active document's tab registered, and its metadata fresh.
+  //
+  // This was a forty-nine line effect that also mirrored `isDirty` into the tab
+  // array — which is what made a keystroke write into tab state, and why the
+  // dependency list carried both `isDirty` and `chapterId`. The dirty flag is
+  // derived now, so all that remains is registration and renames, and ensureTab
+  // returns the untouched state when neither has happened.
+  //
+  // One thing the old code carried that is worth recording: a guard reading
+  // `activeChapter.id === chapterId`. It could never be false — activeChapter is
+  // looked up *by* chapterId — so it was dead, and dropping it here is not a
+  // behaviour change.
   useEffect(() => {
     if (!activeChapter) return;
-    setTabs((prev) => {
-      // Find matching tab by ID or by matching absolutePath or matching title/src
-      const matchIndex = prev.findIndex(
-        (t) =>
-          t.id === activeChapter.id ||
-          (t.absolutePath &&
-            activeChapter.absolutePath &&
-            t.absolutePath.toLowerCase() === activeChapter.absolutePath.toLowerCase()) ||
-          (t.title === activeChapter.title && (!t.absolutePath || !activeChapter.absolutePath))
-      );
-      if (matchIndex !== -1) {
-        const existing = prev[matchIndex];
-        const nextDirty = Boolean(isDirty && activeChapter.id === chapterId);
-        if (
-          existing.id === activeChapter.id &&
-          existing.title === activeChapter.title &&
-          existing.relativePath === activeChapter.src &&
-          existing.absolutePath === activeChapter.absolutePath &&
-          Boolean(existing.isDirty) === nextDirty
-        ) {
-          return prev;
-        }
-        return prev.map((t, idx) =>
-          idx === matchIndex
-            ? {
-                ...t,
-                id: activeChapter.id,
-                title: activeChapter.title,
-                relativePath: activeChapter.src,
-                absolutePath: activeChapter.absolutePath,
-                isDirty: nextDirty,
-              }
-            : t
-        );
-      }
-      return [
-        ...prev,
-        {
-          id: activeChapter.id,
-          title: activeChapter.title,
-          relativePath: activeChapter.src,
-          absolutePath: activeChapter.absolutePath,
-          isDirty: Boolean(isDirty),
-        },
-      ];
+    ensureTab({
+      id: activeChapter.id,
+      title: activeChapter.title,
+      relativePath: activeChapter.src,
+      absolutePath: activeChapter.absolutePath,
     });
-  }, [activeChapter, isDirty, chapterId]);
+  }, [activeChapter, ensureTab]);
 
   const handleOpenDualSplit = useCallback(
     (tabId: string) => {
@@ -908,11 +908,11 @@ export function App() {
       if (tabId === dualSplitTabId) {
         setDualSplitTabId(null);
       }
-      const closedIndex = tabs.findIndex((t) => t.id === tabId);
-      const next = tabs.filter((t) => t.id !== tabId);
-      setTabs(next);
+      const nextActiveId = nextActiveAfterClose(tabs, tabId);
+      setTabs((prev) => prev.filter((t) => t.id !== tabId));
 
-      if (next.length === 0) {
+      if (nextActiveId === null) {
+        // The last tab closed, so the editing session goes with it.
         setChapterId("");
         activeLoadedChapterIdRef.current = "";
         closeSession();
@@ -920,12 +920,10 @@ export function App() {
       }
 
       if (tabId === chapterId) {
-        const newActiveIndex = Math.min(Math.max(0, closedIndex), next.length - 1);
-        const targetId = next[newActiveIndex].id;
-        selectChapter(targetId);
+        selectChapter(nextActiveId);
       }
     },
-    [tabs, chapterId, dualSplitTabId, selectChapter, closeSession]
+    [tabs, chapterId, dualSplitTabId, selectChapter, closeSession, setChapterId, setDualSplitTabId]
   );
 
   const handleDetachTab = useCallback(
@@ -971,21 +969,24 @@ export function App() {
 
   const handleCloseRightTabs = useCallback(
     (tabId: string) => {
-      setTabs((prev) => {
-        const idx = prev.findIndex((t) => t.id === tabId);
-        if (idx === -1) return prev;
-        const next = prev.slice(0, idx + 1);
-        if (dualSplitTabId && !next.some((t) => t.id === dualSplitTabId)) {
-          setDualSplitTabId(null);
-        }
-        const activeStillExists = next.some((t) => t.id === chapterId);
-        if (!activeStillExists) {
-          selectChapter(tabId);
-        }
-        return next;
-      });
+      const next = tabsAfterClosingRight(tabs, tabId);
+      // A tab that is not open has nothing to its right. The inline version
+      // returned early here too, so neither of the checks below ran.
+      if (!next) return;
+      setTabs(next);
+
+      // These two used to live inside the setTabs updater, which StrictMode
+      // invokes twice in development to surface impure updaters — so the
+      // navigation below (and the unsaved-changes guard it can raise) could
+      // fire twice. Reacting to the return value keeps it to once.
+      if (dualSplitTabId && !next.some((t) => t.id === dualSplitTabId)) {
+        setDualSplitTabId(null);
+      }
+      if (!next.some((t) => t.id === chapterId)) {
+        selectChapter(tabId);
+      }
     },
-    [chapterId, dualSplitTabId, selectChapter]
+    [tabs, chapterId, dualSplitTabId, selectChapter, setDualSplitTabId]
   );
 
   // The store persists the flag when it changes, so this callback does not.
@@ -1017,7 +1018,7 @@ export function App() {
       setManifest(localManifest);
       setBookmarks(loadBookmarks(localId, localManifest.chapters));
       setChapterId("uploaded");
-      setTabs([{ id: "uploaded", title: baseName, relativePath: file.name, absolutePath: undefined, isDirty: false }]);
+      setTabs([{ id: "uploaded", title: baseName, relativePath: file.name, absolutePath: undefined }]);
       if (file.name.toLowerCase().endsWith(".canvas")) {
         setViewMode("canvas");
         setDirectoryOpen(false);
@@ -1150,7 +1151,6 @@ export function App() {
             title: baseName,
             relativePath: fileName,
             absolutePath,
-            isDirty: false,
           },
         ];
       });
@@ -1255,7 +1255,6 @@ export function App() {
             title: targetChapter.title,
             relativePath: targetChapter.src,
             absolutePath: targetChapter.absolutePath,
-            isDirty: false,
           },
         ];
       });
@@ -1340,7 +1339,6 @@ export function App() {
             title: activeChap.title,
             relativePath: activeChap.src,
             absolutePath: result.absolutePath,
-            isDirty: false,
           },
         ];
       });
@@ -1422,7 +1420,6 @@ export function App() {
             title: activeChap.title,
             relativePath: activeChap.src,
             absolutePath: result.absolutePath,
-            isDirty: false,
           },
         ];
       });
@@ -1503,7 +1500,6 @@ export function App() {
             title: activeChap.title,
             relativePath: activeChap.src,
             absolutePath: result.absolutePath,
-            isDirty: false,
           },
         ];
       });
@@ -1619,7 +1615,6 @@ export function App() {
               title: activeChap.title,
               relativePath: activeChap.src,
               absolutePath: result.absolutePath,
-              isDirty: false,
             },
           ];
         });
@@ -3253,7 +3248,7 @@ export function App() {
         <section className="reader-frame">
           {!isCanvasFullscreen && tabs.length > 0 && (
             <TabBar
-              tabs={tabs}
+              tabs={tabsForDisplay}
               activeTabId={chapterId}
               dualSplitTabId={dualSplitTabId}
               onSelectTab={selectChapter}

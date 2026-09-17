@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import App from "../App";
 import { useUiStore } from "../store/useUiStore";
+import { useTabStore } from "../store/useTabStore";
 import {
   installDesktopMock,
   removeDesktopMock,
@@ -26,18 +27,22 @@ import {
 describe("App - shell smoke tests", () => {
   let desktop: DesktopMock;
   const pristineUiState = useUiStore.getState();
+  const pristineTabState = useTabStore.getState();
 
   beforeEach(() => {
     desktop = installDesktopMock();
-    // UI chrome lives in a module-level store now, so it has to be reset
-    // between tests or one test's sidebar/notice leaks into the next.
+    // Both stores are module-level singletons, so they have to be reset between
+    // tests or one test's sidebar, notice, open tabs or active document leaks
+    // into the next.
     useUiStore.setState(pristineUiState, true);
+    useTabStore.setState(pristineTabState, true);
     localStorage.clear();
   });
 
   afterEach(() => {
     removeDesktopMock();
     useUiStore.setState(pristineUiState, true);
+    useTabStore.setState(pristineTabState, true);
     delete document.documentElement.dataset.theme;
     vi.restoreAllMocks();
   });
@@ -129,6 +134,17 @@ describe("App - shell smoke tests", () => {
     // Opening a vault raises a notice; before the R1 migration that lived in
     // App's own useState, and this assertion is what proves it moved.
     expect(useUiStore.getState().notice).toMatch(/已打开目录/);
+  });
+
+  it("registers the opened document as a tab through the store", async () => {
+    render(<App />);
+    await openSampleVault();
+
+    const { tabs, activeTabId } = useTabStore.getState();
+    expect(activeTabId).not.toBe("");
+    // ensureTab runs from an effect keyed on the active chapter, so a tab for
+    // it must exist without anything having called setTabs explicitly.
+    expect(tabs.some((tab) => tab.id === activeTabId)).toBe(true);
   });
 
   it("applies store preferences to the document without going through props", async () => {
