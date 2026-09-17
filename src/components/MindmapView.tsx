@@ -57,6 +57,7 @@ import type { MindmapNode } from "../core/types";
 import { loadMindmapCollapsed, saveMindmapCollapsed } from "../services/storage";
 import { MindmapCanvasMenu } from "./MindmapCanvasMenu";
 import { MindmapExportMenu } from "./MindmapExportMenu";
+import { MindmapSearchGroup } from "./MindmapSearchGroup";
 
 export type MindmapViewProps = {
   title: string;
@@ -477,6 +478,22 @@ export const MindmapView = memo(function MindmapView({
     setCurrentSearchIndex(prevIdx);
     focusOnNode(searchMatchIds[prevIdx]);
   }, [currentSearchIndex, focusOnNode, searchMatchIds]);
+
+  /**
+   * Closes the search and clears it.
+   *
+   * One callback rather than the same three setters written out at each of the
+   * four places that dismiss the search — the field's Escape, its close button,
+   * the canvas Escape and now the extracted group. Clearing the query on close
+   * is part of it: leaving it behind means reopening shows stale matches with
+   * no focused node, which reads as the search being broken.
+   */
+  const handleCloseSearch = useCallback(() => {
+    setIsSearchOpen(false);
+    setSearchQuery("");
+    setSearchMatchIds([]);
+    setCurrentSearchIndex(0);
+  }, []);
 
   // Select all nodes handler
   const handleSelectAll = useCallback(() => {
@@ -976,9 +993,7 @@ export const MindmapView = memo(function MindmapView({
       if (e.key === "Escape") {
         e.preventDefault();
         if (isSearchOpen) {
-          setIsSearchOpen(false);
-          setSearchQuery("");
-          setSearchMatchIds([]);
+          handleCloseSearch();
           return;
         }
         if (contextMenu) {
@@ -1695,80 +1710,26 @@ export const MindmapView = memo(function MindmapView({
           )}
 
           {/* In-Canvas Search Toolbar Group */}
-          <div className="mindmap-toolbar-btn-group mindmap-search-group">
-            <button
-              type="button"
-              className={`mindmap-tool-btn text-btn ${isSearchOpen ? "highlight-btn" : ""}`}
-              onClick={() => {
-                setIsSearchOpen((prev) => {
-                  const next = !prev;
-                  if (next) setTimeout(() => searchInputRef.current?.focus(), 60);
-                  return next;
-                });
-              }}
-              title="搜索导图节点"
-            >
-              <Search size={13} className="text-cyan" />
-              <span>搜索</span>
-            </button>
-            {isSearchOpen && (
-              <div className="mindmap-search-box">
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => handleSearch(e.target.value)}
-                  placeholder="搜索导图节点..."
-                  className="mindmap-search-input"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      if (e.shiftKey) handlePrevSearch();
-                      else handleNextSearch();
-                    } else if (e.key === "Escape") {
-                      setIsSearchOpen(false);
-                      setSearchQuery("");
-                      setSearchMatchIds([]);
-                    }
-                  }}
-                />
-                {searchMatchIds.length > 0 && (
-                  <span className="mindmap-search-count">
-                    {currentSearchIndex + 1}/{searchMatchIds.length}
-                  </span>
-                )}
-                <button
-                  type="button"
-                  className="mindmap-search-nav-btn"
-                  onClick={handlePrevSearch}
-                  disabled={searchMatchIds.length === 0}
-                  title="上一个 (Shift+Enter)"
-                >
-                  ▲
-                </button>
-                <button
-                  type="button"
-                  className="mindmap-search-nav-btn"
-                  onClick={handleNextSearch}
-                  disabled={searchMatchIds.length === 0}
-                  title="下一个 (Enter)"
-                >
-                  ▼
-                </button>
-                <button
-                  type="button"
-                  className="mindmap-search-nav-btn close-btn"
-                  onClick={() => {
-                    setIsSearchOpen(false);
-                    setSearchQuery("");
-                    setSearchMatchIds([]);
-                  }}
-                  title="关闭搜索 (Esc)"
-                >
-                  ✕
-                </button>
-              </div>
-            )}
-          </div>
+          <MindmapSearchGroup
+            isOpen={isSearchOpen}
+            query={searchQuery}
+            matchIds={searchMatchIds}
+            currentIndex={currentSearchIndex}
+            inputRef={searchInputRef}
+            onToggle={() => {
+              setIsSearchOpen((prev) => {
+                const next = !prev;
+                // Focus after the field exists, hence the delay: it is rendered
+                // by the same state change that this returns.
+                if (next) setTimeout(() => searchInputRef.current?.focus(), 60);
+                return next;
+              });
+            }}
+            onQueryChange={handleSearch}
+            onPrev={handlePrevSearch}
+            onNext={handleNextSearch}
+            onClose={handleCloseSearch}
+          />
 
           {/* Zoom. The wheel already worked, but nothing said so and there was
               no way back to a fitted view once you had zoomed — fitToScreen
