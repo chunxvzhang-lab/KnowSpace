@@ -6,6 +6,17 @@ const POSITIONS_V1_KEY = "bookmd.positions.v1";
 const POSITIONS_V2_KEY = "bookmd.positions.v2";
 const PREFS_KEY = "bookmd.preferences.v1";
 const MINDMAP_COLLAPSED_KEY = "bookmd.mindmap.collapsed.v1";
+const MINDMAP_THEME_KEY = "bookmd.mindmap.theme.v1";
+
+/**
+ * Duplicated from the theme module rather than imported.
+ *
+ * Importing it would make this service depend on the theme table, and storage
+ * has no business knowing what themes exist — it is the one place in the app
+ * that should stay ignorant of them. The coupling would also be circular in
+ * spirit: the theme module is what tells a stored id whether it is valid.
+ */
+const DEFAULT_MINDMAP_THEME_ID = "classic";
 
 export type Preferences = {
   theme: ThemeMode;
@@ -101,6 +112,35 @@ export function savePreferences(preferences: Preferences): void {
  * Keyed by path rather than title, because a vault full of `README` and `索引`
  * files would otherwise share one set of folds between all of them.
  */
+/**
+ * The chosen mind map theme, keyed by document.
+ *
+ * Per document rather than global, because a theme is a property of how a map
+ * reads: a technical map and a client-facing one in the same vault can sensibly
+ * want different ones, and making the choice global means every switch is a
+ * decision about all of them.
+ *
+ * Stored as a bare id. Interpreting it is the theme module's job, and a document
+ * naming a theme that no longer exists falls back there rather than here.
+ */
+export function loadMindmapTheme(docKey: string): string | null {
+  const all = readRecord<string>(MINDMAP_THEME_KEY);
+  const id = all[docKey];
+  return typeof id === "string" && id ? id : null;
+}
+
+export function saveMindmapTheme(docKey: string, themeId: string): void {
+  const all = readRecord<string>(MINDMAP_THEME_KEY);
+  if (themeId === DEFAULT_MINDMAP_THEME_ID) {
+    // The default is what a document gets with no entry at all, so writing it
+    // would only leave a key behind for every document ever opened.
+    delete all[docKey];
+  } else {
+    all[docKey] = themeId;
+  }
+  writeRecord(MINDMAP_THEME_KEY, all);
+}
+
 export function loadMindmapCollapsed(docKey: string): string[] {
   const all = readRecord<string[]>(MINDMAP_COLLAPSED_KEY);
   const ids = all[docKey];

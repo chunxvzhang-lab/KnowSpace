@@ -1,7 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { MindmapView } from "../components/MindmapView";
-import { loadMindmapCollapsed, saveMindmapCollapsed } from "../services/storage";
+import {
+  loadMindmapCollapsed,
+  saveMindmapCollapsed,
+  loadMindmapTheme,
+  saveMindmapTheme,
+} from "../services/storage";
 
 /**
  * Folded branches are remembered per document.
@@ -71,6 +76,59 @@ describe("折叠状态持久化", () => {
       localStorage.setItem("bookmd.mindmap.collapsed.v1", "{ 不是 JSON");
 
       expect(loadMindmapCollapsed("/vault/a.md")).toEqual([]);
+    });
+  });
+
+  describe("主题的按文档记忆", () => {
+    it("按文档存取主题", () => {
+      saveMindmapTheme("/vault/a.md", "dark");
+
+      expect(loadMindmapTheme("/vault/a.md")).toBe("dark");
+    });
+
+    it("没有记录时返回 null 而不是默认主题的 id", () => {
+      // Null means "this document has not chosen", which is not the same as
+      // "this document chose classic". Collapsing the two would make it
+      // impossible to tell a deliberate choice from a fallback, and the
+      // deliberate one has to survive a round trip unchanged.
+      expect(loadMindmapTheme("/vault/从未打开.md")).toBeNull();
+    });
+
+    it("选回默认主题时不留下记录", () => {
+      saveMindmapTheme("/vault/a.md", "dark");
+      saveMindmapTheme("/vault/a.md", "classic");
+
+      expect(loadMindmapTheme("/vault/a.md")).toBeNull();
+      expect(localStorage.getItem("bookmd.mindmap.theme.v1")).not.toContain("/vault/a.md");
+    });
+
+    it("不同文档各有各的主题", () => {
+      // Per document rather than global, because a theme is about how a map
+      // reads: a technical map and a client-facing one in the same vault can
+      // sensibly differ, and a global setting makes every switch a decision
+      // about all of them.
+      saveMindmapTheme("/vault/one.md", "dark");
+      saveMindmapTheme("/vault/two.md", "corporate");
+
+      expect(loadMindmapTheme("/vault/one.md")).toBe("dark");
+      expect(loadMindmapTheme("/vault/two.md")).toBe("corporate");
+    });
+
+    it("与折叠状态互不干扰", () => {
+      saveMindmapTheme("/vault/a.md", "dark");
+      saveMindmapCollapsed("/vault/a.md", ["node-1"]);
+
+      expect(loadMindmapTheme("/vault/a.md")).toBe("dark");
+      expect(loadMindmapCollapsed("/vault/a.md")).toEqual(["node-1"]);
+    });
+
+    it("存储的不认识的值原样返回，由主题模块决定怎么处理", () => {
+      // Storage has no business knowing which themes exist — it is the one
+      // place that should stay ignorant of them. Deciding that an id is
+      // unknown belongs to resolveThemeId, which has the table.
+      saveMindmapTheme("/vault/a.md", "已删除的主题");
+
+      expect(loadMindmapTheme("/vault/a.md")).toBe("已删除的主题");
     });
   });
 

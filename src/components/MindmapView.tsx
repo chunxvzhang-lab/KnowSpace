@@ -53,13 +53,19 @@ import {
   type MindmapLayoutNode,
 } from "../services/mindmapService";
 import type { MindmapNode } from "../core/types";
-import { loadMindmapCollapsed, saveMindmapCollapsed } from "../services/storage";
+import {
+  loadMindmapCollapsed,
+  saveMindmapCollapsed,
+  loadMindmapTheme,
+  saveMindmapTheme,
+} from "../services/storage";
 import { MindmapCanvasMenu } from "./MindmapCanvasMenu";
 import { MindmapExportMenu } from "./MindmapExportMenu";
 import { MindmapSearchGroup } from "./MindmapSearchGroup";
 import {
   DEFAULT_THEME_ID,
   MINDMAP_THEMES,
+  MINDMAP_THEME_LIST,
   branchColorFor,
   resolveThemeId,
   type MindmapTheme,
@@ -221,10 +227,37 @@ export const MindmapView = memo(function MindmapView({
   documentKey,
   themeId,
 }: MindmapViewProps) {
-  // Resolved once rather than at each of the two call sites below, and through
-  // resolveThemeId so an id from storage naming a theme that has since been
-  // removed falls back instead of yielding a function or undefined.
-  const mindmapTheme: MindmapTheme = MINDMAP_THEMES[resolveThemeId(themeId ?? DEFAULT_THEME_ID)];
+  /**
+   * The theme the reader picked, or null while the document's own is unknown.
+   *
+   * Null is a real state rather than a placeholder: it means nobody has chosen
+   * for this document yet, so the stored value — or the caller's prop, or the
+   * default — applies. Collapsing that into a single string would lose the
+   * difference between "this document says dark" and "dark is what we fall back
+   * to", and the first is what has to be written back unchanged.
+   */
+  const [pickedThemeId, setPickedThemeId] = useState<string | null>(null);
+
+  // Load the document's theme when the document changes. Unlike the folds,
+  // there is no matching save effect, so no guard is needed here: the write
+  // happens in the handler below, which only runs on a deliberate choice.
+  useEffect(() => {
+    setPickedThemeId(documentKey ? loadMindmapTheme(documentKey) : null);
+  }, [documentKey]);
+
+  const activeThemeId = resolveThemeId(pickedThemeId ?? themeId ?? DEFAULT_THEME_ID);
+  const mindmapTheme: MindmapTheme = MINDMAP_THEMES[activeThemeId];
+
+  const handlePickTheme = useCallback(
+    (next: string) => {
+      setPickedThemeId(next);
+      // Only a document with a path can be remembered. A preview of unsaved
+      // text has nowhere to file the choice, and inventing a key for it would
+      // mean every such preview shared one.
+      if (documentKey) saveMindmapTheme(documentKey, next);
+    },
+    [documentKey]
+  );
   const containerRef = useRef<HTMLDivElement | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const editInputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -1747,6 +1780,29 @@ export const MindmapView = memo(function MindmapView({
             onNext={handleNextSearch}
             onClose={handleCloseSearch}
           />
+
+          {/* Theme picker. A native select rather than a hand-rolled dropdown:
+              there are six options, none of them needs a preview, and a select
+              arrives with the keyboard handling and accessibility a custom menu
+              would have to reimplement.
+              Switching repaints only the nodes nobody has styled by hand, so it
+              needs no confirmation — nothing is overwritten. */}
+          <div className="mindmap-toolbar-btn-group mindmap-theme-group">
+            <Palette size={14} className="text-cyan" />
+            <select
+              className="mindmap-theme-select"
+              value={activeThemeId}
+              onChange={(e) => handlePickTheme(e.target.value)}
+              title="切换主题（不会改变手工设置过样式的节点）"
+              aria-label="导图主题"
+            >
+              {MINDMAP_THEME_LIST.map((option) => (
+                <option key={option.id} value={option.id} title={option.description}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
 
           {/* Zoom. The wheel already worked, but nothing said so and there was
               no way back to a fitted view once you had zoomed — fitToScreen

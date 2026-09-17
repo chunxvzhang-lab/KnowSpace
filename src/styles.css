@@ -11723,3 +11723,52 @@ body:has(.flash-capsule-overlay) {
 }
 
 /* ── End mind map canvas context menu ── */
+
+/* ── Mind map theme picker ──────────────────────────────────────────────
+   A native select dressed to match the toolbar buttons beside it.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+.mindmap-theme-group {
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+}
+
+.mindmap-theme-select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 4px 20px 4px 8px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 6px;
+  background-color: transparent;
+  /* The chevron is drawn rather than taken from the OS, since appearance: none
+     removes it. Kept inline so the rule needs no asset. */
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: right 11px center, right 7px center;
+  background-size: 4px 4px, 4px 4px;
+  background-repeat: no-repeat;
+  color: var(--text-primary, #e2e8f0);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.mindmap-theme-select:hover {
+  border-color: rgba(56, 189, 248, 0.55);
+}
+
+.mindmap-theme-select:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 1px;
+}
+
+/* The dropdown list itself is drawn by the OS; on some platforms the options
+   inherit the closed control's transparent background and become unreadable. */
+.mindmap-theme-select option {
+  background: var(--surface-1, #1e293b);
+  color: var(--text-primary, #e2e8f0);
+}
+
+/* ── End mind map theme picker ── */
