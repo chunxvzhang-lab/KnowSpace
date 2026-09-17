@@ -128,6 +128,9 @@ import { MarqueeSelectionBox } from "./canvas/MarqueeSelectionBox";
 import { CanvasMinimap } from "./canvas/CanvasMinimap";
 import { CanvasEdgeBatchToolbar } from "./canvas/CanvasEdgeBatchToolbar";
 import { getNodePalette } from "./canvas/canvasPalette";
+import { modalOverlayStyle, modalContentStyle, toolBtnStyle } from "./canvas/canvasModalStyles";
+import { ExtractModal } from "./canvas/ExtractModal";
+import { FilePickerModal } from "./canvas/FilePickerModal";
 
 export type CanvasViewProps = {
   title: string;
@@ -6403,152 +6406,12 @@ export const CanvasView = memo(function CanvasView({
 
       {/* 5. MODAL: INSERT NOTE FILE PICKER */}
       {showFilePicker && (
-        <div
-          style={modalOverlayStyle}
-          onMouseDown={(e) => e.stopPropagation()}
-          onClick={() => setShowFilePicker(false)}
-          onWheel={(e) => e.stopPropagation()}
-        >
-          <div style={modalContentStyle(theme, colors)} onClick={(e) => e.stopPropagation()} onWheel={(e) => e.stopPropagation()}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-              <h3 style={{ margin: 0, fontSize: 16, display: "flex", alignItems: "center", gap: 8 }}>
-                <FileText size={18} color="#10b981" /> 引入知识库笔记至白板
-              </h3>
-              <button
-                onClick={() => setShowFilePicker(false)}
-                style={{ background: "none", border: "none", color: colors.cardText, cursor: "pointer" }}
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <div style={{ marginBottom: 12 }}>
-              <input
-                type="text"
-                value={searchKeyword}
-                onChange={(e) => setSearchKeyword(e.target.value)}
-                placeholder="搜索笔记标题或路径..."
-                style={{
-                  width: "100%",
-                  padding: "8px 12px",
-                  borderRadius: 6,
-                  border: `1px solid ${colors.cardBorder}`,
-                  background: theme === "light" ? "#ffffff" : "rgba(0,0,0,0.2)",
-                  color: colors.cardText,
-                  outline: "none",
-                  fontSize: 13,
-                }}
-              />
-            </div>
-
-            <div
-              style={{ maxHeight: 280, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }}
-              onWheel={(e) => e.stopPropagation()}
-            >
-              {allChapters
-                .filter(
-                  (c) =>
-                    !searchKeyword ||
-                    c.title.toLowerCase().includes(searchKeyword.toLowerCase()) ||
-                    c.src.toLowerCase().includes(searchKeyword.toLowerCase())
-                )
-                .map((ch) => (
-                  <div
-                    key={ch.src}
-                    onClick={() => handleAddFileCard(ch)}
-                    style={{
-                      padding: "8px 12px",
-                      borderRadius: 6,
-                      cursor: "pointer",
-                      backgroundColor: theme === "light" ? "#f1f5f9" : "rgba(255,255,255,0.05)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <span style={{ fontSize: 13, fontWeight: 500 }}>{ch.title}</span>
-                    <span style={{ fontSize: 11, opacity: 0.6 }}>{ch.src}</span>
-                  </div>
-                ))}
-            </div>
-          </div>
-        </div>
+      <FilePickerModal chapters={allChapters} searchKeyword={searchKeyword} onSearchChange={setSearchKeyword} theme={theme} colors={colors} onPick={handleAddFileCard} onClose={() => setShowFilePicker(false)} />
       )}
 
       {/* 6. MODAL: EXTRACT CANVAS TO ARTICLE PREVIEW */}
       {showExtractModal && (
-        <div
-          style={modalOverlayStyle}
-          onMouseDown={(e) => e.stopPropagation()}
-          onClick={() => setShowExtractModal(false)}
-          onWheel={(e) => e.stopPropagation()}
-        >
-          <div
-            style={{ ...modalContentStyle(theme, colors), width: 620, maxWidth: "90vw" }}
-            onClick={(e) => e.stopPropagation()}
-            onWheel={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-              <h3 style={{ margin: 0, fontSize: 16, display: "flex", alignItems: "center", gap: 8 }}>
-                <BookOpen size={18} color="#10b981" /> 白板结构化萃取专著
-              </h3>
-              <button
-                onClick={() => setShowExtractModal(false)}
-                style={{ background: "none", border: "none", color: colors.cardText, cursor: "pointer" }}
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <textarea
-              readOnly
-              value={extractedMarkdown}
-              onWheel={(e) => e.stopPropagation()}
-              style={{
-                width: "100%",
-                height: 320,
-                backgroundColor: theme === "light" ? "#ffffff" : "rgba(0,0,0,0.3)",
-                border: `1px solid ${colors.cardBorder}`,
-                borderRadius: 8,
-                padding: 12,
-                color: colors.cardText,
-                fontFamily: "var(--font-mono, monospace)",
-                fontSize: 13,
-                resize: "vertical",
-              }}
-            />
-
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 14 }}>
-              <button
-                onClick={handleCopyExtracted}
-                style={{
-                  ...toolBtnStyle(theme, colors),
-                  padding: "6px 14px",
-                  borderRadius: 6,
-                  border: `1px solid ${colors.cardBorder}`,
-                }}
-              >
-                {copiedNotification ? <Check size={14} color="#10b981" /> : <Copy size={14} />}
-                {copiedNotification ? "已复制到剪贴板！" : "复制全文"}
-              </button>
-              {onExtractToNote && (
-                <button
-                  onClick={handleSaveAsNote}
-                  style={{
-                    ...toolBtnStyle(theme, colors),
-                    backgroundColor: "#10b981",
-                    color: "#ffffff",
-                    padding: "6px 14px",
-                    borderRadius: 6,
-                    fontWeight: 600,
-                  }}
-                >
-                  另存为新笔记
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
+      <ExtractModal markdown={extractedMarkdown} theme={theme} colors={colors} copied={copiedNotification} canSaveAsNote={Boolean(onExtractToNote)} onCopy={handleCopyExtracted} onSaveAsNote={handleSaveAsNote} onClose={() => setShowExtractModal(false)} />
       )}
 
       {/* 6.5. MODAL: EXPORT CANVAS AS IMAGE */}
@@ -8691,24 +8554,7 @@ function getEdgeRing(edge: CanvasEdge): { center: { x: number; y: number }; radi
 // getCanvasThemeColors now lives in ../services/canvasTheme so that the SVG/PNG
 // exporter reads exactly the same palette the screen does.
 
-function toolBtnStyle(theme: ThemeMode, colors: ReturnType<typeof getCanvasThemeColors>): React.CSSProperties {
-  return {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 4,
-    padding: "4px 8px",
-    background: "none",
-    border: "none",
-    borderRadius: 6,
-    color: colors.cardText,
-    cursor: "pointer",
-    fontSize: 12,
-    fontWeight: 500,
-    transition: "all 0.15s ease",
-    whiteSpace: "nowrap",
-    flexShrink: 0,
-  };
-}
+// toolBtnStyle now lives in ./canvas/canvasModalStyles (imported at the top).
 
 function cardHeaderBtnStyle(_colors: ReturnType<typeof getCanvasThemeColors>): React.CSSProperties {
   return {
@@ -8766,31 +8612,5 @@ function getAnchorDotStyle(
   }
 }
 
-const modalOverlayStyle: React.CSSProperties = {
-  position: "absolute",
-  top: 0,
-  left: 0,
-  width: "100%",
-  height: "100%",
-  backgroundColor: "rgba(0,0,0,0.6)",
-  backdropFilter: "blur(4px)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  zIndex: 200,
-};
-
-function modalContentStyle(
-  theme: ThemeMode,
-  colors: ReturnType<typeof getCanvasThemeColors>
-): React.CSSProperties {
-  return {
-    width: 440,
-    backgroundColor: colors.cardBg,
-    color: colors.cardText,
-    borderRadius: 12,
-    border: `1px solid ${colors.cardBorder}`,
-    boxShadow: "0 16px 48px rgba(0,0,0,0.35)",
-    padding: 20,
-  };
-}
+// modalOverlayStyle / modalContentStyle now live in ./canvas/canvasModalStyles
+// so the extracted modal components share them (imported at the top).
