@@ -188,10 +188,15 @@
 | B3b-3 | `useVaultOpening` | 3203 → 2914 | **-289** |
 | B3b-4 | `useSearch` | 2914 → 2586 | **-328** |
 | B3b-5 | `useBacklinkIndex` | 2586 → 2383 | **-203** |
-| B3b-6 | `useGlobalShortcuts` | 2383 → **2171** | **-212** |
-| **合计** | — | **3589 → 2171** | **-1418** |
+| B3b-6 | `useGlobalShortcuts` | 2383 → 2171 | **-212** |
+| B3b-7 | `useBookmarks` | 2171 → **2145** | **-26** |
+| **合计** | — | **3589 → 2145** | **-1444** |
 
-> 📌 **状态迁移贡献 2.5%，抽取贡献 97.5%。** `App.tsx` 已减少 **39.5%**，七个 hook 与一个组件承担了几乎全部。按此速率，最后一个 hook 可将 `App.tsx` 推进到 `< 2000 行`；达到 `< 1500 行` 还需一并处理剩余的 JSX 区块（目录栏 + 侧栏 157 行、reader-frame 203 行）。
+> 📌 **状态迁移贡献 2.4%，抽取贡献 97.6%。** `App.tsx` 已减少 **40.2%**。
+>
+> **八个 hook 已全部落地**（`useColumnResize` / `useDocumentCreation` / `useVaultOpening` / `useSearch` / `useBacklinkIndex` / `useGlobalShortcuts` / `useBookmarks`，加上此前的 `useDocumentSession`）。B3b 阶段结束。
+>
+> **距离 `< 1500 行` 尚差约 645 行**，只能由 **B3c（剩余 JSX 区块）** 拿下。当初搁置它们是因为需要 20+ props；现在会话、检索、反链、书签都已移出 App，**props 面已大幅收窄，值得重新评估** —— 这是 B3c 动工前的第一件事。
 
 **搬移脚本（可复用）**
 
@@ -495,7 +500,8 @@ graph TD
 | **R1-B3b-4** | `useSearch`（检索编排 / 命中高亮 / 滚动定位） | 09/17 | R1-B3b-3 ✅ | ✅ **已完成** |
 | **R1-B3b-5** | `useBacklinkIndex`（索引构建 / 增量更新 / 图谱） | 09/17 | R1-B3b-4 ✅ | ✅ **已完成** |
 | **R1-B3b-6** | `useGlobalShortcuts`（桌面接线 / 键盘快捷键） | 09/17 | R1-B3b-5 ✅ | ✅ **已完成** |
-| **R1-B3b-7** | `useBookmarks`（书签增删改与定位） | 10/01 – 10/20 | R1-B3b-6 ✅ | 待启动 |
+| **R1-B3b-7** | `useBookmarks`（书签增删改与定位） | 09/17 | R1-B3b-6 ✅ | ✅ **已完成** |
+| **R1-B3c** | 剩余 JSX 区块（目录栏+侧栏 ~157 行、reader-frame ~203 行） | 10/01 – 10/20 | R1-B3b-7 ✅ | 待启动（需重估 props 面） |
 | **R2-B1** | canvasService 拆分（9 模块 + 门面） | 09/17 | R2-设计 ✅ | ✅ **已完成** |
 | **R2-B2~B5** | CanvasView 分层拆分（4 批） | 10/06 – 11/02 | R2-B1 ✅ | 待启动 |
 | **F1-UI** | 每日复盘视图 | 09/17 | F1-算法 ✅ | ✅ **已完成** |
