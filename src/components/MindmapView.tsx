@@ -56,6 +56,7 @@ import {
 import type { MindmapNode } from "../core/types";
 import { loadMindmapCollapsed, saveMindmapCollapsed } from "../services/storage";
 import { MindmapCanvasMenu } from "./MindmapCanvasMenu";
+import { MindmapExportMenu } from "./MindmapExportMenu";
 
 export type MindmapViewProps = {
   title: string;
@@ -1808,73 +1809,27 @@ export const MindmapView = memo(function MindmapView({
           </div>
         </div>
 
-        <div className="mindmap-toolbar-right" ref={exportMenuRef}>
-          <div className="mindmap-export-dropdown">
-            <button
-              type="button"
-              className={`mindmap-tool-btn text-btn export-btn ${isExportMenuOpen ? "active" : ""}`}
-              onClick={() => setIsExportMenuOpen((prev) => !prev)}
-              title="导出导图为 PNG、OPML 2.0、FreeMind (.mm) 或 Markdown 大纲"
-              aria-haspopup="true"
-              aria-expanded={isExportMenuOpen}
-            >
-              <Download size={14} />
-              <span>导出 ▾</span>
-            </button>
-            {isExportMenuOpen && (
-              <div className="mindmap-export-menu" role="menu">
-                <button
-                  type="button"
-                  className="mindmap-export-menu-item"
-                  role="menuitem"
-                  onClick={() => {
-                    setIsExportMenuOpen(false);
-                    handleExportPng();
-                  }}
-                >
-                  <span className="export-item-title">导出 PNG 图片</span>
-                  <span className="export-item-desc">高清透明背景位图 (.png)</span>
-                </button>
-                <button
-                  type="button"
-                  className="mindmap-export-menu-item"
-                  role="menuitem"
-                  onClick={() => {
-                    setIsExportMenuOpen(false);
-                    handleExportOpml();
-                  }}
-                >
-                  <span className="export-item-title">导出 OPML 2.0</span>
-                  <span className="export-item-desc">兼容 MindNode、OmniOutliner (.opml)</span>
-                </button>
-                <button
-                  type="button"
-                  className="mindmap-export-menu-item"
-                  role="menuitem"
-                  onClick={() => {
-                    setIsExportMenuOpen(false);
-                    handleExportFreeMind();
-                  }}
-                >
-                  <span className="export-item-title">导出 FreeMind (.mm)</span>
-                  <span className="export-item-desc">兼容 XMind、FreeMind、Freeplane (.mm)</span>
-                </button>
-                <button
-                  type="button"
-                  className="mindmap-export-menu-item"
-                  role="menuitem"
-                  onClick={() => {
-                    setIsExportMenuOpen(false);
-                    handleExportMarkdownOutline();
-                  }}
-                >
-                  <span className="export-item-title">导出 Markdown 大纲</span>
-                  <span className="export-item-desc">多级层级纯文本大纲 (.md)</span>
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
+        <MindmapExportMenu
+          menuRef={exportMenuRef}
+          isOpen={isExportMenuOpen}
+          onToggle={() => setIsExportMenuOpen((prev) => !prev)}
+          onExportPng={() => {
+            setIsExportMenuOpen(false);
+            handleExportPng();
+          }}
+          onExportOpml={() => {
+            setIsExportMenuOpen(false);
+            handleExportOpml();
+          }}
+          onExportFreeMind={() => {
+            setIsExportMenuOpen(false);
+            handleExportFreeMind();
+          }}
+          onExportMarkdownOutline={() => {
+            setIsExportMenuOpen(false);
+            handleExportMarkdownOutline();
+          }}
+        />
       </header>
 
       {/* Main SVG Infinite Mindmap Canvas */}
