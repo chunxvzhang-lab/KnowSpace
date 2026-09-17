@@ -5,6 +5,7 @@ const BOOKMARKS_V2_KEY = "bookmd.bookmarks.v2";
 const POSITIONS_V1_KEY = "bookmd.positions.v1";
 const POSITIONS_V2_KEY = "bookmd.positions.v2";
 const PREFS_KEY = "bookmd.preferences.v1";
+const MINDMAP_COLLAPSED_KEY = "bookmd.mindmap.collapsed.v1";
 
 export type Preferences = {
   theme: ThemeMode;
@@ -87,6 +88,35 @@ export function loadPreferences(): Preferences {
 
 export function savePreferences(preferences: Preferences): void {
   localStorage.setItem(PREFS_KEY, JSON.stringify(preferences));
+}
+
+/**
+ * Folded branches, keyed by document.
+ *
+ * Stored as node ids, which is safe because the ids are derived from the
+ * document structure rather than generated fresh: the root is a fixed literal,
+ * list items are `node-<path>-<index>` and headings are `heading-<line>-<text>`.
+ * A set of random ids would silently empty itself on every reload.
+ *
+ * Keyed by path rather than title, because a vault full of `README` and `索引`
+ * files would otherwise share one set of folds between all of them.
+ */
+export function loadMindmapCollapsed(docKey: string): string[] {
+  const all = readRecord<string[]>(MINDMAP_COLLAPSED_KEY);
+  const ids = all[docKey];
+  return Array.isArray(ids) ? ids : [];
+}
+
+export function saveMindmapCollapsed(docKey: string, ids: string[]): void {
+  const all = readRecord<string[]>(MINDMAP_COLLAPSED_KEY);
+  if (ids.length === 0) {
+    // Everything expanded is the default, so an empty entry is dropped rather
+    // than kept — otherwise every document ever opened leaves a key behind.
+    delete all[docKey];
+  } else {
+    all[docKey] = ids;
+  }
+  writeRecord(MINDMAP_COLLAPSED_KEY, all);
 }
 
 function migrateBookmarks(bookmarks: Bookmark[], chapters?: ChapterManifest[]): Bookmark[] {

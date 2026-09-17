@@ -1967,6 +1967,11 @@ export function App() {
                 onSourceChange={updateSource}
                 editable={session.writable}
                 theme={preferences.theme}
+                // Identifies the document whose folds are being remembered.
+                // The absolute path is preferred because two chapters can
+                // share a title; `src` and the file name cover the cases
+                // where there is no path to hand.
+                documentKey={session.absolutePath || activeChapter?.src || session.fileName}
                 onJumpToHeading={(headingId, _line) => {
                   setViewMode("split");
                   window.setTimeout(() => {

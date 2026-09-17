@@ -52,6 +52,7 @@ import {
   type MindmapLayoutNode,
 } from "../services/mindmapService";
 import type { MindmapNode } from "../core/types";
+import { loadMindmapCollapsed, saveMindmapCollapsed } from "../services/storage";
 
 export type MindmapViewProps = {
   title: string;
@@ -62,6 +63,15 @@ export type MindmapViewProps = {
   onJumpToHeading?: (headingId: string, line?: number) => void;
   onClose?: () => void;
   theme?: ThemeMode;
+  /**
+   * Identifies the document whose folds are being shown.
+   *
+   * A path, from the caller that has one. It cannot be derived from `title`:
+   * a vault with several `README` or `索引` files would share a single set of
+   * folds between all of them. Omitted means folds are not persisted for this
+   * mind map, which is the right behaviour for a preview with no file behind it.
+   */
+  documentKey?: string;
 };
 
 // Rich 18-color modern curated palette for node card background fill (includes transparent)
@@ -191,6 +201,7 @@ export const MindmapView = memo(function MindmapView({
   onJumpToHeading,
   onClose,
   theme = "system",
+  documentKey,
 }: MindmapViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -307,6 +318,48 @@ export const MindmapView = memo(function MindmapView({
 
   // Node collapse state
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
+
+  /**
+   * The document whose folds are currently in `collapsedIds`.
+   *
+   * Guards the save below. Without it, opening a second document would write
+   * the first document's folds under the second one's key: the save effect runs
+   * once with the previous set still in state, before the restore has landed.
+   */
+  const collapsedKeyRef = useRef<string | undefined>(undefined);
+
+  // Restore this document's folds when the document changes.
+  useEffect(() => {
+    if (!documentKey) {
+      collapsedKeyRef.current = undefined;
+      return;
+    }
+
+    // Ids for nodes that no longer exist are dropped. The document may have
+    // been edited since the folds were saved, and a stale id would otherwise
+    // sit in storage forever without ever being read back.
+    const present = new Set<string>();
+    const collect = (node: MindmapNode) => {
+      present.add(node.id);
+      for (const child of node.children ?? []) collect(child);
+    };
+    collect(tree);
+
+    const restored = loadMindmapCollapsed(documentKey).filter((id) => present.has(id));
+    collapsedKeyRef.current = documentKey;
+    setCollapsedIds(new Set(restored));
+    // Deliberately keyed on documentKey alone: re-running when the tree changes
+    // would re-apply the stored folds over ones the reader has just made.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [documentKey]);
+
+  // Save folds as they change. Folding is a discrete click rather than a
+  // per-frame drag, so unlike the pane widths there is nothing to gain by
+  // deferring the write.
+  useEffect(() => {
+    if (!documentKey || collapsedKeyRef.current !== documentKey) return;
+    saveMindmapCollapsed(documentKey, [...collapsedIds]);
+  }, [collapsedIds, documentKey]);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
 
   // Node manual resizing state
