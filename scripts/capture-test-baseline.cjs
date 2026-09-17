@@ -127,11 +127,14 @@ function writeDoc({ rows, totals }) {
   ];
 
   const targets = [
+    ["src/components/CanvasView.tsx", "R2 待拆分: 目标各模块 < 2500 行"],
     ["src/App.tsx", "R1: < 500 行"],
-    ["src/components/CanvasView.tsx", "R2: 拆分后各模块 < 2500 行"],
-    ["src/services/canvasService.ts", "R2: 拆分后各模块 < 2500 行（门面模式）"],
+    ["src/services/canvasGraph.ts", "R2 已拆分 ✅"],
+    ["src/services/canvasExport.ts", "R2 已拆分 ✅"],
+    ["src/services/canvasGeometry.ts", "R2 已拆分 ✅"],
+    ["src/services/canvasService.ts", "R2 门面（127 行）✅"],
+    ["src/services/fsrsService.ts", "F1 新增 · 观察项"],
     ["src/components/MindmapView.tsx", "观察项（已达标）"],
-    ["src/services/fsrsService.ts", "F1 新增模块 · 观察项"],
     ["src/services/mindmapService.ts", "观察项"],
   ];
 

@@ -80,11 +80,14 @@
 
 | 文件 | 当前行数 | 目标 |
 | :--- | ---: | :--- |
+| `src/components/CanvasView.tsx` | 9161 | R2 待拆分: 目标各模块 < 2500 行 |
 | `src/App.tsx` | 3589 | R1: < 500 行 |
-| `src/components/CanvasView.tsx` | 9161 | R2: 拆分后各模块 < 2500 行 |
-| `src/services/canvasService.ts` | 5060 | R2: 拆分后各模块 < 2500 行（门面模式） |
+| `src/services/canvasGraph.ts` | 1152 | R2 已拆分 ✅ |
+| `src/services/canvasExport.ts` | 1081 | R2 已拆分 ✅ |
+| `src/services/canvasGeometry.ts` | 1027 | R2 已拆分 ✅ |
+| `src/services/canvasService.ts` | 127 | R2 门面（127 行）✅ |
+| `src/services/fsrsService.ts` | 895 | F1 新增 · 观察项 |
 | `src/components/MindmapView.tsx` | 2284 | 观察项（已达标） |
-| `src/services/fsrsService.ts` | 895 | F1 新增模块 · 观察项 |
 | `src/services/mindmapService.ts` | 1241 | 观察项 |
 
 ---

@@ -54,3 +54,6 @@ Thumbs.db
 test-baseline.json
 baseline-run.txt
 baseline-capture.log
+
+# Pre-split backup written by scripts/split-canvas-service.cjs
+*.pre-split.ts.bak
