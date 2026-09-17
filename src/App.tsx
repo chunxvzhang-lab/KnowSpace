@@ -21,7 +21,6 @@ import {
 import { buildGraphDataFromIndex } from "./services/graphService";
 import { MindmapView } from "./components/MindmapView";
 import { CanvasView } from "./components/CanvasView";
-import { createDefaultCanvas } from "./services/canvasService";
 import { SearchPanel } from "./components/SearchPanel";
 import { SpaceTimelinePanel } from "./components/SpaceTimelinePanel";
 import { StatusBar } from "./components/StatusBar";
@@ -42,6 +41,7 @@ import type {
 } from "./core/types";
 import { EditorView } from "@codemirror/view";
 import { useColumnResize } from "./hooks/useColumnResize";
+import { useDocumentCreation } from "./hooks/useDocumentCreation";
 import { useDocumentSession } from "./hooks/useDocumentSession";
 import { useReadingTracker } from "./hooks/useReadingTracker";
 import { createBookmark, resolveBookmark } from "./services/bookmarks";
@@ -1213,240 +1213,11 @@ export function App() {
     }
   };
 
-  const doCreateNewFile = async () => {
-    if (!window.bookMDDesktop) {
-      setNotice("新建文件功能仅在桌面版可用。");
-      return;
-    }
-
-    try {
-      const rootPath = manifest?.rootPath;
-      const result = await window.bookMDDesktop.createMarkdownFile({ rootPath });
-      if (result.canceled || !result.success) {
-        if (!result.canceled && result.message) setNotice(result.message);
-        return;
-      }
-
-      let nextManifest = manifest;
-      if (rootPath && window.bookMDDesktop.refreshDirectory) {
-        nextManifest = await window.bookMDDesktop.refreshDirectory(rootPath);
-      } else {
-        const newChapter = result.chapter;
-        nextManifest = {
-          id: manifest?.id ?? `directory:${result.absolutePath}`,
-          title: manifest?.title ?? result.chapter.title,
-          rootPath: manifest?.rootPath,
-          chapters: manifest ? [...manifest.chapters, newChapter] : [newChapter],
-        };
-      }
-
-      const activeChap = nextManifest.chapters.find(
-        (c) => c.absolutePath && c.absolutePath.toLowerCase() === result.absolutePath.toLowerCase()
-      ) ?? result.chapter;
-
-      setManifest(nextManifest);
-      setChapterId(activeChap.id);
-      setTabs((prev) => {
-        const exists = prev.some(
-          (t) =>
-            t.id === activeChap.id ||
-            (t.absolutePath &&
-              activeChap.absolutePath &&
-              t.absolutePath.toLowerCase() === activeChap.absolutePath.toLowerCase())
-        );
-        if (exists) return prev;
-        return [
-          ...prev,
-          {
-            id: activeChap.id,
-            title: activeChap.title,
-            relativePath: activeChap.src,
-            absolutePath: result.absolutePath,
-          },
-        ];
-      });
-      setSidebarOpen(true);
-      setSidebarTab("toc");
-      setViewMode("split");
-      activeLoadedChapterIdRef.current = activeChap.id;
-
-      openSession({
-        chapterId: activeChap.id,
-        absolutePath: result.absolutePath,
-        fileName: activeChap.src.split("/").pop() ?? activeChap.title,
-        baseUrl: result.source.baseUrl,
-        source: result.source.markdown,
-        diskVersion: result.source.diskVersion ?? null,
-        writable: true,
-        hasBom: result.source.hasBom,
-        lineEnding: result.source.lineEnding,
-      });
-
-      setNotice(`已新建文件：${activeChap.title}`);
-    } catch (cause: unknown) {
-      setNotice(cause instanceof Error ? cause.message : "新建文件失败。");
-    }
-  };
-
-  const doCreateNewMindmap = async () => {
-    if (!window.bookMDDesktop) {
-      setNotice("新建思维导图功能仅在桌面版可用。");
-      return;
-    }
-
-    try {
-      const rootPath = manifest?.rootPath;
-      const initialContent = `# 中心主题\n\n- 主要分支 1\n  - 子主题 1.1\n  - 子主题 1.2\n- 主要分支 2\n  - 子主题 2.1\n- 主要分支 3\n`;
-      const result = await window.bookMDDesktop.createMarkdownFile({
-        rootPath,
-        defaultName: "新建思维导图.mindmap.md",
-        initialContent,
-      });
-      if (result.canceled || !result.success) {
-        if (!result.canceled && result.message) setNotice(result.message);
-        return;
-      }
-
-      let nextManifest = manifest;
-      if (rootPath && window.bookMDDesktop.refreshDirectory) {
-        nextManifest = await window.bookMDDesktop.refreshDirectory(rootPath);
-      } else {
-        const newChapter = result.chapter;
-        nextManifest = {
-          id: manifest?.id ?? `directory:${result.absolutePath}`,
-          title: manifest?.title ?? result.chapter.title,
-          rootPath: manifest?.rootPath,
-          chapters: manifest ? [...manifest.chapters, newChapter] : [newChapter],
-        };
-      }
-
-      const activeChap =
-        nextManifest.chapters.find(
-          (c) => c.absolutePath && c.absolutePath.toLowerCase() === result.absolutePath.toLowerCase()
-        ) ?? result.chapter;
-
-      setManifest(nextManifest);
-      setChapterId(activeChap.id);
-      setTabs((prev) => {
-        const exists = prev.some(
-          (t) =>
-            t.id === activeChap.id ||
-            (t.absolutePath &&
-              activeChap.absolutePath &&
-              t.absolutePath.toLowerCase() === activeChap.absolutePath.toLowerCase())
-        );
-        if (exists) return prev;
-        return [
-          ...prev,
-          {
-            id: activeChap.id,
-            title: activeChap.title,
-            relativePath: activeChap.src,
-            absolutePath: result.absolutePath,
-          },
-        ];
-      });
-      setSidebarOpen(true);
-      setSidebarTab("toc");
-      setViewMode("mindmap");
-      activeLoadedChapterIdRef.current = activeChap.id;
-
-      openSession({
-        chapterId: activeChap.id,
-        absolutePath: result.absolutePath,
-        fileName: activeChap.src.split("/").pop() ?? activeChap.title,
-        baseUrl: result.source.baseUrl,
-        source: result.source.markdown,
-        diskVersion: result.source.diskVersion ?? null,
-        writable: true,
-        hasBom: result.source.hasBom,
-        lineEnding: result.source.lineEnding,
-      });
-      setNotice(`已新建思维导图：${activeChap.title}（按 Tab 添加子主题，Enter 添加同级主题）`);
-    } catch (err: any) {
-      setNotice(`新建思维导图失败：${err.message || String(err)}`);
-    }
-  };
-
-  const doCreateNewCanvas = async () => {
-    if (!window.bookMDDesktop) {
-      setNotice("新建空间白板功能仅在桌面版可用。");
-      return;
-    }
-
-    try {
-      const rootPath = manifest?.rootPath;
-      const initialContent = JSON.stringify(createDefaultCanvas(), null, 2);
-      const result = await window.bookMDDesktop.createMarkdownFile({
-        rootPath,
-        defaultName: "新建空间白板.canvas",
-        initialContent,
-      });
-      if (result.canceled || !result.success) {
-        if (!result.canceled && result.message) setNotice(result.message);
-        return;
-      }
-
-      let nextManifest = manifest;
-      if (rootPath && window.bookMDDesktop.refreshDirectory) {
-        nextManifest = await window.bookMDDesktop.refreshDirectory(rootPath);
-      } else {
-        const newChapter = result.chapter;
-        nextManifest = {
-          id: manifest?.id ?? `directory:${result.absolutePath}`,
-          title: manifest?.title ?? result.chapter.title,
-          rootPath: manifest?.rootPath,
-          chapters: manifest ? [...manifest.chapters, newChapter] : [newChapter],
-        };
-      }
-
-      const activeChap =
-        nextManifest.chapters.find(
-          (c) => c.absolutePath && c.absolutePath.toLowerCase() === result.absolutePath.toLowerCase()
-        ) ?? result.chapter;
-
-      setManifest(nextManifest);
-      setChapterId(activeChap.id);
-      setTabs((prev) => {
-        const exists = prev.some(
-          (t) =>
-            t.id === activeChap.id ||
-            (t.absolutePath &&
-              activeChap.absolutePath &&
-              t.absolutePath.toLowerCase() === activeChap.absolutePath.toLowerCase())
-        );
-        if (exists) return prev;
-        return [
-          ...prev,
-          {
-            id: activeChap.id,
-            title: activeChap.title,
-            relativePath: activeChap.src,
-            absolutePath: result.absolutePath,
-          },
-        ];
-      });
-      setDirectoryOpen(false);
-      setSidebarOpen(false);
-      setViewMode("canvas");
-      activeLoadedChapterIdRef.current = activeChap.id;
-
-      openSession({
-        chapterId: activeChap.id,
-        absolutePath: result.absolutePath,
-        fileName: activeChap.src.split("/").pop() ?? activeChap.title,
-        baseUrl: result.source.baseUrl,
-        source: result.source.markdown,
-        diskVersion: result.source.diskVersion ?? null,
-        writable: true,
-        hasBom: result.source.hasBom,
-        lineEnding: result.source.lineEnding,
-      });
-      setNotice(`已新建空间白板：${activeChap.title}（双击画布添加卡片，拖拽节点圆点连线）`);
-    } catch (err: any) {
-      setNotice(`新建空间白板失败：${err.message || String(err)}`);
-    }
-  };
+  const { doCreateNewFile, doCreateNewMindmap, doCreateNewCanvas } = useDocumentCreation({
+    openSession,
+    setViewMode,
+    activeLoadedChapterIdRef,
+  });
 
   const openMarkdownFile = useCallback(
     (file: File) => {
