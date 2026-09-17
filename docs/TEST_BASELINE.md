@@ -81,7 +81,7 @@
 
 | 文件 | 当前行数 | 目标 |
 | :--- | ---: | :--- |
-| `src/components/CanvasView.tsx` | 7726 | R2 待拆分: 目标各模块 < 2500 行 |
+| `src/components/CanvasView.tsx` | 7101 | R2 待拆分: 目标各模块 < 2500 行 |
 | `src/App.tsx` | 3589 | R1: < 500 行 |
 | `src/services/canvasGraph.ts` | 1152 | R2 已拆分 ✅ |
 | `src/services/canvasExport.ts` | 1081 | R2 已拆分 ✅ |
