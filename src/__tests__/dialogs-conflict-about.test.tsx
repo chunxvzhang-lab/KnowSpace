@@ -110,7 +110,12 @@ describe("Dialogs Sub-function Tests", () => {
       render(<AboutDialog isOpen={true} onClose={onClose} />);
 
       expect(screen.getAllByText("KnowSpace").length).toBeGreaterThan(0);
-      expect(screen.getAllByText(/v2\.3\.0/).length).toBeGreaterThan(0);
+      // The version is injected from package.json rather than hard-coded, and
+      // asserting a literal here would only move the drift into the test — which
+      // is what happened: this used to expect v2.3.0 while the app shipped
+      // v2.4.0. Asserting against the injected value instead means the test
+      // fails only if the dialog stops reading it.
+      expect(screen.getAllByText(`v${__APP_VERSION__}`).length).toBeGreaterThan(0);
       expect(screen.getAllByText(/v2\.0\./).length).toBeGreaterThan(0);
       expect(screen.getByText(/Personal Knowledge Workspace/)).toBeDefined();
 

@@ -121,7 +121,7 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
             <div>
               <div className="about-header-title-row">
                 <span className="about-app-name">KnowSpace</span>
-                <span className="about-version-badge">v2.3.0</span>
+                <span className="about-version-badge">v{__APP_VERSION__}</span>
               </div>
               <p className="about-tagline">Personal Knowledge Workspace · 个人知识工作台</p>
             </div>
@@ -147,9 +147,40 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
             <div className="about-card-title">
               <History size={16} className="about-icon text-blue" />
               <span>版本更新日志 · What&apos;s New</span>
-              <span className="about-changelog-version-badge">v2.3.0</span>
+              <span className="about-changelog-version-badge">v{__APP_VERSION__}</span>
             </div>
             <div className="about-changelog-list">
+              {/* v2.5.0 */}
+              <div className="about-changelog-group">
+                <div className="about-changelog-group-label">
+                  <Sparkles size={12} className="text-cyan" />
+                  <span>v2.5.0 FSRS-5 间隔重复闪卡与架构减负</span>
+                </div>
+                <ul className="about-changelog-items">
+                  <li>🃏 <strong>FSRS-5 间隔重复闪卡 (Spaced Repetition)</strong>：补齐「记录 → 整理 → 连接 → <strong>内化</strong>」的最后一环。基于 <strong>DSR 记忆模型</strong>（稳定性 / 难度 / 可回忆性）与遗忘曲线 <code>R(t,S) = (1 + FACTOR·t/S)^DECAY</code> 逐卡调度，让「保持率恰好降到 90% 的那一刻」成为复习时刻。</li>
+                  <li>📝 <strong>三种零侵入语法</strong>：<code>Q:</code>/<code>A:</code> 问答块、<code>问题 :: 答案</code> 行内卡、<code>{"{{c1::答案}}"}</code> 与 <code>==高亮==</code> 挖空卡 —— 卡片直接写在普通 Markdown 里，<strong>不污染正文、不与第三方编辑器冲突</strong>；调度进度存于文档末尾单条 HTML 注释，一卡一行，Git diff 保持可读。</li>
+                  <li>🎚️ <strong>四档评分与间隔预览</strong>：「重来 / 困难 / 良好 / 轻松」四键，每个按钮上直接显示选择它之后的下次间隔，不必试错；卡片 ID 由内容派生，<strong>重排笔记顺序不会让卡片丢失历史</strong>。</li>
+                  <li>⚡ <strong>纯 CPU、毫秒级、零联网</strong>：不依赖 GPU、不调用端侧 AI、不产生任何网络请求，评分响应预算 &lt; 50ms 已固化为守护测试。</li>
+                  <li>🏗️ <strong>架构减负</strong>：<code>App.tsx</code> 减少 <strong>40%</strong>（3589 → 2145 行），领域状态外移为 3 个 Zustand store，并抽出 7 个自定义 hook；<code>canvasService</code> 拆为 <strong>9 个模块 + 门面</strong>（5060 → 127 行）；<code>CanvasView</code> 减少 <strong>30%</strong>（9161 → 6416 行）。</li>
+                  <li>🧪 <strong>测试规模翻倍</strong>：55 个测试套件、<strong>619 项</strong>单元与集成测试 100% 通过（v2.4.0 时为 43 套件 / 384 项）。</li>
+                </ul>
+              </div>
+
+              {/* v2.4.0 */}
+              <div className="about-changelog-group" style={{ marginTop: 10, opacity: 0.9 }}>
+                <div className="about-changelog-group-label">
+                  <Sparkles size={12} className="text-blue" />
+                  <span>v2.4.0 交互式排布间距调校、多模态媒体插入与导出链路加固</span>
+                </div>
+                <ul className="about-changelog-items">
+                  <li>🎛️ <strong>交互式排布间距调校</strong>：环形半径滑块与直接拖拽环上卡片实时调距、网格行列间距拖拽微调、多选组中心空白区整体平移；防重叠保护与「整段手势仅记一条撤销」。</li>
+                  <li>🖼️ <strong>多模态媒体插入与全屏预览</strong>：右键一键插入图片 / 视频 / 音频并按点击位置精准落卡；双击媒体卡片全屏预览（视频播放与音频播放器，<code>✕</code> / <code>Esc</code> 关闭）。</li>
+                  <li>🛡️ <strong>导出与剪贴板彻底修复</strong>：渲染进程栅格化失败时自动改用主进程离屏 <code>capturePage()</code> 出图（<strong>PNG 请求必定得到 PNG</strong>，绝不静默降级）；剪贴板改走系统原生 API；导出配色与屏幕主题 1:1 一致；媒体路径按画布目录解析，图片卡片不再破图。</li>
+                  <li>🎨 <strong>12 色专业调色盘</strong>：调色盘由 6 色扩展至 12 色（键 1-6 保持 JSON Canvas 标准色以确保互通），批量卡片与批量连线新增自定义 HEX 取色器。</li>
+                  <li>🔗 <strong>绕障寻路优化</strong>：多障碍链式包络合并绕行（一串相邻卡片一次绕开），连线图层下沉至卡片之下，线条永不遮挡卡片文字。</li>
+                </ul>
+              </div>
+
               {/* v2.3.0 */}
               <div className="about-changelog-group">
                 <div className="about-changelog-group-label">
@@ -417,7 +448,7 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
                 }}
                 title="下载最新安装包与便携版"
               >
-                <span>{repoUrl}/releases (下载 v2.3.0 安装包与便携版)</span>
+                <span>{repoUrl}/releases (下载 v{__APP_VERSION__} 安装包与便携版)</span>
                 <ExternalLink size={13} />
               </a>
             </div>
