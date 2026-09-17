@@ -41,6 +41,7 @@ import type {
   ThemeMode,
 } from "./core/types";
 import { EditorView } from "@codemirror/view";
+import { useColumnResize } from "./hooks/useColumnResize";
 import { useDocumentSession } from "./hooks/useDocumentSession";
 import { useReadingTracker } from "./hooks/useReadingTracker";
 import { createBookmark, resolveBookmark } from "./services/bookmarks";
@@ -185,10 +186,9 @@ export function App() {
   const setCommandPaletteOpen = useUiStore((s) => s.setCommandPaletteOpen);
   const setVersionHistoryOpen = useUiStore((s) => s.setVersionHistoryOpen);
   const setIsGraphPaneOpen = useUiStore((s) => s.setGraphPaneOpen);
-  const setDirectoryWidth = useUiStore((s) => s.setDirectoryWidth);
-  const setSidebarWidth = useUiStore((s) => s.setSidebarWidth);
-  const setResizingType = useUiStore((s) => s.setResizingType);
-  const persistLayout = useUiStore((s) => s.persistLayout);
+  // The width setters and persistLayout moved into useColumnResize along with
+  // the drag that drives them. The widths themselves are still subscribed here
+  // because the resizers and panels render them.
 
   // Where the reader has scrolled to. Stays here because it describes the
   // rendered document, not the vault.
@@ -211,9 +211,7 @@ export function App() {
 
   // Pane widths and the "a divider is being dragged" flag come from the store,
   // which reads and writes the same localStorage keys as the initialisers that
-  // used to live here.
-  const startXRef = useRef(0);
-  const startWidthRef = useRef(0);
+  // used to live here. Dragging them is useColumnResize's job.
   const selectChapterRef = useRef<(id: string) => void>(() => {});
 
   const {
@@ -300,89 +298,17 @@ export function App() {
     setNotice("Mermaid 图表渲染失败，请检查语法。");
   }, []);
 
-  const handleDirResizeMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setResizingType("dir");
-    startXRef.current = e.clientX;
-    startWidthRef.current = directoryWidth;
-  }, [directoryWidth]);
-
-  const handleSidebarResizeMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setResizingType("sidebar");
-    startXRef.current = e.clientX;
-    startWidthRef.current = sidebarWidth;
-  }, [sidebarWidth]);
-
-  useEffect(() => {
-    if (!resizingType) return;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      const deltaX = e.clientX - startXRef.current;
-      if (resizingType === "dir") {
-        const newWidth = Math.min(Math.max(startWidthRef.current + deltaX, 160), 480);
-        setDirectoryWidth(newWidth);
-      } else if (resizingType === "sidebar") {
-        const newWidth = Math.min(Math.max(startWidthRef.current + deltaX, 180), 520);
-        setSidebarWidth(newWidth);
-      }
-    };
-
-    const handleMouseUp = () => {
-      // Persist once, when the gesture ends. The store's width setters run on
-      // every mousemove, and a synchronous localStorage write per frame would
-      // make the drag stutter — which is why persistLayout exists separately.
-      persistLayout();
-      setResizingType(null);
-      document.body.classList.remove("is-resizing-col");
-    };
-
-    document.body.classList.add("is-resizing-col");
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
-    return () => {
-      document.body.classList.remove("is-resizing-col");
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    };
-    // The widths are deliberately absent from this list. They used to be here
-    // only to seed the locals that tracked the latest value for mouseup; with
-    // that gone, depending on them would tear down and re-add the window
-    // listeners on every frame of the drag to no effect.
-  }, [resizingType, setDirectoryWidth, setSidebarWidth, setResizingType, persistLayout]);
-
-  const handleDirDoubleClick = useCallback(() => {
-    const treeContainer = document.querySelector(".chapter-list");
-    if (treeContainer) {
-      const items = treeContainer.querySelectorAll(".tree-item-title, .tree-folder-title, .tree-heading");
-      let maxW = 0;
-      items.forEach((el) => {
-        maxW = Math.max(maxW, el.getBoundingClientRect().width + 60);
-      });
-      const optimal = Math.min(Math.max(Math.ceil(maxW), 200), 380);
-      setDirectoryWidth(optimal);
-    } else {
-      setDirectoryWidth(240);
-    }
-    // persistLayout reads through get(), so it already sees the width just set.
-    persistLayout();
-  }, [setDirectoryWidth, persistLayout]);
-
-  const handleSidebarDoubleClick = useCallback(() => {
-    const panel = document.querySelector(".side-panel");
-    if (panel) {
-      const items = panel.querySelectorAll(".toc-item-text, .search-card-excerpt, .bookmark-item-title, .tabs");
-      let maxW = 0;
-      items.forEach((el) => {
-        maxW = Math.max(maxW, el.getBoundingClientRect().width + 48);
-      });
-      const optimal = Math.min(Math.max(Math.ceil(maxW), 220), 400);
-      setSidebarWidth(optimal);
-    } else {
-      setSidebarWidth(260);
-    }
-    persistLayout();
-  }, [setSidebarWidth, persistLayout]);
+  // ── Column dragging and fitting (R1 batch B3b) ────────────────────────────
+  //
+  // The first hook out of App.tsx. Its four handlers keep the names the JSX
+  // already used, so the two resizer elements below are unchanged. The width
+  // stores stay subscribed here because the resizers render their width.
+  const {
+    handleDirResizeMouseDown,
+    handleSidebarResizeMouseDown,
+    handleDirDoubleClick,
+    handleSidebarDoubleClick,
+  } = useColumnResize();
 
   const jumpToHeading = useCallback(
     (headingId: string, behavior: ScrollBehavior = "smooth", highlight: boolean = false) => {
