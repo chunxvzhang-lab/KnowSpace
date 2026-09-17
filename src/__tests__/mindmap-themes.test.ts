@@ -8,6 +8,7 @@ import {
   resolveThemeId,
   type MindmapThemeId,
 } from "../core/mindmapThemes";
+import { BRANCH_COLORS } from "../services/mindmapService";
 
 /**
  * A theme supplies defaults; a node's own styles win.
@@ -42,6 +43,24 @@ describe("思维导图主题", () => {
 
     it("默认主题存在", () => {
       expect(MINDMAP_THEMES[DEFAULT_THEME_ID]).toBeDefined();
+    });
+  });
+
+  describe("默认主题必须复现原有观感", () => {
+    // The default theme is what everyone who never opens the picker sees, so it
+    // has to reproduce the pre-theme appearance exactly. This was wrong when
+    // first written: the classic palette had the same colours in a different
+    // order, plus two that were not in the original at all, which would have
+    // silently recoloured every existing map.
+    it("经典主题的分支色与 mindmapService 的原色板逐项相同", () => {
+      expect(MINDMAP_THEMES.classic.branchColors).toEqual(BRANCH_COLORS);
+    });
+
+    it("色板长度相同，因为布局按长度派生分支的颜色索引", () => {
+      // layoutMindmap computes each top-level child's colour index as
+      // `i % BRANCH_COLORS.length`, so a different number of entries reassigns
+      // every branch even if the colours themselves are unchanged.
+      expect(MINDMAP_THEMES.classic.branchColors.length).toBe(BRANCH_COLORS.length);
     });
   });
 

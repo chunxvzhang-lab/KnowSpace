@@ -27,7 +27,6 @@ import {
 } from "lucide-react";
 import type { Heading, ThemeMode, MindmapNodeShape, MindmapLineStyle, MindmapTextAlign } from "../core/types";
 import {
-  BRANCH_COLORS,
   buildMindmapTree,
   layoutMindmap,
   parseMarkdownToMindmapTree,
@@ -58,6 +57,13 @@ import { loadMindmapCollapsed, saveMindmapCollapsed } from "../services/storage"
 import { MindmapCanvasMenu } from "./MindmapCanvasMenu";
 import { MindmapExportMenu } from "./MindmapExportMenu";
 import { MindmapSearchGroup } from "./MindmapSearchGroup";
+import {
+  DEFAULT_THEME_ID,
+  MINDMAP_THEMES,
+  branchColorFor,
+  resolveThemeId,
+  type MindmapTheme,
+} from "../core/mindmapThemes";
 
 export type MindmapViewProps = {
   title: string;
@@ -77,6 +83,12 @@ export type MindmapViewProps = {
    * mind map, which is the right behaviour for a preview with no file behind it.
    */
   documentKey?: string;
+  /**
+   * The appearance the map falls back to for anything a node has not styled
+   * itself. Defaults to the classic theme, so a caller that has not been taught
+   * about themes yet still renders as it always did.
+   */
+  themeId?: string;
 };
 
 // Rich 18-color modern curated palette for node card background fill (includes transparent)
@@ -207,7 +219,12 @@ export const MindmapView = memo(function MindmapView({
   onClose,
   theme = "system",
   documentKey,
+  themeId,
 }: MindmapViewProps) {
+  // Resolved once rather than at each of the two call sites below, and through
+  // resolveThemeId so an id from storage naming a theme that has since been
+  // removed falls back instead of yielding a function or undefined.
+  const mindmapTheme: MindmapTheme = MINDMAP_THEMES[resolveThemeId(themeId ?? DEFAULT_THEME_ID)];
   const containerRef = useRef<HTMLDivElement | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const editInputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -1837,7 +1854,9 @@ export const MindmapView = memo(function MindmapView({
           {/* Render Bezier / Step / Straight Connecting Edges */}
           <g className="mindmap-edges-group">
             {layout.edges.map((edge) => {
-              const defaultColor = BRANCH_COLORS[edge.colorIndex % BRANCH_COLORS.length];
+              // The theme is where branch colours come from. An edge that
+              // carries its own colour keeps it; only the default changes.
+              const defaultColor = branchColorFor(mindmapTheme, edge.colorIndex);
               const color = edge.color || defaultColor;
               const isHighlighted =
                 hoveredNodeId === edge.fromId ||
@@ -1864,8 +1883,8 @@ export const MindmapView = memo(function MindmapView({
             {layout.nodes.map((node) => {
               const defaultBranchColor =
                 node.level === 0
-                  ? "#38bdf8"
-                  : BRANCH_COLORS[node.colorIndex % BRANCH_COLORS.length];
+                  ? mindmapTheme.root.fill ?? mindmapTheme.node.fill
+                  : branchColorFor(mindmapTheme, node.colorIndex);
               const customBg = node.color || "";
               const isCustomTransparent = customBg === "transparent";
               const isHovered = hoveredNodeId === node.id;

@@ -59,9 +59,21 @@ export const MINDMAP_THEMES: Record<MindmapThemeId, MindmapTheme> = {
     id: "classic",
     label: "经典",
     description: "彩色分支，圆角卡片。默认。",
+    // Byte-for-byte the palette mindmapService used before themes existed, and
+    // in the same order, because this is the default: anyone who never opens
+    // the theme picker must see exactly what they saw yesterday. The order is
+    // load-bearing as well as the colours — layoutMindmap derives each branch's
+    // colour index from the palette's length, so a different number of entries
+    // would reassign every branch even with the same colours in it.
     branchColors: [
-      "#38bdf8", "#34d399", "#fbbf24", "#f472b6",
-      "#a78bfa", "#22d3ee", "#fb923c", "#4ade80",
+      "#38bdf8", // Sky blue
+      "#818cf8", // Indigo
+      "#a78bfa", // Purple
+      "#f472b6", // Pink
+      "#fb923c", // Orange
+      "#facc15", // Amber
+      "#34d399", // Emerald
+      "#2dd4bf", // Teal
     ],
     canvasBackground: "transparent",
     defaultEdgeColor: "#64748b",
