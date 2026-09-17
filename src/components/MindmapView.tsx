@@ -63,6 +63,7 @@ import { MindmapCanvasMenu } from "./MindmapCanvasMenu";
 import { MindmapExportMenu } from "./MindmapExportMenu";
 import { MindmapSearchGroup } from "./MindmapSearchGroup";
 import { MindmapInlineEditor } from "./MindmapInlineEditor";
+import { MindmapZoomGroup } from "./MindmapZoomGroup";
 import {
   DEFAULT_THEME_ID,
   MINDMAP_THEMES,
@@ -1805,43 +1806,11 @@ export const MindmapView = memo(function MindmapView({
             </select>
           </div>
 
-          {/* Zoom. The wheel already worked, but nothing said so and there was
-              no way back to a fitted view once you had zoomed — fitToScreen
-              only ran once, sixty milliseconds after the canvas mounted. */}
-          <div className="mindmap-toolbar-btn-group mindmap-zoom-group">
-            <button
-              type="button"
-              className="mindmap-tool-btn text-btn"
-              onClick={() => handleZoomStep(0.87)}
-              title="缩小 (Ctrl+-)"
-            >
-              <ZoomOut size={14} />
-            </button>
-            <button
-              type="button"
-              className="mindmap-zoom-value"
-              onClick={handleFitToScreen}
-              title="适应画布 (Ctrl+0)"
-            >
-              {Math.round(transform.scale * 100)}%
-            </button>
-            <button
-              type="button"
-              className="mindmap-tool-btn text-btn"
-              onClick={() => handleZoomStep(1.15)}
-              title="放大 (Ctrl+=)"
-            >
-              <ZoomIn size={14} />
-            </button>
-            <button
-              type="button"
-              className="mindmap-tool-btn text-btn"
-              onClick={handleFitToScreen}
-              title="适应画布 (Ctrl+0)"
-            >
-              <Maximize2 size={14} />
-            </button>
-          </div>
+          <MindmapZoomGroup
+            scale={transform.scale}
+            onStep={handleZoomStep}
+            onFitToScreen={handleFitToScreen}
+          />
         </div>
 
         <MindmapExportMenu
