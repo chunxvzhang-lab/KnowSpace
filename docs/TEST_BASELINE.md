@@ -80,11 +80,12 @@
 
 | 文件 | 当前行数 | 目标 |
 | :--- | ---: | :--- |
-| `src/App.tsx` | 3590 | R1: < 500 行 |
-| `src/components/CanvasView.tsx` | 9162 | R2: 拆分后各模块 < 2500 行 |
-| `src/services/canvasService.ts` | 5061 | R2 新增目标: 建议 < 2500 行 |
-| `src/components/MindmapView.tsx` | 2285 | 观察项 |
-| `src/services/mindmapService.ts` | 1242 | 观察项 |
+| `src/App.tsx` | 3589 | R1: < 500 行 |
+| `src/components/CanvasView.tsx` | 9161 | R2: 拆分后各模块 < 2500 行 |
+| `src/services/canvasService.ts` | 5060 | R2: 拆分后各模块 < 2500 行（门面模式） |
+| `src/components/MindmapView.tsx` | 2284 | 观察项（已达标） |
+| `src/services/fsrsService.ts` | 895 | F1 新增模块 · 观察项 |
+| `src/services/mindmapService.ts` | 1241 | 观察项 |
 
 ---
 

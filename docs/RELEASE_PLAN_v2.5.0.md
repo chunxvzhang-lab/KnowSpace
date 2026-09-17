@@ -33,13 +33,13 @@
 
 ### 1.1 一句话目标
 
-> **在不动摇现有功能的前提下，拆掉三个巨石文件（`CanvasView.tsx` 8636 行 / `canvasService.ts` 4535 行 / `App.tsx` 3319 行），并交付 KnowSpace 的第一个「知识内化」能力 —— FSRS 间隔重复闪卡系统。**
+> **在不动摇现有功能的前提下，拆掉三个巨石文件（`CanvasView.tsx` 9161 行 / `canvasService.ts` 5060 行 / `App.tsx` 3589 行），并交付 KnowSpace 的第一个「知识内化」能力 —— FSRS 间隔重复闪卡系统。**
 
 ### 1.2 目标拆解
 
 | 目标 | 类型 | 为什么是这一版 |
 | :--- | :--- | :--- |
-| **G1 · 架构减负** | 技术债 | 三个巨石文件合计 **16,490 行**。后续所有功能都要落在其中，越晚拆成本越高（🔴 头号风险） |
+| **G1 · 架构减负** | 技术债 | 三个巨石文件合计 **17,810 行**。后续所有功能都要落在其中，越晚拆成本越高（🔴 头号风险） |
 | **G2 · FSRS 闪卡** | 新功能 | 纯 CPU 毫秒级计算，**不被端侧 AI 算力阻塞**；补齐「记录 → 整理 → 连接 → **内化**」闭环 |
 | **G3 · 质量基线** | 工程质量 | 口径已澄清（见 §2.3），本轮目标转为**守住基线不倒退** |
 
@@ -60,16 +60,21 @@
 
 ### 2.1 代码规模
 
-| 文件 | 规划时记载 | **实测** | 变化 |
-| :--- | ---: | ---: | :--- |
-| `src/components/CanvasView.tsx` | 8451 | **8636** | +185（含 v2.4.0 新增交互） |
-| `src/services/canvasService.ts` | 未识别 | **4535** | ⚠️ **新增拆分目标** |
-| `src/App.tsx` | 3319 | **3319** | 无变化 |
-| `src/components/MindmapView.tsx` | 未识别 | 2137 | 观察项 |
-| `src/__tests__/canvas-service.test.ts` | — | 2358 | 测试 |
-| `src/__tests__/canvas-view.test.tsx` | — | 1781 | 测试 |
+> 📏 **口径统一**：本节采用**总行数（含空行）** —— 与编辑器、GitHub 显示一致。
+> 原计划使用的 `Measure-Object -Line` **不含空行**，同一文件会得出不同数字（如 `CanvasView` 既是 8636 也是 9161）。
 
-> ⚠️ **对原计划的修正**：原计划只把 `CanvasView.tsx` 列为拆分目标，但 **`canvasService.ts` 已达 4535 行**，且承担绕障寻路 / 环网格几何 / 色彩映射 / 导出栅格化等多重职责，风险等级与 `CanvasView` 同级，**纳入本版拆分范围**。
+| 文件 | 非空行数（原口径） | **总行数（本版口径）** | 说明 |
+| :--- | ---: | ---: | :--- |
+| `src/components/CanvasView.tsx` | 8636 | **9161** | R2 拆分目标 |
+| `src/services/canvasService.ts` | 4535 | **5060** | ⚠️ **原计划未识别的拆分目标** |
+| `src/App.tsx` | 3319 | **3589** | R1 目标：< 500 |
+| `src/components/MindmapView.tsx` | 2137 | 2284 | 观察项（已达标） |
+| `src/services/fsrsService.ts` | 784 | 895 | F1 新增 |
+| **三巨石合计** | 16,490 | **17,810** | — |
+
+> ⚠️ **对原计划的两处修正**：
+> ① **`canvasService.ts` 原计划未识别**，实际已达 **5060 行**，承担绕障寻路 / 环网格几何 / 色彩映射 / 导出栅格化等多重职责，风险等级与 `CanvasView` 同级 —— 已纳入 R2 范围；
+> ② 行数口径不统一会让「< 2500 行」的验收标准失去意义 —— 已统一为总行数，并在 `scripts/capture-test-baseline.cjs` 中固化。
 
 ### 2.2 模块就绪度
 
@@ -148,20 +153,25 @@
 
 | 项目 | 内容 |
 | :--- | :--- |
-| **需求背景** | `CanvasView.tsx` 8636 行 + `canvasService.ts` 4535 行是**头号技术债**。白板是差异化核心，也是最难维护、最易引入回归的模块 |
+| **需求背景** | `CanvasView.tsx` 9161 行 + `canvasService.ts` 5060 行是**头号技术债**。白板是差异化核心，也是最难维护、最易引入回归的模块 |
+| **设计文档** | 📐 **拆分方案已产出：`docs/CANVAS_SPLIT_DESIGN.md`**（含逐行结构审计、模块边界、依赖图、批次计划、回滚预案） |
 | **影响范围** | 见下方拆分方案 |
 | **验收标准** | ① 拆分后单文件均 **< 2500 行**<br/>② **白板相关全部测试通过**（`canvas-service` 98 项 + `canvas-view` 54 项）<br/>③ 手动回归清单全通过（见 §6.2）<br/>④ **性能无回退**：拖动帧率与拆分前持平 |
 
-**拆分方案**：
+**拆分方案**（详见 `docs/CANVAS_SPLIT_DESIGN.md`）：
 
 | 原文件 | 目标模块 |
 | :--- | :--- |
-| `CanvasView.tsx`<br/>8636 行 | `CanvasViewport`（视口/手势/缩放）<br/>`CanvasNodeLayer`（卡片渲染）<br/>`CanvasEdgeLayer`（连线渲染）<br/>`CanvasPresentationOverlay`（F5 演播）<br/>`CanvasMinimap`（小地图）<br/>`CanvasView`（组合根，< 800 行） |
-| `canvasService.ts`<br/>4535 行 | `canvasGeometry`（环/网格检测与对齐）<br/>`canvasRouting`（AABB 绕障寻路）<br/>`canvasColor`（调色板与色彩映射）<br/>`canvasExport`（SVG/PNG 导出与栅格化）<br/>`canvasSerialization`（解析/序列化/校验）<br/>`canvasService`（门面 re-export，**保持既有 import 路径不变**） |
+| `CanvasView.tsx`<br/>9161 行 | 组合根 `CanvasView`（< 800 行）+ `CanvasToolbar` / `CanvasWorld` / `CanvasEdgeLayer` / `CanvasNodeLayer` / `CanvasEdgeLabelLayer` / `CanvasMinimap` / `CanvasContextMenu`（3 分支）/ `CanvasModals`（4 个）/ `CanvasPresentation` / `CanvasEdgeBatchToolbar` / `CanvasChrome`，共享状态收敛到 6 个 hook |
+| `canvasService.ts`<br/>5060 行 | `canvasPrimitives`（常量·媒体·文本·包含谓词）<br/>`canvasGeometry`（几何与环网格对齐）<br/>`canvasRouting`（AABB 绕障）<br/>`canvasGraph`（环检测 + 缓存 + sync*）<br/>`canvasColor`（调色板与色彩映射）<br/>`canvasSerialization`（解析/序列化）<br/>`canvasEdges`（建边与变更）<br/>`canvasExport`（导出，独占 DOM）<br/>`canvasService`（门面 re-export） |
 
-> 💡 **门面模式**：`canvasService.ts` 拆分后保留为 re-export 门面，**调用方无需改动**，可把回归面压到最小。
+> 💡 **门面模式**：`canvasService.ts` 拆分后保留为 re-export 门面，**转发全部 80 个导出**，3 个调用方（`CanvasView` 49 符号 / 测试 57 符号 / `App` 1 符号，并集 65）**一行都不用改**。
+>
+> ⚠️ **两处必须处理的耦合**（设计文档 §1.4）：
+> ① 未导出的 `getLoopEdgeIdsCached` 被 `canvasColor` 跨组使用 → 缓存随函数迁入 `canvasGraph` 并内部导出；
+> ② 三个 `sync*` 函数横跨 graph + geometry → 归入 `canvasGraph`，避免形成双向依赖。
 
-**时间节点**：依赖分析 + 拆分设计 09/22–10/05；`canvasService` 拆分 10/06–10/16；`CanvasView` 批次拆分 10/06–10/28；回归 10/29–11/02
+**时间节点**：拆分设计 ✅ **已完成（09/17）**；`canvasService` 拆分 10/06–10/16；`CanvasView` 分 4 批拆分 10/06–11/02；回归 10/29–11/02
 
 ---
 
@@ -239,7 +249,7 @@ graph TD
 | ID | 风险 | 等级 | 应对 |
 | :--- | :--- | :---: | :--- |
 | **R-1** | **范围过大** —— 解耦 + 拆分 + FSRS 三线并行 | 🔴 高 | 已劈版（PDF/手绘移出）；§5.2 裁剪顺序；10/20 中期检查 |
-| **R-2** | **重构引入回归** —— `CanvasView` 8636 行拆分风险极高 | 🔴 高 | ① 基线已固化 ✅<br/>② 分批拆分，每批跑全量 + 基线对比<br/>③ `canvasService` 用门面 re-export 降低调用方影响面 |
+| **R-2** | **重构引入回归** —— `CanvasView` 9161 行拆分风险极高 | 🔴 高 | ① 基线已固化 ✅<br/>② 分批拆分，每批跑全量 + 基线对比（见设计文档 §3.2）<br/>③ `canvasService` 用门面 re-export 降低调用方影响面 |
 | **R-3** | **数据格式兼容** —— FSRS 注释被旧版误读 | 🟠 中 | ① 仅用标准 HTML 注释<br/>② 发布前用 v2.4.0 实测打开含 FSRS 数据的库<br/>③ 解析器对未知注释放行 |
 | **R-4** | **两线并行冲突** —— R1 与 R2 同时改文件 | 🟠 中 | **文件归属约定**：R2 独占 `CanvasView*` 与 `canvasService*`；R1 独占 `store/` 与 `App.tsx`；接口变更先约定后实施 |
 | **R-5** | **单人投入** —— 无专职团队，排期易落空 | 🟠 中 | 优先级已排定；若无连续投入，按 §5.2 裁至「FSRS 单品交付」 |
@@ -268,9 +278,9 @@ graph TD
 
 | 阶段 | 窗口 | 里程碑 | 交付物 |
 | :--- | :--- | :--- | :--- |
-| **准备期** | 09/17 – 09/30 | 基线固化 ✅ + 拆分设计评审 | `TEST_BASELINE.md` ✅；R1/R2 拆分设计文档 |
+| **准备期** | 09/17 – 09/30 | 基线固化 ✅ + 拆分设计 ✅ | `TEST_BASELINE.md` ✅；`CANVAS_SPLIT_DESIGN.md` ✅ |
 | **开发期 A** | 10/01 – 10/20 | 架构解耦主攻 | 三大 Store；`App.tsx` < 500 行 |
-| **开发期 B** | 10/06 – 11/02 | 拆分 + FSRS 并行 | 拆分模块；FSRS 内核与复盘视图 |
+| **开发期 B** | 10/06 – 11/02 | 拆分 + FSRS 并行 | 拆分模块（5 批）；FSRS 内核 ✅ 与复盘视图 |
 | **联调期** | 10/29 – 11/02 | 集成验证 | 全量绿 + 手动回归通过 |
 | **发布期** | 11/03 – 11/07 | 打包发布 | 三产物；Release Notes；手册更新 |
 | **观察期** | 11/08 – 11/14 | 灰度反馈 | 缺陷收集与 hotfix 判断 |
@@ -381,11 +391,11 @@ graph TD
 | ID | 任务 | 起止 | 前置 | 状态 |
 | :--- | :--- | :--- | :--- | :---: |
 | **R3** | 测试口径校准与基线固化 | 09/17 | — | ✅ **已完成** |
-| **R2-设计** | 拆分方案与回滚预案 | 09/22 – 09/30 | R3 ✅ | 待启动 |
+| **R2-设计** | 拆分方案与回滚预案 | 09/17 | R3 ✅ | ✅ **已完成** |
+| **F1-算法** | FSRS 内核与语法解析 | 09/17 | — | ✅ **已完成** |
 | **R1** | Zustand 解耦 | 10/01 – 10/20 | R3 ✅ | 待启动 |
-| **R2** | 巨石文件拆分 | 10/06 – 11/02 | R3 ✅ | 待启动 |
-| **F1-算法** | FSRS 内核与语法解析 | 10/01 – 10/18 | — | 待启动 |
-| **F1-UI** | 每日复盘视图 | 10/15 – 10/28 | F1-算法 | 待启动 |
+| **R2** | 巨石文件拆分（5 批） | 10/06 – 11/02 | R2-设计 ✅ | 待启动 |
+| **F1-UI** | 每日复盘视图 | 10/15 – 10/28 | F1-算法 ✅ | 待启动 |
 | **F1-联调** | 闭环联调 | 10/29 – 11/02 | F1-UI | 待启动 |
 | **R4** | 资产与文档治理 | 11/03 – 11/07 | — | 待启动 |
 | **发布** | 打包与 Release | 11/03 – 11/07 | 全部 | 待启动 |

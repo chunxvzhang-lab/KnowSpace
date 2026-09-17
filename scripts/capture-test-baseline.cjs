@@ -67,9 +67,15 @@ function buildReport(report) {
 function writeDoc({ rows, totals }) {
   const now = new Date().toISOString().slice(0, 10);
   const pkg = require(path.join(root, "package.json"));
+  // Total line count including blank lines, matching what editors and GitHub
+  // display (and what .NET's ReadAllLines reports). The earlier figures in the
+  // planning docs used Measure-Object -Line, which omits blank lines — that is
+  // why the same file appeared as both 8636 and 9161.
   const lineCount = (rel) => {
     try {
-      return fs.readFileSync(path.join(root, rel), "utf8").split("\n").length;
+      const lines = fs.readFileSync(path.join(root, rel), "utf8").split(/\r?\n/);
+      if (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
+      return lines.length;
     } catch {
       return null;
     }
@@ -123,8 +129,9 @@ function writeDoc({ rows, totals }) {
   const targets = [
     ["src/App.tsx", "R1: < 500 行"],
     ["src/components/CanvasView.tsx", "R2: 拆分后各模块 < 2500 行"],
-    ["src/services/canvasService.ts", "R2 新增目标: 建议 < 2500 行"],
-    ["src/components/MindmapView.tsx", "观察项"],
+    ["src/services/canvasService.ts", "R2: 拆分后各模块 < 2500 行（门面模式）"],
+    ["src/components/MindmapView.tsx", "观察项（已达标）"],
+    ["src/services/fsrsService.ts", "F1 新增模块 · 观察项"],
     ["src/services/mindmapService.ts", "观察项"],
   ];
 
