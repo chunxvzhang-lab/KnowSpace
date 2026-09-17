@@ -62,6 +62,7 @@ import {
 import { MindmapCanvasMenu } from "./MindmapCanvasMenu";
 import { MindmapExportMenu } from "./MindmapExportMenu";
 import { MindmapSearchGroup } from "./MindmapSearchGroup";
+import { MindmapInlineEditor } from "./MindmapInlineEditor";
 import {
   DEFAULT_THEME_ID,
   MINDMAP_THEMES,
@@ -2380,32 +2381,14 @@ export const MindmapView = memo(function MindmapView({
 
       {/* Inline Text Editing Overlay Input */}
       {editingNode && (
-        <textarea
-          ref={editInputRef}
-          className="mindmap-inline-edit-input"
-          style={{
-            position: "absolute",
-            left: transform.x + editingNode.x * transform.scale,
-            top: transform.y + editingNode.y * transform.scale,
-            width: Math.max(120, editingNode.width * transform.scale),
-            height: Math.max(30, editingNode.height * transform.scale),
-            fontSize: `${Math.max(11, Math.round((editingNode.fontSize || 13) * transform.scale))}px`,
-            fontWeight: editingNode.fontWeight === "bold" ? 700 : 500,
-            textAlign: (editingNode.textAlign === "justify" ? "left" : editingNode.textAlign) || "center",
-            resize: "none",
-          }}
+        <MindmapInlineEditor
+          node={editingNode}
+          transform={transform}
           value={editingText}
-          onChange={(e) => setEditingText(e.target.value)}
-          onBlur={handleCommitEdit}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              handleCommitEdit();
-            } else if (e.key === "Escape") {
-              e.preventDefault();
-              handleCancelEdit();
-            }
-          }}
+          inputRef={editInputRef}
+          onChange={setEditingText}
+          onCommit={handleCommitEdit}
+          onCancel={handleCancelEdit}
         />
       )}
 
