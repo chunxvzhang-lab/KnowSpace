@@ -344,4 +344,36 @@ describe("useUiStore - UI chrome store", () => {
       expect(useUiStore.getState().notice).toBe("由调用方负责清除");
     });
   });
+
+  describe("review focus", () => {
+    // The flashcard review asks the shell to get out of the way. The chain is:
+    // DailyReviewPanel → onReviewActiveChange → handleReviewActiveChange →
+    // isReviewFocus → the `is-review-focus` class on .app-shell → CSS.
+    //
+    // The store is the middle of that chain. It is tested here because the two
+    // ends are CSS and a class name, neither of which a unit test can reach —
+    // so this at least pins the value the ends depend on.
+    it("starts off, so the reader is not collapsed before a review begins", () => {
+      expect(useUiStore.getState().isReviewFocus).toBe(false);
+    });
+
+    it("toggles in both directions", () => {
+      useUiStore.getState().setReviewFocus(true);
+      expect(useUiStore.getState().isReviewFocus).toBe(true);
+
+      useUiStore.getState().setReviewFocus(false);
+      expect(useUiStore.getState().isReviewFocus).toBe(false);
+    });
+
+    it("is not persisted", () => {
+      // Leaving the review collapses the reader, but a restart must come back to
+      // the reader rather than to a review nobody asked for — so this flag has
+      // no localStorage key of its own, unlike the pane widths.
+      useUiStore.getState().setReviewFocus(true);
+      useUiStore.getState().persistLayout();
+
+      const keys = Object.keys(localStorage);
+      expect(keys.some((key) => /review/i.test(key))).toBe(false);
+    });
+  });
 });
