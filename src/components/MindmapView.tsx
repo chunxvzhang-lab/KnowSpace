@@ -45,6 +45,8 @@ import {
   reparentNode,
   planDrop,
   moveWithinSiblings,
+  copySubtree,
+  pasteSubtree,
   searchMindmapNodes,
   exportMindmapToOpml,
   exportMindmapToFreeMind,
@@ -540,6 +542,52 @@ export const MindmapView = memo(function MindmapView({
     });
   }, []);
 
+  /**
+   * The copied branch.
+   *
+   * A ref rather than state, deliberately: nothing renders from it, and the
+   * paste shortcut reads it at the moment it runs — putting it in state would
+   * re-render the whole canvas on every copy for no visible change. It is not
+   * the system clipboard either; what is copied is a tree, not text.
+   */
+  const clipboardRef = useRef<MindmapNode | null>(null);
+
+  const handleCopyNode = useCallback(() => {
+    const nodeId = [...selectedNodeIds][0];
+    if (!nodeId) return;
+    const copied = copySubtree(tree, nodeId);
+    if (copied) clipboardRef.current = copied;
+  }, [selectedNodeIds, tree]);
+
+  const handleCutNode = useCallback(() => {
+    const nodeId = [...selectedNodeIds][0];
+    // The root is refused: cutting it would leave no tree to paste into.
+    if (!nodeId || nodeId === tree.id) return;
+
+    const copied = copySubtree(tree, nodeId);
+    if (!copied) return;
+    clipboardRef.current = copied;
+
+    // deleteNode returns the tree *and* what to select afterwards, so a cut
+    // leaves a sensible selection rather than nothing selected.
+    const { nextTree, fallbackSelectedId } = deleteNode(tree, nodeId);
+    applyTreeChange(nextTree);
+    setSelectedNodeIds(new Set([fallbackSelectedId]));
+  }, [applyTreeChange, selectedNodeIds, tree]);
+
+  const handlePasteNode = useCallback(() => {
+    const copied = clipboardRef.current;
+    if (!copied) return;
+
+    // Pasted under the selection, so a paste into empty space lands on the root
+    // rather than doing nothing.
+    const result = pasteSubtree(tree, [...selectedNodeIds][0], copied);
+    if (!result) return;
+
+    applyTreeChange(result.nextTree);
+    setSelectedNodeIds(new Set([result.newNodeId]));
+  }, [applyTreeChange, selectedNodeIds, tree]);
+
   const handleUndo = useCallback(() => {
     if (undoStackRef.current.length === 0) return;
     const prev = undoStackRef.current.pop()!;
@@ -736,6 +784,26 @@ export const MindmapView = memo(function MindmapView({
         return;
       }
 
+      // Copy, cut and paste the selected branch. These sit after the
+      // editing guard at the top of this handler, so they never fire while
+      // text is being edited — Ctrl+C in the inline editor has to stay the
+      // browser's copy.
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "c") {
+        e.preventDefault();
+        handleCopyNode();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "x") {
+        e.preventDefault();
+        handleCutNode();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "v") {
+        e.preventDefault();
+        handlePasteNode();
+        return;
+      }
+
       // Escape closes search, context menu, deselects nodes, or closes view
       if (e.key === "Escape") {
         e.preventDefault();
@@ -866,6 +934,9 @@ export const MindmapView = memo(function MindmapView({
     startEditing,
     handleNavigate,
     handleMoveSibling,
+    handleCopyNode,
+    handleCutNode,
+    handlePasteNode,
     handleZoomStep,
     handleFitToScreen,
     onClose,

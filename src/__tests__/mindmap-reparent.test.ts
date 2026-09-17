@@ -4,6 +4,8 @@ import {
   reparentNode,
   planDrop,
   moveWithinSiblings,
+  copySubtree,
+  pasteSubtree,
   searchMindmapNodes,
 } from "../services/mindmapService";
 
@@ -188,6 +190,83 @@ describe("mindmap reparenting and search algorithms", () => {
     it("moves a top-level branch among the root's children", () => {
       const updated = moveWithinSiblings(sampleTree, "node-a", 1);
       expect(updated.children.map((c) => c.id)).toEqual(["node-b", "node-a"]);
+    });
+
+    it("copies a branch with fresh ids and keeps the original alone", () => {
+      const copied = copySubtree(sampleTree, "node-a")!;
+
+      expect(copied.text).toBe("分支A");
+      // Fresh ids are the whole point: node ids are derived from a document's
+      // structure, so a copy that kept them would give two nodes the same id
+      // and every lookup would find whichever came first.
+      expect(copied.id).not.toBe("node-a");
+      expect(copied.children.map((c) => c.id)).not.toContain("node-a1");
+      expect(copied.children.map((c) => c.text)).toEqual(["要点A1", "要点A2"]);
+    });
+
+    it("copies styles so a pasted branch does not lose its colour", () => {
+      const styled: MindmapNode = {
+        ...sampleTree,
+        children: [{ ...sampleTree.children[0], color: "#38bdf8" }],
+      };
+
+      const copied = copySubtree(styled, "node-a")!;
+
+      expect(copied.color).toBe("#38bdf8");
+    });
+
+    it("returns null when there is nothing to copy", () => {
+      expect(copySubtree(sampleTree, "does-not-exist")).toBeNull();
+    });
+
+    it("pastes under the given parent and selects the new node", () => {
+      const copied = copySubtree(sampleTree, "node-a1")!;
+      const result = pasteSubtree(sampleTree, "node-b", copied)!;
+
+      const branchB = result.nextTree.children.find((c) => c.id === "node-b")!;
+      expect(branchB.children.map((c) => c.text)).toEqual(["要点B1", "要点A1"]);
+      // The id handed back is the one that actually landed in the tree,
+      // because that is what the view selects afterwards.
+      expect(branchB.children.some((c) => c.id === result.newNodeId)).toBe(true);
+    });
+
+    it("pasting twice produces two distinct nodes rather than one duplicated id", () => {
+      const copied = copySubtree(sampleTree, "node-a1")!;
+      const first = pasteSubtree(sampleTree, "node-b", copied)!;
+      const second = pasteSubtree(first.nextTree, "node-b", copied)!;
+
+      const branchB = second.nextTree.children.find((c) => c.id === "node-b")!;
+      expect(branchB.children).toHaveLength(3);
+      expect(new Set(branchB.children.map((c) => c.id)).size).toBe(3);
+    });
+
+    it("pastes onto the root when nothing is selected", () => {
+      const copied = copySubtree(sampleTree, "node-b1")!;
+      const result = pasteSubtree(sampleTree, undefined, copied)!;
+
+      expect(result.nextTree.children.at(-1)!.text).toBe("要点B1");
+    });
+
+    it("recomputes levels so a pasted branch sits at its new depth", () => {
+      // Copying a level-2 leaf onto a deep branch would otherwise carry level 2
+      // with it, and every indentation afterwards would be wrong.
+      const copied = copySubtree(sampleTree, "node-b1")!;
+      expect(copied.level).toBe(2);
+
+      const result = pasteSubtree(sampleTree, "node-a1", copied)!;
+      const branchA = result.nextTree.children.find((c) => c.id === "node-a")!;
+      const pasted = branchA.children[0].children[0];
+
+      expect(pasted.text).toBe("要点B1");
+      expect(pasted.level).toBe(3);
+    });
+
+    it("leaves the tree it was given untouched", () => {
+      const copied = copySubtree(sampleTree, "node-a")!;
+      pasteSubtree(sampleTree, "node-b", copied);
+
+      const branchB = sampleTree.children.find((c) => c.id === "node-b")!;
+      expect(branchB.children.map((c) => c.id)).toEqual(["node-b1"]);
     });
 
     it("returns the same tree when the node is already first", () => {

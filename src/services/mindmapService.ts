@@ -1129,6 +1129,66 @@ export function updateNodesStyle(
 }
 
 /**
+ * Copies a branch for later pasting, with fresh ids.
+ *
+ * Ids are regenerated rather than carried over. Node ids here are derived from
+ * a document's structure — `node-<path>-<index>` — so pasting a copy that kept
+ * its ids would produce two nodes claiming the same one, and every lookup by id
+ * would find whichever came first. Regenerating at copy time rather than paste
+ * time also means the same clipboard contents can be pasted repeatedly without
+ * the second paste colliding with the first.
+ *
+ * Styles come along, because a copied branch that lost its colours would be a
+ * worse answer than no copy at all.
+ */
+export function copySubtree(tree: MindmapNode, nodeId: string): MindmapNode | null {
+  const source = findNode(tree, nodeId);
+  if (!source) return null;
+
+  const stamp = (node: MindmapNode, level: number): MindmapNode => ({
+    ...node,
+    id: `node-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+    level,
+    children: (node.children ?? []).map((child) => stamp(child, level + 1)),
+  });
+
+  // The clipboard copy is detached: it is data, not part of the tree, and
+  // nothing should be able to mutate one through the other.
+  return stamp(JSON.parse(JSON.stringify(source)) as MindmapNode, source.level);
+}
+
+/**
+ * Attaches a copied branch under a node.
+ *
+ * Returns null when there is nothing to paste. The parent falls back to the
+ * root, so a paste with an empty selection still lands somewhere sensible
+ * instead of being silently dropped.
+ */
+export function pasteSubtree(
+  tree: MindmapNode,
+  parentId: string | undefined,
+  subtree: MindmapNode
+): { nextTree: MindmapNode; newNodeId: string } | null {
+  if (!subtree) return null;
+
+  const nextTree = cloneTree(tree);
+  const parent = (parentId ? findNode(nextTree, parentId) : null) ?? nextTree;
+
+  const restamp = (node: MindmapNode, level: number): MindmapNode => ({
+    ...node,
+    id: `node-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+    level,
+    children: (node.children ?? []).map((child) => restamp(child, level + 1)),
+  });
+
+  const attached = restamp(subtree, parent.level + 1);
+  if (!parent.children) parent.children = [];
+  parent.children.push(attached);
+
+  return { nextTree, newNodeId: attached.id };
+}
+
+/**
  * Where a dragged node should land when it is dropped on another one.
  *
  * Returns the parent to attach it to and the position among that parent's
