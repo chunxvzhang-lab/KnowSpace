@@ -11724,17 +11724,22 @@ body:has(.flash-capsule-overlay) {
 
 /* ── End mind map canvas context menu ── */
 
-/* ── Mind map theme picker ──────────────────────────────────────────────
-   A native select dressed to match the toolbar buttons beside it.
+/* ── Mind map theme and layout pickers ──────────────────────────────────
+   Two native selects dressed to match the toolbar buttons beside them. They
+   share one set of rules on purpose: they sit next to each other, they are
+   the same kind of control, and two copies of a chevron drift apart the first
+   time one of them is adjusted.
    ─────────────────────────────────────────────────────────────────────────── */
 
-.mindmap-theme-group {
+.mindmap-theme-group,
+.mindmap-layout-group {
   align-items: center;
   gap: 6px;
   padding: 0 8px;
 }
 
-.mindmap-theme-select {
+.mindmap-theme-select,
+.mindmap-layout-select {
   appearance: none;
   -webkit-appearance: none;
   padding: 4px 20px 4px 8px;
@@ -11755,20 +11760,23 @@ body:has(.flash-capsule-overlay) {
   transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
-.mindmap-theme-select:hover {
+.mindmap-theme-select:hover,
+.mindmap-layout-select:hover {
   border-color: rgba(56, 189, 248, 0.55);
 }
 
-.mindmap-theme-select:focus-visible {
+.mindmap-theme-select:focus-visible,
+.mindmap-layout-select:focus-visible {
   outline: 2px solid #38bdf8;
   outline-offset: 1px;
 }
 
 /* The dropdown list itself is drawn by the OS; on some platforms the options
    inherit the closed control's transparent background and become unreadable. */
-.mindmap-theme-select option {
+.mindmap-theme-select option,
+.mindmap-layout-select option {
   background: var(--surface-1, #1e293b);
   color: var(--text-primary, #e2e8f0);
 }
 
-/* ── End mind map theme picker ── */
+/* ── End mind map theme and layout pickers ── */

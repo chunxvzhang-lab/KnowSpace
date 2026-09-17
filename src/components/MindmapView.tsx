@@ -1,29 +1,18 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
-  Download,
-  ListTree,
-  PlusCircle,
   CornerDownRight,
   Edit3,
+  PlusCircle,
   Trash2,
   Palette,
   Check,
   X,
-  CheckSquare,
   Bold,
   AlignCenter,
   AlignLeft,
   AlignRight,
   AlignJustify,
   RotateCcw,
-  Search,
-  FoldVertical,
-  UnfoldVertical,
-  RefreshCw,
-  ZoomIn,
-  ZoomOut,
-  Maximize2,
-  MoreHorizontal,
 } from "lucide-react";
 import type { Heading, ThemeMode, MindmapNodeShape, MindmapLineStyle, MindmapTextAlign } from "../core/types";
 import {
@@ -58,20 +47,20 @@ import {
   saveMindmapCollapsed,
   loadMindmapTheme,
   saveMindmapTheme,
+  loadMindmapLayout,
+  saveMindmapLayout,
 } from "../services/storage";
 import { MindmapCanvasMenu } from "./MindmapCanvasMenu";
-import { MindmapExportMenu } from "./MindmapExportMenu";
-import { MindmapSearchGroup } from "./MindmapSearchGroup";
 import { MindmapInlineEditor } from "./MindmapInlineEditor";
-import { MindmapZoomGroup } from "./MindmapZoomGroup";
+import { MindmapToolbar } from "./MindmapToolbar";
 import {
   DEFAULT_THEME_ID,
   MINDMAP_THEMES,
-  MINDMAP_THEME_LIST,
   branchColorFor,
   resolveThemeId,
   type MindmapTheme,
 } from "../core/mindmapThemes";
+import { DEFAULT_LAYOUT_ID, resolveLayoutId } from "../core/mindmapLayouts";
 
 export type MindmapViewProps = {
   title: string;
@@ -217,6 +206,21 @@ function getContrastTextColor(hexColor?: string): string {
   return yiq >= 150 ? "#0f172a" : "#ffffff";
 }
 
+/**
+ * Where the collapse toggle sits on a node: just outside the edge its children
+ * are on.
+ *
+ * The answer comes from the layout — it is the same `side` field the connector
+ * pass uses — because only the layout knows which way a branch grows. Reading it
+ * here rather than re-deriving it from coordinates is what keeps the toggle and
+ * the connectors agreeing after a layout switch.
+ */
+function collapseToggleAnchor(node: MindmapLayoutNode): string {
+  if (node.side === "left") return `translate(-1, ${node.height / 2})`;
+  if (node.side === "bottom") return `translate(${node.width / 2}, ${node.height + 1})`;
+  return `translate(${node.width + 1}, ${node.height / 2})`;
+}
+
 export const MindmapView = memo(function MindmapView({
   title,
   headings,
@@ -260,6 +264,36 @@ export const MindmapView = memo(function MindmapView({
     },
     [documentKey]
   );
+
+  /**
+   * The layout the reader picked, or null while the document's own is unknown.
+   *
+   * Same shape as the theme above, and for the same reason: null means "nobody
+   * has chosen for this document", which is not the same as "this document chose
+   * the default", and the deliberate choice has to survive a round trip as
+   * itself. There is no caller-supplied prop to fall back to — a layout has no
+   * equivalent of the theme's frontmatter, and inventing one would be a second
+   * source of truth for a value only this view reads.
+   */
+  const [pickedLayoutId, setPickedLayoutId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPickedLayoutId(documentKey ? loadMindmapLayout(documentKey) : null);
+  }, [documentKey]);
+
+  const activeLayoutId = resolveLayoutId(pickedLayoutId ?? DEFAULT_LAYOUT_ID);
+
+  const handlePickLayout = useCallback(
+    (next: string) => {
+      setPickedLayoutId(next);
+      // A layout is a property of the document, like the theme, so it is filed
+      // under the same key. A preview with no path behind it cannot be
+      // remembered, and inventing a key would make all such previews share one.
+      if (documentKey) saveMindmapLayout(documentKey, next);
+    },
+    [documentKey]
+  );
+
   const containerRef = useRef<HTMLDivElement | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const editInputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -325,32 +359,6 @@ export const MindmapView = memo(function MindmapView({
     y2: number;
   } | null>(null);
   const [menuPos, setMenuPos] = useState<{ left: number; top: number }>({ left: 0, top: 0 });
-  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
-  const exportMenuRef = useRef<HTMLDivElement | null>(null);
-  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
-  const moreMenuRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!isExportMenuOpen) return;
-    const handleOutside = (e: MouseEvent) => {
-      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
-        setIsExportMenuOpen(false);
-      }
-    };
-    window.addEventListener("mousedown", handleOutside);
-    return () => window.removeEventListener("mousedown", handleOutside);
-  }, [isExportMenuOpen]);
-
-  useEffect(() => {
-    if (!isMoreMenuOpen) return;
-    const handleOutside = (e: MouseEvent) => {
-      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
-        setIsMoreMenuOpen(false);
-      }
-    };
-    window.addEventListener("mousedown", handleOutside);
-    return () => window.removeEventListener("mousedown", handleOutside);
-  }, [isMoreMenuOpen]);
 
   // Safe boundary calculation for context menu to prevent bottom/right clipping
   useLayoutEffect(() => {
@@ -455,8 +463,8 @@ export const MindmapView = memo(function MindmapView({
 
   // Compute 2D layout coordinates
   const layout = useMemo(() => {
-    return layoutMindmap(tree, collapsedIds);
-  }, [tree, collapsedIds]);
+    return layoutMindmap(tree, collapsedIds, activeLayoutId);
+  }, [tree, collapsedIds, activeLayoutId]);
 
   // Drag-and-drop reparenting state
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
@@ -1475,7 +1483,6 @@ export const MindmapView = memo(function MindmapView({
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    setIsExportMenuOpen(false);
   }, [tree, title]);
 
   const handleExportFreeMind = useCallback(() => {
@@ -1487,12 +1494,11 @@ export const MindmapView = memo(function MindmapView({
     const a = document.createElement("a");
     a.href = url;
     a.download = `${title || "mindmap"}.mm`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      setIsExportMenuOpen(false);
-    }, [tree, title, collapsedIds]);
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [tree, title, collapsedIds]);
 
   const handleExportMarkdownOutline = useCallback(() => {
     const md = exportMindmapToMarkdownOutline(tree);
@@ -1505,7 +1511,6 @@ export const MindmapView = memo(function MindmapView({
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    setIsExportMenuOpen(false);
   }, [tree, title]);
 
   const editingNode = useMemo(() => {
@@ -1519,6 +1524,26 @@ export const MindmapView = memo(function MindmapView({
   }, [contextMenu, tree]);
 
   const isBatchMode = selectedNodeIds.size > 1;
+
+  /**
+   * Opens the style panel under whatever the toolbar pressed.
+   *
+   * The bar measures its own button and hands the rect over; converting it into
+   * canvas coordinates belongs here, because the canvas offset is this view's to
+   * know. The panel targets the primary selection, or the root when nothing is
+   * selected — the same target the node context menu uses.
+   */
+  const handleStylePanelRequest = useCallback(
+    (anchor: DOMRect) => {
+      const containerRect = containerRef.current?.getBoundingClientRect();
+      setContextMenu({
+        x: anchor.left - (containerRect?.left ?? 0),
+        y: anchor.bottom - (containerRect?.top ?? 0) + 6,
+        nodeId: primarySelectedId || tree.id,
+      });
+    },
+    [primarySelectedId, tree.id]
+  );
 
   const [isSemiCompact, setIsSemiCompact] = useState(false);
   const [isCompact, setIsCompact] = useState(false);
@@ -1556,285 +1581,53 @@ export const MindmapView = memo(function MindmapView({
       onWheel={handleWheel}
     >
       {/* Top Floating Clean & Spacious Control Bar */}
-      <header className="mindmap-toolbar">
-        <div className="mindmap-toolbar-left">
-          <div className="mindmap-toolbar-title" title={tree.text || title}>
-            <ListTree size={16} className="text-cyan" />
-            <strong>{tree.text || title || "思维导图"}</strong>
-          </div>
-          <span className="mindmap-node-count-badge">
-            {layout.nodes.length} 节点
-          </span>
-          {selectedNodeIds.size > 1 && (
-            <span className="mindmap-node-count-badge text-cyan">
-              已选 {selectedNodeIds.size} 项
-            </span>
-          )}
-        </div>
-
-        <div className="mindmap-toolbar-center">
-          {editable && onSourceChange && (
-            <>
-              <div className="mindmap-toolbar-btn-group">
-                <button
-                  type="button"
-                  className={`mindmap-tool-btn text-btn mindmap-sync-doc-btn ${hasUnsyncedChanges ? "is-dirty" : ""}`}
-                  onClick={handleSyncToDocument}
-                  title={hasUnsyncedChanges ? "检测到导图架构修改，点击将章节变更无损同步至文档 (Ctrl+S)" : "导图架构与文档内容保持一致"}
-                >
-                  <RefreshCw size={13} className={hasUnsyncedChanges ? "sync-icon-spin" : "text-muted"} />
-                  <span>{hasUnsyncedChanges ? "同步到文档" : "已同步"}</span>
-                  {hasUnsyncedChanges && <span className="sync-dirty-dot" />}
-                </button>
-              </div>
-
-              <div className="mindmap-toolbar-divider" />
-            </>
-          )}
-
-          {editable && (
-            <>
-              <div className="mindmap-toolbar-btn-group">
-                <button
-                  type="button"
-                  className="mindmap-tool-btn text-btn highlight-btn"
-                  onClick={() => handleAddSibling()}
-                  title="添加同级主题 (Enter)"
-                >
-                  <PlusCircle size={14} />
-                  <span>同级主题</span>
-                </button>
-                <button
-                  type="button"
-                  className="mindmap-tool-btn text-btn highlight-btn"
-                  onClick={() => handleAddChild()}
-                  title="添加子主题 (Tab)"
-                >
-                  <CornerDownRight size={14} />
-                  <span>子主题</span>
-                </button>
-              </div>
-
-              <div className="mindmap-toolbar-divider" />
-            </>
-          )}
-
-          {!isUltraNarrow ? (
-            <>
-              {editable && (
-                <>
-                  <div className="mindmap-toolbar-btn-group">
-                    <button
-                      type="button"
-                      className="mindmap-tool-btn text-btn secondary-action"
-                      onClick={(e) => {
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        const containerRect = containerRef.current?.getBoundingClientRect();
-                        setContextMenu({
-                          x: rect.left - (containerRect?.left ?? 0),
-                          y: rect.bottom - (containerRect?.top ?? 0) + 6,
-                          nodeId: primarySelectedId || tree.id,
-                        });
-                      }}
-                      title="自定义节点背景、边框、形状、字体及连线风格 (也可在节点上右键)"
-                    >
-                      <Palette size={14} className="text-cyan" />
-                      <span>{isBatchMode ? `批量样式 (${selectedNodeIds.size})` : "外观样式"}</span>
-                    </button>
-                  </div>
-
-                  <div className="mindmap-toolbar-divider" />
-                </>
-              )}
-
-              <div className="mindmap-toolbar-btn-group">
-                <button
-                  type="button"
-                  className="mindmap-tool-btn text-btn secondary-action"
-                  onClick={handleSelectAll}
-                  title="选中所有节点 (Ctrl+A)"
-                >
-                  <CheckSquare size={13} />
-                  <span>全选</span>
-                </button>
-                <button
-                  type="button"
-                  className="mindmap-tool-btn text-btn secondary-action"
-                  onClick={handleCollapseToLevel2}
-                  title="仅保留 1~2 级主题"
-                >
-                  <FoldVertical size={13} />
-                  <span>折叠至2级</span>
-                </button>
-                <button
-                  type="button"
-                  className="mindmap-tool-btn text-btn secondary-action"
-                  onClick={handleExpandAll}
-                  title="展开所有分支"
-                >
-                  <UnfoldVertical size={13} />
-                  <span>全部展开</span>
-                </button>
-              </div>
-
-              <div className="mindmap-toolbar-divider" />
-            </>
-          ) : (
-            <>
-              {/* Ultra-narrow folded More Actions dropdown menu */}
-              <div className="mindmap-toolbar-btn-group">
-                <div className="mindmap-more-dropdown" ref={moreMenuRef}>
-                  <button
-                    type="button"
-                    className={`mindmap-tool-btn text-btn ${isMoreMenuOpen ? "highlight-btn active" : ""}`}
-                    onClick={() => setIsMoreMenuOpen((prev) => !prev)}
-                    title="更多导图样式与视图选项"
-                    aria-haspopup="true"
-                    aria-expanded={isMoreMenuOpen}
-                  >
-                    <MoreHorizontal size={14} />
-                  </button>
-                  {isMoreMenuOpen && (
-                    <div className="mindmap-more-menu" role="menu">
-                      {editable && (
-                        <button
-                          type="button"
-                          className="mindmap-more-menu-item"
-                          role="menuitem"
-                          onClick={(e) => {
-                            setIsMoreMenuOpen(false);
-                            const rect = e.currentTarget.getBoundingClientRect();
-                            const containerRect = containerRef.current?.getBoundingClientRect();
-                            setContextMenu({
-                              x: rect.left - (containerRect?.left ?? 0),
-                              y: rect.bottom - (containerRect?.top ?? 0) + 6,
-                              nodeId: primarySelectedId || tree.id,
-                            });
-                          }}
-                        >
-                          <Palette size={13} className="text-cyan" />
-                          <span>{isBatchMode ? `批量样式 (${selectedNodeIds.size})` : "外观样式"}</span>
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        className="mindmap-more-menu-item"
-                        role="menuitem"
-                        onClick={() => {
-                          setIsMoreMenuOpen(false);
-                          handleSelectAll();
-                        }}
-                      >
-                        <CheckSquare size={13} />
-                        <span>全选所有节点 (Ctrl+A)</span>
-                      </button>
-                      <button
-                        type="button"
-                        className="mindmap-more-menu-item"
-                        role="menuitem"
-                        onClick={() => {
-                          setIsMoreMenuOpen(false);
-                          handleCollapseToLevel2();
-                        }}
-                      >
-                        <FoldVertical size={13} />
-                        <span>折叠至 2 级</span>
-                      </button>
-                      <button
-                        type="button"
-                        className="mindmap-more-menu-item"
-                        role="menuitem"
-                        onClick={() => {
-                          setIsMoreMenuOpen(false);
-                          handleExpandAll();
-                        }}
-                      >
-                        <UnfoldVertical size={13} />
-                        <span>全部展开所有分支</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="mindmap-toolbar-divider" />
-            </>
-          )}
-
-          {/* In-Canvas Search Toolbar Group */}
-          <MindmapSearchGroup
-            isOpen={isSearchOpen}
-            query={searchQuery}
-            matchIds={searchMatchIds}
-            currentIndex={currentSearchIndex}
-            inputRef={searchInputRef}
-            onToggle={() => {
-              setIsSearchOpen((prev) => {
-                const next = !prev;
-                // Focus after the field exists, hence the delay: it is rendered
-                // by the same state change that this returns.
-                if (next) setTimeout(() => searchInputRef.current?.focus(), 60);
-                return next;
-              });
-            }}
-            onQueryChange={handleSearch}
-            onPrev={handlePrevSearch}
-            onNext={handleNextSearch}
-            onClose={handleCloseSearch}
-          />
-
-          {/* Theme picker. A native select rather than a hand-rolled dropdown:
-              there are six options, none of them needs a preview, and a select
-              arrives with the keyboard handling and accessibility a custom menu
-              would have to reimplement.
-              Switching repaints only the nodes nobody has styled by hand, so it
-              needs no confirmation — nothing is overwritten. */}
-          <div className="mindmap-toolbar-btn-group mindmap-theme-group">
-            <Palette size={14} className="text-cyan" />
-            <select
-              className="mindmap-theme-select"
-              value={activeThemeId}
-              onChange={(e) => handlePickTheme(e.target.value)}
-              title="切换主题（不会改变手工设置过样式的节点）"
-              aria-label="导图主题"
-            >
-              {MINDMAP_THEME_LIST.map((option) => (
-                <option key={option.id} value={option.id} title={option.description}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <MindmapZoomGroup
-            scale={transform.scale}
-            onStep={handleZoomStep}
-            onFitToScreen={handleFitToScreen}
-          />
-        </div>
-
-        <MindmapExportMenu
-          menuRef={exportMenuRef}
-          isOpen={isExportMenuOpen}
-          onToggle={() => setIsExportMenuOpen((prev) => !prev)}
-          onExportPng={() => {
-            setIsExportMenuOpen(false);
-            handleExportPng();
-          }}
-          onExportOpml={() => {
-            setIsExportMenuOpen(false);
-            handleExportOpml();
-          }}
-          onExportFreeMind={() => {
-            setIsExportMenuOpen(false);
-            handleExportFreeMind();
-          }}
-          onExportMarkdownOutline={() => {
-            setIsExportMenuOpen(false);
-            handleExportMarkdownOutline();
-          }}
-        />
-      </header>
+      <MindmapToolbar
+        title={tree.text || title}
+        nodeCount={layout.nodes.length}
+        selectedCount={selectedNodeIds.size}
+        editable={editable}
+        canSyncToDocument={editable && !!onSourceChange}
+        hasUnsyncedChanges={hasUnsyncedChanges}
+        isUltraNarrow={isUltraNarrow}
+        scale={transform.scale}
+        themeId={activeThemeId}
+        layoutId={activeLayoutId}
+        search={{
+          isOpen: isSearchOpen,
+          query: searchQuery,
+          matchIds: searchMatchIds,
+          currentIndex: currentSearchIndex,
+          inputRef: searchInputRef,
+          onToggle: () => {
+            setIsSearchOpen((prev) => {
+              const next = !prev;
+              // Focus after the field exists, hence the delay: it is rendered
+              // by the same state change that this returns.
+              if (next) setTimeout(() => searchInputRef.current?.focus(), 60);
+              return next;
+            });
+          },
+          onQueryChange: handleSearch,
+          onPrev: handlePrevSearch,
+          onNext: handleNextSearch,
+          onClose: handleCloseSearch,
+        }}
+        onSyncToDocument={handleSyncToDocument}
+        onAddSibling={() => handleAddSibling()}
+        onAddChild={() => handleAddChild()}
+        onStylePanelRequest={handleStylePanelRequest}
+        onSelectAll={handleSelectAll}
+        onCollapseToLevel2={handleCollapseToLevel2}
+        onExpandAll={handleExpandAll}
+        onPickTheme={handlePickTheme}
+        onPickLayout={handlePickLayout}
+        onZoomStep={handleZoomStep}
+        onFitToScreen={handleFitToScreen}
+        onExportPng={handleExportPng}
+        onExportOpml={handleExportOpml}
+        onExportFreeMind={handleExportFreeMind}
+        onExportMarkdownOutline={handleExportMarkdownOutline}
+      />
 
       {/* Main SVG Infinite Mindmap Canvas */}
       <svg
@@ -2224,11 +2017,15 @@ export const MindmapView = memo(function MindmapView({
                     );
                   })()}
 
-                  {/* Children Collapse/Expand Toggle Button (+ / - geometrically centered via SVG vector lines) */}
+                  {/* Children Collapse/Expand Toggle Button (+ / - geometrically centered via SVG vector lines).
+                      Hung off the edge the children are actually on: the default layout grows
+                      everything right, so nothing moves there, while a branch on the left of a
+                      bidirectional map and every parent in the vertical layout would otherwise
+                      end up with the toggle in the middle of the row below it. */}
                   {node.hasChildren && (
                     <g
                       className="mindmap-collapse-btn"
-                      transform={`translate(${node.width + 1}, ${node.height / 2})`}
+                      transform={collapseToggleAnchor(node)}
                       onClick={(e) => handleToggleCollapse(node.id, e)}
                     >
                       <circle

@@ -1,12 +1,21 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MindmapView } from "../components/MindmapView";
 import {
   loadMindmapCollapsed,
   saveMindmapCollapsed,
   loadMindmapTheme,
   saveMindmapTheme,
+  loadMindmapLayout,
+  saveMindmapLayout,
 } from "../services/storage";
+
+/** Where a rendered node sits, read back out of its group's transform. */
+function nodeX(target: Element | string): number {
+  const el = typeof target === "string" ? document.querySelector(target) : target;
+  const transform = el?.getAttribute("transform") ?? "";
+  return Number((transform.match(/-?[\d.]+/g) ?? ["0"])[0]);
+}
 
 /**
  * Folded branches are remembered per document.
@@ -189,6 +198,64 @@ describe("折叠状态持久化", () => {
       expect(screen.queryByText("父节点")).toBeNull();
       // ...and the dead one is not carried forward.
       expect(loadMindmapCollapsed("/vault/a.md")).toEqual([ROOT_ID]);
+    });
+  });
+
+  /**
+   * The layout picker, end to end.
+   *
+   * The storage rules themselves are covered in `mindmap-layouts.test.ts`. What
+   * can only be checked here is the wiring: a stored value reaching the canvas,
+   * and a choice made in the toolbar being filed under the right document.
+   *
+   * The second half reads the rendered coordinates rather than any state,
+   * because "the layout changed" and "the nodes moved" are different claims.
+   */
+  describe("布局的按文档记忆（组件）", () => {
+    const picker = () => screen.getByLabelText("导图布局") as HTMLSelectElement;
+    const leftmostX = () =>
+      Math.min(
+        ...Array.from(document.querySelectorAll(".mindmap-node-interactive")).map((el) => nodeX(el))
+      );
+
+    it("打开文档时用这份文档记住的布局", () => {
+      saveMindmapLayout("/vault/a.md", "bidirectional");
+
+      render(<MindmapView title="测试" source={SOURCE} documentKey="/vault/a.md" />);
+
+      expect(picker().value).toBe("bidirectional");
+    });
+
+    it("没有记录时停在默认布局", () => {
+      render(<MindmapView title="测试" source={SOURCE} documentKey="/vault/b.md" />);
+
+      expect(picker().value).toBe("logic");
+    });
+
+    it("切换后写回这篇文档，并真的把分支排到另一侧", () => {
+      render(<MindmapView title="测试" source={SOURCE} documentKey="/vault/c.md" />);
+
+      // The default layout grows everything to the right of the root, so the
+      // leftmost node on the canvas is the root itself.
+      expect(leftmostX()).toBe(nodeX(".mindmap-node-interactive.is-root"));
+
+      fireEvent.change(picker(), { target: { value: "bidirectional" } });
+
+      // ...and the bidirectional layout puts at least one branch on the left.
+      expect(leftmostX()).toBeLessThan(nodeX(".mindmap-node-interactive.is-root"));
+      expect(loadMindmapLayout("/vault/c.md")).toBe("bidirectional");
+    });
+
+    it("没有文档键时正常渲染且不写存储", () => {
+      // A preview with no file behind it cannot be remembered, and inventing a
+      // key would make every such preview share one.
+      render(<MindmapView title="测试" source={SOURCE} />);
+
+      expect(picker().value).toBe("logic");
+
+      fireEvent.change(picker(), { target: { value: "bidirectional" } });
+
+      expect(localStorage.getItem("bookmd.mindmap.layout.v1")).toBeNull();
     });
   });
 });

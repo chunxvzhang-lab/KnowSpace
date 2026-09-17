@@ -7,6 +7,7 @@ const POSITIONS_V2_KEY = "bookmd.positions.v2";
 const PREFS_KEY = "bookmd.preferences.v1";
 const MINDMAP_COLLAPSED_KEY = "bookmd.mindmap.collapsed.v1";
 const MINDMAP_THEME_KEY = "bookmd.mindmap.theme.v1";
+const MINDMAP_LAYOUT_KEY = "bookmd.mindmap.layout.v1";
 
 /**
  * Duplicated from the theme module rather than imported.
@@ -17,6 +18,9 @@ const MINDMAP_THEME_KEY = "bookmd.mindmap.theme.v1";
  * spirit: the theme module is what tells a stored id whether it is valid.
  */
 const DEFAULT_MINDMAP_THEME_ID = "classic";
+
+/** Duplicated from the layout module, for the same reason as the theme id. */
+const DEFAULT_MINDMAP_LAYOUT_ID = "logic";
 
 export type Preferences = {
   theme: ThemeMode;
@@ -139,6 +143,34 @@ export function saveMindmapTheme(docKey: string, themeId: string): void {
     all[docKey] = themeId;
   }
   writeRecord(MINDMAP_THEME_KEY, all);
+}
+
+/**
+ * The chosen layout, keyed by document.
+ *
+ * Also per document, and for the same reason as the theme: a wide map with many
+ * branches wants sides, a narrow outline reads better as one column, and that is
+ * a decision about the document rather than about the application.
+ *
+ * Stored as a bare id. Deciding whether an id still names a layout belongs to
+ * the layout module, which has the table.
+ */
+export function loadMindmapLayout(docKey: string): string | null {
+  const all = readRecord<string>(MINDMAP_LAYOUT_KEY);
+  const id = all[docKey];
+  return typeof id === "string" && id ? id : null;
+}
+
+export function saveMindmapLayout(docKey: string, layoutId: string): void {
+  const all = readRecord<string>(MINDMAP_LAYOUT_KEY);
+  if (layoutId === DEFAULT_MINDMAP_LAYOUT_ID) {
+    // The default is what a document gets with no entry at all, so writing it
+    // would only leave a key behind for every document ever opened.
+    delete all[docKey];
+  } else {
+    all[docKey] = layoutId;
+  }
+  writeRecord(MINDMAP_LAYOUT_KEY, all);
 }
 
 export function loadMindmapCollapsed(docKey: string): string[] {
