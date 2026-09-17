@@ -3,6 +3,7 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import App from "../App";
 import { useUiStore } from "../store/useUiStore";
 import { useTabStore } from "../store/useTabStore";
+import { resetStores, restoreStores } from "./helpers/resetStores";
 import {
   installDesktopMock,
   removeDesktopMock,
@@ -26,23 +27,17 @@ import {
  */
 describe("App - shell smoke tests", () => {
   let desktop: DesktopMock;
-  const pristineUiState = useUiStore.getState();
-  const pristineTabState = useTabStore.getState();
 
   beforeEach(() => {
     desktop = installDesktopMock();
-    // Both stores are module-level singletons, so they have to be reset between
-    // tests or one test's sidebar, notice, open tabs or active document leaks
-    // into the next.
-    useUiStore.setState(pristineUiState, true);
-    useTabStore.setState(pristineTabState, true);
-    localStorage.clear();
+    // Every store is a module-level singleton, so an open folder, a registered
+    // tab or a toggled sidebar would otherwise survive into the next test.
+    resetStores();
   });
 
   afterEach(() => {
     removeDesktopMock();
-    useUiStore.setState(pristineUiState, true);
-    useTabStore.setState(pristineTabState, true);
+    restoreStores();
     delete document.documentElement.dataset.theme;
     vi.restoreAllMocks();
   });

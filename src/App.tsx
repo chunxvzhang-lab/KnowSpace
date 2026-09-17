@@ -10,13 +10,11 @@ import { DualDocumentWorkspace } from "./components/DualDocumentWorkspace";
 import type { WikiLinkTarget } from "./components/EditorPane";
 import { GraphWorkspaceLayout } from "./components/GraphWorkspaceLayout";
 import {
-  createBacklinkIndex,
   updateDocumentInIndex,
   getLinkedReferences,
   getUnlinkedMentions,
   convertUnlinkedMentionInText,
   refactorWikiLinksInContent,
-  type BacklinkIndexData,
   type UnlinkedMention,
 } from "./services/backlinkIndex";
 import { buildGraphDataFromIndex } from "./services/graphService";
@@ -53,16 +51,13 @@ import { loadChapterMarkdown } from "./services/bookSource";
 import { renderMermaid, type MermaidTheme } from "./services/mermaid";
 import { extractExcerpt, extractHeadingsFromSource, findHeadingLineInSource, findInChapter, renderMarkdown } from "./services/markdown";
 import {
-  buildVaultSearchIndex,
   updateVaultSearchIndexForDocument,
   searchVault,
-  type VaultSearchIndex,
 } from "./services/searchIndexService";
 import {
   loadBookmarks,
   loadPreferences,
   loadReadingPosition,
-  saveBookmarks,
   saveReadingPosition,
 } from "./services/storage";
 import { useUiStore } from "./store/useUiStore";
@@ -73,6 +68,7 @@ import {
   tabsAfterClosingRight,
   type TabMeta,
 } from "./store/useTabStore";
+import { useVaultStore } from "./store/useVaultStore";
 
 type PendingAction =
   | { type: "select-chapter"; chapterId: string }
@@ -98,7 +94,27 @@ export function App() {
   const restoredChapterIdRef = useRef<string | null>(null);
   const navLockUntilRef = useRef<number>(0);
 
-  const [manifest, setManifest] = useState<BookManifest | null>(null);
+  // ── Vault (useVaultStore · R1 batch B2) ───────────────────────────────────
+  //
+  // The open folder, its bookmarks, the two indexes built from its documents
+  // and the search fields. Same aliasing as the earlier batches — `manifest`
+  // alone is read in over a hundred places and not one of them changed.
+  const manifest = useVaultStore((s) => s.manifest);
+  const setManifest = useVaultStore((s) => s.setManifest);
+  const bookmarks = useVaultStore((s) => s.bookmarks);
+  const setBookmarks = useVaultStore((s) => s.setBookmarks);
+  const persistBookmarks = useVaultStore((s) => s.persistBookmarks);
+  const backlinkIndex = useVaultStore((s) => s.backlinkIndex);
+  const setBacklinkIndex = useVaultStore((s) => s.setBacklinkIndex);
+  const vaultSearchIndex = useVaultStore((s) => s.vaultSearchIndex);
+  const setVaultSearchIndex = useVaultStore((s) => s.setVaultSearchIndex);
+  const searchQuery = useVaultStore((s) => s.searchQuery);
+  const setSearchQuery = useVaultStore((s) => s.setSearchQuery);
+  const searchScope = useVaultStore((s) => s.searchScope);
+  const setSearchScope = useVaultStore((s) => s.setSearchScope);
+  const activeSearchMatchId = useVaultStore((s) => s.activeSearchMatchId);
+  const setActiveSearchMatchId = useVaultStore((s) => s.setActiveSearchMatchId);
+
   const manifestRef = useRef<BookManifest | null>(manifest);
   manifestRef.current = manifest;
 
@@ -130,8 +146,6 @@ export function App() {
   const [secondaryRenderedChapter, setSecondaryRenderedChapter] = useState<RenderedChapter | null>(null);
   const secondaryReaderRef = useRef<HTMLElement | null>(null);
   const isDualSplitMode = Boolean(dualSplitTabId && tabs.some((t) => t.id === dualSplitTabId));
-
-  const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
 
   // ── UI chrome (useUiStore · R1 batch B0) ──────────────────────────────────
   //
@@ -181,13 +195,9 @@ export function App() {
   const setResizingType = useUiStore((s) => s.setResizingType);
   const persistLayout = useUiStore((s) => s.persistLayout);
 
+  // Where the reader has scrolled to. Stays here because it describes the
+  // rendered document, not the vault.
   const [activeHeadingId, setActiveHeadingId] = useState<string | undefined>();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchScope, setSearchScope] = useState<"current" | "vault">("current");
-  const [vaultSearchIndex, setVaultSearchIndex] = useState<VaultSearchIndex>(() =>
-    buildVaultSearchIndex([])
-  );
-  const [activeSearchMatchId, setActiveSearchMatchId] = useState<string | null>(null);
 
   const handleOpenCommandPalette = useCallback(() => {
     setCommandPaletteOpen(true);
@@ -290,14 +300,10 @@ export function App() {
     return ids;
   }, [bookmarks, chapterId]);
 
-  const persistBookmarks = useCallback(
-    (next: Bookmark[]) => {
-      if (!manifest) return;
-      setBookmarks(next);
-      saveBookmarks(manifest.id, next);
-    },
-    [manifest],
-  );
+  // Bookmark writes moved into the store with the bookmark list. Keeping the
+  // replacement and the disk write in one action is what stops them drifting
+  // apart: the write needs the manifest id, so it has to read the same state
+  // the replacement does.
 
   const handleMermaidError = useCallback(() => {
     setNotice("Mermaid 图表渲染失败，请检查语法。");
@@ -2660,9 +2666,8 @@ export function App() {
   );
 
   // Backlink Index & Mentions
-  const [backlinkIndex, setBacklinkIndex] = useState<BacklinkIndexData>(() =>
-    createBacklinkIndex([])
-  );
+  // backlinkIndex and the vault search index live in useVaultStore alongside the
+  // manifest they are derived from.
 
   // Cooperative idle background index scheduler
   // Guarantees 0ms lag upon opening files or folders, with buttery-smooth 60/120fps UI responsiveness.
