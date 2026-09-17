@@ -49,3 +49,8 @@ pnpm-debug.log*
 # OS files
 .DS_Store
 Thumbs.db
+
+# Test baseline raw report (docs/TEST_BASELINE.md is the committed snapshot)
+test-baseline.json
+baseline-run.txt
+baseline-capture.log
