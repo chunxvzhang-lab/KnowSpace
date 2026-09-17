@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   useUiStore,
+  readStoredWidth,
   DIRECTORY_WIDTH_MAX,
   DIRECTORY_WIDTH_MIN,
   SIDEBAR_WIDTH_MAX,
@@ -22,10 +23,14 @@ describe("useUiStore - UI chrome store", () => {
   beforeEach(() => {
     useUiStore.setState(pristine, true);
     vi.useRealTimers();
+    // The store owns persistence now, so each test starts from empty storage —
+    // otherwise a write in one test changes what the next one reads back.
+    localStorage.clear();
   });
 
   afterEach(() => {
     useUiStore.setState(pristine, true);
+    localStorage.clear();
     vi.restoreAllMocks();
     vi.useRealTimers();
   });
@@ -219,6 +224,124 @@ describe("useUiStore - UI chrome store", () => {
       useUiStore.getState().notify("稍后清除");
       useUiStore.getState().notify(null);
       expect(useUiStore.getState().notice).toBeNull();
+    });
+  });
+
+  describe("persistence", () => {
+    it("writes both pane widths when the layout is persisted", () => {
+      const store = useUiStore.getState();
+      store.setDirectoryWidth(300);
+      store.setSidebarWidth(420);
+
+      store.persistLayout();
+
+      expect(localStorage.getItem("bookmd.layout.dirWidth")).toBe("300");
+      expect(localStorage.getItem("bookmd.layout.sidebarWidth")).toBe("420");
+    });
+
+    it("stays off the disk while a divider is being dragged", () => {
+      // The resize handler calls these on every mousemove; a synchronous write
+      // per frame would make the drag stutter, so only the end of the gesture
+      // may reach storage.
+      const store = useUiStore.getState();
+      store.setDirectoryWidth(300);
+      store.setDirectoryWidth(310);
+      store.setDirectoryWidth(320);
+
+      expect(localStorage.getItem("bookmd.layout.dirWidth")).toBeNull();
+    });
+
+    it("persists preferences so they survive a restart", () => {
+      useUiStore.getState().setPreferences({ theme: "eink", fontScale: 1.4 });
+
+      const reloaded = loadPreferences();
+      expect(reloaded.theme).toBe("eink");
+      expect(reloaded.fontScale).toBe(1.4);
+    });
+
+    it("persists a partial preferences patch", () => {
+      useUiStore.getState().patchPreferences({ showLineNumbers: false });
+
+      expect(loadPreferences().showLineNumbers).toBe(false);
+    });
+
+    it("persists a theme toggle", () => {
+      useUiStore.getState().setPreferences({ theme: "twitter", fontScale: 1 });
+
+      useUiStore.getState().toggleTheme();
+
+      expect(loadPreferences().theme).toBe("light");
+      expect(useUiStore.getState().preferences.theme).toBe("light");
+    });
+
+    it("persists the typewriter flag in both directions", () => {
+      useUiStore.getState().setTypewriterMode(true);
+      expect(localStorage.getItem("bookmd.editor.typewriter")).toBe("true");
+
+      useUiStore.getState().toggleTypewriterMode();
+      expect(localStorage.getItem("bookmd.editor.typewriter")).toBe("false");
+      expect(useUiStore.getState().typewriterMode).toBe(false);
+    });
+  });
+
+  describe("preferences updater form", () => {
+    it("derives the next value from the current one", () => {
+      useUiStore.getState().setPreferences({ theme: "twitter", fontScale: 1 });
+
+      useUiStore.getState().setPreferences((prev) => ({ ...prev, fontScale: 1.8 }));
+
+      expect(useUiStore.getState().preferences.fontScale).toBe(1.8);
+      // The sibling field must survive
+      expect(useUiStore.getState().preferences.theme).toBe("twitter");
+    });
+
+    it("composes successive updaters rather than last-one-wins", () => {
+      // App.tsx has several call sites in this shape, so it is worth pinning
+      // that they accumulate.
+      const store = useUiStore.getState();
+      store.setPreferences((prev) => ({ ...prev, fontScale: prev.fontScale + 0.5 }));
+      store.setPreferences((prev) => ({ ...prev, fontScale: prev.fontScale + 0.5 }));
+
+      expect(useUiStore.getState().preferences.fontScale).toBe(2);
+    });
+  });
+
+  describe("readStoredWidth", () => {
+    it("returns the stored value when it is in range", () => {
+      localStorage.setItem("probe.width", "333.5");
+      expect(readStoredWidth("probe.width", 240, 160, 480)).toBe(333.5);
+    });
+
+    it("falls back rather than clamping when the value is out of range", () => {
+      // A stored 900 was written by something else; silently resizing the pane
+      // to its maximum would be a stranger outcome than ignoring it.
+      localStorage.setItem("probe.width", "900");
+      expect(readStoredWidth("probe.width", 240, 160, 480)).toBe(240);
+
+      localStorage.setItem("probe.width", "10");
+      expect(readStoredWidth("probe.width", 240, 160, 480)).toBe(240);
+    });
+
+    it("falls back when nothing is stored", () => {
+      expect(readStoredWidth("probe.missing", 260, 180, 520)).toBe(260);
+    });
+
+    it("falls back when the stored value is not a number", () => {
+      localStorage.setItem("probe.width", "wide");
+      expect(readStoredWidth("probe.width", 240, 160, 480)).toBe(240);
+    });
+  });
+
+  describe("setNotice", () => {
+    it("sets the notice without scheduling a clear of its own", () => {
+      vi.useFakeTimers();
+      useUiStore.getState().setNotice("由调用方负责清除");
+
+      vi.advanceTimersByTime(NOTICE_TIMEOUT_MS * 2);
+
+      // App.tsx owns the auto-clear through its own effect, so the raw setter
+      // must not race it.
+      expect(useUiStore.getState().notice).toBe("由调用方负责清除");
     });
   });
 });

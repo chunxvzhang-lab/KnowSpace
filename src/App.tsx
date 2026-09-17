@@ -21,7 +21,7 @@ import {
 } from "./services/backlinkIndex";
 import { buildGraphDataFromIndex } from "./services/graphService";
 import { FileConflictDialog } from "./components/FileConflictDialog";
-import { MediaLightbox, type LightboxMedia } from "./components/MediaLightbox";
+import { MediaLightbox } from "./components/MediaLightbox";
 import { MindmapView } from "./components/MindmapView";
 import { CanvasView } from "./components/CanvasView";
 import { createDefaultCanvas } from "./services/canvasService";
@@ -63,9 +63,9 @@ import {
   loadPreferences,
   loadReadingPosition,
   saveBookmarks,
-  savePreferences,
   saveReadingPosition,
 } from "./services/storage";
+import { useUiStore } from "./store/useUiStore";
 
 type PendingAction =
   | { type: "select-chapter"; chapterId: string }
@@ -105,18 +105,55 @@ export function App() {
   const isDualSplitMode = Boolean(dualSplitTabId && tabs.some((t) => t.id === dualSplitTabId));
 
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [directoryOpen, setDirectoryOpen] = useState(true);
-  const [sidebarTab, setSidebarTab] = useState<SidebarTab>("toc");
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [typewriterMode, setTypewriterMode] = useState(() => {
-    try {
-      return localStorage.getItem("bookmd.editor.typewriter") === "true";
-    } catch {
-      return false;
-    }
-  });
-  const [lightboxMedia, setLightboxMedia] = useState<LightboxMedia | null>(null);
+
+  // ── UI chrome (useUiStore · R1 batch B0) ──────────────────────────────────
+  //
+  // Layout, overlays and appearance now live in a Zustand store, so this
+  // component stops owning state that no other shell logic cares about.
+  //
+  // The selector names deliberately match the useState identifiers they
+  // replace — that is what let the rest of the file stay exactly as it was:
+  // every read, every set, including the 14 functional-update call sites. Only
+  // the callbacks that hand-rolled localStorage persistence needed edits,
+  // because the store owns that now too.
+  const sidebarOpen = useUiStore((s) => s.sidebarOpen);
+  const directoryOpen = useUiStore((s) => s.directoryOpen);
+  const sidebarTab = useUiStore((s) => s.sidebarTab);
+  const isFullscreen = useUiStore((s) => s.isFullscreen);
+  const typewriterMode = useUiStore((s) => s.typewriterMode);
+  const lightboxMedia = useUiStore((s) => s.lightboxMedia);
+  const notice = useUiStore((s) => s.notice);
+  const preferences = useUiStore((s) => s.preferences);
+  const unsavedDialogOpen = useUiStore((s) => s.unsavedDialogOpen);
+  const aboutOpen = useUiStore((s) => s.aboutOpen);
+  const commandPaletteOpen = useUiStore((s) => s.commandPaletteOpen);
+  const versionHistoryOpen = useUiStore((s) => s.versionHistoryOpen);
+  const isGraphPaneOpen = useUiStore((s) => s.isGraphPaneOpen);
+  const directoryWidth = useUiStore((s) => s.directoryWidth);
+  const sidebarWidth = useUiStore((s) => s.sidebarWidth);
+  const resizingType = useUiStore((s) => s.resizingType);
+
+  const setSidebarOpen = useUiStore((s) => s.setSidebarOpen);
+  const setDirectoryOpen = useUiStore((s) => s.setDirectoryOpen);
+  const setSidebarTab = useUiStore((s) => s.setSidebarTab);
+  // The store calls this one setFullscreen; the local alias keeps the existing
+  // call sites reading naturally.
+  const setIsFullscreen = useUiStore((s) => s.setFullscreen);
+  const setTypewriterMode = useUiStore((s) => s.setTypewriterMode);
+  const setLightboxMedia = useUiStore((s) => s.setLightboxMedia);
+  const setNotice = useUiStore((s) => s.setNotice);
+  const setPreferences = useUiStore((s) => s.setPreferences);
+  const patchPreferences = useUiStore((s) => s.patchPreferences);
+  const setUnsavedDialogOpen = useUiStore((s) => s.setUnsavedDialogOpen);
+  const setAboutOpen = useUiStore((s) => s.setAboutOpen);
+  const setCommandPaletteOpen = useUiStore((s) => s.setCommandPaletteOpen);
+  const setVersionHistoryOpen = useUiStore((s) => s.setVersionHistoryOpen);
+  const setIsGraphPaneOpen = useUiStore((s) => s.setGraphPaneOpen);
+  const setDirectoryWidth = useUiStore((s) => s.setDirectoryWidth);
+  const setSidebarWidth = useUiStore((s) => s.setSidebarWidth);
+  const setResizingType = useUiStore((s) => s.setResizingType);
+  const persistLayout = useUiStore((s) => s.persistLayout);
+
   const [activeHeadingId, setActiveHeadingId] = useState<string | undefined>();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchScope, setSearchScope] = useState<"current" | "vault">("current");
@@ -124,12 +161,6 @@ export function App() {
     buildVaultSearchIndex([])
   );
   const [activeSearchMatchId, setActiveSearchMatchId] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [preferences, setPreferences] = useState(preferencesRef.current);
-  const [unsavedDialogOpen, setUnsavedDialogOpen] = useState(false);
-  const [aboutOpen, setAboutOpen] = useState(false);
-  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
-  const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
   const [recentVisitedDocIds, setRecentVisitedDocIds] = useState<string[]>([]);
 
   const handleOpenCommandPalette = useCallback(() => {
@@ -140,8 +171,8 @@ export function App() {
     setCommandPaletteOpen(false);
   }, []);
 
-  // 软件启动时默认不自动打开知识图谱（保持纯净文档视图，需时由用户主动开启）
-  const [isGraphPaneOpen, setIsGraphPaneOpen] = useState(false);
+  // isGraphPaneOpen defaults to false in the store: the app launches on a pure
+  // document view and the graph pane is opened on demand.
 
   const handleToggleGraphPane = useCallback(() => {
     setIsGraphPaneOpen((prev) => !prev);
@@ -151,33 +182,9 @@ export function App() {
     setIsGraphPaneOpen(false);
   }, []);
 
-  const [directoryWidth, setDirectoryWidth] = useState(() => {
-    try {
-      const saved = localStorage.getItem("bookmd.layout.dirWidth");
-      if (saved) {
-        const val = parseFloat(saved);
-        if (!Number.isNaN(val) && val >= 160 && val <= 480) return val;
-      }
-    } catch {
-      // fallback
-    }
-    return 240;
-  });
-
-  const [sidebarWidth, setSidebarWidth] = useState(() => {
-    try {
-      const saved = localStorage.getItem("bookmd.layout.sidebarWidth");
-      if (saved) {
-        const val = parseFloat(saved);
-        if (!Number.isNaN(val) && val >= 180 && val <= 520) return val;
-      }
-    } catch {
-      // fallback
-    }
-    return 260;
-  });
-
-  const [resizingType, setResizingType] = useState<"dir" | "sidebar" | null>(null);
+  // Pane widths and the "a divider is being dragged" flag come from the store,
+  // which reads and writes the same localStorage keys as the initialisers that
+  // used to live here.
   const startXRef = useRef(0);
   const startWidthRef = useRef(0);
   const selectChapterRef = useRef<(id: string) => void>(() => {});
@@ -283,36 +290,22 @@ export function App() {
   useEffect(() => {
     if (!resizingType) return;
 
-    let latestDirWidth = directoryWidth;
-    let latestSidebarWidth = sidebarWidth;
-
     const handleMouseMove = (e: MouseEvent) => {
       const deltaX = e.clientX - startXRef.current;
       if (resizingType === "dir") {
         const newWidth = Math.min(Math.max(startWidthRef.current + deltaX, 160), 480);
-        latestDirWidth = newWidth;
         setDirectoryWidth(newWidth);
       } else if (resizingType === "sidebar") {
         const newWidth = Math.min(Math.max(startWidthRef.current + deltaX, 180), 520);
-        latestSidebarWidth = newWidth;
         setSidebarWidth(newWidth);
       }
     };
 
     const handleMouseUp = () => {
-      if (resizingType === "dir") {
-        try {
-          localStorage.setItem("bookmd.layout.dirWidth", latestDirWidth.toString());
-        } catch {
-          // ignore
-        }
-      } else if (resizingType === "sidebar") {
-        try {
-          localStorage.setItem("bookmd.layout.sidebarWidth", latestSidebarWidth.toString());
-        } catch {
-          // ignore
-        }
-      }
+      // Persist once, when the gesture ends. The store's width setters run on
+      // every mousemove, and a synchronous localStorage write per frame would
+      // make the drag stutter — which is why persistLayout exists separately.
+      persistLayout();
       setResizingType(null);
       document.body.classList.remove("is-resizing-col");
     };
@@ -325,7 +318,11 @@ export function App() {
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [resizingType, directoryWidth, sidebarWidth]);
+    // The widths are deliberately absent from this list. They used to be here
+    // only to seed the locals that tracked the latest value for mouseup; with
+    // that gone, depending on them would tear down and re-add the window
+    // listeners on every frame of the drag to no effect.
+  }, [resizingType, setDirectoryWidth, setSidebarWidth, setResizingType, persistLayout]);
 
   const handleDirDoubleClick = useCallback(() => {
     const treeContainer = document.querySelector(".chapter-list");
@@ -337,20 +334,12 @@ export function App() {
       });
       const optimal = Math.min(Math.max(Math.ceil(maxW), 200), 380);
       setDirectoryWidth(optimal);
-      try {
-        localStorage.setItem("bookmd.layout.dirWidth", optimal.toString());
-      } catch {
-        // ignore
-      }
     } else {
       setDirectoryWidth(240);
-      try {
-        localStorage.setItem("bookmd.layout.dirWidth", "240");
-      } catch {
-        // ignore
-      }
     }
-  }, []);
+    // persistLayout reads through get(), so it already sees the width just set.
+    persistLayout();
+  }, [setDirectoryWidth, persistLayout]);
 
   const handleSidebarDoubleClick = useCallback(() => {
     const panel = document.querySelector(".side-panel");
@@ -362,20 +351,11 @@ export function App() {
       });
       const optimal = Math.min(Math.max(Math.ceil(maxW), 220), 400);
       setSidebarWidth(optimal);
-      try {
-        localStorage.setItem("bookmd.layout.sidebarWidth", optimal.toString());
-      } catch {
-        // ignore
-      }
     } else {
       setSidebarWidth(260);
-      try {
-        localStorage.setItem("bookmd.layout.sidebarWidth", "260");
-      } catch {
-        // ignore
-      }
     }
-  }, []);
+    persistLayout();
+  }, [setSidebarWidth, persistLayout]);
 
   const jumpToHeading = useCallback(
     (headingId: string, behavior: ScrollBehavior = "smooth", highlight: boolean = false) => {
@@ -1008,17 +988,10 @@ export function App() {
     [chapterId, dualSplitTabId, selectChapter]
   );
 
+  // The store persists the flag when it changes, so this callback does not.
   const toggleTypewriterMode = useCallback(() => {
-    setTypewriterMode((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem("bookmd.editor.typewriter", String(next));
-      } catch {
-        // ignore
-      }
-      return next;
-    });
-  }, []);
+    setTypewriterMode((prev) => !prev);
+  }, [setTypewriterMode]);
 
   const doOpenMarkdownFile = async (file: File) => {
     openRequestRef.current += 1;
@@ -2080,10 +2053,12 @@ export function App() {
     return () => window.clearTimeout(handle);
   }, [activeHeadingId, chapterId, manifest, saveCurrentReadingPosition]);
 
-  // Update theme
+  // Apply the theme to the document and the native window frame.
+  //
+  // Persisting preferences is no longer part of this effect — the store writes
+  // them when they change — so only the DOM and Electron side effects remain.
   useEffect(() => {
     preferencesRef.current = preferences;
-    savePreferences(preferences);
     document.documentElement.dataset.theme = preferences.theme;
     window.bookMDDesktop?.setNativeTheme?.(preferences.theme);
   }, [preferences]);
@@ -3095,11 +3070,7 @@ export function App() {
             fontScale={preferences.fontScale}
             showLineNumbers={preferences.showLineNumbers}
             onToggleLineNumbers={() =>
-              setPreferences((prev) => {
-                const next = { ...prev, showLineNumbers: !prev.showLineNumbers };
-                savePreferences(next);
-                return next;
-              })
+              patchPreferences({ showLineNumbers: !preferences.showLineNumbers })
             }
             typewriterMode={typewriterMode}
             onToggleTypewriterMode={toggleTypewriterMode}
@@ -3115,13 +3086,7 @@ export function App() {
             canSave={Boolean(session?.writable)}
             onOpenMarkdown={openMarkdownFile}
             onOpenDirectory={window.bookMDDesktop ? openMarkdownDirectory : undefined}
-            onFontScaleChange={(fontScale) => {
-              setPreferences((current) => {
-                const next = { ...current, fontScale };
-                savePreferences(next);
-                return next;
-              });
-            }}
+            onFontScaleChange={(fontScale) => patchPreferences({ fontScale })}
             onPrint={handlePrintDocument}
             onOpenCommandPalette={handleOpenCommandPalette}
             onOpenVersionHistory={() => setVersionHistoryOpen(true)}

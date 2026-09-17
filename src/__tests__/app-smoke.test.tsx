@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import App from "../App";
+import { useUiStore } from "../store/useUiStore";
 import {
   installDesktopMock,
   removeDesktopMock,
@@ -24,13 +25,20 @@ import {
  */
 describe("App - shell smoke tests", () => {
   let desktop: DesktopMock;
+  const pristineUiState = useUiStore.getState();
 
   beforeEach(() => {
     desktop = installDesktopMock();
+    // UI chrome lives in a module-level store now, so it has to be reset
+    // between tests or one test's sidebar/notice leaks into the next.
+    useUiStore.setState(pristineUiState, true);
+    localStorage.clear();
   });
 
   afterEach(() => {
     removeDesktopMock();
+    useUiStore.setState(pristineUiState, true);
+    delete document.documentElement.dataset.theme;
     vi.restoreAllMocks();
   });
 
@@ -112,6 +120,29 @@ describe("App - shell smoke tests", () => {
     });
     expect(desktop.onMenuCommand).toHaveBeenCalled();
     expect(desktop.onBeforeClose).toHaveBeenCalled();
+  });
+
+  it("writes UI chrome into the store rather than local state", async () => {
+    render(<App />);
+    await openSampleVault();
+
+    // Opening a vault raises a notice; before the R1 migration that lived in
+    // App's own useState, and this assertion is what proves it moved.
+    expect(useUiStore.getState().notice).toMatch(/已打开目录/);
+  });
+
+  it("applies store preferences to the document without going through props", async () => {
+    render(<App />);
+
+    act(() => {
+      useUiStore.getState().setPreferences({ theme: "eink", fontScale: 1 });
+    });
+
+    // App subscribes to the store and syncs the theme attribute, so changing it
+    // from outside the component tree must be reflected.
+    await waitFor(() => {
+      expect(document.documentElement.dataset.theme).toBe("eink");
+    });
   });
 
   it("cleans up its subscriptions on unmount", async () => {

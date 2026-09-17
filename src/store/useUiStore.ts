@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { LightboxMedia, SidebarTab } from "../core/types";
-import { loadPreferences, type Preferences } from "../services/storage";
+import { loadPreferences, savePreferences, type Preferences } from "../services/storage";
 
 /**
  * UI chrome: layout, appearance, modal visibility and transient notices.
@@ -25,7 +25,7 @@ export const SIDEBAR_WIDTH_MIN = 180;
 export const SIDEBAR_WIDTH_MAX = 520;
 
 export const DIRECTORY_WIDTH_DEFAULT = 240;
-export const SIDEBAR_WIDTH_DEFAULT = 280;
+export const SIDEBAR_WIDTH_DEFAULT = 260;
 
 /** How long a notice stays on screen before clearing itself. */
 export const NOTICE_TIMEOUT_MS = 4500;
@@ -36,19 +36,34 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 /**
- * Reads a legacy layout width.
+ * localStorage keys for everything this store persists.
  *
- * Before this store existed, App.tsx persisted the two pane widths under
- * separate localStorage keys. Reading them here means a user's layout survives
- * the migration instead of snapping back to the defaults.
+ * These are the very keys App.tsx used before the migration, so an existing
+ * layout and reader preference carry over instead of snapping back to defaults.
  */
-function readLegacyWidth(key: string, fallback: number, min: number, max: number): number {
+const DIR_WIDTH_KEY = "bookmd.layout.dirWidth";
+const SIDEBAR_WIDTH_KEY = "bookmd.layout.sidebarWidth";
+const TYPEWRITER_KEY = "bookmd.editor.typewriter";
+
+/**
+ * Reads a persisted layout width.
+ *
+ * An out-of-range value falls back to the default rather than being clamped: a
+ * stored 900 was written by something else, and silently resizing the pane to
+ * its maximum is a stranger outcome than ignoring it. This matches what the
+ * useState initialisers in App.tsx did.
+ *
+ * Exported because the store consumes it at module load — a moment a test
+ * cannot re-create, so this is the only way to cover the fallback rules.
+ */
+export function readStoredWidth(key: string, fallback: number, min: number, max: number): number {
   if (typeof localStorage === "undefined") return fallback;
   try {
     const raw = localStorage.getItem(key);
     if (raw === null) return fallback;
-    const parsed = Number.parseInt(raw, 10);
-    return Number.isNaN(parsed) ? fallback : clamp(parsed, min, max);
+    const parsed = Number.parseFloat(raw);
+    if (Number.isNaN(parsed) || parsed < min || parsed > max) return fallback;
+    return parsed;
   } catch {
     return fallback;
   }
@@ -58,9 +73,36 @@ function readLegacyWidth(key: string, fallback: number, min: number, max: number
 function readLegacyTypewriter(): boolean {
   if (typeof localStorage === "undefined") return false;
   try {
-    return localStorage.getItem("bookmd.editor.typewriter") === "true";
+    return localStorage.getItem(TYPEWRITER_KEY) === "true";
   } catch {
     return false;
+  }
+}
+
+/**
+ * Writes a value, tolerating a full or unavailable store.
+ *
+ * The in-memory value stays authoritative for the session, so a failed write
+ * costs the user nothing until the next launch.
+ */
+function writeString(key: string, value: string): void {
+  if (typeof localStorage === "undefined") return;
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * Preferences round-trip through JSON, and `savePreferences` has no guard of
+ * its own — a quota error there would otherwise escape into a click handler.
+ */
+function persistPreferences(preferences: Preferences): void {
+  try {
+    savePreferences(preferences);
+  } catch {
+    // ignore
   }
 }
 
@@ -99,11 +141,25 @@ type UiActions = {
   setDirectoryWidth: (width: number) => void;
   setSidebarWidth: (width: number) => void;
   setResizingType: (type: "dir" | "sidebar" | null) => void;
+  /**
+   * Writes both pane widths to storage.
+   *
+   * Deliberately not folded into the width setters: dragging a divider calls
+   * them on every mousemove, and a synchronous localStorage write sixty times a
+   * second would make the drag stutter. The resize handler calls this once when
+   * the gesture ends, which is what App.tsx did before the migration.
+   */
+  persistLayout: () => void;
 
-  setGraphPaneOpen: (open: boolean) => void;
+  setGraphPaneOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
   setFullscreen: (fullscreen: boolean) => void;
 
-  setPreferences: (preferences: Preferences) => void;
+  /**
+   * Accepts an updater as well as a value — several call sites already derived
+   * the next preferences from the previous ones, so keeping that shape meant
+   * those lines needed no change.
+   */
+  setPreferences: (preferences: Preferences | ((prev: Preferences) => Preferences)) => void;
   /** Applies a partial update — the shape components actually use. */
   patchPreferences: (patch: Partial<Preferences>) => void;
   /** Flips between light and dark, leaving eink/system untouched. */
@@ -117,7 +173,15 @@ type UiActions = {
   setCommandPaletteOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
   setVersionHistoryOpen: (open: boolean) => void;
 
-  /** Shows a notice; it clears itself after {@link NOTICE_TIMEOUT_MS}. */
+  /**
+   * Sets the notice without scheduling anything.
+   *
+   * App.tsx owns the auto-clear today through an effect keyed on the notice, so
+   * this is the setter it needed to migrate to. Switching it over to `notify`
+   * and dropping that effect is a follow-up, not part of this move.
+   */
+  setNotice: (message: string | null) => void;
+  /** Shows a notice and clears it after {@link NOTICE_TIMEOUT_MS} itself. */
   notify: (message: string | null) => void;
 
   /** Closes every overlay — used by the Escape chain and on navigation. */
@@ -134,14 +198,14 @@ export const useUiStore = create<UiStore>()((set, get) => ({
   sidebarOpen: true,
   directoryOpen: true,
   sidebarTab: "toc",
-  directoryWidth: readLegacyWidth(
-    "bookmd.layout.dirWidth",
+  directoryWidth: readStoredWidth(
+    DIR_WIDTH_KEY,
     DIRECTORY_WIDTH_DEFAULT,
     DIRECTORY_WIDTH_MIN,
     DIRECTORY_WIDTH_MAX
   ),
-  sidebarWidth: readLegacyWidth(
-    "bookmd.layout.sidebarWidth",
+  sidebarWidth: readStoredWidth(
+    SIDEBAR_WIDTH_KEY,
     SIDEBAR_WIDTH_DEFAULT,
     SIDEBAR_WIDTH_MIN,
     SIDEBAR_WIDTH_MAX
@@ -182,28 +246,57 @@ export const useUiStore = create<UiStore>()((set, get) => ({
 
   setResizingType: (type) => set({ resizingType: type }),
 
-  setGraphPaneOpen: (open) => set({ isGraphPaneOpen: open }),
+  persistLayout: () => {
+    const { directoryWidth, sidebarWidth } = get();
+    writeString(DIR_WIDTH_KEY, String(directoryWidth));
+    writeString(SIDEBAR_WIDTH_KEY, String(sidebarWidth));
+  },
+
+  setGraphPaneOpen: (open) =>
+    set((state) => ({
+      isGraphPaneOpen: typeof open === "function" ? open(state.isGraphPaneOpen) : open,
+    })),
   setFullscreen: (fullscreen) => set({ isFullscreen: fullscreen }),
 
-  setPreferences: (preferences) => set({ preferences }),
+  // The preferences actions read through get() and set() rather than computing
+  // inside the updater, so the storage write stays outside it. An updater with
+  // side effects is legal but surprising, and it would also make the write run
+  // twice when a caller passes one that saves on its own.
+  setPreferences: (preferences) => {
+    const next =
+      typeof preferences === "function" ? preferences(get().preferences) : preferences;
+    persistPreferences(next);
+    set({ preferences: next });
+  },
 
-  patchPreferences: (patch) => set((state) => ({ preferences: { ...state.preferences, ...patch } })),
+  patchPreferences: (patch) => {
+    const next = { ...get().preferences, ...patch };
+    persistPreferences(next);
+    set({ preferences: next });
+  },
 
-  toggleTheme: () =>
-    set((state) => ({
-      preferences: {
-        ...state.preferences,
-        theme: state.preferences.theme === "light" ? "twitter" : "light",
-      },
-    })),
+  toggleTheme: () => {
+    const current = get().preferences;
+    const next: Preferences = {
+      ...current,
+      theme: current.theme === "light" ? "twitter" : "light",
+    };
+    persistPreferences(next);
+    set({ preferences: next });
+  },
 
-  setTypewriterMode: (enabled) =>
-    set((state) => ({
-      typewriterMode:
-        typeof enabled === "function" ? enabled(state.typewriterMode) : enabled,
-    })),
+  setTypewriterMode: (enabled) => {
+    const current = get().typewriterMode;
+    const next = typeof enabled === "function" ? enabled(current) : enabled;
+    writeString(TYPEWRITER_KEY, String(next));
+    set({ typewriterMode: next });
+  },
 
-  toggleTypewriterMode: () => set((state) => ({ typewriterMode: !state.typewriterMode })),
+  toggleTypewriterMode: () => {
+    const next = !get().typewriterMode;
+    writeString(TYPEWRITER_KEY, String(next));
+    set({ typewriterMode: next });
+  },
 
   setLightboxMedia: (media) => set({ lightboxMedia: media }),
   setUnsavedDialogOpen: (open) => set({ unsavedDialogOpen: open }),
@@ -216,6 +309,8 @@ export const useUiStore = create<UiStore>()((set, get) => ({
     })),
 
   setVersionHistoryOpen: (open) => set({ versionHistoryOpen: open }),
+
+  setNotice: (message) => set({ notice: message }),
 
   notify: (message) => {
     if (noticeTimer) {
