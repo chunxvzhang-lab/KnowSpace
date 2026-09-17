@@ -17,7 +17,9 @@ import {
   ExternalLink,
   Filter,
 } from "lucide-react";
+import { GraduationCap } from "lucide-react";
 import type { FlashNoteSummaryItem, FlashNotesSummaryResult } from "../types/desktop";
+import { DailyReviewPanel } from "./DailyReviewPanel";
 
 type SpaceTimelinePanelProps = {
   onOpenNoteFile?: (filePath: string) => void;
@@ -32,7 +34,7 @@ export const SpaceTimelinePanel: React.FC<SpaceTimelinePanelProps> = ({
   const [spaceDir, setSpaceDir] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [activeTab, setActiveTab] = useState<"timeline" | "todos">("timeline");
+  const [activeTab, setActiveTab] = useState<"timeline" | "todos" | "review">("timeline");
   const [todoFilter, setTodoFilter] = useState<"all" | "pending" | "done">("pending");
   const [feedback, setFeedback] = useState<string>("");
 
@@ -221,6 +223,51 @@ export const SpaceTimelinePanel: React.FC<SpaceTimelinePanelProps> = ({
     return groups;
   }, [filteredNotes]);
 
+  // Shared between all three views: the review panel renders it through a slot
+  // so the user can always switch back out.
+  const tabSwitcher = (
+    <div className="space-tab-switcher">
+      <button
+        type="button"
+        className={`space-tab-btn ${activeTab === "timeline" ? "active" : ""}`}
+        onClick={() => setActiveTab("timeline")}
+      >
+        <Clock size={12} />
+        <span>时间轴</span>
+      </button>
+      <button
+        type="button"
+        className={`space-tab-btn ${activeTab === "todos" ? "active" : ""}`}
+        onClick={() => setActiveTab("todos")}
+      >
+        <CheckSquare size={12} />
+        <span>待办 ({completedTodoCount}/{totalTodoCount})</span>
+      </button>
+      <button
+        type="button"
+        className={`space-tab-btn ${activeTab === "review" ? "active" : ""}`}
+        onClick={() => setActiveTab("review")}
+      >
+        <GraduationCap size={12} />
+        <span>复盘</span>
+      </button>
+    </div>
+  );
+
+  // The review view brings its own header (progress bar instead of search), so
+  // it takes over the panel rather than nesting inside the timeline body.
+  if (activeTab === "review") {
+    return (
+      <DailyReviewPanel
+        notes={notes}
+        loading={loading}
+        onOpenNoteFile={onOpenNoteFile}
+        onProgressSaved={loadSummary}
+        tabsSlot={tabSwitcher}
+      />
+    );
+  }
+
   return (
     <div className="space-timeline-container">
       {/* Panel Top Header */}
@@ -254,24 +301,7 @@ export const SpaceTimelinePanel: React.FC<SpaceTimelinePanelProps> = ({
         </div>
 
         {/* Segmented View Switcher */}
-        <div className="space-tab-switcher">
-          <button
-            type="button"
-            className={`space-tab-btn ${activeTab === "timeline" ? "active" : ""}`}
-            onClick={() => setActiveTab("timeline")}
-          >
-            <Clock size={12} />
-            <span>时间轴</span>
-          </button>
-          <button
-            type="button"
-            className={`space-tab-btn ${activeTab === "todos" ? "active" : ""}`}
-            onClick={() => setActiveTab("todos")}
-          >
-            <CheckSquare size={12} />
-            <span>待办事项 ({completedTodoCount}/{totalTodoCount})</span>
-          </button>
-        </div>
+        {tabSwitcher}
 
         {/* Search & Filter Bar */}
         <div className="space-search-wrapper">
