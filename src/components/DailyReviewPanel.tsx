@@ -6,8 +6,8 @@ import {
   CheckCircle2,
   Inbox,
   Keyboard,
+  AlertCircle,
 } from "lucide-react";
-import type { FlashNoteSummaryItem } from "../types/desktop";
 import {
   buildReviewQueue,
   parseFlashcards,
@@ -18,10 +18,17 @@ import {
   type FsrsRating,
   type FsrsStats,
 } from "../services/fsrsService";
+import { useVaultCards, type ReviewSourceDocument } from "../hooks/useVaultCards";
 
 type DailyReviewPanelProps = {
-  /** Space notes, already loaded by the parent — each item carries its content. */
-  notes: FlashNoteSummaryItem[];
+  /**
+   * Documents from the parent's own source — the Space folder, in practice.
+   *
+   * Typed as the two fields the review actually uses rather than as the full
+   * summary the timeline works with, so a knowledge-base chapter can be passed
+   * in as-is — it has no date, time or tag list for the caller to invent.
+   */
+  notes: ReviewSourceDocument[];
   loading?: boolean;
   onOpenNoteFile?: (filePath: string) => void;
   /** Called after a rating is persisted, so the parent can refresh its summary. */
@@ -66,6 +73,27 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
     typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
 
   /**
+   * Where the cards come from.
+   *
+   * Space is the default: it is where the app's own capture flow files things,
+   * and the parent already has it loaded. The knowledge base is fetched only
+   * when it is chosen.
+   */
+  const [reviewSource, setReviewSource] = useState<"space" | "vault">("space");
+  const vault = useVaultCards();
+  const isVaultSource = reviewSource === "vault";
+
+  /**
+   * The documents this session draws from.
+   *
+   * Switching source mid-session is allowed, and it starts a fresh round — the
+   * queue is derived from this, so changing it rebuilds the queue exactly as a
+   * changed note list would.
+   */
+  const activeNotes: ReviewSourceDocument[] = isVaultSource ? vault.documents : notes;
+  const isLoading = isVaultSource ? vault.loading : Boolean(loading);
+
+  /**
    * Cards rated in this session, by card id.
    *
    * Advancement is tracked by identity rather than by a position in the queue.
@@ -98,7 +126,7 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
     const inputs: Array<{ path: string; content: string }> = [];
     const sources = new Map<string, { path: string; content: string }>();
 
-    for (const note of notes) {
+    for (const note of activeNotes) {
       inputs.push({ path: note.filePath, content: note.content });
 
       // Every card of one note shares a single mutable holder. Giving each card
@@ -121,7 +149,7 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
       stats: inputs.length > 0 ? summarize(inputs) : emptyStats,
       sourceMap: sources,
     };
-  }, [notes]);
+  }, [activeNotes]);
 
   /**
    * The card being asked about: the first one in the queue that has not been
@@ -200,14 +228,29 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
         // and this is what keeps the next card in front of the reader.
         setReviewedIds((prev) => new Set(prev).add(current.card.id));
         setRevealed(false);
+        // The parent owns the Space list and refreshes it. The vault documents
+        // are this panel's own, so it has to refresh those itself.
         onProgressSaved?.();
+        if (isVaultSource) vault.reloadIfLoaded();
       } catch (err) {
         showToast(`保存失败：${err instanceof Error ? err.message : "未知错误"}`);
       } finally {
         setSaving(false);
       }
     },
-    [current, saving, sourceMap, desktop, showToast, onProgressSaved]
+    // vault.reloadIfLoaded rather than the whole vault object, whose identity is
+    // new on every render — depending on it would re-register the key listener
+    // below on every keystroke.
+    [
+      current,
+      saving,
+      sourceMap,
+      desktop,
+      showToast,
+      onProgressSaved,
+      isVaultSource,
+      vault.reloadIfLoaded,
+    ]
   );
 
   // Keyboard review flow: Space reveals, 1-4 grade. Guarded against firing while
@@ -281,6 +324,38 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
 
         {tabsSlot}
 
+        {/* Card source. Space is where the capture flow files things; the vault
+            is everything else the app can already read. Reuses the tab styling
+            so the two switch rows read as the same kind of control. */}
+        <div className="space-tab-switcher" role="group" aria-label="卡片来源">
+          <button
+            type="button"
+            className={`space-tab-btn ${reviewSource === "space" ? "active" : ""}`}
+            onClick={() => setReviewSource("space")}
+          >
+            <span>闪念 Space</span>
+          </button>
+          <button
+            type="button"
+            className={`space-tab-btn ${reviewSource === "vault" ? "active" : ""}`}
+            onClick={() => {
+              setReviewSource("vault");
+              // Fetched the first time it is asked for rather than on mount:
+              // reading every chapter is the expensive part here, and most
+              // sessions draw on Space.
+              if (!vault.loaded) void vault.load();
+            }}
+            disabled={vault.chapterCount === 0}
+            title={
+              vault.chapterCount === 0
+                ? "尚未打开知识库"
+                : `从当前知识库的 ${vault.chapterCount} 篇文档中复习`
+            }
+          >
+            <span>当前知识库</span>
+          </button>
+        </div>
+
         {/* Session progress */}
         <div className="dr-progress-track" aria-label="本轮进度">
           <div className="dr-progress-fill" style={{ width: `${progressPct}%` }} />
@@ -299,18 +374,33 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
 
       {/* Panel Body */}
       <div className="space-panel-body">
-        {loading ? (
+        {isLoading ? (
           <div className="space-empty-state">
             <RotateCw size={24} />
-            <p>正在载入 Space 闪念库...</p>
+            <p>{isVaultSource ? "正在读取知识库文档..." : "正在载入 Space 闪念库..."}</p>
+          </div>
+        ) : isVaultSource && vault.error ? (
+          <div className="space-empty-state">
+            <AlertCircle size={32} />
+            <p>读取知识库失败</p>
+            <p className="dr-empty-hint">{vault.error}</p>
           </div>
         ) : stats.total === 0 ? (
           <div className="space-empty-state">
             <Inbox size={32} />
-            <p>Space 里还没有闪卡</p>
+            <p>{isVaultSource ? "知识库里还没有闪卡" : "Space 里还没有闪卡"}</p>
             <p className="dr-empty-hint">
-              在闪念里写下 <code>问题 :: 答案</code>、<code>Q: / A:</code> 或{" "}
-              <code>{"{{c1::答案}}"}</code> 即可生成卡片。
+              {isVaultSource ? (
+                <>
+                  在当前知识库的任意文档里写下 <code>问题 :: 答案</code>、
+                  <code>Q: / A:</code> 或 <code>{"{{c1::答案}}"}</code>，即可生成卡片。
+                </>
+              ) : (
+                <>
+                  在闪念里写下 <code>问题 :: 答案</code>、<code>Q: / A:</code> 或{" "}
+                  <code>{"{{c1::答案}}"}</code> 即可生成卡片。
+                </>
+              )}
             </p>
           </div>
         ) : !current ? (
