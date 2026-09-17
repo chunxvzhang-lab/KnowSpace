@@ -15,7 +15,6 @@ import {
   summarize,
   upsertFsrsMetadata,
   type FsrsCardKind,
-  type FsrsQueueItem,
   type FsrsRating,
   type FsrsStats,
 } from "../services/fsrsService";
@@ -66,8 +65,18 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
   const desktop =
     typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
 
-  const [queue, setQueue] = useState<FsrsQueueItem[]>([]);
-  const [index, setIndex] = useState(0);
+  /**
+   * Cards rated in this session, by card id.
+   *
+   * Advancement is tracked by identity rather than by a position in the queue.
+   * Rating a card tells the parent to reload, the queue is rebuilt, and a card
+   * that has just been scheduled into the future is no longer in it — so a
+   * position-based cursor was reset to zero on every rebuild, which is why
+   * rating appeared to do nothing at all. Identity survives the rebuild, and it
+   * also keeps a card rated "重来" from being shown again in the same session
+   * while still coming back on its new due date.
+   */
+  const [reviewedIds, setReviewedIds] = useState<ReadonlySet<string>>(() => new Set());
   const [revealed, setRevealed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState("");
@@ -114,18 +123,23 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
     };
   }, [notes]);
 
-  // Rebuild the working queue whenever the underlying notes change (a new flash
-  // note, an external edit, a manual refresh), and restart the session.
-  useEffect(() => {
-    setQueue(initialQueue);
-    setIndex(0);
-    setRevealed(false);
-    setLog([]);
-  }, [initialQueue]);
+  /**
+   * The card being asked about: the first one in the queue that has not been
+   * rated yet this session. Derived rather than stored, so a queue rebuild
+   * cannot move it backwards.
+   */
+  const current = initialQueue.find((item) => !reviewedIds.has(item.card.id));
 
-  const current = queue[index];
-  const total = queue.length;
-  const done = Math.min(index, total);
+  /**
+   * Session progress, measured against what the session started with.
+   *
+   * Counting the remaining cards rather than the whole queue keeps the numbers
+   * still as rated cards drop out of it: each rating adds one to `done` and
+   * takes one off `remaining`, so the total does not shrink under the reader.
+   */
+  const done = reviewedIds.size;
+  const remaining = initialQueue.filter((item) => !reviewedIds.has(item.card.id)).length;
+  const total = done + remaining;
   const progressPct = total > 0 ? Math.round((done / total) * 100) : 0;
 
   /**
@@ -182,7 +196,9 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
           ...prev,
           { cardId: current.card.id, rating, intervalDays: result.intervalDays },
         ]);
-        setIndex((i) => i + 1);
+        // Mark rather than advance: the parent reload below rebuilds the queue,
+        // and this is what keeps the next card in front of the reader.
+        setReviewedIds((prev) => new Set(prev).add(current.card.id));
         setRevealed(false);
         onProgressSaved?.();
       } catch (err) {
@@ -251,8 +267,7 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
               type="button"
               className="space-icon-btn"
               onClick={() => {
-                setQueue(initialQueue);
-                setIndex(0);
+                setReviewedIds(new Set());
                 setRevealed(false);
                 setLog([]);
                 showToast("已重新排队");

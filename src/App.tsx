@@ -163,6 +163,7 @@ export function App() {
   const commandPaletteOpen = useUiStore((s) => s.commandPaletteOpen);
   const versionHistoryOpen = useUiStore((s) => s.versionHistoryOpen);
   const isGraphPaneOpen = useUiStore((s) => s.isGraphPaneOpen);
+  const isReviewFocus = useUiStore((s) => s.isReviewFocus);
   const directoryWidth = useUiStore((s) => s.directoryWidth);
   const sidebarWidth = useUiStore((s) => s.sidebarWidth);
   const resizingType = useUiStore((s) => s.resizingType);
@@ -183,6 +184,7 @@ export function App() {
   const setCommandPaletteOpen = useUiStore((s) => s.setCommandPaletteOpen);
   const setVersionHistoryOpen = useUiStore((s) => s.setVersionHistoryOpen);
   const setIsGraphPaneOpen = useUiStore((s) => s.setGraphPaneOpen);
+  const setReviewFocus = useUiStore((s) => s.setReviewFocus);
   // The width setters and persistLayout moved into useColumnResize along with
   // the drag that drives them. The widths themselves are still subscribed here
   // because the resizers and panels render them.
@@ -205,6 +207,23 @@ export function App() {
   const handleCloseGraphPane = useCallback(() => {
     setIsGraphPaneOpen(false);
   }, []);
+
+  /**
+   * Entering the flashcard review gets the workspace to itself.
+   *
+   * The document tree is collapsed on the way in because the review, the tree
+   * and the reader were all competing for the same width and the cards ended up
+   * squeezed. The reader is not unmounted, only collapsed by the shell's CSS, so
+   * returning from the review finds the document exactly as it was left —
+   * scroll position, editor state and all.
+   */
+  const handleReviewActiveChange = useCallback(
+    (active: boolean) => {
+      setReviewFocus(active);
+      if (active) setDirectoryOpen(false);
+    },
+    [setReviewFocus, setDirectoryOpen]
+  );
 
   // Pane widths and the "a divider is being dragged" flag come from the store,
   // which reads and writes the same localStorage keys as the initialisers that
@@ -1658,7 +1677,7 @@ export function App() {
 
   return (
     <div
-      className={`app-shell theme-${preferences.theme} ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}${directoryOpen ? "" : " directory-closed"}${manifest ? "" : " empty-source"}${isFullscreen ? " is-fullscreen" : ""}${isCanvasFullscreen ? " is-canvas-fullscreen" : ""}${isDualSplitMode ? " is-dual-split-mode" : ""}`}
+      className={`app-shell theme-${preferences.theme} ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}${directoryOpen ? "" : " directory-closed"}${manifest ? "" : " empty-source"}${isFullscreen ? " is-fullscreen" : ""}${isCanvasFullscreen ? " is-canvas-fullscreen" : ""}${isDualSplitMode ? " is-dual-split-mode" : ""}${isReviewFocus ? " is-review-focus" : ""}`}
     >
       {!isDualSplitMode && !isCanvasFullscreen && (
         <ActivityBar
@@ -1784,6 +1803,7 @@ export function App() {
                         openDesktopMarkdownPathRef.current(filePath);
                       }
                     }}
+                    onReviewActiveChange={handleReviewActiveChange}
                     onMergeIntoDocument={handleMergeFlashNote}
                   />
                 </section>

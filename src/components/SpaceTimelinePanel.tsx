@@ -24,17 +24,36 @@ import { DailyReviewPanel } from "./DailyReviewPanel";
 type SpaceTimelinePanelProps = {
   onOpenNoteFile?: (filePath: string) => void;
   onMergeIntoDocument?: (content: string, fileName: string) => void;
+  /**
+   * Fired when the review tab becomes active, and again when it stops being.
+   *
+   * The workspace listens so it can get out of the way. The review needs the
+   * width, and leaving the document tree and the reader open beside it left the
+   * three surfaces fighting over the same space.
+   */
+  onReviewActiveChange?: (active: boolean) => void;
 };
 
 export const SpaceTimelinePanel: React.FC<SpaceTimelinePanelProps> = ({
   onOpenNoteFile,
   onMergeIntoDocument,
+  onReviewActiveChange,
 }) => {
   const [notes, setNotes] = useState<FlashNoteSummaryItem[]>([]);
   const [spaceDir, setSpaceDir] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [activeTab, setActiveTab] = useState<"timeline" | "todos" | "review">("timeline");
+  const isReviewActive = activeTab === "review";
+
+  // Tell the parent whenever the review view comes and goes, including on
+  // unmount, so a collapsed workspace is never left behind.
+  useEffect(() => {
+    onReviewActiveChange?.(isReviewActive);
+    return () => {
+      if (isReviewActive) onReviewActiveChange?.(false);
+    };
+  }, [isReviewActive, onReviewActiveChange]);
   const [todoFilter, setTodoFilter] = useState<"all" | "pending" | "done">("pending");
   const [feedback, setFeedback] = useState<string>("");
 

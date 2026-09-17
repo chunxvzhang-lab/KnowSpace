@@ -116,6 +116,14 @@ type UiState = {
   /** Which pane divider is being dragged, if any. */
   resizingType: "dir" | "sidebar" | null;
   isGraphPaneOpen: boolean;
+  /**
+   * The flashcard review is on screen.
+   *
+   * Set while the Space panel is showing its review tab. The workspace reacts by
+   * collapsing the reader and the document tree, because the review needs the
+   * width and the two surfaces used to fight over it.
+   */
+  isReviewFocus: boolean;
   isFullscreen: boolean;
 
   // ── Appearance ──────────────────────────────────────────────────────────
@@ -153,6 +161,8 @@ type UiActions = {
 
   setGraphPaneOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
   setFullscreen: (fullscreen: boolean) => void;
+  /** Turns the wide review layout on and off. */
+  setReviewFocus: (active: boolean) => void;
 
   /**
    * Accepts an updater as well as a value — several call sites already derived
@@ -212,6 +222,7 @@ export const useUiStore = create<UiStore>()((set, get) => ({
   ),
   resizingType: null,
   isGraphPaneOpen: false,
+  isReviewFocus: false,
   isFullscreen: false,
 
   preferences: loadPreferences(),
@@ -257,6 +268,8 @@ export const useUiStore = create<UiStore>()((set, get) => ({
       isGraphPaneOpen: typeof open === "function" ? open(state.isGraphPaneOpen) : open,
     })),
   setFullscreen: (fullscreen) => set({ isFullscreen: fullscreen }),
+
+  setReviewFocus: (active) => set({ isReviewFocus: active }),
 
   // The preferences actions read through get() and set() rather than computing
   // inside the updater, so the storage write stays outside it. An updater with

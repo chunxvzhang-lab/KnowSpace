@@ -159,6 +159,49 @@ describe("DailyReviewPanel - 每日复盘视图", () => {
     expect(screen.queryByText("答案乙")).toBeNull();
   });
 
+  it("父组件刷新笔记列表后仍停在下一张，不退回第一张", async () => {
+    // The panel asks its parent to reload after every rating, and the parent
+    // hands back a fresh notes array. The queue is rebuilt from it — and the
+    // previous implementation reset its cursor to zero on that rebuild, so
+    // rating a card put the first card back on screen and looked like it had
+    // done nothing. The test above passes either way because it never re-renders
+    // with new notes; this one is the case that was broken.
+    const { rerender } = render(<DailyReviewPanel notes={THREE_CARDS} />);
+
+    fireEvent.click(screen.getByText("显示答案"));
+    await act(async () => {
+      fireEvent.click(screen.getByText("良好"));
+    });
+    await waitFor(() => expect(screen.getByText("问题乙")).toBeDefined());
+
+    // The parent reload: same notes, new array identity.
+    await act(async () => {
+      rerender(<DailyReviewPanel notes={THREE_CARDS.map((note) => ({ ...note }))} />);
+    });
+
+    expect(screen.getByText("问题乙")).toBeDefined();
+    expect(screen.queryByText("问题甲")).toBeNull();
+  });
+
+  it("父组件刷新后本轮进度与统计不会重置", async () => {
+    // The same rebuild used to clear the session log, so a completed session
+    // could never show its summary — `log.length` was always zero by then.
+    const { rerender } = render(<DailyReviewPanel notes={THREE_CARDS} />);
+
+    fireEvent.click(screen.getByText("显示答案"));
+    await act(async () => {
+      fireEvent.click(screen.getByText("良好"));
+    });
+    await waitFor(() => expect(screen.getByText(/1 \/ 3/)).toBeDefined());
+
+    await act(async () => {
+      rerender(<DailyReviewPanel notes={THREE_CARDS.map((note) => ({ ...note }))} />);
+    });
+
+    // One rated, two still to go — the totals must not shrink under the reader.
+    expect(screen.getByText(/1 \/ 3/)).toBeDefined();
+  });
+
   it("评为「重来」会写入重置后的进度", async () => {
     render(<DailyReviewPanel notes={THREE_CARDS} />);
     fireEvent.click(screen.getByText("显示答案"));
