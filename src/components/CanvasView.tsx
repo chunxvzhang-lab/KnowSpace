@@ -122,6 +122,12 @@ import {
 import { renderCardMarkdown } from "../services/markdown";
 import { getCanvasThemeColors } from "../services/canvasTheme";
 import { MediaLightbox, type LightboxMedia } from "./MediaLightbox";
+// Extracted during the R2 split (docs/CANVAS_SPLIT_DESIGN.md, batch B2).
+import { CanvasToast } from "./canvas/CanvasToast";
+import { MarqueeSelectionBox } from "./canvas/MarqueeSelectionBox";
+import { CanvasMinimap } from "./canvas/CanvasMinimap";
+import { CanvasEdgeBatchToolbar } from "./canvas/CanvasEdgeBatchToolbar";
+import { getNodePalette } from "./canvas/canvasPalette";
 
 export type CanvasViewProps = {
   title: string;
@@ -151,17 +157,8 @@ const SIDES: CanvasNodeSide[] = ["top", "right", "bottom", "left"];
  */
 const EMPTY_DRAG_MAP = new Map<string, { id: string; startX: number; startY: number }>();
 
-function getNodePalette(color?: string): { label: string; stroke: string; bg: string } | undefined {
-  if (!color) return undefined;
-  if (CANVAS_COLOR_PALETTES[color]) return CANVAS_COLOR_PALETTES[color];
-  if (color.startsWith("#")) {
-    // 1f hex ≈ 12% — the same tint the standard palette uses for its `bg`,
-    // instead of 18 (~9%) which made a custom colour read noticeably paler
-    // than its own swatch.
-    return { label: "自定义", stroke: color, bg: `${color}1f` };
-  }
-  return undefined;
-}
+// getNodePalette now lives in ./canvas/canvasPalette so the minimap and this
+// file share one definition (imported at the top).
 
 function hexToRgbString(hex: string): string | null {
   const cleanHex = hex.replace(/^#/, "").trim();
@@ -1043,6 +1040,24 @@ export const CanvasView = memo(function CanvasView({
       panY: rect.height / 2 - centerY * fitZoom,
     });
   }, [data.nodes]);
+
+  /**
+   * Recentres the board on a point picked from the minimap.
+   *
+   * The minimap reports canvas-space coordinates and the viewport lives here,
+   * so the camera maths stays with the rest of the viewport handlers.
+   */
+  const handleMinimapNavigate = useCallback((canvasX: number, canvasY: number) => {
+    const el = containerRef.current;
+    if (!el) return;
+    const viewW = el.clientWidth;
+    const viewH = el.clientHeight;
+    setViewport((prev) => ({
+      ...prev,
+      panX: viewW / 2 - canvasX * prev.zoom,
+      panY: viewH / 2 - canvasY * prev.zoom,
+    }));
+  }, []);
 
   // Mouse wheel zoom and pan with requestAnimationFrame batching
   const handleWheel = useCallback(
@@ -6384,159 +6399,7 @@ export const CanvasView = memo(function CanvasView({
       </div>
 
       {/* 5. BOTTOM-RIGHT INTERACTIVE MINIMAP */}
-      <div
-        className="canvas-minimap"
-        style={{
-          position: "absolute",
-          bottom: 16,
-          right: 16,
-          width: 180,
-          height: 130,
-          zIndex: 90,
-          borderRadius: 10,
-          backgroundColor:
-            theme === "eink"
-              ? "rgba(244, 241, 234, 0.9)"
-              : !isDark
-              ? "rgba(255, 255, 255, 0.94)"
-              : "rgba(15, 23, 42, 0.85)",
-          backdropFilter: "blur(8px)",
-          border: `1px solid ${!isDark ? "#e2e8f0" : colors.cardBorder}`,
-          boxShadow: !isDark ? "0 4px 16px rgba(0,0,0,0.06)" : "0 6px 20px rgba(0,0,0,0.2)",
-          overflow: "hidden",
-        }}
-        onMouseDown={(e) => e.stopPropagation()}
-        onClick={(e) => {
-          e.stopPropagation();
-          const rect = e.currentTarget.getBoundingClientRect();
-          const clickX = (e.clientX - rect.left - minimapOffsetX) / minimapScale + minimapBBox.minX;
-          const clickY = (e.clientY - rect.top - minimapOffsetY) / minimapScale + minimapBBox.minY;
-          if (containerRef.current) {
-            const viewW = containerRef.current.clientWidth;
-            const viewH = containerRef.current.clientHeight;
-            setViewport((prev) => ({
-              ...prev,
-              panX: viewW / 2 - clickX * prev.zoom,
-              panY: viewH / 2 - clickY * prev.zoom,
-            }));
-          }
-        }}
-      >
-        <svg style={{ width: "100%", height: "100%" }}>
-          {/* Layer A: Group Containers */}
-          {data.nodes
-            .filter((n): n is CanvasGroupNode => n.type === "group")
-            .map((group) => {
-              const rx = minimapOffsetX + (group.x - minimapBBox.minX) * minimapScale;
-              const ry = minimapOffsetY + (group.y - minimapBBox.minY) * minimapScale;
-              const rw = Math.max(6, group.width * minimapScale);
-              const rh = Math.max(6, group.height * minimapScale);
-              const pal = getNodePalette(group.color);
-              return (
-                <rect
-                  key={`mini-grp-${group.id}`}
-                  x={rx}
-                  y={ry}
-                  width={rw}
-                  height={rh}
-                  fill={pal ? pal.bg : isDark ? "rgba(59, 130, 246, 0.12)" : "rgba(59, 130, 246, 0.08)"}
-                  stroke={pal ? pal.stroke : "#3b82f6"}
-                  strokeWidth={0.8}
-                  strokeDasharray="2 2"
-                  rx={3}
-                />
-              );
-            })}
-
-          {/* Layer B: Edges preview */}
-          {data.edges.map((edge) => {
-            const fromNode = nodeMap.get(edge.fromNode);
-            const toNode = nodeMap.get(edge.toNode);
-            if (!fromNode || !toNode) return null;
-            const x1 = minimapOffsetX + (fromNode.x + fromNode.width / 2 - minimapBBox.minX) * minimapScale;
-            const y1 = minimapOffsetY + (fromNode.y + fromNode.height / 2 - minimapBBox.minY) * minimapScale;
-            const x2 = minimapOffsetX + (toNode.x + toNode.width / 2 - minimapBBox.minX) * minimapScale;
-            const y2 = minimapOffsetY + (toNode.y + toNode.height / 2 - minimapBBox.minY) * minimapScale;
-            return (
-              <line
-                key={`mini-edge-${edge.id}`}
-                x1={x1}
-                y1={y1}
-                x2={x2}
-                y2={y2}
-                stroke={colors.edgeColor}
-                strokeWidth={0.8}
-                opacity={0.4}
-              />
-            );
-          })}
-
-          {/* Layer C: All Information Cards (Inside Groups & Standalone Outside Containers) */}
-          {data.nodes
-            .filter((n) => n.type !== "group")
-            .map((card) => {
-              const rx = minimapOffsetX + (card.x - minimapBBox.minX) * minimapScale;
-              const ry = minimapOffsetY + (card.y - minimapBBox.minY) * minimapScale;
-              const rw = Math.max(5, card.width * minimapScale);
-              const rh = Math.max(4, card.height * minimapScale);
-              const isSelected = selectedNodeIds.has(card.id);
-              const pal = getNodePalette(card.color);
-              const cardColor = isSelected
-                ? "#f59e0b"
-                : pal
-                ? pal.stroke
-                : card.type === "file"
-                ? "#10b981"
-                : card.type === "link"
-                ? "#8b5cf6"
-                : colors.edgeColor;
-              return (
-                <rect
-                  key={`mini-card-${card.id}`}
-                  x={rx}
-                  y={ry}
-                  width={rw}
-                  height={rh}
-                  fill={cardColor}
-                  stroke={!isDark ? "#ffffff" : "#0f172a"}
-                  strokeWidth={0.8}
-                  rx={2}
-                  style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.25))" }}
-                />
-              );
-            })}
-
-          {/* Layer D: Viewport Camera Box */}
-          {containerRef.current && (() => {
-            const viewW = containerRef.current.clientWidth;
-            const viewH = containerRef.current.clientHeight;
-            const camX = -viewport.panX / viewport.zoom;
-            const camY = -viewport.panY / viewport.zoom;
-            const camW = viewW / viewport.zoom;
-            const camH = viewH / viewport.zoom;
-
-            const vrx = minimapOffsetX + (camX - minimapBBox.minX) * minimapScale;
-            const vry = minimapOffsetY + (camY - minimapBBox.minY) * minimapScale;
-            const vrw = Math.max(12, camW * minimapScale);
-            const vrh = Math.max(8, camH * minimapScale);
-
-            return (
-              <rect
-                x={vrx}
-                y={vry}
-                width={vrw}
-                height={vrh}
-                fill="rgba(245, 158, 11, 0.08)"
-                stroke="#f59e0b"
-                strokeWidth={1.2}
-                strokeDasharray="3 2"
-                rx={2}
-                pointerEvents="none"
-              />
-            );
-          })()}
-        </svg>
-      </div>
+      <CanvasMinimap data={data} viewport={viewport} theme={theme} isDark={isDark} colors={colors} nodeMap={nodeMap} selectedNodeIds={selectedNodeIds} bounds={minimapBBox} scale={minimapScale} offsetX={minimapOffsetX} offsetY={minimapOffsetY} containerEl={containerRef.current} onNavigate={handleMinimapNavigate} />
 
       {/* 5. MODAL: INSERT NOTE FILE PICKER */}
       {showFilePicker && (
@@ -7040,20 +6903,7 @@ export const CanvasView = memo(function CanvasView({
       )}
 
       {/* 7. MARQUEE SELECTION BOX */}
-      {selectionBox && (
-        <div
-          className="canvas-selection-box"
-          style={{
-            position: "absolute",
-            left: Math.min(selectionBox.startX, selectionBox.currentX) * viewport.zoom + viewport.panX,
-            top: Math.min(selectionBox.startY, selectionBox.currentY) * viewport.zoom + viewport.panY,
-            width: Math.abs(selectionBox.currentX - selectionBox.startX) * viewport.zoom,
-            height: Math.abs(selectionBox.currentY - selectionBox.startY) * viewport.zoom,
-            zIndex: 80,
-            pointerEvents: "none",
-          }}
-        />
-      )}
+      <MarqueeSelectionBox box={selectionBox} viewport={viewport} />
 
       {/* 8. RIGHT-CLICK CONTEXT MENU (MINDMAP INSPIRED) */}
       {contextMenu &&
@@ -8586,230 +8436,15 @@ export const CanvasView = memo(function CanvasView({
 
       {/* 8.5 Floating Batch Toolbar for Multiple Selected Edges */}
       {selectedEdgeIds.size > 1 && (
-        <div
-          className="canvas-edge-batch-toolbar"
-          style={{
-            position: "absolute",
-            bottom: 24,
-            left: "50%",
-            transform: "translateX(-50%)",
-            zIndex: 1000,
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            padding: "6px 14px",
-            borderRadius: 24,
-            background: theme === "eink" ? "#f4f1ea" : !isDark ? "#ffffff" : "#1e293b",
-            border: `1px solid ${colors.cardBorder}`,
-            boxShadow: "0 10px 30px rgba(0,0,0,0.25)",
-            pointerEvents: "all",
-            whiteSpace: "nowrap",
-            fontSize: 12,
-          }}
-          onClick={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 5,
-              fontWeight: 600,
-              color: "#f59e0b",
-              paddingRight: 4,
-            }}
-          >
-            <Link size={14} />
-            <span>已选中 {selectedEdgeIds.size} 条连线</span>
-          </div>
-
-          <div style={{ width: 1, height: 16, background: colors.cardBorder, margin: "0 2px" }} />
-
-          {/* Line Style options */}
-          <div style={{ display: "flex", gap: 3 }}>
-            {(["bezier", "step", "straight"] as const).map((st) => (
-              <button
-                key={st}
-                onClick={() => handleBatchSetEdgeStyle(st)}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 3,
-                  padding: "3px 7px",
-                  borderRadius: 6,
-                  border: `1px solid ${colors.cardBorder}`,
-                  background: "transparent",
-                  color: colors.cardText,
-                  cursor: "pointer",
-                  fontSize: 11,
-                }}
-                title={`批量设为: ${st === "bezier" ? "贝塞尔曲线" : st === "step" ? "直角折线" : "直线"}`}
-              >
-                <Spline size={11} />
-                <span>{st === "bezier" ? "曲线" : st === "step" ? "折线" : "直线"}</span>
-              </button>
-            ))}
-          </div>
-
-          <div style={{ width: 1, height: 16, background: colors.cardBorder, margin: "0 2px" }} />
-
-          {/* Stroke pattern cycle */}
-          <button
-            onClick={handleBatchCycleStrokePattern}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 3,
-              padding: "3px 7px",
-              borderRadius: 6,
-              border: `1px solid ${colors.cardBorder}`,
-              background: "transparent",
-              color: colors.cardText,
-              cursor: "pointer",
-              fontSize: 11,
-            }}
-            title="批量切换虚实 (实线 / 虚线 / 点线)"
-          >
-            <span style={{ fontSize: 10, letterSpacing: 1 }}>- -</span>
-            <span>虚实</span>
-          </button>
-
-          {/* Arrow toggle */}
-          <button
-            onClick={handleBatchToggleArrow}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 3,
-              padding: "3px 7px",
-              borderRadius: 6,
-              border: `1px solid ${colors.cardBorder}`,
-              background: "transparent",
-              color: colors.cardText,
-              cursor: "pointer",
-              fontSize: 11,
-            }}
-            title="批量切换箭头 (无 / 单向 / 双向)"
-          >
-            <ArrowLeftRight size={12} />
-            <span>箭头</span>
-          </button>
-
-          {/* Reverse flow */}
-          <button
-            onClick={handleBatchReverseEdges}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 3,
-              padding: "3px 7px",
-              borderRadius: 6,
-              border: `1px solid ${colors.cardBorder}`,
-              background: "transparent",
-              color: "#0284c7",
-              cursor: "pointer",
-              fontSize: 11,
-            }}
-            title="批量反转连线流向 (R)"
-          >
-            <Shuffle size={12} />
-            <span>反向</span>
-          </button>
-
-          <div style={{ width: 1, height: 16, background: colors.cardBorder, margin: "0 2px" }} />
-
-          {/* Color dots — wraps onto a second row now that the palette carries
-              twelve swatches. */}
-          <div className="canvas-ctx-colors" style={{ gap: 4, maxWidth: 190 }}>
-            {Object.entries(CANVAS_COLOR_PALETTES).map(([k, c]) => (
-              <div
-                key={k}
-                onClick={() => handleBatchSetEdgeColor(k)}
-                style={{
-                  width: 13,
-                  height: 13,
-                  borderRadius: "50%",
-                  backgroundColor: c.stroke,
-                  cursor: "pointer",
-                  border: "1px solid rgba(0,0,0,0.15)",
-                }}
-                title={`批量设为: ${c.label}`}
-              />
-            ))}
-          </div>
-
-          <div style={{ width: 1, height: 16, background: colors.cardBorder, margin: "0 2px" }} />
-
-          {/* Delete edges */}
-          <button
-            onClick={handleBatchDeleteEdges}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 3,
-              padding: "3px 7px",
-              borderRadius: 6,
-              border: "none",
-              background: "none",
-              color: "#ef4444",
-              cursor: "pointer",
-              fontSize: 11,
-            }}
-            title="批量删除所选连线 (Delete)"
-          >
-            <Trash2 size={13} />
-            <span>删除</span>
-          </button>
-
-          {/* Dismiss / clear selection */}
-          <button
-            onClick={() => setSelectedEdgeIds(new Set())}
-            style={{
-              background: "none",
-              border: "none",
-              padding: "2px",
-              cursor: "pointer",
-              color: colors.cardText,
-              opacity: 0.6,
-              display: "flex",
-              alignItems: "center",
-              marginLeft: 2,
-            }}
-            title="取消选择"
-          >
-            <X size={13} />
-          </button>
-        </div>
+      <CanvasEdgeBatchToolbar count={selectedEdgeIds.size} theme={theme} isDark={isDark} colors={colors} onSetStyle={handleBatchSetEdgeStyle} onCycleStrokePattern={handleBatchCycleStrokePattern} onToggleArrow={handleBatchToggleArrow} onReverse={handleBatchReverseEdges} onSetColor={handleBatchSetEdgeColor} onDelete={handleBatchDeleteEdges} onClear={() => setSelectedEdgeIds(new Set())} />
       )}
 
       {/* 9. Floating Toast Feedback */}
-      {toastMessage && (
-        <div
-          className="canvas-toast-msg"
-          style={{
-            position: "absolute",
-            bottom: selectedEdgeIds.size > 1 ? 76 : 24,
-            left: "50%",
-            transform: "translateX(-50%)",
-            background: isDark ? "rgba(30, 41, 59, 0.95)" : "rgba(15, 23, 42, 0.9)",
-            color: "#ffffff",
-            padding: "7px 16px",
-            borderRadius: 20,
-            fontSize: 12.5,
-            fontWeight: 500,
-            zIndex: 1100,
-            boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
-            pointerEvents: "none",
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            backdropFilter: "blur(8px)",
-          }}
-        >
-          <Check size={13} color="#10b981" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
+      <CanvasToast
+        message={toastMessage}
+        lifted={selectedEdgeIds.size > 1}
+        isDark={isDark}
+      />
 
       {/* Media preview lightbox (double-click an image / video / audio card) */}
       <MediaLightbox media={lightboxMedia} onClose={() => setLightboxMedia(null)} />
