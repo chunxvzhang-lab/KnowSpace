@@ -1129,6 +1129,84 @@ export function updateNodesStyle(
 }
 
 /**
+ * Where a dragged node should land when it is dropped on another one.
+ *
+ * Returns the parent to attach it to and the position among that parent's
+ * children, or null when the move means nothing — onto itself, or onto one of
+ * its own descendants, which reparentNode would refuse anyway.
+ *
+ * Lives here rather than in the view so the arithmetic can be tested without a
+ * rendered canvas. Two subtleties it exists to get right:
+ *
+ * - Dropping "after" the node below itself still lands in the right place,
+ *   because detaching the node shifts everything after it down by one. The
+ *   index is corrected before it is returned.
+ * - The root has no siblings, so a before/after drop on it is meaningless and
+ *   returns null; the caller falls back to a child drop.
+ */
+export function planDrop(
+  tree: MindmapNode,
+  movingNodeId: string,
+  targetId: string,
+  position: "before" | "after" | "child"
+): { parentId: string; index: number } | null {
+  if (movingNodeId === targetId) return null;
+
+  const moving = findNode(tree, movingNodeId);
+  if (moving && findNode(moving, targetId)) return null;
+
+  if (position === "child") {
+    const target = findNode(tree, targetId);
+    return { parentId: targetId, index: target?.children?.length ?? 0 };
+  }
+
+  const parent = findParent(tree, targetId);
+  if (!parent) return null;
+
+  const siblings = parent.children ?? [];
+  const targetIndex = siblings.findIndex((child) => child.id === targetId);
+  if (targetIndex === -1) return null;
+
+  const movingIndex = siblings.findIndex((child) => child.id === movingNodeId);
+  let index = position === "before" ? targetIndex : targetIndex + 1;
+  if (movingIndex !== -1 && movingIndex < index) index -= 1;
+
+  return { parentId: parent.id, index };
+}
+
+/**
+ * Moves a node towards the front or the back among its own siblings.
+ *
+ * `delta` is -1 or +1. Returns the tree it was given when the node is already
+ * at that end, so a caller can tell a no-op from a move — which matters because
+ * a move pushes an undo entry and a no-op must not.
+ *
+ * Built on planDrop rather than reimplementing the index arithmetic: moving a
+ * node down and dropping it after the sibling it passes are the same problem,
+ * including the shift correction, and having one implementation means the two
+ * cannot disagree.
+ */
+export function moveWithinSiblings(
+  tree: MindmapNode,
+  nodeId: string,
+  delta: number
+): MindmapNode {
+  const parent = findParent(tree, nodeId);
+  if (!parent) return tree;
+
+  const siblings = parent.children ?? [];
+  const index = siblings.findIndex((child) => child.id === nodeId);
+  if (index === -1) return tree;
+
+  const target = index + delta;
+  if (target < 0 || target >= siblings.length) return tree;
+
+  const plan = planDrop(tree, nodeId, siblings[target].id, delta < 0 ? "before" : "after");
+  if (!plan) return tree;
+  return reparentNode(tree, nodeId, plan.parentId, plan.index);
+}
+
+/**
  * Moves a node (and all its descendants) to become a child of newParentId,
  * or reorders it among newParent's children.
  * Includes cycle prevention (cannot move a node into itself or any of its descendants).

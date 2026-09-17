@@ -20,6 +20,9 @@ import {
   FoldVertical,
   UnfoldVertical,
   RefreshCw,
+  ZoomIn,
+  ZoomOut,
+  Maximize2,
   MoreHorizontal,
 } from "lucide-react";
 import type { Heading, ThemeMode, MindmapNodeShape, MindmapLineStyle, MindmapTextAlign } from "../core/types";
@@ -40,6 +43,8 @@ import {
   findParent,
   findSibling,
   reparentNode,
+  planDrop,
+  moveWithinSiblings,
   searchMindmapNodes,
   exportMindmapToOpml,
   exportMindmapToFreeMind,
@@ -322,6 +327,16 @@ export const MindmapView = memo(function MindmapView({
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
   const [dragGhostPos, setDragGhostPos] = useState<{ x: number; y: number } | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+  /**
+   * Where the dragged node would land relative to the node under the pointer.
+   *
+   * "before" and "after" slot it between that node's siblings; "child" makes it
+   * a child, which is what dropping on the middle of a node has always meant.
+   *
+   * Before this, a drop could only ever append: reparentNode has taken a
+   * targetIndex since it was written, and nothing ever passed one.
+   */
+  const [dropPosition, setDropPosition] = useState<"before" | "after" | "child">("child");
   const nodeDragStartRef = useRef<{
     nodeId: string;
     startX: number;
@@ -426,6 +441,51 @@ export const MindmapView = memo(function MindmapView({
     },
     [tree]
   );
+
+  /**
+   * Reorders the selected node among its siblings; Alt+↑ and Alt+↓.
+   *
+   * Only the first selected node moves, and never the root — it has no siblings
+   * to move among. A move that would run off either end returns the same tree
+   * and is skipped, so it does not push an undo entry that undoes nothing.
+   */
+  const handleMoveSibling = useCallback(
+    (delta: number) => {
+      const nodeId = [...selectedNodeIds][0];
+      if (!nodeId || nodeId === tree.id) return;
+
+      const nextTree = moveWithinSiblings(tree, nodeId, delta);
+      if (nextTree === tree) return;
+      applyTreeChange(nextTree);
+    },
+    [applyTreeChange, selectedNodeIds, tree]
+  );
+
+  /**
+   * Steps the zoom, keeping the centre of the viewport fixed.
+   *
+   * The wheel handler anchors on the cursor; from a keyboard there is no cursor
+   * to anchor to, so the middle of the canvas is the equivalent choice.
+   */
+  const handleZoomStep = useCallback((factor: number) => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const rect = container.getBoundingClientRect();
+    const centreX = rect.width / 2;
+    const centreY = rect.height / 2;
+
+    setTransform((prev) => {
+      const nextScale = Math.max(0.25, Math.min(2.5, Number((prev.scale * factor).toFixed(3))));
+      const scaleRatio = nextScale / prev.scale;
+      return {
+        ...prev,
+        scale: nextScale,
+        x: centreX - (centreX - prev.x) * scaleRatio,
+        y: centreY - (centreY - prev.y) * scaleRatio,
+      };
+    });
+  }, []);
 
   const handleUndo = useCallback(() => {
     if (undoStackRef.current.length === 0) return;
@@ -687,6 +747,33 @@ export const MindmapView = memo(function MindmapView({
         startEditing();
         return;
       }
+      // Zoom. Ctrl/Cmd with the usual keys, plus Ctrl+0 for fit-to-screen,
+      // which until now only ran once when the canvas mounted.
+      if ((e.ctrlKey || e.metaKey) && (e.key === "=" || e.key === "+")) {
+        e.preventDefault();
+        handleZoomStep(1.15);
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === "-") {
+        e.preventDefault();
+        handleZoomStep(0.87);
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === "0") {
+        e.preventDefault();
+        handleFitToScreen();
+        return;
+      }
+
+      // Alt+arrows reorder among siblings. This has to be tested before the
+      // plain arrow navigation below, which does not look at the modifier and
+      // would otherwise swallow both of these.
+      if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+        e.preventDefault();
+        handleMoveSibling(e.key === "ArrowUp" ? -1 : 1);
+        return;
+      }
+
       if (e.key === "ArrowUp") {
         e.preventDefault();
         handleNavigate("up");
@@ -725,6 +812,9 @@ export const MindmapView = memo(function MindmapView({
     handleDeleteNode,
     startEditing,
     handleNavigate,
+    handleMoveSibling,
+    handleZoomStep,
+    handleFitToScreen,
     onClose,
     isSearchOpen,
     handleSyncToDocument,
@@ -798,6 +888,7 @@ export const MindmapView = memo(function MindmapView({
             const canvasY = (e.clientY - containerRect.top - transform.y) / transform.scale;
 
             let targetFound: string | null = null;
+            let position: "before" | "after" | "child" = "child";
             for (const node of layout.nodes) {
               if (node.id === nodeDragStartRef.current.nodeId) continue;
               if (
@@ -807,10 +898,20 @@ export const MindmapView = memo(function MindmapView({
                 canvasY <= node.y + node.height + 25
               ) {
                 targetFound = node.id;
+                // The upper and lower fifths reorder among siblings; the middle
+                // makes the node a child. The root is exempt from the bands —
+                // it has no siblings to slot between.
+                if (node.id !== tree.id) {
+                  const topBand = node.y + node.height * 0.2;
+                  const bottomBand = node.y + node.height * 0.8;
+                  if (canvasY < topBand) position = "before";
+                  else if (canvasY > bottomBand) position = "after";
+                }
                 break;
               }
             }
             setDropTargetId(targetFound);
+            setDropPosition(position);
           }
           return;
         }
@@ -825,7 +926,8 @@ export const MindmapView = memo(function MindmapView({
         y: Math.round(dragStartRef.current.startTransformY + dy),
       }));
     },
-    [isDragging, resizingNode, transform.scale, transform.x, transform.y, layout, handleUpdateStyle]
+    // tree.id is here because the drop bands are skipped for the root node.
+    [isDragging, resizingNode, transform.scale, transform.x, transform.y, layout, tree.id, handleUpdateStyle]
   );
 
   const handleMouseUp = useCallback(() => {
@@ -834,16 +936,23 @@ export const MindmapView = memo(function MindmapView({
     }
     if (nodeDragStartRef.current) {
       if (nodeDragStartRef.current.hasMoved && draggingNodeId && dropTargetId) {
-        const nextTree = reparentNode(tree, draggingNodeId, dropTargetId);
-        applyTreeChange(nextTree);
+        // A before/after drop on the root or on one's own descendant is
+        // meaningless, so planDrop returns null and the move is dropped rather
+        // than silently becoming something else.
+        const plan = planDrop(tree, draggingNodeId, dropTargetId, dropPosition);
+        if (plan) {
+          const nextTree = reparentNode(tree, draggingNodeId, plan.parentId, plan.index);
+          if (nextTree !== tree) applyTreeChange(nextTree);
+        }
       }
       nodeDragStartRef.current = null;
       setDraggingNodeId(null);
       setDropTargetId(null);
+      setDropPosition("child");
       setDragGhostPos(null);
     }
     setIsDragging(false);
-  }, [applyTreeChange, draggingNodeId, dropTargetId, resizingNode, tree]);
+  }, [applyTreeChange, draggingNodeId, dropTargetId, dropPosition, resizingNode, tree]);
 
   // Wheel zoom handler
   const handleWheel = useCallback((e: React.WheelEvent) => {
@@ -1366,6 +1475,44 @@ export const MindmapView = memo(function MindmapView({
               </div>
             )}
           </div>
+
+          {/* Zoom. The wheel already worked, but nothing said so and there was
+              no way back to a fitted view once you had zoomed — fitToScreen
+              only ran once, sixty milliseconds after the canvas mounted. */}
+          <div className="mindmap-toolbar-btn-group mindmap-zoom-group">
+            <button
+              type="button"
+              className="mindmap-tool-btn text-btn"
+              onClick={() => handleZoomStep(0.87)}
+              title="缩小 (Ctrl+-)"
+            >
+              <ZoomOut size={14} />
+            </button>
+            <button
+              type="button"
+              className="mindmap-zoom-value"
+              onClick={handleFitToScreen}
+              title="适应画布 (Ctrl+0)"
+            >
+              {Math.round(transform.scale * 100)}%
+            </button>
+            <button
+              type="button"
+              className="mindmap-tool-btn text-btn"
+              onClick={() => handleZoomStep(1.15)}
+              title="放大 (Ctrl+=)"
+            >
+              <ZoomIn size={14} />
+            </button>
+            <button
+              type="button"
+              className="mindmap-tool-btn text-btn"
+              onClick={handleFitToScreen}
+              title="适应画布 (Ctrl+0)"
+            >
+              <Maximize2 size={14} />
+            </button>
+          </div>
         </div>
 
         <div className="mindmap-toolbar-right" ref={exportMenuRef}>
@@ -1603,9 +1750,29 @@ export const MindmapView = memo(function MindmapView({
                         fontSize={11}
                         fontWeight="bold"
                       >
-                        + 移为子主题
+                        {dropPosition === "before"
+                          ? "↑ 插入到此主题之前"
+                          : dropPosition === "after"
+                            ? "↓ 插入到此主题之后"
+                            : "+ 移为子主题"}
                       </text>
                     </g>
+                  )}
+
+                  {/* Where exactly the dragged node would land. The ring above
+                      says which node is the target; this says whether the drop
+                      reorders among its siblings or reparents under it. */}
+                  {dropTargetId === node.id && dropPosition !== "child" && (
+                    <line
+                      className="mindmap-drop-insert-line"
+                      x1={-6}
+                      x2={node.width + 6}
+                      y1={dropPosition === "before" ? -8 : node.height + 8}
+                      y2={dropPosition === "before" ? -8 : node.height + 8}
+                      stroke="#38bdf8"
+                      strokeWidth={3}
+                      strokeLinecap="round"
+                    />
                   )}
 
                   {/* In-Canvas Search Match Ring */}

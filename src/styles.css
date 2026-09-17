@@ -11676,3 +11676,36 @@ body:has(.flash-capsule-overlay) {
 }
 
 /* ── End flashcard review focus ── */
+
+/* ── Mind map zoom controls ──────────────────────────────────────────────────
+   The zoom readout doubles as the fit-to-screen button, so it is a button
+   rather than a span. It keeps the toolbar's muted colour by default and only
+   picks up the accent on hover, to avoid competing with the primary actions
+   beside it.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+.mindmap-zoom-group {
+  align-items: center;
+  gap: 2px;
+}
+
+.mindmap-zoom-value {
+  min-width: 44px;
+  padding: 2px 6px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted, #94a3b8);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.mindmap-zoom-value:hover {
+  background: rgba(56, 189, 248, 0.14);
+  color: #38bdf8;
+}
+
+/* ── End mind map zoom controls ── */
