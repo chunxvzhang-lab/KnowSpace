@@ -129,7 +129,10 @@ export const NodeContextMenu = memo(function NodeContextMenu({
 }: NodeContextMenuProps) {
   return (
     <>
-      {(() => {
+      {/* The extracted body is already an IIFE, so it only needs a JSX
+          expression wrapper here. Wrapping it in a second one renders nothing
+          while still type-checking — the canvas-view tests catch that, tsc does
+          not. */}
 `;
 
 const FOOTER = `      })()}
