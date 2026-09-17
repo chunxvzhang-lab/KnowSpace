@@ -54,6 +54,41 @@ New-Item -ItemType Directory -Force -Path (Split-Path -Parent $lockFile) | Out-N
 $PID | Out-File -FilePath $lockFile -Encoding ascii
 
 try {
+  # ── Use a local proxy when one is running ─────────────────────────────────
+  #
+  # electron-builder reaches GitHub for the Electron runtime and the winCodeSign
+  # binaries, and on a network where GitHub is unreachable that is the failure
+  # everyone hits first. Two ways out, and this script takes whichever is
+  # available:
+  #
+  #   1. A local proxy. Its environment variable is what got() — the HTTP client
+  #      underneath electron-builder — reads.
+  #   2. The npmmirror mirror below, which needs no proxy client running.
+  #
+  # The proxy is tried first because it also serves git and anything else that
+  # needs GitHub, whereas the mirror only covers these two downloads.
+  #
+  # The port is probed rather than assumed. 7890 is the commonly cited default
+  # and was not the one running here; 7897 was. A wrong guess is invisible —
+  # the variable is set, nothing uses it, and the download fails exactly as it
+  # would have without it.
+  $proxyCandidates = @(7897, 7890, 7891, 10809, 10808, 1080, 20171, 8080)
+  $proxyPort = $null
+  foreach ($port in $proxyCandidates) {
+    if (Test-NetConnection -ComputerName 127.0.0.1 -Port $port -InformationLevel Quiet -WarningAction SilentlyContinue) {
+      $proxyPort = $port
+      break
+    }
+  }
+
+  if ($proxyPort) {
+    $env:HTTPS_PROXY = "http://127.0.0.1:$proxyPort"
+    $env:HTTP_PROXY = "http://127.0.0.1:$proxyPort"
+    Write-Host "using the local proxy on port $proxyPort for GitHub downloads"
+  } else {
+    Write-Host "no local proxy found; relying on mirrors for GitHub downloads"
+  }
+
   $env:ELECTRON_BUILDER_BINARIES_MIRROR = "https://npmmirror.com/mirrors/electron-builder-binaries/"
   $env:ELECTRON_MIRROR = "https://npmmirror.com/mirrors/electron/"
 
