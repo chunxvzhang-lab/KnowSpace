@@ -11,9 +11,9 @@
 
 | 项目 | 数值 |
 | :--- | ---: |
-| 测试文件 | **52** |
-| 用例总数 | **596** |
-| 通过 | 596 |
+| 测试文件 | **53** |
+| 用例总数 | **602** |
+| 通过 | 602 |
 | 失败 | 0 |
 | 跳过 | 0 |
 | 通过率 | 100.0% |
@@ -50,6 +50,7 @@
 | `src/__tests__/dialogs-conflict-about.test.tsx` | 6 | ✅ |
 | `src/__tests__/diff-service.test.ts` | 6 | ✅ |
 | `src/__tests__/rename-refactor.test.ts` | 6 | ✅ |
+| `src/__tests__/search-hook.test.ts` | 6 | ✅ |
 | `src/__tests__/space-timeline.test.ts` | 6 | ✅ |
 | `src/__tests__/sync-selection.test.ts` | 6 | ✅ |
 | `src/__tests__/blocklink.test.ts` | 5 | ✅ |
@@ -89,7 +90,7 @@
 | 文件 | 当前行数 | 目标 |
 | :--- | ---: | :--- |
 | `src/components/CanvasView.tsx` | 6416 | R2 待拆分: 目标各模块 < 2500 行 |
-| `src/App.tsx` | 2914 | R1: < 500 行 |
+| `src/App.tsx` | 2586 | R1: < 500 行 |
 | `src/services/canvasGraph.ts` | 1152 | R2 已拆分 ✅ |
 | `src/services/canvasExport.ts` | 1081 | R2 已拆分 ✅ |
 | `src/services/canvasGeometry.ts` | 1027 | R2 已拆分 ✅ |
@@ -104,7 +105,7 @@
 
 任何重构都必须满足：
 
-1. 用例总数 **不低于 596**（删除测试需在 PR 说明中论证）
+1. 用例总数 **不低于 602**（删除测试需在 PR 说明中论证）
 2. 通过率 **100%**
 3. 单文件用例数**不得下降**（防止测试被静默删除）
 
