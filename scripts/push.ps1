@@ -45,8 +45,19 @@ if ($proxyPort) {
 
 # Report what is about to be sent, so a push that turns out to be a no-op is
 # visible as one rather than looking like a success.
-$ahead = git rev-list --count "$Remote/$Branch..HEAD" 2>$null
-if ($ahead) { Write-Host "$ahead commit(s) to send" }
+$ahead = [int](git rev-list --count "$Remote/$Branch..HEAD" 2>$null)
+
+if ($ahead -eq 0) {
+  # Said plainly and returned early, rather than reported as a push that
+  # happened. The previous version printed `pushed: <last commit>` whatever the
+  # count was, which reads as though that commit had just been sent — when in
+  # fact nothing was. The last commit is not evidence of a push; the branch line
+  # below is.
+  Write-Host "nothing to send: $Remote/$Branch is already up to date at $(git log -1 --format='%h')"
+  exit 0
+}
+
+Write-Host "$ahead commit(s) to send"
 
 git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=30 push $Remote $Branch
 
@@ -58,5 +69,6 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host ""
-Write-Host "pushed: $(git log -1 --format='%h %s')"
+Write-Host "pushed $ahead commit(s); now at $(git log -1 --format='%h %s')"
+# The branch line is the check: it shows `ahead` if anything failed to send.
 git status --short --branch | Select-Object -First 1
