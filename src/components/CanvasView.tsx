@@ -129,6 +129,8 @@ import { CanvasMinimap } from "./canvas/CanvasMinimap";
 import { CanvasEdgeBatchToolbar } from "./canvas/CanvasEdgeBatchToolbar";
 import { getNodePalette } from "./canvas/canvasPalette";
 import { modalOverlayStyle, modalContentStyle, toolBtnStyle } from "./canvas/canvasModalStyles";
+import { CanvasEdgeLabelLayer } from "./canvas/CanvasEdgeLabelLayer";
+import { getEdgeRing } from "./canvas/canvasEdgeUtils";
 import { ExtractModal } from "./canvas/ExtractModal";
 import { FilePickerModal } from "./canvas/FilePickerModal";
 import { ExportModal } from "./canvas/ExportModal";
@@ -6187,220 +6189,7 @@ export const CanvasView = memo(function CanvasView({
         })}
 
         {/* 4. EDGE LABELS OVERLAY LAYER (z-index: 25 - never occluded by cards) */}
-        {data.edges.map((edge) => {
-          const fromNode = nodeMap.get(edge.fromNode);
-          const toNode = nodeMap.get(edge.toNode);
-          if (!fromNode || !toNode) return null;
-          if (!isEdgeInViewport(edge, fromNode, toNode)) return null;
-
-          const hasLabel = Boolean(edge.label && edge.label.trim().length > 0);
-          const isEditing = editingEdgeId === edge.id;
-          if (!hasLabel && !isEditing) return null;
-
-          const optSides = getOptimalAnchorSides(fromNode, toNode);
-          const fromSide = edge.fromSide || optSides.fromSide;
-          const toSide = edge.toSide || optSides.toSide;
-          const p1 = getNodeAnchorPoint(fromNode, fromSide);
-          const p2 = getNodeAnchorPoint(toNode, toSide);
-          const edgeObstacles = canvasObstacles.filter(
-            (o) => o.id !== edge.fromNode && o.id !== edge.toNode
-          );
-          // Place label exactly at geometric midpoint — the connection line passes THROUGH the label center
-          const rawMid = computeEdgeMidpoint(
-            p1,
-            fromSide,
-            p2,
-            toSide,
-            edge.gridPath ? "straight" : edge.style,
-            edge.stepOffset,
-            getEdgeRing(edge),
-            edgeObstacles
-          );
-
-          const isSelected = selectedEdgeIds.has(edge.id);
-          const effectiveColorKey = getEffectiveEdgeColorKey(
-            edge,
-            data.edges,
-            data.nodes,
-            sourceDisplayColorMap
-          );
-          const edgeColor =
-            effectiveColorKey && CANVAS_COLOR_PALETTES[effectiveColorKey]
-              ? CANVAS_COLOR_PALETTES[effectiveColorKey].stroke
-              : effectiveColorKey?.startsWith("#")
-              ? effectiveColorKey
-              : colors.edgeColor;
-
-          const shape = edge.labelShape || "pill";
-          const badgeBg = isDark ? "rgba(30, 41, 59, 0.98)" : "rgba(255, 255, 255, 0.98)";
-          const badgeBorder = isSelected ? "#f59e0b" : edgeColor;
-          const badgeColor = isSelected ? "#f59e0b" : colors.edgeLabelText;
-
-          const isEdgeConnectedToCurrentSlide =
-            isPresentationMode &&
-            (edge.fromNode === presentationSequence[currentSlideIndex] ||
-              edge.toNode === presentationSequence[currentSlideIndex]);
-          const labelOpacity = isPresentationMode ? (isEdgeConnectedToCurrentSlide ? 1 : 0.10) : 1;
-          const labelFilter = isPresentationMode
-            ? isEdgeConnectedToCurrentSlide
-              ? "none"
-              : "blur(2.2px)"
-            : undefined;
-
-          return (
-            <div
-              key={`edge-label-${edge.id}`}
-              className={`canvas-edge-label-badge shape-${shape}`}
-              style={{
-                position: "absolute",
-                left: rawMid.x,
-                top: rawMid.y,
-                transform: "translate(-50%, -50%)",
-                zIndex: isSelected || isEditing ? 35 : 25,
-                opacity: labelOpacity,
-                filter: labelFilter,
-                transition: "opacity 0.4s cubic-bezier(0.2, 0.9, 0.3, 1), filter 0.4s cubic-bezier(0.2, 0.9, 0.3, 1)",
-                pointerEvents: "all",
-                userSelect: "none",
-              }}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (e.shiftKey || e.ctrlKey || e.metaKey) {
-                  setSelectedEdgeIds((prev) => {
-                    const next = new Set(prev);
-                    if (next.has(edge.id)) next.delete(edge.id);
-                    else next.add(edge.id);
-                    return next;
-                  });
-                } else {
-                  setSelectedEdgeIds(new Set([edge.id]));
-                  setSelectedNodeIds(new Set());
-                }
-              }}
-              onDoubleClick={(e) => {
-                e.stopPropagation();
-                setEditingEdgeId(edge.id);
-                setEditingEdgeLabel(edge.label || "");
-              }}
-              onContextMenu={(e) => handleContextMenuEdge(e, edge)}
-            >
-              {isEditing ? (
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    background: colors.cardBg,
-                    border: "2px solid #f59e0b",
-                    borderRadius: shape === "pill" ? 16 : shape === "rect" ? 6 : 10,
-                    padding: "2px 8px",
-                    boxShadow: "0 6px 20px rgba(0,0,0,0.25)",
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <input
-                    type="text"
-                    value={editingEdgeLabel}
-                    onChange={(e) => setEditingEdgeLabel(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleSaveEdgeLabel();
-                      if (e.key === "Escape") setEditingEdgeId(null);
-                    }}
-                    onBlur={handleSaveEdgeLabel}
-                    autoFocus
-                    placeholder="关系标签..."
-                    style={{
-                      width: 110,
-                      border: "none",
-                      background: "transparent",
-                      color: colors.cardText,
-                      fontSize: 12,
-                      outline: "none",
-                    }}
-                  />
-                  <button
-                    onClick={handleSaveEdgeLabel}
-                    style={{
-                      border: "none",
-                      background: "none",
-                      color: "#10b981",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                    }}
-                  >
-                    <Check size={13} />
-                  </button>
-                </div>
-              ) : shape === "diamond" ? (
-                <div
-                  style={{
-                    position: "relative",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    padding: "5px 18px",
-                    color: badgeColor,
-                    fontSize: 11.5,
-                    fontWeight: 600,
-                    whiteSpace: "nowrap",
-                    filter: isSelected
-                      ? "drop-shadow(0 3px 10px rgba(245, 158, 11, 0.45))"
-                      : "drop-shadow(0 2px 6px rgba(0,0,0,0.14))",
-                    cursor: "pointer",
-                    transition: "all 0.15s ease",
-                  }}
-                  title="双击编辑关系说明 (右键呼出关系菜单)"
-                >
-                  <svg
-                    style={{
-                      position: "absolute",
-                      top: 0,
-                      left: 0,
-                      width: "100%",
-                      height: "100%",
-                      overflow: "visible",
-                      pointerEvents: "none",
-                    }}
-                    viewBox="0 0 100 100"
-                    preserveAspectRatio="none"
-                  >
-                    <polygon
-                      points="50,1.5 98.5,50 50,98.5 1.5,50"
-                      vectorEffect="non-scaling-stroke"
-                      fill={badgeBg}
-                      stroke={badgeBorder}
-                      strokeWidth="1.5"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                  <span style={{ position: "relative", zIndex: 1 }}>{edge.label}</span>
-                </div>
-              ) : (
-                <div
-                  style={{
-                    padding: shape === "rect" ? "3px 9px" : "3px 12px",
-                    borderRadius: shape === "rect" ? 4 : 9999,
-                    backgroundColor: badgeBg,
-                    backdropFilter: "blur(6px)",
-                    border: `1.5px solid ${badgeBorder}`,
-                    color: badgeColor,
-                    fontSize: 11.5,
-                    fontWeight: 600,
-                    whiteSpace: "nowrap",
-                    boxShadow: isSelected
-                      ? "0 4px 12px rgba(245, 158, 11, 0.35)"
-                      : "0 2px 8px rgba(0,0,0,0.12)",
-                    cursor: "pointer",
-                    transition: "all 0.15s ease",
-                  }}
-                  title="双击编辑关系说明 (右键呼出关系菜单)"
-                >
-                  {edge.label}
-                </div>
-              )}
-            </div>
-          );
-        })}
+        <CanvasEdgeLabelLayer edges={data.edges} nodes={data.nodes} nodeMap={nodeMap} obstacles={canvasObstacles} selectedEdgeIds={selectedEdgeIds} editingEdgeId={editingEdgeId} editingLabel={editingEdgeLabel} onEditingLabelChange={setEditingEdgeLabel} onStartEditing={(edgeId) => { setEditingEdgeId(edgeId); setEditingEdgeLabel(data.edges.find((e) => e.id === edgeId)?.label || ''); }} onStopEditing={() => setEditingEdgeId(null)} onSelectionChange={setSelectedEdgeIds} onClearNodeSelection={() => setSelectedNodeIds(new Set())} onSaveLabel={handleSaveEdgeLabel} onContextMenu={handleContextMenuEdge} isInViewport={isEdgeInViewport} colorMap={sourceDisplayColorMap} colors={colors} isDark={isDark} presentation={{ active: isPresentationMode, sequence: presentationSequence, index: currentSlideIndex }} />
       </div>
 
       {/* 5. BOTTOM-RIGHT INTERACTIVE MINIMAP */}
@@ -8206,11 +7995,8 @@ export const CanvasView = memo(function CanvasView({
 
 // Helpers & Styles
 /** Extracts the circular-arc descriptor from an edge, when it has one. */
-function getEdgeRing(edge: CanvasEdge): { center: { x: number; y: number }; radius: number } | undefined {
-  return edge.ringCenter && edge.ringRadius
-    ? { center: edge.ringCenter, radius: edge.ringRadius }
-    : undefined;
-}
+// getEdgeRing now lives in ./canvas/canvasEdgeUtils so the edge layer, the
+// label layer and the exporter all read the arc metadata the same way.
 
 // getCanvasThemeColors now lives in ../services/canvasTheme so that the SVG/PNG
 // exporter reads exactly the same palette the screen does.
