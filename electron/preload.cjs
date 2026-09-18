@@ -13,6 +13,9 @@ const desktopApi = {
   refreshDirectory: (rootPath) => ipcRenderer.invoke("bookmd:refresh-directory", rootPath),
   readMarkdownFile: (absolutePath) => ipcRenderer.invoke("bookmd:read-markdown-file", absolutePath),
   readMarkdownBatch: (paths) => ipcRenderer.invoke("bookmd:read-markdown-batch", paths),
+  // The mind map's companion file: what a Markdown document cannot hold.
+  readMindmapSidecar: (params) => ipcRenderer.invoke("bookmd:read-mindmap-sidecar", params),
+  saveMindmapSidecar: (params) => ipcRenderer.invoke("bookmd:save-mindmap-sidecar", params),
   getDirectoryForFile: (absolutePath) => ipcRenderer.invoke("bookmd:get-directory-for-file", absolutePath),
   saveMarkdownFile: (request) => ipcRenderer.invoke("bookmd:save-markdown-file", request),
   createMarkdownFile: (options) => ipcRenderer.invoke("bookmd:create-markdown-file", options),

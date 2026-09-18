@@ -89,6 +89,25 @@ export type KnowSpaceDesktopAPI = {
   refreshDirectory: (rootPath: string) => Promise<BookManifest & { rootPath: string }>;
   readMarkdownFile: (absolutePath: string) => Promise<ChapterSource>;
   readMarkdownBatch?: (paths: string[]) => Promise<ChapterSource[]>;
+  /**
+   * The mind map's companion file, which holds what the document cannot.
+   *
+   * A Markdown file stays the source of truth for the tree; notes, markers and
+   * anything else the tree cannot express live in `<document>.mindmap.json`
+   * beside it. `exists: false` is a normal answer rather than an error — a
+   * document that never carried a note is exactly that — and the map then
+   * degrades to a plain tree.
+   *
+   * The path is not passed in: the renderer names a document it has open, and
+   * the main process derives the companion's name from it.
+   */
+  readMindmapSidecar?: (params: {
+    documentPath: string;
+  }) => Promise<{ success?: boolean; exists?: boolean; content?: string; message?: string }>;
+  saveMindmapSidecar?: (params: {
+    documentPath: string;
+    content: string;
+  }) => Promise<{ success?: boolean; path?: string; message?: string }>;
   getDirectoryForFile: (absolutePath: string) => Promise<{
     directory: BookManifest & { rootPath: string };
     activeChapterId: string | null;

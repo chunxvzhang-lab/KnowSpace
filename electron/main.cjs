@@ -8,6 +8,8 @@ const {
   readMarkdownSource,
   readMarkdownSourcesBatch,
   saveMarkdownFile,
+  readMindmapSidecar,
+  saveMindmapSidecar,
   registerPath,
   isValidMarkdownPath,
 } = require("./markdown-files.cjs");
@@ -1032,6 +1034,20 @@ ipcMain.handle("bookmd:read-markdown-file", async (_event, absolutePath) => {
 
 ipcMain.handle("bookmd:read-markdown-batch", async (_event, paths) => {
   return await readMarkdownSourcesBatch(paths);
+});
+
+// The mind map's companion file. The renderer sends a document path it already
+// has open and the main process derives the companion's path from it, so neither
+// handler can be asked to touch a file of the renderer's choosing.
+ipcMain.handle("bookmd:read-mindmap-sidecar", async (_event, params) => {
+  return await readMindmapSidecar(params?.documentPath);
+});
+
+ipcMain.handle("bookmd:save-mindmap-sidecar", async (_event, params) => {
+  return await saveMindmapSidecar({
+    documentPath: params?.documentPath,
+    content: params?.content,
+  });
 });
 
 ipcMain.handle("bookmd:open-external", async (_event, url) => {

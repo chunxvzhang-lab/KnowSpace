@@ -17,6 +17,68 @@ describe("electron/markdown-files.cjs", () => {
     await fs.rm(tempDir, { recursive: true, force: true });
   });
 
+  /**
+   * The mind map's companion file, at the level where it actually touches disk.
+   *
+   * The renderer's half — parsing, merging, what a note means — is in
+   * mindmap-sidecar.test.ts. What can only be checked here is the file: that the
+   * companion is named after the document, that a document without one is not an
+   * error, and that saving one leaves the document alone.
+   */
+  describe("导图伴生文件", () => {
+    it("伴生文件的路径是文档名加上后缀", () => {
+      const documentPath = path.join(tempDir, "笔记.md");
+
+      expect(markdownFiles.sidecarPathFor(documentPath)).toBe(
+        path.join(tempDir, "笔记.md.mindmap.json")
+      );
+    });
+
+    it("只认文档，不给任意文件配伴生文件", () => {
+      // The containment of the whole feature: the renderer names a document it
+      // has open, and the main process derives the rest. A non-document, or a
+      // companion file itself, is not a document to hang a companion off.
+      expect(() => markdownFiles.sidecarPathFor(path.join(tempDir, "notes.txt"))).toThrow();
+      expect(() => markdownFiles.sidecarPathFor(path.join(tempDir, "a.md.mindmap.json"))).toThrow();
+    });
+
+    it("没有伴生文件不是错误", async () => {
+      const result = await markdownFiles.readMindmapSidecar(path.join(tempDir, "未写过.md"));
+
+      expect(result.success).toBe(true);
+      expect(result.exists).toBe(false);
+      expect(result.content).toBeUndefined();
+    });
+
+    it("存了再读，拿回原文，且文档本身没被碰过", async () => {
+      const documentPath = path.join(tempDir, "有备注.md");
+      await fs.writeFile(documentPath, "# 标题\n", "utf8");
+      const before = await fs.stat(documentPath);
+
+      const content = '{\n  "version": 1,\n  "notes": {}\n}\n';
+      const saved = await markdownFiles.saveMindmapSidecar({ documentPath, content });
+      expect(saved.success).toBe(true);
+
+      const read = await markdownFiles.readMindmapSidecar(documentPath);
+      expect(read.exists).toBe(true);
+      expect(read.content).toBe(content);
+
+      // A companion is written beside the document, never instead of it.
+      expect(await fs.readFile(documentPath, "utf8")).toBe("# 标题\n");
+      expect((await fs.stat(documentPath)).size).toBe(before.size);
+    });
+
+    it("内容不是文本时拒绝写入", async () => {
+      const documentPath = path.join(tempDir, "a.md");
+      await fs.writeFile(documentPath, "# a\n", "utf8");
+
+      const saved = await markdownFiles.saveMindmapSidecar({ documentPath, content: { notes: {} } });
+
+      expect(saved.success).toBe(false);
+      await expect(fs.stat(markdownFiles.sidecarPathFor(documentPath))).rejects.toThrow();
+    });
+  });
+
   it("generates stable chapter IDs based on relative path", () => {
     const id1 = markdownFiles.generateStableChapterId("docs/01-intro.md");
     const id2 = markdownFiles.generateStableChapterId("docs\\01-intro.md");

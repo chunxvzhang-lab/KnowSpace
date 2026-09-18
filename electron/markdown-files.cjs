@@ -351,8 +351,98 @@ async function saveMarkdownFile({ absolutePath, content, expectedVersion, force 
   }
 }
 
+/**
+ * The companion file a mind map keeps beside its document.
+ *
+ * A Markdown file is the source of truth for the tree, but a tree cannot say
+ * everything a map can — a note hanging off a node, a marker, a topic with no
+ * parent — and those belong here rather than in the document, which is meant to
+ * stay readable prose. Keyed by node id.
+ *
+ * The suffix is appended to the whole document name rather than replacing its
+ * extension, so `a.md` pairs with `a.md.mindmap.json`: the pairing is obvious in
+ * a file listing, and two documents whose names differ only by extension cannot
+ * collide.
+ */
+const MINDMAP_SIDECAR_SUFFIX = ".mindmap.json";
+
+/**
+ * Where a document's companion file goes.
+ *
+ * This is the containment: the renderer names a document it already has open and
+ * the main process derives the rest, so the pair of handlers below cannot be
+ * asked to read or write an arbitrary path — only the companion of a Markdown or
+ * Canvas document, and only one whose name is the document's plus the suffix.
+ */
+function sidecarPathFor(documentPath) {
+  if (!isValidMarkdownPath(documentPath)) {
+    throw new Error("只能为 Markdown 或 Canvas 文档配置伴生文件。");
+  }
+  return `${path.resolve(documentPath)}${MINDMAP_SIDECAR_SUFFIX}`;
+}
+
+/**
+ * Reads the companion file, with "there isn't one" as a normal answer.
+ *
+ * Not an error: every document that has never carried a note is in exactly that
+ * state, and the renderer's rule is that a missing companion means a plain tree
+ * rather than a failure. Anything unreadable is reported the same way.
+ */
+async function readMindmapSidecar(documentPath) {
+  let sidecarPath;
+  try {
+    sidecarPath = sidecarPathFor(documentPath);
+  } catch (error) {
+    return { success: false, message: error.message };
+  }
+
+  registerPath(path.resolve(documentPath));
+
+  try {
+    const raw = await fs.readFile(sidecarPath, "utf8");
+    return { success: true, exists: true, content: raw };
+  } catch (error) {
+    if (error && error.code === "ENOENT") {
+      return { success: true, exists: false };
+    }
+    return { success: false, message: `无法读取伴生文件：${error.message}` };
+  }
+}
+
+/**
+ * Writes the companion file, atomically and without a snapshot.
+ *
+ * Same temp-then-rename as the documents, because a half-written companion is a
+ * file the app would have to guess about on the next open. No snapshot: version
+ * history belongs to the document, and a note is not a revision of it.
+ */
+async function saveMindmapSidecar({ documentPath, content }) {
+  if (typeof content !== "string") {
+    return { success: false, message: "伴生文件的内容必须是文本。" };
+  }
+
+  let sidecarPath;
+  try {
+    sidecarPath = sidecarPathFor(documentPath);
+  } catch (error) {
+    return { success: false, message: error.message };
+  }
+
+  try {
+    await atomicWriteFile(sidecarPath, content, { lineEnding: "\n" });
+    registerPath(path.resolve(documentPath));
+    return { success: true, path: sidecarPath };
+  } catch (error) {
+    return { success: false, message: `写入伴生文件失败：${error.message}` };
+  }
+}
+
 module.exports = {
   markdownExtensions,
+  MINDMAP_SIDECAR_SUFFIX,
+  sidecarPathFor,
+  readMindmapSidecar,
+  saveMindmapSidecar,
   generateStableChapterId,
   titleFromRelativePath,
   collectMarkdownFiles,
