@@ -1,30 +1,15 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import {
-  CornerDownRight,
-  Edit3,
-  PlusCircle,
-  Trash2,
-  Palette,
-  Check,
-  X,
-  Bold,
-  AlignCenter,
-  AlignLeft,
-  AlignRight,
-  AlignJustify,
-  RotateCcw,
-} from "lucide-react";
+// The icons the style panel draws with went with it; what is left here is the
+// canvas, the toolbar and the inline editor.
 import type { Heading, ThemeMode, MindmapNodeShape, MindmapLineStyle, MindmapTextAlign } from "../core/types";
 import {
   buildMindmapTree,
   parseMarkdownToMindmapTree,
-  mindmapTreeToMarkdown,
   syncMindmapToDocument,
   addChildNode,
   addSiblingNode,
   deleteNode,
   updateNodeText,
-  updateNodeStyle,
   updateNodesStyle,
   findNode,
   findParent,
@@ -50,6 +35,7 @@ import {
 } from "../services/storage";
 import { buildStandaloneMindmapSvg } from "../services/mindmapSvgExport";
 import { MindmapCanvasMenu } from "./MindmapCanvasMenu";
+import { MindmapNodeStyleMenu } from "./MindmapNodeStyleMenu";
 import { MindmapInlineEditor } from "./MindmapInlineEditor";
 import { MindmapToolbar } from "./MindmapToolbar";
 import {
@@ -93,107 +79,16 @@ export type MindmapViewProps = {
 };
 
 // Rich 18-color modern curated palette for node card background fill (includes transparent)
-const PRESET_COLORS = [
-  { label: "默认", value: "" },
-  { label: "透明", value: "transparent" },
-  { label: "天蓝", value: "#38bdf8" },
-  { label: "极客蓝", value: "#3b82f6" },
-  { label: "靛青", value: "#6366f1" },
-  { label: "青空", value: "#06b6d4" },
-  { label: "翡翠绿", value: "#10b981" },
-  { label: "薄荷绿", value: "#14b8a6" },
-  { label: "鲜柠绿", value: "#84cc16" },
-  { label: "琥珀黄", value: "#f59e0b" },
-  { label: "暖日光", value: "#eab308" },
-  { label: "珊瑚橙", value: "#f97316" },
-  { label: "朱砂红", value: "#ef4444" },
-  { label: "玫瑰粉", value: "#f43f5e" },
-  { label: "兰花紫", value: "#a855f7" },
-  { label: "丁香紫", value: "#c084fc" },
-  { label: "石墨灰", value: "#64748b" },
-  { label: "曜石黑", value: "#334155" },
-];
 
 // Curated node border colors (includes default branch color and transparent border)
-const PRESET_BORDER_COLORS = [
-  { label: "默认", value: "" },
-  { label: "无边框", value: "transparent" },
-  { label: "天蓝", value: "#38bdf8" },
-  { label: "极客蓝", value: "#3b82f6" },
-  { label: "青空", value: "#06b6d4" },
-  { label: "翡翠绿", value: "#10b981" },
-  { label: "薄荷绿", value: "#14b8a6" },
-  { label: "鲜柠绿", value: "#84cc16" },
-  { label: "琥珀黄", value: "#f59e0b" },
-  { label: "珊瑚橙", value: "#f97316" },
-  { label: "朱砂红", value: "#ef4444" },
-  { label: "玫瑰粉", value: "#f43f5e" },
-  { label: "兰花紫", value: "#a855f7" },
-  { label: "石墨灰", value: "#64748b" },
-  { label: "曜石黑", value: "#334155" },
-  { label: "纯白", value: "#ffffff" },
-];
 
-const PRESET_SHAPES: { label: string; value: MindmapNodeShape }[] = [
-  { label: "胶囊", value: "capsule" },
-  { label: "圆角", value: "rounded" },
-  { label: "直角", value: "rect" },
-  { label: "下划线", value: "underline" },
-];
 
-const PRESET_FONT_SIZES = [
-  { label: "12", value: 12 },
-  { label: "14", value: 14 },
-  { label: "16", value: 16 },
-  { label: "18", value: 18 },
-  { label: "20", value: 20 },
-];
 
 // Curated high-contrast font colors
-const PRESET_TEXT_COLORS = [
-  { label: "默认", value: "" },
-  { label: "纯黑", value: "#0f172a" },
-  { label: "纯白", value: "#ffffff" },
-  { label: "极客蓝", value: "#2563eb" },
-  { label: "翡翠绿", value: "#059669" },
-  { label: "珊瑚橙", value: "#ea580c" },
-  { label: "朱砂红", value: "#dc2626" },
-  { label: "玫瑰粉", value: "#e11d48" },
-  { label: "兰花紫", value: "#9333ea" },
-  { label: "琥珀黄", value: "#d97706" },
-  { label: "石墨灰", value: "#64748b" },
-];
 
-const PRESET_ALIGNMENTS: { label: string; value: MindmapTextAlign; icon: typeof AlignCenter }[] = [
-  { label: "居中", value: "center", icon: AlignCenter },
-  { label: "左对齐", value: "left", icon: AlignLeft },
-  { label: "右对齐", value: "right", icon: AlignRight },
-  { label: "双边对齐", value: "justify", icon: AlignJustify },
-];
 
-const PRESET_LINE_STYLES: { label: string; value: MindmapLineStyle }[] = [
-  { label: "曲线", value: "bezier" },
-  { label: "折线", value: "step" },
-  { label: "直线", value: "straight" },
-];
 
 // Rich 14-color line palette
-const PRESET_LINE_COLORS = [
-  { label: "继承", value: "" },
-  { label: "天蓝", value: "#38bdf8" },
-  { label: "极客蓝", value: "#3b82f6" },
-  { label: "青空", value: "#06b6d4" },
-  { label: "翡翠绿", value: "#10b981" },
-  { label: "薄荷绿", value: "#14b8a6" },
-  { label: "鲜柠绿", value: "#84cc16" },
-  { label: "琥珀黄", value: "#f59e0b" },
-  { label: "珊瑚橙", value: "#f97316" },
-  { label: "朱砂红", value: "#ef4444" },
-  { label: "玫瑰粉", value: "#f43f5e" },
-  { label: "兰花紫", value: "#a855f7" },
-  { label: "石墨灰", value: "#94a3b8" },
-  { label: "曜石黑", value: "#334155" },
-];
 
 /**
  * Calculates optimal contrast text color (dark vs white) based on background luminance.
@@ -2192,349 +2087,21 @@ export const MindmapView = memo(function MindmapView({
       )}
 
       {/* Right Click Appearance & Typography Customization Context Menu */}
-      {contextMenu && !contextMenu.isCanvas && (
-        <div
-          ref={menuRef}
-          className="mindmap-context-menu"
-          style={{
-            left: menuPos.left,
-            top: menuPos.top,
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="mindmap-ctx-header">
-            <span
-              className="mindmap-ctx-title"
-              title={
-                isBatchMode
-                  ? `批量样式定制 (已选 ${selectedNodeIds.size} 个节点)`
-                  : contextTargetNode?.text || "主题样式定制"
-              }
-            >
-              <Palette size={13} className="text-cyan" />
-              {isBatchMode
-                ? `批量样式定制 (${selectedNodeIds.size}节点)`
-                : contextTargetNode?.text || "主题样式定制"}
-            </span>
-            <button
-              type="button"
-              className="mindmap-ctx-close"
-              onClick={() => setContextMenu(null)}
-              title="关闭"
-            >
-              <X size={13} />
-            </button>
-          </div>
-
-          {/* Node Background Color */}
-          <div className="mindmap-ctx-section">
-            <div className="mindmap-ctx-label-row">
-              <span className="mindmap-ctx-label">节点背景颜色</span>
-              <label className="mindmap-custom-color-trigger" title="拾取任意自定义背景颜色">
-                <input
-                  type="color"
-                  className="mindmap-hidden-color-input"
-                  value={contextTargetNode?.color && contextTargetNode.color !== "transparent" ? contextTargetNode.color : "#38bdf8"}
-                  onChange={(e) => handleUpdateStyle(contextMenu.nodeId, { color: e.target.value })}
-                />
-                <span className="mindmap-custom-color-badge">🎨 自定义</span>
-              </label>
-            </div>
-            <div className="mindmap-ctx-palette">
-              {PRESET_COLORS.map((c) => {
-                const isActive = (contextTargetNode?.color || "") === c.value;
-                const isTransparent = c.value === "transparent";
-                return (
-                  <button
-                    key={c.label}
-                    type="button"
-                    className={`mindmap-color-swatch ${isTransparent ? "is-transparent-swatch" : ""} ${isActive ? "is-active" : ""}`}
-                    style={{ background: isTransparent ? undefined : (c.value || "var(--surface-2)") }}
-                    onClick={() => handleUpdateStyle(contextMenu.nodeId, { color: c.value })}
-                    title={`背景: ${c.label}`}
-                  >
-                    {isActive && <Check size={11} color={c.value === "transparent" ? "#0f172a" : (c.value ? "#ffffff" : "var(--text)")} />}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Node Border Color */}
-          <div className="mindmap-ctx-section">
-            <div className="mindmap-ctx-label-row">
-              <span className="mindmap-ctx-label">节点边框颜色</span>
-              <label className="mindmap-custom-color-trigger" title="拾取任意边框颜色">
-                <input
-                  type="color"
-                  className="mindmap-hidden-color-input"
-                  value={contextTargetNode?.borderColor && contextTargetNode.borderColor !== "transparent" ? contextTargetNode.borderColor : "#38bdf8"}
-                  onChange={(e) => handleUpdateStyle(contextMenu.nodeId, { borderColor: e.target.value })}
-                />
-                <span className="mindmap-custom-color-badge">🎨 自定义</span>
-              </label>
-            </div>
-            <div className="mindmap-ctx-palette">
-              {PRESET_BORDER_COLORS.map((c) => {
-                const isActive = (contextTargetNode?.borderColor || "") === c.value;
-                const isTransparent = c.value === "transparent";
-                return (
-                  <button
-                    key={c.label}
-                    type="button"
-                    className={`mindmap-color-swatch ${isTransparent ? "is-transparent-swatch" : ""} ${isActive ? "is-active" : ""}`}
-                    style={{ background: isTransparent ? undefined : (c.value || "var(--surface-2)") }}
-                    onClick={() => handleUpdateStyle(contextMenu.nodeId, { borderColor: c.value })}
-                    title={`边框: ${c.label}`}
-                  >
-                    {isActive && <Check size={11} color={c.value === "transparent" ? "#0f172a" : (c.value ? "#ffffff" : "var(--text)")} />}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Node Shape */}
-          <div className="mindmap-ctx-section">
-            <div className="mindmap-ctx-label">节点形状</div>
-            <div className="mindmap-ctx-pills">
-              {PRESET_SHAPES.map((s) => {
-                const currentShape = contextTargetNode?.shape || (contextTargetNode?.level === 0 ? "capsule" : "rounded");
-                const isActive = currentShape === s.value;
-                return (
-                  <button
-                    key={s.value}
-                    type="button"
-                    className={`mindmap-pill-btn ${isActive ? "is-active" : ""}`}
-                    onClick={() => handleUpdateStyle(contextMenu.nodeId, { shape: s.value })}
-                  >
-                    {s.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Typography: Font Size & Bold Toggle */}
-          <div className="mindmap-ctx-section">
-            <div className="mindmap-ctx-label-row">
-              <span className="mindmap-ctx-label">字号与加粗</span>
-              <button
-                type="button"
-                className={`mindmap-bold-toggle-btn ${contextTargetNode?.fontWeight === "bold" ? "is-active" : ""}`}
-                onClick={() => {
-                  const nextWeight = contextTargetNode?.fontWeight === "bold" ? "normal" : "bold";
-                  handleUpdateStyle(contextMenu.nodeId, { fontWeight: nextWeight });
-                }}
-                title={contextTargetNode?.fontWeight === "bold" ? "取消加粗" : "文字加粗 (Bold)"}
-              >
-                <Bold size={11} strokeWidth={2.6} />
-                <span>加粗</span>
-              </button>
-            </div>
-            <div className="mindmap-ctx-pills">
-              {PRESET_FONT_SIZES.map((fs) => {
-                const currentSize = contextTargetNode?.fontSize || (contextTargetNode?.level === 0 ? 16 : 14);
-                const isActive = currentSize === fs.value;
-                return (
-                  <button
-                    key={fs.value}
-                    type="button"
-                    className={`mindmap-pill-btn ${isActive ? "is-active" : ""}`}
-                    onClick={() => handleUpdateStyle(contextMenu.nodeId, { fontSize: fs.value })}
-                  >
-                    {fs.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Typography: Text Alignment (居中、左对齐、右对齐、双边对齐) */}
-          <div className="mindmap-ctx-section">
-            <div className="mindmap-ctx-label">文字对齐</div>
-            <div className="mindmap-ctx-pills">
-              {PRESET_ALIGNMENTS.map((al) => {
-                const currentAlign = contextTargetNode?.textAlign || "center";
-                const isActive = currentAlign === al.value;
-                const IconComponent = al.icon;
-                return (
-                  <button
-                    key={al.value}
-                    type="button"
-                    className={`mindmap-pill-btn mindmap-align-btn ${isActive ? "is-active" : ""}`}
-                    onClick={() => handleUpdateStyle(contextMenu.nodeId, { textAlign: al.value })}
-                    title={al.label}
-                  >
-                    <IconComponent size={12} />
-                    <span>{al.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Typography: Font/Text Color */}
-          <div className="mindmap-ctx-section">
-            <div className="mindmap-ctx-label-row">
-              <span className="mindmap-ctx-label">文字颜色</span>
-              <label className="mindmap-custom-color-trigger" title="拾取任意文字颜色">
-                <input
-                  type="color"
-                  className="mindmap-hidden-color-input"
-                  value={contextTargetNode?.textColor || "#0f172a"}
-                  onChange={(e) => handleUpdateStyle(contextMenu.nodeId, { textColor: e.target.value })}
-                />
-                <span className="mindmap-custom-color-badge">🎨 自定义</span>
-              </label>
-            </div>
-            <div className="mindmap-ctx-palette font-palette">
-              {PRESET_TEXT_COLORS.map((tc) => {
-                const isActive = (contextTargetNode?.textColor || "") === tc.value;
-                return (
-                  <button
-                    key={tc.label}
-                    type="button"
-                    className={`mindmap-color-swatch text-color-swatch ${isActive ? "is-active" : ""}`}
-                    style={{ background: tc.value || "var(--surface-2)" }}
-                    onClick={() => handleUpdateStyle(contextMenu.nodeId, { textColor: tc.value })}
-                    title={`文字: ${tc.label}`}
-                  >
-                    {isActive && <Check size={11} color={tc.value === "#ffffff" ? "#0f172a" : "#ffffff"} />}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Branch Connector Line Shape */}
-          <div className="mindmap-ctx-section">
-            <div className="mindmap-ctx-label">分支连线形状</div>
-            <div className="mindmap-ctx-pills">
-              {PRESET_LINE_STYLES.map((l) => {
-                const currentStyle = contextTargetNode?.lineStyle || "bezier";
-                const isActive = currentStyle === l.value;
-                return (
-                  <button
-                    key={l.value}
-                    type="button"
-                    className={`mindmap-pill-btn ${isActive ? "is-active" : ""}`}
-                    onClick={() => handleUpdateStyle(contextMenu.nodeId, { lineStyle: l.value })}
-                  >
-                    {l.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Branch Connector Line Color */}
-          <div className="mindmap-ctx-section">
-            <div className="mindmap-ctx-label-row">
-              <span className="mindmap-ctx-label">连线颜色</span>
-              <label className="mindmap-custom-color-trigger" title="拾取任意连线颜色">
-                <input
-                  type="color"
-                  className="mindmap-hidden-color-input"
-                  value={contextTargetNode?.lineColor || "#38bdf8"}
-                  onChange={(e) => handleUpdateStyle(contextMenu.nodeId, { lineColor: e.target.value })}
-                />
-                <span className="mindmap-custom-color-badge">🎨 自定义</span>
-              </label>
-            </div>
-            <div className="mindmap-ctx-palette">
-              {PRESET_LINE_COLORS.map((c) => {
-                const isActive = (contextTargetNode?.lineColor || "") === c.value;
-                return (
-                  <button
-                    key={c.label}
-                    type="button"
-                    className={`mindmap-color-swatch ${isActive ? "is-active" : ""}`}
-                    style={{ background: c.value || "var(--surface-2)" }}
-                    onClick={() => handleUpdateStyle(contextMenu.nodeId, { lineColor: c.value })}
-                    title={`连线: ${c.label}`}
-                  >
-                    {isActive && <Check size={11} color={c.value ? "#ffffff" : "var(--text)"} />}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="mindmap-ctx-divider" />
-
-          {/* Actions */}
-          <div className="mindmap-ctx-actions">
-            {!isBatchMode && (
-              <>
-                <button
-                  type="button"
-                  className="mindmap-ctx-action-item"
-                  onClick={() => {
-                    const nid = contextMenu.nodeId;
-                    setContextMenu(null);
-                    handleAddChild(nid);
-                  }}
-                >
-                  <CornerDownRight size={13} />
-                  <span>添加子主题 (Tab)</span>
-                </button>
-                <button
-                  type="button"
-                  className="mindmap-ctx-action-item"
-                  onClick={() => {
-                    const nid = contextMenu.nodeId;
-                    setContextMenu(null);
-                    handleAddSibling(nid);
-                  }}
-                >
-                  <PlusCircle size={13} />
-                  <span>添加同级主题 (Enter)</span>
-                </button>
-                <button
-                  type="button"
-                  className="mindmap-ctx-action-item"
-                  onClick={() => {
-                    const nid = contextMenu.nodeId;
-                    setContextMenu(null);
-                    startEditing(nid);
-                  }}
-                >
-                  <Edit3 size={13} />
-                  <span>重命名 (F2)</span>
-                </button>
-              </>
-            )}
-            {(contextTargetNode?.customWidth || contextTargetNode?.customHeight) && (
-              <button
-                type="button"
-                className="mindmap-ctx-action-item"
-                onClick={() => {
-                  handleUpdateStyle(contextMenu.nodeId, {
-                    customWidth: undefined,
-                    customHeight: undefined,
-                  });
-                }}
-              >
-                <RotateCcw size={13} />
-                <span>恢复自适应大小</span>
-              </button>
-            )}
-            <button
-              type="button"
-              className="mindmap-ctx-action-item is-delete"
-              onClick={() => {
-                const nid = contextMenu.nodeId;
-                setContextMenu(null);
-                handleDeleteNode(nid);
-              }}
-            >
-              <Trash2 size={13} />
-              <span>{isBatchMode ? `删除选中的 ${selectedNodeIds.size} 个主题 (Del)` : "删除主题 (Del)"}</span>
-            </button>
-          </div>
-        </div>
-      )}
+      <MindmapNodeStyleMenu
+        open={!!contextMenu && !contextMenu.isCanvas}
+        position={menuPos}
+        menuRef={menuRef}
+        nodeId={contextMenu?.nodeId ?? tree.id}
+        target={contextTargetNode}
+        isBatchMode={isBatchMode}
+        selectedCount={selectedNodeIds.size}
+        onUpdateStyle={handleUpdateStyle}
+        onDelete={handleDeleteNode}
+        onAddChild={handleAddChild}
+        onAddSibling={handleAddSibling}
+        onStartRename={startEditing}
+        onClose={() => setContextMenu(null)}
+      />
     </div>
   );
 });
