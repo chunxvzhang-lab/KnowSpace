@@ -11759,6 +11759,62 @@ body:has(.flash-capsule-overlay) {
 
 /* ── End mind map canvas context menu ── */
 
+/* ── Mind map node notes ────────────────────────────────────────────────
+   A note lives in the document's companion file rather than in the document,
+   so it is edited from the map's own panel and marked on the node. The badge is
+   part of the drawing, not a control: it has to read at a glance from across a
+   large map, and it must never take the click meant for the node under it.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+.mindmap-note-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--text-primary, #e2e8f0);
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.5;
+  /* Downwards only: the panel's width is set by its other controls, and a note
+     is not a reason for it to grow sideways. */
+  resize: vertical;
+}
+
+.mindmap-note-input::placeholder {
+  color: var(--text-tertiary, #64748b);
+}
+
+.mindmap-note-input:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 1px;
+}
+
+/* Shown only after a write has actually failed, so it keeps meaning something. */
+.mindmap-note-error {
+  font-size: 11px;
+  font-weight: 500;
+  color: #f43f5e;
+}
+
+.mindmap-note-marker {
+  pointer-events: none;
+}
+
+.mindmap-note-marker circle {
+  fill: color-mix(in srgb, #38bdf8 24%, var(--surface-1, #1e293b));
+  stroke: color-mix(in srgb, #38bdf8 72%, transparent);
+  stroke-width: 1;
+}
+
+.mindmap-note-marker path {
+  fill: none;
+  stroke: #38bdf8;
+  stroke-width: 1.1;
+  stroke-linecap: round;
+}
+
 /* ── Mind map theme and layout pickers ──────────────────────────────────
    Two native selects dressed to match the toolbar buttons beside them. They
    share one set of rules on purpose: they sit next to each other, they are

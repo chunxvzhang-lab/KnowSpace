@@ -52,6 +52,23 @@ import {
   resolveLayoutId,
   type MindmapLayoutNode,
 } from "../services/mindmapLayout";
+import {
+  emptySidecar,
+  loadSidecar,
+  noteFor,
+  saveSidecar,
+  setNodeNote,
+  type MindmapSidecar,
+} from "../services/mindmapSidecar";
+
+/**
+ * How long a note waits before it is written.
+ *
+ * Writing on every keystroke would mean a disk write per character. Long enough
+ * to cover a burst of typing, short enough that a reader who types and then
+ * moves on never notices the pause.
+ */
+const NOTE_SAVE_DELAY = 600;
 
 export type MindmapViewProps = {
   title: string;
@@ -209,6 +226,81 @@ export const MindmapView = memo(function MindmapView({
       if (documentKey) saveMindmapLayout(documentKey, next);
     },
     [documentKey]
+  );
+
+  /**
+   * The document's companion file: what the map knows that the document does not.
+   *
+   * Held as the reader's text rather than as what is on disk — the two differ by
+   * up to one pause in typing, since a write per keystroke would be a write per
+   * character. `null` means no companion was found, which is the ordinary state
+   * of a document nobody has annotated.
+   */
+  const [sidecar, setSidecar] = useState<MindmapSidecar | null>(null);
+  const [noteSaveFailed, setNoteSaveFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setSidecar(null);
+    setNoteSaveFailed(false);
+    if (!documentKey) return;
+
+    void loadSidecar(documentKey).then((loaded) => {
+      if (!cancelled) setSidecar(loaded);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [documentKey]);
+
+  const pendingNoteSave = useRef<{ key: string; sidecar: MindmapSidecar } | null>(null);
+  const noteSaveTimer = useRef<number | null>(null);
+
+  /**
+   * Writes notes to the companion file, a pause after typing stops.
+   *
+   * The document key and the contents are captured when the pause starts rather
+   * than read when it ends: switching documents mid-pause would otherwise write
+   * the previous document's notes into the new document's file, which is the one
+   * way this could lose writing rather than merely delay it.
+   */
+  const scheduleNoteSave = useCallback((key: string, next: MindmapSidecar) => {
+    pendingNoteSave.current = { key, sidecar: next };
+    if (noteSaveTimer.current !== null) window.clearTimeout(noteSaveTimer.current);
+    noteSaveTimer.current = window.setTimeout(() => {
+      noteSaveTimer.current = null;
+      const pending = pendingNoteSave.current;
+      pendingNoteSave.current = null;
+      if (!pending) return;
+      void saveSidecar(pending.key, pending.sidecar).then((ok) => setNoteSaveFailed(!ok));
+    }, NOTE_SAVE_DELAY);
+  }, []);
+
+  useEffect(
+    () => () => {
+      // A pause still running when the view goes away is written out now, so
+      // closing the map right after typing does not lose what was typed.
+      if (noteSaveTimer.current !== null) window.clearTimeout(noteSaveTimer.current);
+      const pending = pendingNoteSave.current;
+      pendingNoteSave.current = null;
+      if (pending) void saveSidecar(pending.key, pending.sidecar);
+    },
+    []
+  );
+
+  /**
+   * A note edit: immediate in memory, written shortly afterwards.
+   *
+   * The panel holds no state of its own, so this arrives on every keystroke;
+   * only the disk write waits, which is why the text never lags the typing.
+   */
+  const handleNoteChange = useCallback(
+    (nodeId: string, text: string) => {
+      const next = setNodeNote(sidecar ?? emptySidecar(), nodeId, text);
+      setSidecar(next);
+      if (documentKey) scheduleNoteSave(documentKey, next);
+    },
+    [documentKey, scheduleNoteSave, sidecar]
   );
 
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -2003,6 +2095,16 @@ export const MindmapView = memo(function MindmapView({
                     );
                   })()}
 
+                  {/* A note is the one thing about a node the document cannot
+                      show, so the map says where one is: a badge on the node's
+                      leading corner, drawn for the eye rather than the cursor. */}
+                  {noteFor(sidecar, node.id) ? (
+                    <g className="mindmap-note-marker" transform="translate(-4, -4)" aria-label="有备注">
+                      <circle r="4.6" />
+                      <path d="M -2 -0.8 H 2 M -2 1.4 H 0.4" />
+                    </g>
+                  ) : null}
+
                   {/* Children Collapse/Expand Toggle Button (+ / - geometrically centered via SVG vector lines).
                       Hung off the edge the children are actually on: the default layout grows
                       everything right, so nothing moves there, while a branch on the left of a
@@ -2184,6 +2286,9 @@ export const MindmapView = memo(function MindmapView({
         target={contextTargetNode}
         isBatchMode={isBatchMode}
         selectedCount={selectedNodeIds.size}
+        note={noteFor(sidecar, contextMenu?.nodeId ?? tree.id)}
+        noteFailed={noteSaveFailed}
+        onNoteChange={handleNoteChange}
         onUpdateStyle={handleUpdateStyle}
         onDelete={handleDeleteNode}
         onAddChild={handleAddChild}

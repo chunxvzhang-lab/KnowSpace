@@ -60,6 +60,19 @@ export type MindmapNodeStyleMenuProps = {
    * after it, those nodes stop following the theme.
    */
   onFreezeTheme: () => void;
+  /**
+   * The note hanging off the node, and where edited notes go.
+   *
+   * The text comes from the caller rather than from a copy kept here, for the
+   * same reason the styles do: two copies of the same text is how a panel ends up
+   * disagreeing with the thing it is describing. The caller also owns when it
+   * reaches the disk — a note is written to the document's companion file, and
+   * that timing is not the panel's business.
+   */
+  note: string;
+  /** True when the last write did not land, so the panel can say so. */
+  noteFailed: boolean;
+  onNoteChange: (nodeId: string, text: string) => void;
   onClose: () => void;
 };
 
@@ -191,6 +204,9 @@ export function MindmapNodeStyleMenu({
   onAddSibling,
   onStartRename,
   onFreezeTheme,
+  note,
+  noteFailed,
+  onNoteChange,
   onClose,
 }: MindmapNodeStyleMenuProps) {
   if (!open) return null;
@@ -228,6 +244,28 @@ export function MindmapNodeStyleMenu({
         >
           <X size={13} />
         </button>
+      </div>
+
+      {/* Node Note — the one thing on this panel that is not in the document.
+          It lives in the mind map's companion file, so it is offered here and
+          nowhere in the editor: this panel is the map's own surface. */}
+      <div className="mindmap-ctx-section">
+        <div className="mindmap-ctx-label-row">
+          <span className="mindmap-ctx-label">节点备注</span>
+          {noteFailed ? (
+            <span className="mindmap-note-error" title="下一步改动会再试一次">
+              未能保存
+            </span>
+          ) : null}
+        </div>
+        <textarea
+          className="mindmap-note-input"
+          value={note}
+          rows={3}
+          placeholder={isBatchMode ? "批量选择时只编辑一个节点的备注" : "写点什么，只留在导图里"}
+          title="备注保存在文档旁边的伴生文件里，不改动文档本身"
+          onChange={(e) => onNoteChange(nodeId, e.target.value)}
+        />
       </div>
 
       {/* Node Background Color */}
