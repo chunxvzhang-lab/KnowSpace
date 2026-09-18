@@ -54,12 +54,15 @@ import {
 } from "../services/mindmapLayout";
 import {
   emptySidecar,
+  iconFor,
   loadSidecar,
   noteFor,
   saveSidecar,
+  setNodeIcon,
   setNodeNote,
   type MindmapSidecar,
 } from "../services/mindmapSidecar";
+import { findMindmapIcon } from "../core/mindmapIcons";
 
 /**
  * How long a note waits before it is written.
@@ -69,6 +72,21 @@ import {
  * moves on never notices the pause.
  */
 const NOTE_SAVE_DELAY = 600;
+
+/**
+ * A node's icon, drawn on its leading edge and outside its box.
+ *
+ * Outside on purpose: a node's size is the layout's business, and growing the
+ * box to fit a drawing would move every node in the map — the golden layout
+ * snapshots exist to stop exactly that kind of drift. An id this build does not
+ * know draws nothing rather than breaking the map.
+ */
+function NodeIcon({ iconId, height }: { iconId: string; height: number }) {
+  const icon = findMindmapIcon(iconId);
+  if (!icon) return null;
+  const Icon = icon.Icon;
+  return <Icon className="mindmap-node-icon" size={16} x={-22} y={(height - 16) / 2} strokeWidth={1.8} />;
+}
 
 export type MindmapViewProps = {
   title: string;
@@ -237,12 +255,12 @@ export const MindmapView = memo(function MindmapView({
    * of a document nobody has annotated.
    */
   const [sidecar, setSidecar] = useState<MindmapSidecar | null>(null);
-  const [noteSaveFailed, setNoteSaveFailed] = useState(false);
+  const [sidecarSaveFailed, setSidecarSaveFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     setSidecar(null);
-    setNoteSaveFailed(false);
+    setSidecarSaveFailed(false);
     if (!documentKey) return;
 
     void loadSidecar(documentKey).then((loaded) => {
@@ -253,8 +271,8 @@ export const MindmapView = memo(function MindmapView({
     };
   }, [documentKey]);
 
-  const pendingNoteSave = useRef<{ key: string; sidecar: MindmapSidecar } | null>(null);
-  const noteSaveTimer = useRef<number | null>(null);
+  const pendingSidecarSave = useRef<{ key: string; sidecar: MindmapSidecar } | null>(null);
+  const sidecarSaveTimer = useRef<number | null>(null);
 
   /**
    * Writes notes to the companion file, a pause after typing stops.
@@ -264,15 +282,15 @@ export const MindmapView = memo(function MindmapView({
    * the previous document's notes into the new document's file, which is the one
    * way this could lose writing rather than merely delay it.
    */
-  const scheduleNoteSave = useCallback((key: string, next: MindmapSidecar) => {
-    pendingNoteSave.current = { key, sidecar: next };
-    if (noteSaveTimer.current !== null) window.clearTimeout(noteSaveTimer.current);
-    noteSaveTimer.current = window.setTimeout(() => {
-      noteSaveTimer.current = null;
-      const pending = pendingNoteSave.current;
-      pendingNoteSave.current = null;
+  const scheduleSidecarSave = useCallback((key: string, next: MindmapSidecar) => {
+    pendingSidecarSave.current = { key, sidecar: next };
+    if (sidecarSaveTimer.current !== null) window.clearTimeout(sidecarSaveTimer.current);
+    sidecarSaveTimer.current = window.setTimeout(() => {
+      sidecarSaveTimer.current = null;
+      const pending = pendingSidecarSave.current;
+      pendingSidecarSave.current = null;
       if (!pending) return;
-      void saveSidecar(pending.key, pending.sidecar).then((ok) => setNoteSaveFailed(!ok));
+      void saveSidecar(pending.key, pending.sidecar).then((ok) => setSidecarSaveFailed(!ok));
     }, NOTE_SAVE_DELAY);
   }, []);
 
@@ -280,27 +298,46 @@ export const MindmapView = memo(function MindmapView({
     () => () => {
       // A pause still running when the view goes away is written out now, so
       // closing the map right after typing does not lose what was typed.
-      if (noteSaveTimer.current !== null) window.clearTimeout(noteSaveTimer.current);
-      const pending = pendingNoteSave.current;
-      pendingNoteSave.current = null;
+      if (sidecarSaveTimer.current !== null) window.clearTimeout(sidecarSaveTimer.current);
+      const pending = pendingSidecarSave.current;
+      pendingSidecarSave.current = null;
       if (pending) void saveSidecar(pending.key, pending.sidecar);
     },
     []
   );
 
   /**
-   * A note edit: immediate in memory, written shortly afterwards.
+   * An annotation edit: immediate in memory, written shortly afterwards.
    *
-   * The panel holds no state of its own, so this arrives on every keystroke;
-   * only the disk write waits, which is why the text never lags the typing.
+   * One path for every kind of annotation rather than one per kind, so there is
+   * a single pause to reason about and a single place where the document a write
+   * belongs to is decided.
+   */
+  const applySidecarEdit = useCallback(
+    (edit: (current: MindmapSidecar) => MindmapSidecar) => {
+      const next = edit(sidecar ?? emptySidecar());
+      setSidecar(next);
+      if (documentKey) scheduleSidecarSave(documentKey, next);
+    },
+    [documentKey, scheduleSidecarSave, sidecar]
+  );
+
+  /**
+   * A note edit arrives on every keystroke, since the panel holds no state of its
+   * own; only the disk write waits, which is why the text never lags the typing.
    */
   const handleNoteChange = useCallback(
-    (nodeId: string, text: string) => {
-      const next = setNodeNote(sidecar ?? emptySidecar(), nodeId, text);
-      setSidecar(next);
-      if (documentKey) scheduleNoteSave(documentKey, next);
-    },
-    [documentKey, scheduleNoteSave, sidecar]
+    (nodeId: string, text: string) => applySidecarEdit((current) => setNodeNote(current, nodeId, text)),
+    [applySidecarEdit]
+  );
+
+  /**
+   * An icon edit. One icon per node: picking the one a node already wears takes
+   * it off, which is the only way to say "none" without a menu of its own.
+   */
+  const handleIconChange = useCallback(
+    (nodeId: string, iconId: string) => applySidecarEdit((current) => setNodeIcon(current, nodeId, iconId)),
+    [applySidecarEdit]
   );
 
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -2095,6 +2132,10 @@ export const MindmapView = memo(function MindmapView({
                     );
                   })()}
 
+                  {/* What the node carries but the document cannot say: an icon
+                      on its leading edge, and a badge for a note on its corner. */}
+                  <NodeIcon iconId={iconFor(sidecar, node.id)} height={node.height} />
+
                   {/* A note is the one thing about a node the document cannot
                       show, so the map says where one is: a badge on the node's
                       leading corner, drawn for the eye rather than the cursor. */}
@@ -2286,8 +2327,10 @@ export const MindmapView = memo(function MindmapView({
         target={contextTargetNode}
         isBatchMode={isBatchMode}
         selectedCount={selectedNodeIds.size}
+        icon={iconFor(sidecar, contextMenu?.nodeId ?? tree.id)}
         note={noteFor(sidecar, contextMenu?.nodeId ?? tree.id)}
-        noteFailed={noteSaveFailed}
+        saveFailed={sidecarSaveFailed}
+        onIconChange={handleIconChange}
         onNoteChange={handleNoteChange}
         onUpdateStyle={handleUpdateStyle}
         onDelete={handleDeleteNode}

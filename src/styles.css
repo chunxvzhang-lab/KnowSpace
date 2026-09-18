@@ -11798,6 +11798,83 @@ body:has(.flash-capsule-overlay) {
   color: #f43f5e;
 }
 
+/* ── Mind map node icons ────────────────────────────────────────────────
+   The picker in the style panel and the icon the node wears. Eight to a row,
+   which is what fits the panel's width at 14px without the buttons looking
+   cramped; the groups' labels are small enough to scan past or read.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+.mindmap-icon-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 6px;
+}
+
+.mindmap-icon-group-label {
+  font-size: 10.5px;
+  color: var(--text-tertiary, #64748b);
+}
+
+.mindmap-icon-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 3px;
+}
+
+.mindmap-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-secondary, #cbd5e1);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.mindmap-icon-btn:hover {
+  background: var(--surface-2);
+  color: var(--text-primary, #e2e8f0);
+}
+
+.mindmap-icon-btn.is-active {
+  background: color-mix(in srgb, #38bdf8 18%, var(--surface-2));
+  border-color: #38bdf8;
+  color: #38bdf8;
+}
+
+.mindmap-icon-btn:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 1px;
+}
+
+.mindmap-icon-clear {
+  padding: 2px 7px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-secondary, #cbd5e1);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.mindmap-icon-clear:hover {
+  border-color: #38bdf8;
+  color: #38bdf8;
+}
+
+/* The icon on the node. Colour comes from the drawing itself — lucide strokes
+   with currentColor — so one rule moves every icon at once. Not a control: it
+   must never take the click meant for the node under it. */
+.mindmap-node-icon {
+  pointer-events: none;
+  color: color-mix(in srgb, #38bdf8 82%, var(--text-primary, #e2e8f0));
+}
+
 .mindmap-note-marker {
   pointer-events: none;
 }

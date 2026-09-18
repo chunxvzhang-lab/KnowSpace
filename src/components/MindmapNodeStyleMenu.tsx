@@ -21,6 +21,7 @@ import type {
   MindmapNodeShape,
   MindmapTextAlign,
 } from "../core/types";
+import { MINDMAP_ICON_GROUPS } from "../core/mindmapIcons";
 
 /**
  * The node style panel: what a right click on a node opens.
@@ -61,17 +62,19 @@ export type MindmapNodeStyleMenuProps = {
    */
   onFreezeTheme: () => void;
   /**
-   * The note hanging off the node, and where edited notes go.
+   * What the node carries that the document cannot say: its icon, its note.
    *
-   * The text comes from the caller rather than from a copy kept here, for the
-   * same reason the styles do: two copies of the same text is how a panel ends up
-   * disagreeing with the thing it is describing. The caller also owns when it
-   * reaches the disk — a note is written to the document's companion file, and
-   * that timing is not the panel's business.
+   * Both come from the caller rather than from copies kept here, for the same
+   * reason the styles do: two copies is how a panel ends up disagreeing with the
+   * thing it is describing. The caller owns when they reach the disk as well —
+   * both live in the document's companion file, and that timing is not the
+   * panel's business.
    */
+  icon: string;
   note: string;
-  /** True when the last write did not land, so the panel can say so. */
-  noteFailed: boolean;
+  /** True when the last write to the companion file did not land. */
+  saveFailed: boolean;
+  onIconChange: (nodeId: string, iconId: string) => void;
   onNoteChange: (nodeId: string, text: string) => void;
   onClose: () => void;
 };
@@ -204,8 +207,10 @@ export function MindmapNodeStyleMenu({
   onAddSibling,
   onStartRename,
   onFreezeTheme,
+  icon,
   note,
-  noteFailed,
+  saveFailed,
+  onIconChange,
   onNoteChange,
   onClose,
 }: MindmapNodeStyleMenuProps) {
@@ -236,6 +241,14 @@ export function MindmapNodeStyleMenu({
             ? `批量样式定制 (${selectedCount}节点)`
             : target?.text || "主题样式定制"}
         </span>
+        {/* One place for the one failure that can come from either control in
+            here: neither an icon nor a note is written to the document, and a
+            write that did not land is worth saying once rather than twice. */}
+        {saveFailed ? (
+          <span className="mindmap-note-error" title="下一次改动会再试一次">
+            未能保存
+          </span>
+        ) : null}
         <button
           type="button"
           className="mindmap-ctx-close"
@@ -246,17 +259,49 @@ export function MindmapNodeStyleMenu({
         </button>
       </div>
 
-      {/* Node Note — the one thing on this panel that is not in the document.
+      {/* Node Icon — a marker the document has no syntax for, so like the note
+          below it lives in the mind map's companion file. Clicking the active
+          one takes it off again, which is where the clear button would be. */}
+      <div className="mindmap-ctx-section">
+        <div className="mindmap-ctx-label-row">
+          <span className="mindmap-ctx-label">节点图标</span>
+          {icon ? (
+            <button
+              type="button"
+              className="mindmap-icon-clear"
+              onClick={() => onIconChange(nodeId, "")}
+            >
+              清除
+            </button>
+          ) : null}
+        </div>
+        {MINDMAP_ICON_GROUPS.map((group) => (
+          <div className="mindmap-icon-group" key={group.group}>
+            <span className="mindmap-icon-group-label">{group.group}</span>
+            <div className="mindmap-icon-grid">
+              {group.icons.map((entry) => (
+                <button
+                  key={entry.id}
+                  type="button"
+                  className={`mindmap-icon-btn ${icon === entry.id ? "is-active" : ""}`}
+                  onClick={() => onIconChange(nodeId, icon === entry.id ? "" : entry.id)}
+                  title={entry.label}
+                  aria-label={entry.label}
+                >
+                  <entry.Icon size={14} />
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Node Note — the other thing on this panel that is not in the document.
           It lives in the mind map's companion file, so it is offered here and
           nowhere in the editor: this panel is the map's own surface. */}
       <div className="mindmap-ctx-section">
         <div className="mindmap-ctx-label-row">
           <span className="mindmap-ctx-label">节点备注</span>
-          {noteFailed ? (
-            <span className="mindmap-note-error" title="下一步改动会再试一次">
-              未能保存
-            </span>
-          ) : null}
         </div>
         <textarea
           className="mindmap-note-input"

@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   emptySidecar,
+  iconFor,
   loadSidecar,
   noteFor,
   parseSidecar,
   saveSidecar,
   serializeSidecar,
+  setNodeIcon,
   setNodeNote,
   sidecarIsEmpty,
   type MindmapSidecar,
@@ -112,7 +114,7 @@ describe("导图伴生文件", () => {
 
   describe("序列化：写出来的东西人也要能看", () => {
     it("缩进两格、结尾换行", () => {
-      const sidecar: MindmapSidecar = { version: 1, notes: { "node-a": "备注" } };
+      const sidecar = setNodeNote(emptySidecar(), "node-a", "备注");
 
       expect(serializeSidecar(sidecar)).toBe(
         ['{', '  "version": 1,', '  "notes": {', '    "node-a": "备注"', "  }", "}", ""].join("\n")
@@ -159,6 +161,58 @@ describe("导图伴生文件", () => {
       // Anything a newer version wrote counts as content, even unseen, or the
       // next save could look like nothing worth writing.
       expect(sidecarIsEmpty({ version: 7, notes: {}, icons: { a: "star" } })).toBe(false);
+      expect(sidecarIsEmpty(setNodeNote(emptySidecar(), "node-a", "备注"))).toBe(false);
+    });
+  });
+
+  describe("图标", () => {
+    it("设值与清除，一个节点只戴一个", () => {
+      const starred = setNodeIcon(emptySidecar(), "node-a", "star");
+
+      expect(iconFor(starred, "node-a")).toBe("star");
+
+      // Choosing another replaces it rather than stacking: one icon per node is
+      // the whole model, and the picker's toggle relies on it.
+      const flagged = setNodeIcon(starred, "node-a", "flag");
+      expect(iconFor(flagged, "node-a")).toBe("flag");
+
+      expect(setNodeIcon(flagged, "node-a", "").icons).toEqual({});
+      expect(iconFor(null, "node-a")).toBe("");
+      expect(iconFor(emptySidecar(), "node-没有图标")).toBe("");
+    });
+
+    it("返回新的对象，不动传进来的那个", () => {
+      const before = emptySidecar();
+      const after = setNodeIcon(before, "node-a", "star");
+
+      expect(before.icons).toEqual({});
+      expect(after.icons).not.toBe(before.icons);
+    });
+
+    it("两个段落一起往返，谁也不丢", () => {
+      const sidecar = setNodeIcon(setNodeNote(emptySidecar(), "node-a", "备注"), "node-b", "star");
+
+      const written = serializeSidecar(sidecar);
+      const back = parseSidecar(written) as MindmapSidecar;
+
+      expect(back.notes).toEqual({ "node-a": "备注" });
+      expect(back.icons).toEqual({ "node-b": "star" });
+    });
+
+    it("不认识的图标 id 照样存着", () => {
+      // A file from a newer version may name an icon this build has never heard
+      // of. Keeping the id is what gives the node its icon back when the app
+      // catches up; whether anything is drawn is the icon table's decision.
+      const back = parseSidecar('{ "version": 1, "icons": { "node-a": "未来的图标" } }');
+
+      expect(iconFor(back, "node-a")).toBe("未来的图标");
+    });
+
+    it("空文件判断把两个段落都算上", () => {
+      // The shape of an empty companion, pinned: a section added to the service
+      // and forgotten in `emptySidecar` would otherwise read as "nothing here".
+      expect(Object.keys(emptySidecar()).sort()).toEqual(["icons", "notes", "version"]);
+      expect(sidecarIsEmpty(setNodeIcon(emptySidecar(), "node-a", "star"))).toBe(false);
       expect(sidecarIsEmpty(setNodeNote(emptySidecar(), "node-a", "备注"))).toBe(false);
     });
   });

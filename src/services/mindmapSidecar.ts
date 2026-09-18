@@ -2,7 +2,8 @@
  * The companion file that holds what a Markdown document cannot.
  *
  * A document stays the source of truth for the tree; this file is for everything
- * a tree cannot say, starting with the notes hanging off nodes. Four rules make
+ * a tree cannot say — the note hanging off a node, the icon it wears — and none
+ * of it can change the outline. Four rules make
  * it safe to have a second file at all, and each of them is a rule because the
  * alternative goes wrong in a way that costs the reader their writing:
  *
@@ -30,13 +31,39 @@ export interface MindmapSidecar {
   version: number;
   /** Note text by node id. A node with no note has no entry. */
   notes: Record<string, string>;
+  /** Icon id by node id, from the mind map's own icon table. */
+  icons: Record<string, string>;
   /** Sections this build does not know about, kept exactly as they were read. */
   [section: string]: unknown;
 }
 
+/**
+ * The sections this build understands: each a map from node id to a string.
+ *
+ * Listed once because three separate places walk all of them — reading
+ * normalises each, writing omits each while it is empty, and "is this file
+ * empty" asks about each. A section of a different shape (a list, a link with a
+ * label) needs handling of its own rather than a place in this list, which is
+ * the point at which this should become something more general than a list of
+ * names.
+ */
+const STRING_SECTIONS = ["notes", "icons"] as const;
+
 /** A companion with nothing in it. */
 export function emptySidecar(): MindmapSidecar {
-  return { version: SIDECAR_VERSION, notes: {} };
+  return { version: SIDECAR_VERSION, notes: {}, icons: {} };
+}
+
+/** One section as read from a file: an empty map if the file's copy is unusable. */
+function readStringSection(value: unknown): Record<string, string> {
+  const section: Record<string, string> = {};
+  if (isPlainObject(value)) {
+    for (const [nodeId, entry] of Object.entries(value)) {
+      // A blank entry is the same as no entry, however the file spells it.
+      if (typeof entry === "string" && entry.trim()) section[nodeId] = entry;
+    }
+  }
+  return section;
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -70,20 +97,14 @@ export function parseSidecar(text: string | null | undefined): MindmapSidecar | 
 
   if (!isPlainObject(parsed)) return null;
 
-  const notes: Record<string, string> = {};
-  const rawNotes = parsed.notes;
-  if (isPlainObject(rawNotes)) {
-    for (const [nodeId, value] of Object.entries(rawNotes)) {
-      // A blank note is the same as no note, whichever way the file says it.
-      if (typeof value === "string" && value.trim()) notes[nodeId] = value;
-    }
-  }
+  const notes = readStringSection(parsed.notes);
+  const icons = readStringSection(parsed.icons);
 
   const version = typeof parsed.version === "number" ? parsed.version : SIDECAR_VERSION;
 
   // The spread comes first so the sections this build does not know about are
   // carried through, and the normalised fields overwrite whatever was there.
-  return { ...parsed, version, notes };
+  return { ...parsed, version, notes, icons };
 }
 
 /**
@@ -100,7 +121,10 @@ export function parseSidecar(text: string | null | undefined): MindmapSidecar | 
 export function serializeSidecar(sidecar: MindmapSidecar): string {
   const payload: Record<string, unknown> = { ...sidecar };
 
-  if (Object.keys(sidecar.notes).length === 0) delete payload.notes;
+  for (const section of STRING_SECTIONS) {
+    const value = payload[section];
+    if (isPlainObject(value) && Object.keys(value).length === 0) delete payload[section];
+  }
 
   return `${JSON.stringify(payload, null, 2)}\n`;
 }
@@ -130,13 +154,42 @@ export function setNodeNote(sidecar: MindmapSidecar, nodeId: string, text: strin
   return { ...sidecar, notes };
 }
 
+/** The icon on a node, or an empty string. */
+export function iconFor(sidecar: MindmapSidecar | null, nodeId: string): string {
+  return sidecar?.icons[nodeId] ?? "";
+}
+
+/**
+ * Sets one node's icon, or clears it.
+ *
+ * An icon is chosen by clicking, so unlike a note there is no half-typed value
+ * to keep: the id is either one the table knows or the empty string that means
+ * none. Returns a new sidecar, like every other edit here.
+ */
+export function setNodeIcon(sidecar: MindmapSidecar, nodeId: string, iconId: string): MindmapSidecar {
+  const icons = { ...sidecar.icons };
+  if (iconId) {
+    icons[nodeId] = iconId;
+  } else {
+    delete icons[nodeId];
+  }
+  return { ...sidecar, icons };
+}
+
 /** Whether anything is stored at all. */
 export function sidecarIsEmpty(sidecar: MindmapSidecar | null): boolean {
   if (!sidecar) return true;
-  if (Object.keys(sidecar.notes).length > 0) return false;
-  // Only the version left — and `notes` itself, which is always a key, empty or
-  // not. Anything else is content a newer version wrote, even unseen here.
-  return Object.keys(sidecar).every((key) => key === "version" || key === "notes");
+
+  for (const section of STRING_SECTIONS) {
+    const value = sidecar[section];
+    if (isPlainObject(value) && Object.keys(value).length > 0) return false;
+  }
+
+  // Only the version and the sections this build knows — and those sections'
+  // own keys, which are present whether or not they hold anything. Anything else
+  // is content a newer version wrote, even if this build cannot see it.
+  const known = new Set<string>(["version", ...STRING_SECTIONS]);
+  return Object.keys(sidecar).every((key) => known.has(key));
 }
 
 function bridge() {

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MindmapView } from "../components/MindmapView";
 import { parseMarkdownToMindmapTree } from "../services/mindmapService";
-import { parseSidecar, serializeSidecar } from "../services/mindmapSidecar";
+import { emptySidecar, parseSidecar, serializeSidecar, setNodeNote } from "../services/mindmapSidecar";
 
 /**
  * Node notes, end to end through the view.
@@ -19,7 +19,7 @@ const DOC = "/vault/notes/a.md";
 
 /** A stored companion carrying one note on the first branch. */
 function sidecarWithNote(nodeId: string, text: string): string {
-  return serializeSidecar({ version: 1, notes: { [nodeId]: text } });
+  return serializeSidecar(setNodeNote(emptySidecar(), nodeId, text));
 }
 
 function firstBranchId(): string {
