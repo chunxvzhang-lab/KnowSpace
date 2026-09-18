@@ -17,6 +17,7 @@ export type MindmapExportMenuProps = {
   isOpen: boolean;
   onToggle: () => void;
   onExportPng: () => void;
+  onExportSvg: () => void;
   onExportOpml: () => void;
   onExportFreeMind: () => void;
   onExportMarkdownOutline: () => void;
@@ -27,6 +28,7 @@ export function MindmapExportMenu({
   isOpen,
   onToggle,
   onExportPng,
+  onExportSvg,
   onExportOpml,
   onExportFreeMind,
   onExportMarkdownOutline,
@@ -35,6 +37,11 @@ export function MindmapExportMenu({
   // behind a menu that is still on screen.
   const rows: Array<{ title: string; description: string; run: () => void }> = [
     { title: "导出 PNG 图片", description: "高清透明背景位图 (.png)", run: onExportPng },
+    {
+      title: "导出 SVG 矢量图",
+      description: "文字仍是文字，可编辑、可缩放印刷 (.svg)",
+      run: onExportSvg,
+    },
     { title: "导出 OPML 2.0", description: "兼容 MindNode、OmniOutliner (.opml)", run: onExportOpml },
     {
       title: "导出 FreeMind (.mm)",
@@ -55,7 +62,7 @@ export function MindmapExportMenu({
           type="button"
           className={`mindmap-tool-btn text-btn export-btn ${isOpen ? "active" : ""}`}
           onClick={onToggle}
-          title="导出导图为 PNG、OPML 2.0、FreeMind (.mm) 或 Markdown 大纲"
+          title="导出导图为 PNG、SVG、OPML 2.0、FreeMind (.mm) 或 Markdown 大纲"
           aria-haspopup="true"
           aria-expanded={isOpen}
         >

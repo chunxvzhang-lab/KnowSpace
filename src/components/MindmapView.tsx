@@ -48,6 +48,7 @@ import {
   loadMindmapLayout,
   saveMindmapLayout,
 } from "../services/storage";
+import { buildStandaloneMindmapSvg } from "../services/mindmapSvgExport";
 import { MindmapCanvasMenu } from "./MindmapCanvasMenu";
 import { MindmapInlineEditor } from "./MindmapInlineEditor";
 import { MindmapToolbar } from "./MindmapToolbar";
@@ -207,6 +208,20 @@ function getContrastTextColor(hexColor?: string): string {
   if (isNaN(r) || isNaN(g) || isNaN(b)) return "#ffffff";
   const yiq = (r * 299 + g * 587 + b * 114) / 1000;
   return yiq >= 150 ? "#0f172a" : "#ffffff";
+}
+
+/**
+ * Whether the app's own chrome is dark.
+ *
+ * Only the exports need it, and only as the fallback for a node that has no
+ * colour of its own: a map written to a file has no stylesheet behind it, so
+ * "transparent" would mean "whatever the program opening it decides".
+ */
+function isDarkUi(theme: ThemeMode): boolean {
+  return (
+    theme === "twitter" ||
+    (theme === "system" && !!window.matchMedia?.("(prefers-color-scheme: dark)").matches)
+  );
 }
 
 /**
@@ -1386,64 +1401,18 @@ export const MindmapView = memo(function MindmapView({
     const svgEl = svgRef.current;
     if (!svgEl || !layout) return;
 
-    const pad = 40;
-    const { width: lWidth, height: lHeight, minX, minY } = layout.bounds;
-    const exportWidth = lWidth + pad * 2;
-    const exportHeight = lHeight + pad * 2;
-    const exportMinX = minX - pad;
-    const exportMinY = minY - pad;
-
-    const clone = svgEl.cloneNode(true) as SVGSVGElement;
-    clone.setAttribute("viewBox", `${exportMinX} ${exportMinY} ${exportWidth} ${exportHeight}`);
-    clone.setAttribute("width", `${exportWidth}`);
-    clone.setAttribute("height", `${exportHeight}`);
-
-    const g = clone.querySelector("g.mindmap-viewport");
-    if (g) {
-      g.removeAttribute("transform");
-    }
-
-    // Strip out interactive-only elements: selection rings, add buttons, and resize handles
-    clone.querySelectorAll(".mindmap-node-selection-ring").forEach((el) => el.remove());
-    clone.querySelectorAll(".mindmap-node-add-btn").forEach((el) => el.remove());
-    clone.querySelectorAll(".mindmap-node-resize-handle").forEach((el) => el.remove());
-
-    // Resolve theme colors for standalone SVG serialization
-    const isDark = theme === "twitter" || (theme === "system" && window.matchMedia?.("(prefers-color-scheme: dark)").matches);
-    const nodeBg = isDark ? "#1e293b" : "#ffffff";
-    const defaultTextFill = isDark ? "#f8fafc" : "#0f172a";
-    const rootTextFill = "#38bdf8";
-
-    // Set explicit inline fill and stroke on rects, texts, and circles
-    clone.querySelectorAll("rect.mindmap-node-rect").forEach((rect) => {
-      const customFill = (rect as SVGRectElement).style.fill;
-      const customStroke = (rect as SVGRectElement).style.stroke;
-      const customStrokeWidth = (rect as SVGRectElement).style.strokeWidth;
-
-      rect.setAttribute("fill", customFill || nodeBg);
-      if (customStroke) rect.setAttribute("stroke", customStroke);
-      if (customStrokeWidth) rect.setAttribute("stroke-width", customStrokeWidth);
+    // The canvas cannot be written out as it is: the pan and zoom, the
+    // interactive-only elements and the stylesheet colours all have to be
+    // resolved first. That is one function, shared with the SVG export — the PNG
+    // below is that SVG rasterised, so the two formats cannot drift apart.
+    const built = buildStandaloneMindmapSvg(svgEl, {
+      bounds: layout.bounds,
+      dark: isDarkUi(theme),
     });
-    clone.querySelectorAll("rect.mindmap-node-rect-underline").forEach((rect) => {
-      rect.setAttribute("fill", "transparent");
-    });
-    clone.querySelectorAll("circle.mindmap-collapse-circle").forEach((circle) => {
-      circle.setAttribute("fill", nodeBg);
-    });
-    clone.querySelectorAll("text.mindmap-node-title-text").forEach((textEl) => {
-      const isRootText = textEl.classList.contains("root-title");
-      const customFill = (textEl as SVGTextElement).style.fill;
-      const customFontSize = (textEl as SVGTextElement).style.fontSize;
-      const customFontWeight = (textEl as SVGTextElement).style.fontWeight;
+    if (!built) return;
 
-      textEl.setAttribute("fill", customFill || (isRootText ? rootTextFill : defaultTextFill));
-      textEl.setAttribute("font-family", "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif");
-      textEl.setAttribute("font-size", customFontSize || (isRootText ? "14px" : "12.5px"));
-      textEl.setAttribute("font-weight", customFontWeight || (isRootText ? "700" : "500"));
-    });
+    const { svg: svgString, width: exportWidth, height: exportHeight } = built;
 
-    const serializer = new XMLSerializer();
-    const svgString = serializer.serializeToString(clone);
     const blob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
     const url = URL.createObjectURL(blob);
 
@@ -1476,6 +1445,32 @@ export const MindmapView = memo(function MindmapView({
       }, "image/png");
     };
     img.src = url;
+  }, [layout, title, theme]);
+
+  /**
+   * Export as SVG.
+   *
+   * The same string the PNG is rasterised from, written out as it is — so a
+   * vector file costs one download and no second implementation. Text stays
+   * text, which is the reason to want one: the file can be opened in an
+   * illustration program and edited, or printed at any size.
+   */
+  const handleExportSvg = useCallback(() => {
+    const built = buildStandaloneMindmapSvg(svgRef.current, {
+      bounds: layout.bounds,
+      dark: isDarkUi(theme),
+    });
+    if (!built) return;
+
+    const blob = new Blob([built.svg], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${title || "mindmap"}-思维导图.svg`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }, [layout, title, theme]);
 
   const handleExportOpml = useCallback(() => {
@@ -1630,6 +1625,7 @@ export const MindmapView = memo(function MindmapView({
         onZoomStep={handleZoomStep}
         onFitToScreen={handleFitToScreen}
         onExportPng={handleExportPng}
+        onExportSvg={handleExportSvg}
         onExportOpml={handleExportOpml}
         onExportFreeMind={handleExportFreeMind}
         onExportMarkdownOutline={handleExportMarkdownOutline}
