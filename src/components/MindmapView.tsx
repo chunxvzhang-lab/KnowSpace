@@ -222,6 +222,7 @@ function getContrastTextColor(hexColor?: string): string {
 function collapseToggleAnchor(node: MindmapLayoutNode): string {
   if (node.toggleOffset) return `translate(${node.toggleOffset.x}, ${node.toggleOffset.y})`;
   if (node.side === "left") return `translate(-1, ${node.height / 2})`;
+  if (node.side === "top") return `translate(${node.width / 2}, -1)`;
   if (node.side === "bottom") return `translate(${node.width / 2}, ${node.height + 1})`;
   return `translate(${node.width + 1}, ${node.height / 2})`;
 }

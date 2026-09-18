@@ -245,6 +245,19 @@ describe("折叠状态持久化", () => {
       expect(loadMindmapLayout("/vault/c.md")).toBe("bidirectional");
     });
 
+    it("选时间轴后分支分居根的上下两侧", () => {
+      render(<MindmapView title="测试" source={SOURCE} documentKey="/vault/e.md" />);
+
+      fireEvent.change(picker(), { target: { value: "timeline" } });
+
+      const root = nodePoint(".mindmap-node-interactive.is-root");
+      const nodes = nodePoints();
+
+      expect(nodes.some((node) => node.y < root.y)).toBe(true);
+      expect(nodes.some((node) => node.y > root.y)).toBe(true);
+      expect(loadMindmapLayout("/vault/e.md")).toBe("timeline");
+    });
+
     it("选径向后节点围到根的四周", () => {
       render(<MindmapView title="测试" source={SOURCE} documentKey="/vault/d.md" />);
 

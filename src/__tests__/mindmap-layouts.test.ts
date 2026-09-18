@@ -803,6 +803,188 @@ describe("思维导图布局", () => {
     });
   });
 
+  describe("时间轴布局", () => {
+    const tree = parseMarkdownToMindmapTree(BRANCHED, "测试");
+    const layout = layoutMindmap(tree, new Set(), "timeline");
+    const placed = byId(layout);
+    const root = rootOf(tree, layout);
+    const spineY = root.y + root.height / 2;
+    const branches = tree.children.map((child) => placed.get(child.id)!);
+
+    it("每个节点都出现，且只出现一次", () => {
+      const ids = layout.nodes.map((node) => node.id);
+      expect(new Set(ids).size).toBe(ids.length);
+      expect(ids.slice().sort()).toEqual(treeIds(tree).sort());
+    });
+
+    it("一级分支沿轴从左到右排列，上下交替，且都不跨轴", () => {
+      const centres = branches.map((node) => node.x + node.width / 2);
+      expect(centres).toEqual(centres.slice().sort((a, b) => a - b));
+
+      let above = 0;
+      let below = 0;
+      branches.forEach((node, index) => {
+        if (index % 2 === 0) {
+          // Entirely on its own side: the axis is the corridor every connector
+          // uses, so a box that straddled it would block the route.
+          expect(node.y + node.height).toBeLessThanOrEqual(spineY);
+          above += 1;
+        } else {
+          expect(node.y).toBeGreaterThanOrEqual(spineY);
+          below += 1;
+        }
+      });
+      expect(above).toBeGreaterThan(0);
+      expect(below).toBeGreaterThan(0);
+    });
+
+    it("后代沿所属分支那一侧继续朝外，不会翻到对面", () => {
+      const distance = (node: MindmapLayoutResult["nodes"][number]) =>
+        Math.abs(node.y + node.height / 2 - spineY);
+
+      let checked = 0;
+      for (const edge of layout.edges) {
+        if (edge.fromId === tree.id) continue;
+        const parent = placed.get(edge.fromId)!;
+        const child = placed.get(edge.toId)!;
+        expect(distance(child)).toBeGreaterThan(distance(parent));
+        expect(child.side).toBe(parent.side);
+        checked += 1;
+      }
+      expect(checked).toBeGreaterThan(0);
+    });
+
+    it("所有节点互不重叠", () => {
+      for (let i = 0; i < layout.nodes.length; i++) {
+        for (let j = i + 1; j < layout.nodes.length; j++) {
+          expect(
+            boxesOverlap(layout.nodes[i], layout.nodes[j]),
+            `重叠: ${layout.nodes[i].id} 与 ${layout.nodes[j].id}`
+          ).toBe(false);
+        }
+      }
+    });
+
+    it("根到分支的连线沿轴走、再垂到节点", () => {
+      const rootEdges = layout.edges.filter((edge) => edge.fromId === tree.id);
+      expect(rootEdges.length).toBe(branches.length);
+
+      for (const edge of rootEdges) {
+        const numbers = pathNumbers(edge.d);
+        // M spineStart spineY L childCentreX spineY L childCentreX innerEdge
+        expect(numbers).toHaveLength(6);
+        expect(numbers[0]).toBeCloseTo(root.x + root.width);
+        expect(numbers[1]).toBeCloseTo(spineY);
+        expect(numbers[3]).toBeCloseTo(spineY);
+
+        const child = placed.get(edge.toId)!;
+        expect(numbers[2]).toBeCloseTo(child.x + child.width / 2);
+        expect(numbers[4]).toBeCloseTo(numbers[2]);
+        expect(numbers[5]).toBeCloseTo(child.side === "bottom" ? child.y : child.y + child.height);
+      }
+    });
+
+    it("轴上的那段走廊没有任何方框占用", () => {
+      // The whole design rests on this: the axis is the only route from the root
+      // to a branch that does not cut across the branches in between.
+      const rootEdges = layout.edges.filter((edge) => edge.fromId === tree.id);
+
+      for (const edge of rootEdges) {
+        const numbers = pathNumbers(edge.d);
+        const left = Math.min(numbers[0], numbers[2]);
+        const right = Math.max(numbers[0], numbers[2]);
+
+        for (const node of layout.nodes) {
+          const blocksX = node.x < right && left < node.x + node.width;
+          const blocksY = node.y < spineY && spineY < node.y + node.height;
+          expect(blocksX && blocksY, `${node.id} 挡住了轴`).toBe(false);
+        }
+      }
+    });
+
+    it("分支内部的连线是纵向的，从父节点外侧边到子节点内侧边", () => {
+      for (const edge of layout.edges) {
+        if (edge.fromId === tree.id) continue;
+        const parent = placed.get(edge.fromId)!;
+        const child = placed.get(edge.toId)!;
+        const { fromX, fromY, toX, toY } = endpoints(edge.d);
+
+        expect(fromX).toBeCloseTo(parent.x + parent.width / 2);
+        expect(fromY).toBeCloseTo(parent.side === "bottom" ? parent.y + parent.height : parent.y);
+        expect(toX).toBeCloseTo(child.x + child.width / 2);
+        expect(toY).toBeCloseTo(child.side === "bottom" ? child.y : child.y + child.height);
+      }
+    });
+
+    it("轴上的每一段共线、共色", () => {
+      // They overlap: five branch colours would blend into a smear near the root
+      // and fade to one colour at the far end.
+      const rootEdges = layout.edges.filter((edge) => edge.fromId === tree.id);
+      expect(rootEdges.length).toBeGreaterThan(1);
+
+      for (const edge of rootEdges) {
+        expect(edge.colorIndex).toBe(0);
+        expect(pathNumbers(edge.d)[1]).toBeCloseTo(spineY, 6);
+      }
+    });
+
+    it("坐标从原点开始，包围盒装得下所有节点", () => {
+      expect(Math.min(...layout.nodes.map((node) => node.x))).toBe(ORIGIN);
+      expect(Math.min(...layout.nodes.map((node) => node.y))).toBe(ORIGIN);
+
+      for (const node of layout.nodes) {
+        expect(node.x).toBeGreaterThanOrEqual(layout.bounds.minX);
+        expect(node.y).toBeGreaterThanOrEqual(layout.bounds.minY);
+        expect(node.x + node.width).toBeLessThanOrEqual(layout.bounds.maxX);
+        expect(node.y + node.height).toBeLessThanOrEqual(layout.bounds.maxY);
+      }
+    });
+
+    it("有子节点的节点把子节点标在自己那一侧", () => {
+      for (const node of layout.nodes) {
+        if (!node.hasChildren || node.level === 0) continue;
+        expect(node.side === "top" || node.side === "bottom").toBe(true);
+      }
+    });
+
+    it("折叠的分支不出现，也没有连线通向它", () => {
+      const folded = layoutMindmap(tree, new Set([tree.children[0].id]), "timeline");
+      const hidden = treeIds(tree.children[0]).filter((id) => id !== tree.children[0].id);
+
+      for (const id of hidden) {
+        expect(folded.nodes.some((node) => node.id === id)).toBe(false);
+        expect(folded.edges.some((edge) => edge.toId === id)).toBe(false);
+      }
+      expect(folded.nodes.some((node) => node.id === tree.children[0].id)).toBe(true);
+    });
+
+    it("分支的颜色索引与默认布局一致", () => {
+      const logic = byId(layoutMindmap(tree, new Set(), "logic"));
+
+      for (const node of layout.nodes) {
+        expect(node.colorIndex).toBe(logic.get(node.id)?.colorIndex);
+      }
+    });
+
+    it("只有一个节点时只剩根，且没有连线", () => {
+      const lone: MindmapNode = { id: "root-mindmap-node", text: "独苗", level: 0, children: [] };
+      const single = layoutMindmap(lone, new Set(), "timeline");
+
+      expect(single.nodes.length).toBe(1);
+      expect(single.edges.length).toBe(0);
+      expect(single.nodes[0].x).toBe(ORIGIN);
+    });
+
+    it("切换布局不改动树", () => {
+      const fresh = parseMarkdownToMindmapTree(BRANCHED, "测试");
+      const before = JSON.stringify(fresh);
+
+      layoutMindmap(fresh, new Set(), "timeline");
+
+      expect(JSON.stringify(fresh)).toBe(before);
+    });
+  });
+
   describe("布局的按文档记忆", () => {
     beforeEach(() => localStorage.clear());
     afterEach(() => localStorage.clear());

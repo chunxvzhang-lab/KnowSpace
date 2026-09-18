@@ -26,7 +26,7 @@ import { BRANCH_COLORS, calculateNodeDimensions } from "./mindmapService";
  * service does not know this module exists.
  */
 
-export type MindmapLayoutId = "logic" | "bidirectional" | "vertical" | "radial";
+export type MindmapLayoutId = "logic" | "bidirectional" | "vertical" | "radial" | "timeline";
 
 /** Used when a document has no layout of its own, or names one that is gone. */
 export const DEFAULT_LAYOUT_ID: MindmapLayoutId = "logic";
@@ -59,6 +59,11 @@ export const MINDMAP_LAYOUT_LIST: MindmapLayoutOption[] = [
     label: "径向",
     description: "根居中，分支按体量分配扇区向外辐射。适合看整体结构，不适合长文本。",
   },
+  {
+    id: "timeline",
+    label: "时间轴",
+    description: "一级分支沿水平轴依次排开、上下交替，子分支向外展开。适合顺序性内容。",
+  },
 ];
 
 /**
@@ -82,11 +87,12 @@ export function resolveLayoutId(value: unknown): MindmapLayoutId {
  * The edge a node's children are on.
  *
  * A leaf has one too — it is the edge its own parent's connector arrives at —
- * because the renderer hangs the collapse toggle off it. Three values rather
- * than two because the vertical layout grows downwards, and a toggle that stayed
- * on the right edge there would sit in the middle of the next row.
+ * because the renderer hangs the collapse toggle off it. Four values rather than
+ * two because the vertical layout grows downwards and the timeline grows both
+ * ways from its axis; a toggle that stayed on the right edge in either would sit
+ * in the middle of the next row.
  */
-export type MindmapLayoutSide = "left" | "right" | "bottom";
+export type MindmapLayoutSide = "left" | "right" | "top" | "bottom";
 
 export interface MindmapLayoutNode {
   id: string;
@@ -193,6 +199,8 @@ export function layoutMindmap(
       return layoutVerticalTree(rootNode, collapsedIds);
     case "radial":
       return layoutRadialTree(rootNode, collapsedIds);
+    case "timeline":
+      return layoutTimelineTree(rootNode, collapsedIds);
     default:
       return layoutLogicTree(rootNode, collapsedIds);
   }
@@ -1056,6 +1064,173 @@ function layoutRadialTree(
         style,
       });
       collectEdges(child);
+    }
+  })(rootNode);
+
+  return {
+    root: rootLayout,
+    nodes: allNodes,
+    edges: allEdges,
+    bounds: layoutBounds(allNodes),
+  };
+}
+
+/** Gap between the root and the first branch on the axis, and between branches. */
+const TIMELINE_GAP = 48;
+/** How far the nearest box on either side sits from the axis. */
+const SPINE_GAP = 26;
+
+/**
+ * A horizontal axis with the first-level branches strung along it, alternating
+ * above and below, each one's own subtree growing further out.
+ *
+ * The route from the root to a branch is the whole design problem here. A
+ * straight line, a step or a bezier all cut across the branches in between: the
+ * spine is horizontal and the branches are spread along it, so a connector that
+ * leaves the root heading for the fifth branch passes over the first four boxes.
+ *
+ * The axis itself is the one corridor nothing occupies, because every box sits
+ * clear of it by construction. So the connector runs along the axis to the
+ * branch's own position and then straight out to it — which is exactly the shape
+ * a timeline is drawn with, and the reason the branches are placed alternating
+ * rather than all on one side.
+ *
+ * Every one of those axis segments is drawn in the same colour, the first
+ * branch's. They are collinear and they overlap, so giving each its own branch
+ * colour would blend five strokes into a smear near the root and fade to a
+ * single colour at the far end. A branch's own colour is on its node and on the
+ * connectors inside its subtree, which is where it reads as belonging to
+ * something.
+ */
+function layoutTimelineTree(
+  rootNode: MindmapNode,
+  collapsedIds: ReadonlySet<string>
+): MindmapLayoutResult {
+  const allNodes: MindmapLayoutNode[] = [];
+  /** Placed nodes by id, so the connector pass can read final coordinates. */
+  const placed = new Map<string, MindmapLayoutNode>();
+
+  /**
+   * Places one subtree on one side of the axis.
+   *
+   * `innerEdge` is the coordinate of the node's edge facing the axis, and
+   * `outward` is -1 above it and +1 below, so the same recursion serves both
+   * sides and every level simply continues away from the axis.
+   */
+  function place(
+    node: MindmapNode,
+    centreX: number,
+    innerEdge: number,
+    outward: -1 | 1,
+    colorIndex: number
+  ): MindmapLayoutNode {
+    const dimensions = calculateNodeDimensions(node);
+    const isCollapsed = collapsedIds.has(node.id);
+    const y = outward > 0 ? innerEdge : innerEdge - dimensions.height;
+    const layoutNode = makeLayoutNode(
+      node,
+      { x: centreX - dimensions.width / 2, y },
+      dimensions,
+      outward > 0 ? "bottom" : "top",
+      colorIndex,
+      collapsedIds
+    );
+    allNodes.push(layoutNode);
+    placed.set(node.id, layoutNode);
+
+    if (!isCollapsed && node.children && node.children.length > 0) {
+      const outerEdge = outward > 0 ? y + dimensions.height : y;
+      const childInnerEdge = outerEdge + outward * VERTICAL_LEVEL_GAP;
+      let bandLeft = centreX - stackWidth(node.children, collapsedIds) / 2;
+      node.children.forEach((child) => {
+        const band = measureSubtreeWidth(child, collapsedIds);
+        place(child, bandLeft + band / 2, childInnerEdge, outward, colorIndex);
+        bandLeft += band + SIBLING_GAP;
+      });
+    }
+
+    return layoutNode;
+  }
+
+  const rootDimensions = calculateNodeDimensions(rootNode);
+  const rootLayout = makeLayoutNode(
+    rootNode,
+    { x: 0, y: -rootDimensions.height / 2 },
+    rootDimensions,
+    "right",
+    0,
+    collapsedIds
+  );
+  allNodes.push(rootLayout);
+  placed.set(rootNode.id, rootLayout);
+
+  if (!collapsedIds.has(rootNode.id) && rootNode.children && rootNode.children.length > 0) {
+    let cursor = rootDimensions.width + TIMELINE_GAP;
+    rootNode.children.forEach((child, index) => {
+      const band = measureSubtreeWidth(child, collapsedIds);
+      // The first branch goes above the axis and the rest alternate, so the
+      // sequence the document has is the sequence read from left to right.
+      const outward: -1 | 1 = index % 2 === 0 ? -1 : 1;
+      place(
+        child,
+        cursor + band / 2,
+        outward * SPINE_GAP,
+        outward,
+        index % BRANCH_COLORS.length
+      );
+      cursor += band + TIMELINE_GAP;
+    });
+  }
+
+  shiftToOrigin(allNodes);
+
+  const spineY = rootLayout.y + rootLayout.height / 2;
+  const spineStart = rootLayout.x + rootLayout.width;
+
+  const allEdges: MindmapLayoutResult["edges"] = [];
+  (function walk(node: MindmapNode) {
+    const parent = placed.get(node.id);
+    if (!parent || !node.children) return;
+    const parentIsRoot = node.id === rootNode.id;
+
+    for (const child of node.children) {
+      const childLayout = placed.get(child.id);
+      // A collapsed node keeps its children in the tree but shows none of them.
+      if (!childLayout) continue;
+
+      const style = child.lineStyle || node.lineStyle || "bezier";
+      const childCentreX = childLayout.x + childLayout.width / 2;
+      const childInnerEdge =
+        childLayout.side === "bottom" ? childLayout.y : childLayout.y + childLayout.height;
+
+      if (parentIsRoot) {
+        allEdges.push({
+          fromId: node.id,
+          toId: child.id,
+          d: `M ${spineStart} ${spineY} L ${childCentreX} ${spineY} L ${childCentreX} ${childInnerEdge}`,
+          // One colour for the whole axis. See the note above the layout.
+          colorIndex: 0,
+          color: child.lineColor || node.lineColor,
+          style,
+        });
+      } else {
+        allEdges.push({
+          fromId: node.id,
+          toId: child.id,
+          d: buildEdgePath(
+            parent.x + parent.width / 2,
+            parent.side === "bottom" ? parent.y + parent.height : parent.y,
+            childCentreX,
+            childInnerEdge,
+            style,
+            "vertical"
+          ),
+          colorIndex: childLayout.colorIndex,
+          color: child.lineColor || node.lineColor,
+          style,
+        });
+      }
+      walk(child);
     }
   })(rootNode);
 
