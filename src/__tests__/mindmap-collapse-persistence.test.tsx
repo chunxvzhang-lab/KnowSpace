@@ -287,4 +287,59 @@ describe("折叠状态持久化", () => {
       expect(localStorage.getItem("bookmd.mindmap.layout.v1")).toBeNull();
     });
   });
+
+  /**
+   * Where the collapse toggle ends up, read off the rendered canvas.
+   *
+   * The layouts answer "which edge are the children on" in three different ways:
+   * a named side, an offset for the case where no single edge answers it, and the
+   * default. The layouts' own tests check the answer; these check that the
+   * renderer does something sensible with it, which is a different claim and the
+   * one a reader actually sees.
+   */
+  describe("折叠按钮的落点（组件）", () => {
+    const picker = () => screen.getByLabelText("导图布局") as HTMLSelectElement;
+
+    /** The toggle for a node, in that node's own coordinates, plus its box. */
+    function toggleOf(label: string) {
+      const group = screen.getByText(label).closest(".mindmap-node-interactive");
+      expect(group, `${label} 找不到节点`).not.toBeNull();
+      const button = group!.querySelector(".mindmap-collapse-btn");
+      expect(button, `${label} 没有折叠按钮`).not.toBeNull();
+
+      const rect = group!.querySelector("rect.mindmap-node-rect")!;
+      const numbers = (button!.getAttribute("transform") ?? "").match(/-?[\d.]+/g) ?? ["0", "0"];
+      return {
+        x: Number(numbers[0]),
+        y: Number(numbers[1]),
+        width: Number(rect.getAttribute("width")),
+        height: Number(rect.getAttribute("height")),
+      };
+    }
+
+    it("默认布局挂在右边缘，其余布局各按自己的方向", () => {
+      render(<MindmapView title="测试" source={SOURCE} />);
+
+      // The default layout grows to the right, so the toggle sits past the right
+      // edge at the vertical middle — which is where it has always been.
+      const rooted = toggleOf("父节点");
+      expect(rooted.x).toBeCloseTo(rooted.width + 1);
+      expect(rooted.y).toBeCloseTo(rooted.height / 2);
+
+      fireEvent.change(picker(), { target: { value: "timeline" } });
+
+      // The first branch hangs above the axis, so its toggle goes on top of it.
+      const above = toggleOf("父节点");
+      expect(above.y).toBeCloseTo(-1);
+      expect(above.x).toBeCloseTo(above.width / 2);
+
+      fireEvent.change(picker(), { target: { value: "radial" } });
+
+      // Radial children are spread around the node, so the toggle is placed by
+      // offset on the outward edge rather than on a named one.
+      const outward = toggleOf("父节点");
+      expect(outward.x).toBeGreaterThan(outward.width / 2);
+      expect(outward.x).toBeLessThanOrEqual(outward.width + 3);
+    });
+  });
 });
