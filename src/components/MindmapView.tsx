@@ -42,6 +42,7 @@ import {
   DEFAULT_THEME_ID,
   MINDMAP_THEMES,
   branchColorFor,
+  freezeAppearance,
   resolveThemeId,
   type MindmapTheme,
 } from "../core/mindmapThemes";
@@ -1429,6 +1430,28 @@ export const MindmapView = memo(function MindmapView({
    * know. The panel targets the primary selection, or the root when nothing is
    * selected — the same target the node context menu uses.
    */
+  /**
+   * Writes the current theme's appearance into the selected nodes.
+   *
+   * Confirmed first, because it is the one action here that changes what later
+   * theme switches do to these nodes: after it they stop following. It cannot
+   * lose anything a reader set by hand — `freezeAppearance` gives a node's own
+   * value priority, so writing the answer back is a no-op for every field the
+   * node had already chosen.
+   */
+  const handleFreezeTheme = useCallback(() => {
+    const targetIds =
+      selectedNodeIds.size > 1 ? Array.from(selectedNodeIds) : [primarySelectedId || tree.id];
+
+    const confirmed = window.confirm(
+      `将把当前主题的外观固化到 ${targetIds.length} 个节点的样式上。\n\n` +
+        "此后切换主题时，这些节点不再跟随；你手工设置过的颜色、形状与字号不会改变。\n\n是否继续？"
+    );
+    if (!confirmed) return;
+
+    applyTreeChange(freezeAppearance(tree, targetIds, mindmapTheme));
+  }, [tree, selectedNodeIds, primarySelectedId, mindmapTheme, applyTreeChange]);
+
   const handleStylePanelRequest = useCallback(
     (anchor: DOMRect) => {
       const containerRect = containerRef.current?.getBoundingClientRect();
@@ -2100,6 +2123,7 @@ export const MindmapView = memo(function MindmapView({
         onAddChild={handleAddChild}
         onAddSibling={handleAddSibling}
         onStartRename={startEditing}
+        onFreezeTheme={handleFreezeTheme}
         onClose={() => setContextMenu(null)}
       />
     </div>

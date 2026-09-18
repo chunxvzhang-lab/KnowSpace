@@ -13,6 +13,7 @@ import {
   AlignRight,
   AlignJustify,
   RotateCcw,
+  Snowflake,
 } from "lucide-react";
 import type {
   MindmapLineStyle,
@@ -51,6 +52,14 @@ export type MindmapNodeStyleMenuProps = {
   onAddChild: (parentId?: string) => void;
   onAddSibling: (targetId?: string) => void;
   onStartRename: (nodeId: string) => void;
+  /**
+   * Writes the current theme's appearance into these nodes as their own styles.
+   *
+   * The confirmation lives in the caller rather than here, because the panel is
+   * presentational and what is being confirmed is a decision about the map:
+   * after it, those nodes stop following the theme.
+   */
+  onFreezeTheme: () => void;
   onClose: () => void;
 };
 
@@ -181,6 +190,7 @@ export function MindmapNodeStyleMenu({
   onAddChild,
   onAddSibling,
   onStartRename,
+  onFreezeTheme,
   onClose,
 }: MindmapNodeStyleMenuProps) {
   if (!open) return null;
@@ -514,6 +524,17 @@ export function MindmapNodeStyleMenu({
             <span>恢复自适应大小</span>
           </button>
         )}
+        {/* Offered in batch mode too, and the reason it sits next to delete is
+            that both are decisions about the nodes rather than controls on them. */}
+        <button
+          type="button"
+          className="mindmap-ctx-action-item"
+          onClick={onFreezeTheme}
+          title="把当前主题的颜色与形状写成这些节点自己的样式；此后换主题它们不再跟随。手工设置过的颜色与形状不受影响。"
+        >
+          <Snowflake size={13} />
+          <span>{isBatchMode ? `固化当前主题 (${selectedCount})` : "固化当前主题"}</span>
+        </button>
         <button
           type="button"
           className="mindmap-ctx-action-item is-delete"

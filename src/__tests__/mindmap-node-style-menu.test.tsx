@@ -69,6 +69,30 @@ describe("节点样式菜单", () => {
     expect(onSourceChange.mock.calls[0][0]).toContain("shape=capsule");
   });
 
+  it("固化当前主题：取消什么都不做，确认后写进样式注释", () => {
+    const onSourceChange = vi.fn();
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+    render(<MindmapView title="测试" source={SOURCE} onSourceChange={onSourceChange} />);
+
+    fireEvent.click(screen.getByText("父节点"));
+    fireEvent.click(screen.getByRole("button", { name: "外观样式" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "固化当前主题" }));
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    // Cancelled: the tree still matches the document, so there is nothing to sync.
+    expect(screen.getByRole("button", { name: "已同步" })).toBeTruthy();
+
+    confirmSpy.mockReturnValue(true);
+    fireEvent.click(screen.getByRole("button", { name: "固化当前主题" }));
+    fireEvent.click(screen.getByRole("button", { name: /同步到文档/ }));
+
+    expect(onSourceChange).toHaveBeenCalledTimes(1);
+    const written = onSourceChange.mock.calls[0][0] as string;
+    // The classic theme's own answers for a non-root node.
+    expect(written).toContain("shape=rounded");
+    expect(written).toContain("color=#1e293b");
+  });
+
   it("没有改动时同步按钮说的是已同步", () => {
     render(<MindmapView title="测试" source={SOURCE} onSourceChange={vi.fn()} />);
 

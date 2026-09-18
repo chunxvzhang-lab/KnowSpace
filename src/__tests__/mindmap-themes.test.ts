@@ -4,11 +4,13 @@ import {
   MINDMAP_THEMES,
   MINDMAP_THEME_LIST,
   branchColorFor,
+  freezeAppearance,
   resolveNodeAppearance,
   resolveThemeId,
   type MindmapThemeId,
 } from "../core/mindmapThemes";
 import { BRANCH_COLORS } from "../services/mindmapService";
+import type { MindmapNode } from "../core/types";
 
 /**
  * A theme supplies defaults; a node's own styles win.
@@ -164,6 +166,78 @@ describe("思维导图主题", () => {
       expect(inDark.fill).toBe("#123456");
       // The theme's other defaults did change, which is the point of switching.
       expect(inDark.textColor).not.toBe(inClassic.textColor);
+    });
+  });
+
+  describe("freezeAppearance", () => {
+    const theme = MINDMAP_THEMES.classic;
+    const tree: MindmapNode = {
+      id: "root-mindmap-node",
+      text: "根",
+      level: 0,
+      children: [
+        { id: "a", text: "甲", level: 1, children: [] },
+        { id: "b", text: "乙", level: 1, color: "#ff0000", shape: "capsule", children: [] },
+      ],
+    };
+
+    it("没有显式样式的节点获得主题的值", () => {
+      const frozen = freezeAppearance(tree, ["a"], theme);
+      const [a] = frozen.children;
+
+      expect(a.color).toBe(theme.node.fill);
+      expect(a.textColor).toBe(theme.node.textColor);
+      expect(a.shape).toBe(theme.node.shape);
+      expect(a.fontSize).toBe(theme.node.fontSize);
+      expect(a.fontWeight).toBe(theme.node.fontWeight);
+    });
+
+    it("节点自己设过的值不会被覆盖", () => {
+      // The reason the confirmation is about pinning rather than about losing
+      // anything: writing the resolved appearance back is a no-op wherever the
+      // node had already chosen.
+      const frozen = freezeAppearance(tree, ["b"], theme);
+      const [, b] = frozen.children;
+
+      expect(b.color).toBe("#ff0000");
+      expect(b.shape).toBe("capsule");
+      // ...while the fields it had not set become explicit.
+      expect(b.textColor).toBe(theme.node.textColor);
+    });
+
+    it("只写入选中的节点", () => {
+      const frozen = freezeAppearance(tree, ["b"], theme);
+
+      // Nobody named 甲, so it keeps exactly what it had — which is nothing.
+      expect(frozen.children[0].color).toBeUndefined();
+      expect(frozen.children[0].shape).toBeUndefined();
+      // ...and the root was not named either.
+      expect(frozen.color).toBeUndefined();
+    });
+
+    it("根节点取主题为根准备的值", () => {
+      const frozen = freezeAppearance(tree, [tree.id], theme);
+
+      expect(frozen.color).toBe(theme.root.fill);
+      expect(frozen.fontWeight).toBe("bold");
+      expect(frozen.children[0].color).toBeUndefined();
+    });
+
+    it("不改动传入的树", () => {
+      const before = JSON.stringify(tree);
+
+      freezeAppearance(tree, ["a", "b"], theme);
+
+      expect(JSON.stringify(tree)).toBe(before);
+    });
+
+    it("固化之后，换主题不再影响这些节点", () => {
+      // The whole point of the action, stated as one assertion.
+      const frozen = freezeAppearance(tree, ["a"], theme);
+      const inDark = resolveNodeAppearance(frozen.children[0], MINDMAP_THEMES.dark, false);
+
+      expect(inDark.fill).toBe(theme.node.fill);
+      expect(inDark.fill).not.toBe(MINDMAP_THEMES.dark.node.fill);
     });
   });
 

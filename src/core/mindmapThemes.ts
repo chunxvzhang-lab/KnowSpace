@@ -228,6 +228,54 @@ export function resolveNodeAppearance(
 }
 
 /**
+ * Writes the theme's appearance into a set of nodes, as their own styles.
+ *
+ * This is the escape hatch from the rule the whole theme system rests on. While
+ * a node has no colour of its own it follows the theme, which is what makes
+ * switching instant and non-destructive — and it is also why a reader who wants
+ * to start from the theme's answer and then adjust one node has nothing to
+ * adjust. Freezing answers that: after it, the named nodes carry the appearance
+ * as their own and stop following.
+ *
+ * What it deliberately does **not** do is overwrite. A node that already has a
+ * colour keeps it, because `resolveNodeAppearance` gives the node's own value
+ * priority and writing the answer back is therefore a no-op for every field the
+ * node had already set. The result is that freezing a map somebody has styled by
+ * hand changes nothing about those nodes, and the confirmation on the way in is
+ * about pinning rather than about losing anything.
+ *
+ * The tree is copied rather than mutated, like every other edit in this codebase.
+ */
+export function freezeAppearance(
+  tree: MindmapNode,
+  nodeIds: readonly string[],
+  theme: MindmapTheme
+): MindmapNode {
+  const targets = new Set(nodeIds);
+
+  const walk = (node: MindmapNode): MindmapNode => {
+    const children = node.children.map(walk);
+    if (!targets.has(node.id)) {
+      return { ...node, children };
+    }
+
+    const appearance = resolveNodeAppearance(node, theme, node.level === 0);
+    return {
+      ...node,
+      children,
+      color: appearance.fill,
+      textColor: appearance.textColor,
+      borderColor: appearance.borderColor,
+      shape: appearance.shape,
+      fontSize: appearance.fontSize,
+      fontWeight: appearance.fontWeight,
+    };
+  };
+
+  return walk(tree);
+}
+
+/**
  * The colour of a branch at a given depth.
  *
  * Cycled rather than indexed directly, because a deep map has more levels than
