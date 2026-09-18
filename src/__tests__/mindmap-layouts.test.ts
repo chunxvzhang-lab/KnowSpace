@@ -72,6 +72,36 @@ function boxesOverlap(a: MindmapLayoutResult["nodes"][number], b: MindmapLayoutR
   return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 }
 
+/** The point a radial layout radiates from: the root's centre. */
+function centreOf(tree: MindmapNode, layout: MindmapLayoutResult) {
+  const root = rootOf(tree, layout);
+  return { x: root.x + root.width / 2, y: root.y + root.height / 2 };
+}
+
+/**
+ * Whether a point lies on the border of a box, within a couple of pixels.
+ *
+ * Deliberately not "does it equal what the layout computes": re-deriving the
+ * same formula would only assert that the code agrees with itself.
+ */
+function onPerimeter(
+  box: MindmapLayoutResult["nodes"][number],
+  x: number,
+  y: number,
+  tolerance = 0.01
+): boolean {
+  const inside =
+    x >= box.x - tolerance &&
+    x <= box.x + box.width + tolerance &&
+    y >= box.y - tolerance &&
+    y <= box.y + box.height + tolerance;
+  const onVerticalEdge =
+    Math.min(Math.abs(x - box.x), Math.abs(x - (box.x + box.width))) <= tolerance;
+  const onHorizontalEdge =
+    Math.min(Math.abs(y - box.y), Math.abs(y - (box.y + box.height))) <= tolerance;
+  return inside && (onVerticalEdge || onHorizontalEdge);
+}
+
 /** Every number in a path, in order: the shape of a connector, not its meaning. */
 function pathNumbers(d: string): number[] {
   return (d.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number);
@@ -560,6 +590,214 @@ describe("思维导图布局", () => {
       const before = JSON.stringify(fresh);
 
       layoutMindmap(fresh, new Set(), "vertical");
+
+      expect(JSON.stringify(fresh)).toBe(before);
+    });
+  });
+
+  describe("径向布局", () => {
+    const tree = parseMarkdownToMindmapTree(BRANCHED, "测试");
+    const layout = layoutMindmap(tree, new Set(), "radial");
+    const placed = byId(layout);
+    const centre = centreOf(tree, layout);
+    const radiusOf = (x: number, y: number) => Math.hypot(x - centre.x, y - centre.y);
+    const centreOfNode = (node: MindmapLayoutResult["nodes"][number]) => ({
+      x: node.x + node.width / 2,
+      y: node.y + node.height / 2,
+    });
+
+    it("每个节点都出现，且只出现一次", () => {
+      const ids = layout.nodes.map((node) => node.id);
+      expect(new Set(ids).size).toBe(ids.length);
+      expect(ids.slice().sort()).toEqual(treeIds(tree).sort());
+    });
+
+    it("同一深度的节点在同一个环上，深度越深环越大", () => {
+      const byLevel = new Map<number, number[]>();
+      for (const node of layout.nodes) {
+        if (node.level === 0) continue;
+        const point = centreOfNode(node);
+        byLevel.set(node.level, [...(byLevel.get(node.level) ?? []), radiusOf(point.x, point.y)]);
+      }
+
+      const levels = [...byLevel.keys()].sort((a, b) => a - b);
+      expect(levels.length).toBeGreaterThan(1);
+      let previous = 0;
+      for (const level of levels) {
+        const radii = byLevel.get(level)!;
+        for (const radius of radii) expect(radius).toBeCloseTo(radii[0], 6);
+        expect(radii[0]).toBeGreaterThan(previous);
+        previous = radii[0];
+      }
+    });
+
+    it("所有节点互不重叠", () => {
+      for (let i = 0; i < layout.nodes.length; i++) {
+        for (let j = i + 1; j < layout.nodes.length; j++) {
+          expect(
+            boxesOverlap(layout.nodes[i], layout.nodes[j]),
+            `重叠: ${layout.nodes[i].id} 与 ${layout.nodes[j].id}`
+          ).toBe(false);
+        }
+      }
+    });
+
+    it("体量大的分支分到更宽的扇区，但差距远小于体量之比", () => {
+      // Two equally heavy branches with one leaf between them, so the shares can
+      // be read straight off the angles: the two heavy branches end up adjacent
+      // across the wrap, and the gap between neighbouring branch centres is the
+      // average of their two shares.
+      //
+      // An earlier version of this test averaged the neighbouring angles to
+      // recover a sector boundary. That is only true when the two sectors are
+      // equal, so it reported the heavy and light shares as identical and failed
+      // on the last bit of a float — the test was wrong, not the layout.
+      const mixTree = parseMarkdownToMindmapTree(
+        [
+          "- 重甲",
+          "  - 重甲一",
+          "  - 重甲二",
+          "  - 重甲三",
+          "  - 重甲四",
+          "- 轻",
+          "- 重乙",
+          "  - 重乙一",
+          "  - 重乙二",
+          "  - 重乙三",
+          "  - 重乙四",
+        ].join("\n"),
+        "测试"
+      );
+      const mixLayout = layoutMindmap(mixTree, new Set(), "radial");
+      const mixCentre = centreOf(mixTree, mixLayout);
+
+      let previous = -Infinity;
+      const angles = mixTree.children.map((child) => {
+        const node = mixLayout.nodes.find((candidate) => candidate.id === child.id)!;
+        let angle = Math.atan2(
+          node.y + node.height / 2 - mixCentre.y,
+          node.x + node.width / 2 - mixCentre.x
+        );
+        // Unwrapped in document order: the assignment runs clockwise from the
+        // top, so the sequence only ever ascends.
+        while (angle < previous) angle += Math.PI * 2;
+        previous = angle;
+        return angle;
+      });
+
+      const heavyShare = angles[0] + Math.PI * 2 - angles[2];
+      const lightShare = Math.PI * 2 - heavyShare * 2;
+      const ratio = heavyShare / lightShare;
+
+      // Weighting by size alone would give 5:1 here — five nodes against one —
+      // and that is the ratio that pushes a light branch onto a sliver of an arc
+      // and the ring it sits on out to thousands of pixels.
+      expect(ratio).toBeGreaterThan(1);
+      expect(ratio).toBeLessThan(3);
+    });
+
+    it("连线从父节点朝向子节点的那条边出发，落在子节点朝向父节点的那条边", () => {
+      expect(layout.edges.length).toBeGreaterThan(0);
+      for (const edge of layout.edges) {
+        const parent = placed.get(edge.fromId)!;
+        const child = placed.get(edge.toId)!;
+        const { fromX, fromY, toX, toY } = endpoints(edge.d);
+
+        expect(onPerimeter(parent, fromX, fromY), `${edge.fromId} 的起点不在边框上`).toBe(true);
+        expect(onPerimeter(child, toX, toY), `${edge.toId} 的终点不在边框上`).toBe(true);
+
+        // ...and on the side facing the other box, not the far side.
+        const parentCentre = centreOfNode(parent);
+        const childCentre = centreOfNode(child);
+        expect(
+          (childCentre.x - parentCentre.x) * (fromX - parentCentre.x) +
+            (childCentre.y - parentCentre.y) * (fromY - parentCentre.y)
+        ).toBeGreaterThan(0);
+        expect(
+          (parentCentre.x - childCentre.x) * (toX - childCentre.x) +
+            (parentCentre.y - childCentre.y) * (toY - childCentre.y)
+        ).toBeGreaterThan(0);
+      }
+    });
+
+    it("默认的贝塞尔沿半径弯折，两个控制点都落在中间环上", () => {
+      for (const edge of layout.edges) {
+        if (edge.style !== "bezier") continue;
+        const numbers = pathNumbers(edge.d);
+        expect(numbers).toHaveLength(8);
+
+        const fromRadius = radiusOf(numbers[0], numbers[1]);
+        const toRadius = radiusOf(numbers[6], numbers[7]);
+        const midRadius = (fromRadius + toRadius) / 2;
+
+        expect(radiusOf(numbers[2], numbers[3])).toBeCloseTo(midRadius, 4);
+        expect(radiusOf(numbers[4], numbers[5])).toBeCloseTo(midRadius, 4);
+      }
+    });
+
+    it("需要折叠按钮的节点，落点朝外且贴着边框", () => {
+      // The toggle has to sit where the children are, and here they are spread
+      // around the node, so the layout hands over a point rather than a side.
+      const parents = layout.nodes.filter((node) => node.hasChildren && node.level > 0);
+      expect(parents.length).toBeGreaterThan(0);
+
+      for (const node of parents) {
+        expect(node.toggleOffset, `${node.id} 没有落点`).toBeDefined();
+        const point = { x: node.x + node.toggleOffset!.x, y: node.y + node.toggleOffset!.y };
+        expect(onPerimeter(node, point.x, point.y, 3), `${node.id} 的落点不在边框附近`).toBe(true);
+
+        const nodeCentre = centreOfNode(node);
+        const away = { x: nodeCentre.x - centre.x, y: nodeCentre.y - centre.y };
+        const towards = { x: point.x - nodeCentre.x, y: point.y - nodeCentre.y };
+        expect(away.x * towards.x + away.y * towards.y).toBeGreaterThan(0);
+      }
+    });
+
+    it("坐标从原点开始，包围盒装得下所有节点", () => {
+      expect(Math.min(...layout.nodes.map((node) => node.x))).toBe(ORIGIN);
+      expect(Math.min(...layout.nodes.map((node) => node.y))).toBe(ORIGIN);
+
+      for (const node of layout.nodes) {
+        expect(node.x).toBeGreaterThanOrEqual(layout.bounds.minX);
+        expect(node.y).toBeGreaterThanOrEqual(layout.bounds.minY);
+        expect(node.x + node.width).toBeLessThanOrEqual(layout.bounds.maxX);
+        expect(node.y + node.height).toBeLessThanOrEqual(layout.bounds.maxY);
+      }
+    });
+
+    it("折叠的分支不出现，也没有连线通向它", () => {
+      const folded = layoutMindmap(tree, new Set([tree.children[0].id]), "radial");
+      const hidden = treeIds(tree.children[0]).filter((id) => id !== tree.children[0].id);
+
+      for (const id of hidden) {
+        expect(folded.nodes.some((node) => node.id === id)).toBe(false);
+        expect(folded.edges.some((edge) => edge.toId === id)).toBe(false);
+      }
+      expect(folded.nodes.some((node) => node.id === tree.children[0].id)).toBe(true);
+    });
+
+    it("分支的颜色索引与默认布局一致", () => {
+      const logic = byId(layoutMindmap(tree, new Set(), "logic"));
+
+      for (const node of layout.nodes) {
+        expect(node.colorIndex).toBe(logic.get(node.id)?.colorIndex);
+      }
+    });
+
+    it("只有一个节点时只剩根，且没有连线", () => {
+      const lone: MindmapNode = { id: "root-mindmap-node", text: "独苗", level: 0, children: [] };
+      const single = layoutMindmap(lone, new Set(), "radial");
+
+      expect(single.nodes.length).toBe(1);
+      expect(single.edges.length).toBe(0);
+      expect(single.nodes[0].x).toBe(ORIGIN);
+    });
+
+    it("切换布局不改动树", () => {
+      const fresh = parseMarkdownToMindmapTree(BRANCHED, "测试");
+      const before = JSON.stringify(fresh);
+
+      layoutMindmap(fresh, new Set(), "radial");
 
       expect(JSON.stringify(fresh)).toBe(before);
     });

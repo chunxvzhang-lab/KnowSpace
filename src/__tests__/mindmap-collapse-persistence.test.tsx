@@ -11,10 +11,10 @@ import {
 } from "../services/storage";
 
 /** Where a rendered node sits, read back out of its group's transform. */
-function nodeX(target: Element | string): number {
+function nodePoint(target: Element | string): { x: number; y: number } {
   const el = typeof target === "string" ? document.querySelector(target) : target;
-  const transform = el?.getAttribute("transform") ?? "";
-  return Number((transform.match(/-?[\d.]+/g) ?? ["0"])[0]);
+  const numbers = (el?.getAttribute("transform") ?? "").match(/-?[\d.]+/g) ?? ["0", "0"];
+  return { x: Number(numbers[0]), y: Number(numbers[1]) };
 }
 
 /**
@@ -213,10 +213,9 @@ describe("折叠状态持久化", () => {
    */
   describe("布局的按文档记忆（组件）", () => {
     const picker = () => screen.getByLabelText("导图布局") as HTMLSelectElement;
-    const leftmostX = () =>
-      Math.min(
-        ...Array.from(document.querySelectorAll(".mindmap-node-interactive")).map((el) => nodeX(el))
-      );
+    const nodePoints = () =>
+      Array.from(document.querySelectorAll(".mindmap-node-interactive")).map((el) => nodePoint(el));
+    const leftmostX = () => Math.min(...nodePoints().map((point) => point.x));
 
     it("打开文档时用这份文档记住的布局", () => {
       saveMindmapLayout("/vault/a.md", "bidirectional");
@@ -237,13 +236,30 @@ describe("折叠状态持久化", () => {
 
       // The default layout grows everything to the right of the root, so the
       // leftmost node on the canvas is the root itself.
-      expect(leftmostX()).toBe(nodeX(".mindmap-node-interactive.is-root"));
+      expect(leftmostX()).toBe(nodePoint(".mindmap-node-interactive.is-root").x);
 
       fireEvent.change(picker(), { target: { value: "bidirectional" } });
 
       // ...and the bidirectional layout puts at least one branch on the left.
-      expect(leftmostX()).toBeLessThan(nodeX(".mindmap-node-interactive.is-root"));
+      expect(leftmostX()).toBeLessThan(nodePoint(".mindmap-node-interactive.is-root").x);
       expect(loadMindmapLayout("/vault/c.md")).toBe("bidirectional");
+    });
+
+    it("选径向后节点围到根的四周", () => {
+      render(<MindmapView title="测试" source={SOURCE} documentKey="/vault/d.md" />);
+
+      fireEvent.change(picker(), { target: { value: "radial" } });
+
+      const root = nodePoint(".mindmap-node-interactive.is-root");
+      const nodes = nodePoints();
+
+      // Every other layout keeps the whole map on one side of the root along at
+      // least one axis; a radial map has nodes in all four directions.
+      expect(nodes.some((node) => node.x < root.x)).toBe(true);
+      expect(nodes.some((node) => node.x > root.x)).toBe(true);
+      expect(nodes.some((node) => node.y < root.y)).toBe(true);
+      expect(nodes.some((node) => node.y > root.y)).toBe(true);
+      expect(loadMindmapLayout("/vault/d.md")).toBe("radial");
     });
 
     it("没有文档键时正常渲染且不写存储", () => {

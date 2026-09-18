@@ -213,12 +213,14 @@ function getContrastTextColor(hexColor?: string): string {
  * Where the collapse toggle sits on a node: just outside the edge its children
  * are on.
  *
- * The answer comes from the layout — it is the same `side` field the connector
- * pass uses — because only the layout knows which way a branch grows. Reading it
- * here rather than re-deriving it from coordinates is what keeps the toggle and
- * the connectors agreeing after a layout switch.
+ * The answer comes from the layout — either the `side` field the connector pass
+ * also uses, or, when the children are spread around the node rather than on one
+ * edge, the offset the radial layout worked out. Only the layout knows which way
+ * a branch grows; reading it here rather than re-deriving it from coordinates is
+ * what keeps the toggle and the connectors agreeing after a layout switch.
  */
 function collapseToggleAnchor(node: MindmapLayoutNode): string {
+  if (node.toggleOffset) return `translate(${node.toggleOffset.x}, ${node.toggleOffset.y})`;
   if (node.side === "left") return `translate(-1, ${node.height / 2})`;
   if (node.side === "bottom") return `translate(${node.width / 2}, ${node.height + 1})`;
   return `translate(${node.width + 1}, ${node.height / 2})`;
