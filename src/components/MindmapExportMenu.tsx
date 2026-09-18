@@ -18,6 +18,14 @@ export type MindmapExportMenuProps = {
   onToggle: () => void;
   onExportPng: () => void;
   onExportSvg: () => void;
+  /**
+   * Opens the print dialog, which is also where a PDF comes out.
+   *
+   * Not a converter: the application already prints documents through the main
+   * process, and a map reuses that rather than growing a second way to make a
+   * PDF.
+   */
+  onPrintPdf: () => void;
   onExportOpml: () => void;
   onExportFreeMind: () => void;
   onExportMarkdownOutline: () => void;
@@ -29,6 +37,7 @@ export function MindmapExportMenu({
   onToggle,
   onExportPng,
   onExportSvg,
+  onPrintPdf,
   onExportOpml,
   onExportFreeMind,
   onExportMarkdownOutline,
@@ -41,6 +50,11 @@ export function MindmapExportMenu({
       title: "导出 SVG 矢量图",
       description: "文字仍是文字，可编辑、可缩放印刷 (.svg)",
       run: onExportSvg,
+    },
+    {
+      title: "打印 / 导出 PDF",
+      description: "整张导图缩放到纸张上；在打印对话框里可存为 PDF",
+      run: onPrintPdf,
     },
     { title: "导出 OPML 2.0", description: "兼容 MindNode、OmniOutliner (.opml)", run: onExportOpml },
     {

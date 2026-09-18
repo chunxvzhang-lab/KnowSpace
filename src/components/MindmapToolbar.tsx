@@ -68,6 +68,7 @@ export type MindmapToolbarProps = {
   onFitToScreen: () => void;
   onExportPng: () => void;
   onExportSvg: () => void;
+  onPrintPdf: () => void;
   onExportOpml: () => void;
   onExportFreeMind: () => void;
   onExportMarkdownOutline: () => void;
@@ -98,6 +99,7 @@ export function MindmapToolbar({
   onFitToScreen,
   onExportPng,
   onExportSvg,
+  onPrintPdf,
   onExportOpml,
   onExportFreeMind,
   onExportMarkdownOutline,
@@ -382,6 +384,10 @@ export function MindmapToolbar({
         onExportSvg={() => {
           setIsExportMenuOpen(false);
           onExportSvg();
+        }}
+        onPrintPdf={() => {
+          setIsExportMenuOpen(false);
+          onPrintPdf();
         }}
         onExportOpml={() => {
           setIsExportMenuOpen(false);

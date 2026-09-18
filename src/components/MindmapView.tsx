@@ -383,6 +383,47 @@ export const MindmapView = memo(function MindmapView({
     return layoutMindmap(tree, collapsedIds, activeLayoutId);
   }, [tree, collapsedIds, activeLayoutId]);
 
+  /**
+   * Fits the whole map onto the printed page.
+   *
+   * On screen this is an infinite canvas, and what is visible is decided by the
+   * reader's pan and zoom; a printed page has no reader, so the map has to be
+   * fitted to the paper instead. The print stylesheet drops the pan and zoom
+   * transform, but it cannot supply a view box, because that depends on where
+   * the layout put everything — which is why this half is code and runs on the
+   * print event the browser (and Electron's printToPDF) fires around printing.
+   *
+   * Whatever was there before is put back afterwards, including nothing: the
+   * canvas normally has no view box at all, and leaving one behind would change
+   * how the map is drawn until the next reload.
+   */
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+
+    let restore: string | null = null;
+
+    const handleBeforePrint = () => {
+      restore = svg.getAttribute("viewBox");
+      const { minX, minY, width, height } = layout.bounds;
+      svg.setAttribute("viewBox", `${minX} ${minY} ${width} ${height}`);
+    };
+
+    const handleAfterPrint = () => {
+      if (restore === null) svg.removeAttribute("viewBox");
+      else svg.setAttribute("viewBox", restore);
+      restore = null;
+    };
+
+    window.addEventListener("beforeprint", handleBeforePrint);
+    window.addEventListener("afterprint", handleAfterPrint);
+    return () => {
+      window.removeEventListener("beforeprint", handleBeforePrint);
+      window.removeEventListener("afterprint", handleAfterPrint);
+      handleAfterPrint();
+    };
+  }, [layout.bounds]);
+
   // Drag-and-drop reparenting state
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
   const [dragGhostPos, setDragGhostPos] = useState<{ x: number; y: number } | null>(null);
@@ -1369,6 +1410,30 @@ export const MindmapView = memo(function MindmapView({
     URL.revokeObjectURL(url);
   }, [layout, title, theme]);
 
+  /**
+   * Print the map, which is also how a PDF comes out of it.
+   *
+   * The application already owns this path — a print stylesheet and the main
+   * process's `printToPdf` — so a map does not need a converter of its own, and
+   * asking the operating system for a PDF costs no dependency. Landscape is
+   * asked for because a map is wider than it is tall; the reader can still change
+   * it in the dialog.
+   *
+   * The view box the page is drawn with is swapped in by the effect above, on the
+   * event Electron fires while printing — the same event a browser fires for
+   * Ctrl+P, which is the fallback when there is no bridge.
+   */
+  const handlePrintPdf = useCallback(() => {
+    const bridge =
+      typeof window !== "undefined" ? window.knowSpaceDesktop ?? window.bookMDDesktop : undefined;
+
+    if (bridge?.printToPdf) {
+      void bridge.printToPdf({ title: `${title || "mindmap"}-思维导图`, landscape: true });
+      return;
+    }
+    window.print();
+  }, [title]);
+
   const handleExportOpml = useCallback(() => {
     const xml = exportMindmapToOpml(tree, title);
     const blob = new Blob([xml], { type: "text/x-opml+xml;charset=utf-8" });
@@ -1544,6 +1609,7 @@ export const MindmapView = memo(function MindmapView({
         onFitToScreen={handleFitToScreen}
         onExportPng={handleExportPng}
         onExportSvg={handleExportSvg}
+        onPrintPdf={handlePrintPdf}
         onExportOpml={handleExportOpml}
         onExportFreeMind={handleExportFreeMind}
         onExportMarkdownOutline={handleExportMarkdownOutline}

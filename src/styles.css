@@ -10514,6 +10514,41 @@ body:has(.flash-capsule-overlay) {
     border: none !important;
   }
 
+  /* ── 思维导图视图：整张图适配纸张，而不是纸上的半个视口 ────────────────
+     屏幕上的导图是无限画布，"看得见什么"由读者的平移与缩放决定；纸张没有读者，
+     所以这里解除变换，让整张图缩放到页面之内。
+     viewBox 只能由代码给出（它取决于布局算出的边界），见 MindmapView 里
+     打印前后设置与复原 viewBox 的那个 effect —— 样式表拿不到边界。 */
+  .mindmap-view-container {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+    cursor: default !important;
+  }
+
+  /* 宽度撑满纸张、高度按比例，并封顶在一页之内：preserveAspectRatio 默认 meet，
+     于是过宽或过高的图会被整体缩小，而不是被裁掉。 */
+  .mindmap-svg-canvas {
+    width: 100% !important;
+    height: auto !important;
+    max-height: 240mm !important;
+  }
+
+  /* 平移与缩放属于读者的位置，不属于图。 */
+  .mindmap-viewport {
+    transform: none !important;
+  }
+
+  /* 与 PNG / SVG 导出去的剔除名单是同一批：这些是控件，不是图的内容。 */
+  .mindmap-node-selection-ring,
+  .mindmap-node-add-btn,
+  .mindmap-node-resize-handle,
+  .mindmap-context-menu,
+  .mindmap-inline-edit-input {
+    display: none !important;
+  }
+
   /* 无论在编辑模式、分屏模式还是预览模式下，确保文章阅读渲染区绝对可见并正常分页排版 */
   .workspace-pane.reader-section,
   .reader-section,

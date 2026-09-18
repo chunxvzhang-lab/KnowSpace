@@ -1,7 +1,12 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { buildStandaloneMindmapSvg } from "../services/mindmapSvgExport";
+import { layoutMindmap } from "../services/mindmapLayout";
+import { parseMarkdownToMindmapTree } from "../services/mindmapService";
+import { installDesktopMock, removeDesktopMock } from "./helpers/desktopMock";
 import { MindmapView } from "../components/MindmapView";
+
+const SOURCE = ["- 父节点", "  - 子节点甲", "  - 子节点乙", "- 第二个分支"].join("\n");
 
 /**
  * The file that leaves the app, for both formats.
@@ -138,6 +143,76 @@ describe("导出的独立 SVG", () => {
 
     expect(result.width).toBe(600);
     expect(result.svg).toContain('viewBox="40 40 600 400"');
+  });
+});
+
+/**
+ * Printing, which is also where the PDF comes from.
+ *
+ * A map on screen is an infinite canvas: what is visible is the reader's pan and
+ * zoom. A page has no reader, so the two halves of fitting the map to the paper
+ * are the stylesheet (in print-pdf.test.ts) and the view box, which only the
+ * layout can supply — and that is what these tests are about.
+ */
+describe("打印 / 导出 PDF", () => {
+  afterEach(() => {
+    cleanup();
+    removeDesktopMock();
+    vi.restoreAllMocks();
+  });
+
+  const canvas = () => document.querySelector(".mindmap-svg-canvas") as SVGSVGElement;
+
+  function fire(event: "beforeprint" | "afterprint") {
+    window.dispatchEvent(new Event(event));
+  }
+
+  it("打印前把视图框换成整张图，打印后原样收回", () => {
+    render(<MindmapView title="测试" source={SOURCE} />);
+
+    // The canvas normally has no view box at all — it is panned and zoomed
+    // instead, and leaving one behind would change how the map draws.
+    expect(canvas().getAttribute("viewBox")).toBeNull();
+
+    fire("beforeprint");
+
+    const expected = layoutMindmap(parseMarkdownToMindmapTree(SOURCE, "测试")).bounds;
+    expect(canvas().getAttribute("viewBox")).toBe(
+      `${expected.minX} ${expected.minY} ${expected.width} ${expected.height}`
+    );
+
+    fire("afterprint");
+
+    expect(canvas().getAttribute("viewBox")).toBeNull();
+  });
+
+  it("打印两次也收得回来", () => {
+    // The restore has to read the attribute at the time of printing rather than
+    // remember it when the effect runs, or the second print would put the view
+    // box the first one installed back as if it were the original.
+    render(<MindmapView title="测试" source={SOURCE} />);
+
+    fire("beforeprint");
+    fire("afterprint");
+    fire("beforeprint");
+    expect(canvas().getAttribute("viewBox")).not.toBeNull();
+    fire("afterprint");
+
+    expect(canvas().getAttribute("viewBox")).toBeNull();
+  });
+
+  it("点菜单里的打印，走应用既有的 PDF 通路并要横向", () => {
+    const desktop = installDesktopMock();
+    render(<MindmapView title="测试" source={SOURCE} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /导出/ }));
+    fireEvent.click(screen.getByText("打印 / 导出 PDF"));
+
+    expect(desktop.printToPdf).toHaveBeenCalledTimes(1);
+    expect(desktop.printToPdf).toHaveBeenCalledWith({
+      title: "测试-思维导图",
+      landscape: true,
+    });
   });
 });
 
