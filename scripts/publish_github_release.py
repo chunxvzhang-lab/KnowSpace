@@ -17,7 +17,8 @@ Release 上**，而那看起来像成功了。
     python scripts/publish_github_release.py --title "KnowSpace v2.6.0 - ..."
 
 凭据取自 `git credential fill`（与推送用的是同一份），所以不需要单独配 token。
-所在网络需要代理时，给进程设好 `HTTPS_PROXY`（urllib 与 curl.exe 都认）。
+所在网络需要代理时：`HTTPS_PROXY` 给 urllib 与 curl.exe，`KNOWSPACE_GIT_PROXY` 给 git
+（git 不认前者）。
 
 标签只在**不存在**时创建；已存在就沿用，除非显式传 `--force-tag`。强制移动一个已经
 发布过的标签会让别人手里的副本指向另一段历史，那不是发版该顺手做的事。
@@ -25,6 +26,7 @@ Release 上**，而那看起来像成功了。
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -43,10 +45,57 @@ def read_version() -> str:
     return str(data["version"])
 
 
+def find_git() -> str:
+    """
+    `git`，先看 PATH，再看几个它的常见落点。
+
+    这台机器上 `git` 并不在 PATH 里 —— 平时提交与推送走的是 GitHub Desktop 自带的那一份
+    （`...\\GitHubDesktop\\...\\git.exe`）。脚本原来只试 PATH，于是在这里取不到凭据，
+    报"系统找不到指定的文件"，而那看起来像网络或权限问题，不像"没找到 git"。
+    """
+    found = shutil.which("git")
+    if found:
+        return found
+
+    candidates = [
+        Path(os.environ.get("LOCALAPPDATA", "")) / "GitHubDesktop",
+        Path("C:/Program Files/Git/cmd"),
+        Path("C:/Program Files (x86)/Git/cmd"),
+    ]
+    for base in candidates:
+        if not base.exists():
+            continue
+        if base.name == "GitHubDesktop":
+            for git_exe in sorted(base.glob("app-*/resources/app/git/cmd/git.exe"), reverse=True):
+                return str(git_exe)
+        else:
+            git_exe = base / "git.exe"
+            if git_exe.exists():
+                return str(git_exe)
+
+    return "git"
+
+
+def git(*args: str) -> subprocess.CompletedProcess:
+    """
+    跑一条 git 命令。
+
+    需要代理的网络里，设 `KNOWSPACE_GIT_PROXY=http://host:port` —— git 不认
+    `HTTPS_PROXY` 环境变量，只认 `http.proxy` 配置，而把这个地址写进仓库脚本是不对的：
+    它是某台机器的网络状况，不是这个项目的一部分。
+    """
+    command = [find_git()]
+    proxy = os.environ.get("KNOWSPACE_GIT_PROXY")
+    if proxy:
+        command += ["-c", f"http.proxy={proxy}", "-c", f"https.proxy={proxy}"]
+    command += list(args)
+    return subprocess.run(command, cwd=ROOT, capture_output=True, text=True)
+
+
 def get_git_token() -> str:
     try:
         proc = subprocess.Popen(
-            ["git", "credential", "fill"],
+            [find_git(), "credential", "fill"],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -62,26 +111,15 @@ def get_git_token() -> str:
 
 
 def ensure_tag(tag: str, force: bool) -> None:
-    exists = (
-        subprocess.run(
-            ["git", "rev-parse", "-q", "--verify", f"refs/tags/{tag}"],
-            cwd=ROOT,
-            capture_output=True,
-        ).returncode
-        == 0
-    )
+    exists = git("rev-parse", "-q", "--verify", f"refs/tags/{tag}").returncode == 0
 
     if exists and not force:
         print(f"1. Tag {tag} already exists; leaving it where it is.")
     else:
-        subprocess.run(
-            ["git", "tag", "-a", tag, "-m", f"Release {tag}"] + (["-f"] if exists else []),
-            cwd=ROOT,
-            check=False,
-        )
+        git("tag", "-a", tag, "-m", f"Release {tag}", *( ["-f"] if exists else [] ))
         print(f"1. Tag {tag} {'moved' if exists else 'created'}.")
 
-    subprocess.run(["git", "push", "origin", tag], cwd=ROOT, check=False)
+    git("push", "origin", tag)
 
 
 def main() -> int:
