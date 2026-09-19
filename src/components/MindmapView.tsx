@@ -1731,6 +1731,22 @@ export const MindmapView = memo(function MindmapView({
 
   // Wheel zoom handler
   const handleWheel = useCallback((e: React.WheelEvent) => {
+    // A wheel that lands on an open menu belongs to the menu. The menus are tall — that is
+    // why they scroll (`overflow-y: auto`, with `overscroll-behavior: contain` so they do
+    // not drag the page with them) — but a wheel event still bubbles up to this container,
+    // so scrolling a long menu also zoomed the map: the reader was trying to see the rest
+    // of the menu and the map grew and shrank underneath it.
+    //
+    // Nothing here moves the map while a menu is up. A wheel outside one dismisses it, the
+    // way a click outside does, and is spent doing that rather than zooming — one gesture,
+    // one effect.
+    const target = e.target as Element | null;
+    if (target?.closest?.(".mindmap-context-menu")) return;
+    if (contextMenu) {
+      setContextMenu(null);
+      return;
+    }
+
     e.preventDefault();
     const container = containerRef.current;
     if (!container) return;
@@ -1751,7 +1767,7 @@ export const MindmapView = memo(function MindmapView({
         scale: nextScale,
       };
     });
-  }, []);
+  }, [contextMenu]);
 
   // Toggle collapse for a specific node
   const handleToggleCollapse = useCallback((nodeId: string, e: React.MouseEvent) => {
