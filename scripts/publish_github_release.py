@@ -194,10 +194,18 @@ def main() -> int:
         with urllib.request.urlopen(req) as resp:
             rel_data = json.loads(resp.read().decode("utf-8"))
     else:
-        print("2. Updating existing GitHub Release title and body...")
+        # 已存在的 Release：正文总要更新，标题只在显式给了 --title 时才动。
+        # 重传一个资产（比如修好便携包之后）不该顺手把人工写好的标题换成默认的那个。
+        payload = {"body": body_md}
+        if args.title:
+            payload["name"] = args.title
+        print(
+            "2. Updating existing GitHub Release body%s..."
+            % (" and title" if args.title else " (title left as it is)")
+        )
         req = urllib.request.Request(
             f"https://api.github.com/repos/{OWNER}/{REPO}/releases/{rel_data['id']}",
-            data=json.dumps({"name": title, "body": body_md}).encode("utf-8"),
+            data=json.dumps(payload).encode("utf-8"),
             headers={**headers, "Content-Type": "application/json; charset=utf-8"},
             method="PATCH",
         )
