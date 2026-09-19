@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 // The icons the style panel draws with went with it; what is left here is the
 // canvas, the toolbar and the inline editor.
 import type { Heading, ThemeMode, MindmapNodeShape, MindmapLineStyle, MindmapTextAlign } from "../core/types";
+import { oppositeSide, type MindmapSide } from "../core/mindmapSides";
 import {
   buildMindmapTree,
   parseMarkdownToMindmapTree,
@@ -73,6 +74,7 @@ import {
   setNodeNote,
   setNodePriority,
   setNodeProgress,
+  setNodeSide,
   addBoundary,
   addFloatingTopic,
   addSummary,
@@ -485,6 +487,29 @@ export const MindmapView = memo(function MindmapView({
   );
 
   /**
+   * Which side of the root a first-level branch hangs on, in the two-sided layout.
+   *
+   * Null hands it back to the layout's own rule — whichever side is shorter — which is what
+   * a branch nobody has placed does.
+   */
+  const handleSideChange = useCallback(
+    (nodeId: string, side: MindmapSide | null) =>
+      applySidecarEdit(["sides"], (current) => setNodeSide(current, nodeId, side)),
+    [applySidecarEdit]
+  );
+
+  /**
+   * The question asked when a branch is about to be created in the two-sided layout.
+   *
+   * Held in state rather than answered after the fact: the answer is what decides where the
+   * branch is drawn, and it is positioned where the branch's parent is on screen so that
+   * the question appears next to the thing it is about.
+   */
+  const [sideChooser, setSideChooser] = useState<{ parentId: string; x: number; y: number } | null>(
+    null
+  );
+
+  /**
    * Follows a link to a heading in this document.
    *
    * The document's headings become this map's nodes, so an anchor names a node
@@ -752,9 +777,14 @@ export const MindmapView = memo(function MindmapView({
   } | null>(null);
 
   // Compute 2D layout coordinates
+  //
+  // The sides are read from the companion file rather than from the tree: which side a
+  // first-level branch hangs on is not something a document can say, and only the
+  // two-sided layout has an opinion about it — the others ignore the map entirely.
+  const statedSides = sidecar?.sides;
   const layout = useMemo(() => {
-    return layoutMindmap(tree, collapsedIds, activeLayoutId);
-  }, [tree, collapsedIds, activeLayoutId]);
+    return layoutMindmap(tree, collapsedIds, activeLayoutId, statedSides ?? {});
+  }, [tree, collapsedIds, activeLayoutId, statedSides]);
 
   /**
    * Numbers by node id, or nothing while the switch is off.
@@ -1263,9 +1293,31 @@ export const MindmapView = memo(function MindmapView({
 
   // Interactive Topic Actions
   const handleAddChild = useCallback(
-    (parentId?: string) => {
+    (parentId?: string, side?: MindmapSide) => {
       if (!editable) return;
       const targetId = parentId || primarySelectedId || tree.id;
+
+      // In the two-sided layout a child of the root becomes a first-level branch, and which
+      // side it hangs on is the reader's to say — the layout balances branches by height,
+      // and 「先做的一半放左边」 has nowhere to be said in that rule. Asking first is also the
+      // honest order: a branch that appears on one side and then jumps to the other is worse
+      // than one that waits a moment to be told.
+      if (side === undefined && activeLayoutId === "bidirectional" && targetId === tree.id) {
+        const root = layout.nodes.find((entry) => entry.id === targetId);
+        const rect = containerRef.current?.getBoundingClientRect();
+        // Just under the branch it is about, and kept inside the canvas: the question is
+        // answered by looking at the map, so it belongs next to the thing it asks about and
+        // must never land off the edge of the view.
+        const rawX = root ? transform.x + (root.x + root.width / 2) * transform.scale : 40;
+        const rawY = root ? transform.y + (root.y + root.height) * transform.scale + 8 : 40;
+        setSideChooser({
+          parentId: targetId,
+          x: Math.max(8, Math.min(rawX, (rect?.width ?? 360) - 190)),
+          y: Math.max(8, Math.min(rawY, (rect?.height ?? 260) - 110)),
+        });
+        return;
+      }
+
       // Uncollapse if collapsed
       if (collapsedIds.has(targetId)) {
         setCollapsedIds((prev) => {
@@ -1276,12 +1328,27 @@ export const MindmapView = memo(function MindmapView({
       }
       const { nextTree, newNodeId } = addChildNode(tree, targetId, "新建子主题");
       applyTreeChange(nextTree);
+      // Recorded before the render that draws it: the layout reads the sides out of the
+      // companion file, so a branch whose side arrived afterwards would be drawn on the
+      // balanced side and then move.
+      if (side) handleSideChange(newNodeId, side);
       setSelectedNodeIds(new Set([newNodeId]));
       setEditingNodeId(newNodeId);
       setEditingText("新建子主题");
       setContextMenu(null);
+      setSideChooser(null);
     },
-    [editable, primarySelectedId, tree, collapsedIds, applyTreeChange]
+    [
+      editable,
+      primarySelectedId,
+      tree,
+      collapsedIds,
+      applyTreeChange,
+      activeLayoutId,
+      layout,
+      transform,
+      handleSideChange,
+    ]
   );
 
   const handleAddSibling = useCallback(
@@ -1457,11 +1524,16 @@ export const MindmapView = memo(function MindmapView({
         return;
       }
 
-      // Escape closes search, context menu, deselects nodes, or closes view
+      // Escape closes search, the side question, the context menu, deselects nodes, or
+      // closes view
       if (e.key === "Escape") {
         e.preventDefault();
         if (isSearchOpen) {
           handleCloseSearch();
+          return;
+        }
+        if (sideChooser) {
+          setSideChooser(null);
           return;
         }
         if (contextMenu) {
@@ -3173,6 +3245,48 @@ export const MindmapView = memo(function MindmapView({
           onCommit={inlineEdit.onCommit}
           onCancel={inlineEdit.onCancel}
         />
+      )}
+
+      {/* Where a new first-level branch goes, asked before it is made. It wears the menus'
+          own class deliberately: it inherits their look, and their wheel handling — which is
+          what keeps the map still while a popover is up. */}
+      {sideChooser && (
+        <div
+          className="mindmap-context-menu mindmap-side-chooser"
+          style={{ left: sideChooser.x, top: sideChooser.y }}
+          onMouseDown={(event) => event.stopPropagation()}
+          role="group"
+          aria-label="这一支放哪边"
+        >
+          <div className="mindmap-ctx-header">
+            <span className="mindmap-ctx-title">这一支放哪边？</span>
+            <button
+              type="button"
+              className="mindmap-ctx-close"
+              onClick={() => setSideChooser(null)}
+              title="关闭 (Esc)"
+              aria-label="关闭"
+            >
+              ×
+            </button>
+          </div>
+          <div className="mindmap-ctx-actions">
+            <button
+              type="button"
+              className="mindmap-ctx-item"
+              onClick={() => handleAddChild(sideChooser.parentId, "left")}
+            >
+              放到左侧
+            </button>
+            <button
+              type="button"
+              className="mindmap-ctx-item"
+              onClick={() => handleAddChild(sideChooser.parentId, "right")}
+            >
+              放到右侧
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Canvas menu, for a right-click on empty space. */}

@@ -539,6 +539,29 @@ export function iconFor(sidecar: MindmapSidecar | null, nodeId: string): string 
   return sidecar?.icons[nodeId] ?? "";
 }
 
+/** The side a branch was put on, or null when the layout still decides. */
+export function sideFor(sidecar: MindmapSidecar | null, nodeId: string): MindmapSide | null {
+  return sidecar?.sides[nodeId] ?? null;
+}
+
+/**
+ * Puts a first-level branch on a side, or hands it back to the layout.
+ *
+ * Null means "no opinion", and it is the honest default: a branch nobody placed is dealt
+ * to whichever side is shorter, and storing a side for it would quietly stop the layout
+ * from balancing it — a click the reader never made, remembered forever.
+ */
+export function setNodeSide(
+  sidecar: MindmapSidecar,
+  nodeId: string,
+  side: MindmapSide | null
+): MindmapSidecar {
+  const sides = { ...sidecar.sides };
+  if (side) sides[nodeId] = side;
+  else delete sides[nodeId];
+  return { ...sidecar, sides };
+}
+
 /**
  * Sets one node's icon, or clears it.
  *

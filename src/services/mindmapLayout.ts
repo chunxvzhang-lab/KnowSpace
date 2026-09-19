@@ -4,6 +4,7 @@ import type {
   MindmapNodeShape,
   MindmapTextAlign,
 } from "../core/types";
+import type { MindmapSide } from "../core/mindmapSides";
 import { BRANCH_COLORS, calculateNodeDimensions } from "./mindmapService";
 
 /**
@@ -190,11 +191,12 @@ const BOUNDS_PADDING = 60;
 export function layoutMindmap(
   rootNode: MindmapNode,
   collapsedIds: ReadonlySet<string> = new Set(),
-  layoutId: MindmapLayoutId = DEFAULT_LAYOUT_ID
+  layoutId: MindmapLayoutId = DEFAULT_LAYOUT_ID,
+  sides: Readonly<Record<string, MindmapSide>> = {}
 ): MindmapLayoutResult {
   switch (layoutId) {
     case "bidirectional":
-      return layoutBidirectionalTree(rootNode, collapsedIds);
+      return layoutBidirectionalTree(rootNode, collapsedIds, sides);
     case "vertical":
       return layoutVerticalTree(rootNode, collapsedIds);
     case "radial":
@@ -489,13 +491,20 @@ function layoutLogicTree(
  * would renumber the branches visually and break the reading order. Dealing in
  * order keeps the document's own sequence intact within each side.
  *
+ * A branch the reader has put on a side stays there, and the rest are dealt around
+ * it: `sides` holds the ones that were stated, which is the reader's own answer to
+ * "which half goes where" — 「先做的一半放左边」 is a thing a mind map is used for, and
+ * a rule that only balances by height cannot express it. A stated branch is counted
+ * like any other, so the branches dealt after it balance against it.
+ *
  * Only the first level is split. A branch dealt to the left grows further left
  * and its descendants inherit that side — turning each generation round again
  * produces a comb, not a map.
  */
 function layoutBidirectionalTree(
   rootNode: MindmapNode,
-  collapsedIds: ReadonlySet<string>
+  collapsedIds: ReadonlySet<string>,
+  sides: Readonly<Record<string, MindmapSide>> = {}
 ): MindmapLayoutResult {
   type Branch = { node: MindmapNode; colorIndex: number; height: number };
 
@@ -571,7 +580,16 @@ function layoutBidirectionalTree(
         colorIndex: index % BRANCH_COLORS.length,
         height: measureSubtree(child, collapsedIds),
       };
-      const target = totalHeight(leftSide) < totalHeight(rightSide) ? leftSide : rightSide;
+      // A stated side wins; the rest are dealt to whichever side is shorter so far.
+      const stated = sides[child.id];
+      const target =
+        stated === "left"
+          ? leftSide
+          : stated === "right"
+            ? rightSide
+            : totalHeight(leftSide) < totalHeight(rightSide)
+              ? leftSide
+              : rightSide;
       target.push(branch);
     });
   }
