@@ -90,6 +90,22 @@ export type KnowSpaceDesktopAPI = {
   readMarkdownFile: (absolutePath: string) => Promise<ChapterSource>;
   readMarkdownBatch?: (paths: string[]) => Promise<ChapterSource[]>;
   /**
+   * A folder to revise from, picked without opening it as the workspace.
+   *
+   * Answers with the paths rather than the contents: reading every file is the
+   * review's own decision to make on demand, and the picker is a dialog that has
+   * already made the reader wait once.
+   */
+  pickReviewFolder?: () => Promise<{
+    canceled: boolean;
+    rootPath?: string;
+    name?: string;
+    paths?: string[];
+    message?: string;
+  }>;
+  /** The Markdown files in a folder chosen earlier, listed again with no side effects. */
+  listReviewFolder?: (rootPath: string) => Promise<{ paths?: string[]; message?: string }>;
+  /**
    * The mind map's companion file, which holds what the document cannot.
    *
    * A Markdown file stays the source of truth for the tree; notes, markers and

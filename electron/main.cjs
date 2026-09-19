@@ -1029,6 +1029,58 @@ ipcMain.handle("bookmd:refresh-directory", async (_event, rootPath) => {
   return await buildDirectoryManifest(rootPath);
 });
 
+/**
+ * A folder to revise from, chosen without opening it as the workspace.
+ *
+ * Opening a folder is a different act with different consequences — it replaces the
+ * vault, the tabs and the reading session — and a reader who wants the cards out of
+ * some folder wants none of that. So this lists the folder and hands back its
+ * Markdown files, and nothing else moves: `lastActiveWorkspaceDir` in particular is
+ * left alone, because revising from a folder is not working in it.
+ */
+ipcMain.handle("bookmd:pick-review-folder", async (event) => {
+  const targetWin = getWindowFromEvent(event);
+  const result = await dialog.showOpenDialog(targetWin || undefined, {
+    title: "选择复习卡片所在的文件夹",
+    properties: ["openDirectory"],
+  });
+
+  if (result.canceled || result.filePaths.length === 0) {
+    return { canceled: true };
+  }
+
+  const rootPath = result.filePaths[0];
+  try {
+    const manifest = await buildDirectoryManifest(rootPath);
+    return {
+      canceled: false,
+      rootPath,
+      name: path.basename(rootPath),
+      paths: manifest.chapters.map((chapter) => chapter.absolutePath).filter(Boolean),
+    };
+  } catch (err) {
+    return { canceled: false, rootPath, name: path.basename(rootPath), paths: [], message: err?.message || "无法读取这个文件夹。" };
+  }
+});
+
+/**
+ * The Markdown files in a folder the reader chose earlier.
+ *
+ * A remembered choice is stored as a path rather than as a list, and this is how it is
+ * looked at again — so cards written since the folder was chosen are in tonight's
+ * review. Listed without side effects, for the same reason the picker has none.
+ */
+ipcMain.handle("bookmd:list-review-folder", async (_event, rootPath) => {
+  if (typeof rootPath !== "string" || !rootPath) return { paths: [] };
+
+  try {
+    const manifest = await buildDirectoryManifest(rootPath);
+    return { paths: manifest.chapters.map((chapter) => chapter.absolutePath).filter(Boolean) };
+  } catch (err) {
+    return { paths: [], message: err?.message || "无法读取这个文件夹。" };
+  }
+});
+
 ipcMain.handle("bookmd:read-markdown-file", async (_event, absolutePath) => {
   return await readMarkdownSource(absolutePath);
 });

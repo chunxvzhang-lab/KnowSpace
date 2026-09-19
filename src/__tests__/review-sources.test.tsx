@@ -195,3 +195,142 @@ describe("DailyReviewPanel - 卡片来源", () => {
     );
   });
 });
+
+/**
+ * The third source: a folder of the reader's own.
+ *
+ * Not the same act as opening it as the workspace — that replaces the vault, the tabs
+ * and the reading session, and someone who wants the cards out of a folder wants none
+ * of it — so the folder is asked for, listed and read, and nothing else moves.
+ */
+describe("DailyReviewPanel - 自定义文件夹来源", () => {
+  let readMarkdownBatch: ReturnType<typeof vi.fn>;
+  let saveMarkdownFile: ReturnType<typeof vi.fn>;
+  let pickReviewFolder: ReturnType<typeof vi.fn>;
+  let listReviewFolder: ReturnType<typeof vi.fn>;
+
+  const folderRow = {
+    rootPath: "C:/Notes/复习",
+    name: "复习",
+    paths: ["C:/Notes/复习/a.md"],
+  };
+
+  beforeEach(() => {
+    localStorage.clear();
+    readMarkdownBatch = vi.fn().mockResolvedValue([]);
+    saveMarkdownFile = vi.fn().mockResolvedValue({ success: true });
+    pickReviewFolder = vi.fn().mockResolvedValue({ canceled: true });
+    listReviewFolder = vi.fn().mockResolvedValue({ paths: [] });
+    (window as unknown as Record<string, unknown>).knowSpaceDesktop = {
+      saveMarkdownFile,
+      readMarkdownBatch,
+      pickReviewFolder,
+      listReviewFolder,
+    };
+    useVaultStore.setState({ ...pristineVault, manifest: VAULT });
+  });
+
+  afterEach(() => {
+    delete (window as unknown as Record<string, unknown>).knowSpaceDesktop;
+    localStorage.clear();
+  });
+
+  it("还没选文件夹时先去问一个；取消了就明说，而不是显示空复习", async () => {
+    render(<DailyReviewPanel notes={[]} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("自定义文件夹"));
+    });
+
+    expect(pickReviewFolder).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("还没有选择文件夹")).toBeDefined();
+  });
+
+  it("选好之后复习这个文件夹里的卡片，并显示它的名字", async () => {
+    pickReviewFolder.mockResolvedValue({ canceled: false, ...folderRow });
+    readMarkdownBatch.mockResolvedValue(batch([["C:/Notes/复习/a.md", "文件夹里的问题 :: 答案"]]));
+    render(<DailyReviewPanel notes={[]} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("自定义文件夹"));
+    });
+
+    await waitFor(() => expect(screen.getByText("文件夹里的问题")).toBeDefined());
+    expect(screen.getByText("复习")).toBeDefined();
+    expect(readMarkdownBatch).toHaveBeenCalledWith(["C:/Notes/复习/a.md"]);
+  });
+
+  it("记住的文件夹会重新列一遍，新写的卡因此进得来", async () => {
+    // The path is remembered rather than the listing: a folder gains files, and a
+    // review that cannot see this week's cards would be worse than one that looks.
+    localStorage.setItem(
+      "knowspace.review-folder",
+      JSON.stringify({ ...folderRow, paths: ["C:/Notes/复习/旧.md"] })
+    );
+    listReviewFolder.mockResolvedValue({ paths: ["C:/Notes/复习/新.md"] });
+    readMarkdownBatch.mockResolvedValue(batch([["C:/Notes/复习/新.md", "新写的卡 :: 答案"]]));
+    render(<DailyReviewPanel notes={[]} />);
+
+    await waitFor(() => expect(listReviewFolder).toHaveBeenCalledWith("C:/Notes/复习"));
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("自定义文件夹"));
+    });
+
+    await waitFor(() => expect(screen.getByText("新写的卡")).toBeDefined());
+    expect(readMarkdownBatch).toHaveBeenCalledWith(["C:/Notes/复习/新.md"]);
+  });
+
+  it("评分之后重新读一遍，同一文件夹的第二张卡才不会把第一张抹掉", async () => {
+    pickReviewFolder.mockResolvedValue({ canceled: false, ...folderRow });
+    readMarkdownBatch.mockResolvedValue(batch([["C:/Notes/复习/a.md", "文件夹里的问题 :: 答案"]]));
+    render(<DailyReviewPanel notes={[]} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("自定义文件夹"));
+    });
+    await waitFor(() => expect(screen.getByText("文件夹里的问题")).toBeDefined());
+
+    fireEvent.click(screen.getByText("显示答案"));
+    await act(async () => {
+      fireEvent.click(screen.getByText("良好"));
+    });
+
+    await waitFor(() => expect(saveMarkdownFile).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(readMarkdownBatch).toHaveBeenCalledTimes(2));
+  });
+
+  it("重新列一遍失败时，不清空已经记住的文件夹", async () => {
+    localStorage.setItem("knowspace.review-folder", JSON.stringify(folderRow));
+    // A drive that is not mounted yet, or a permission blip. The listing answers with
+    // nothing *and says so* — and "could not be read" must not be shown as "has no
+    // cards", which is how a reader concludes their cards are gone.
+    listReviewFolder.mockResolvedValue({ paths: [], message: "无法读取这个文件夹。" });
+    readMarkdownBatch.mockResolvedValue(batch([["C:/Notes/复习/a.md", "记住的卡 :: 答案"]]));
+    render(<DailyReviewPanel notes={[]} />);
+    await waitFor(() => expect(listReviewFolder).toHaveBeenCalled());
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("自定义文件夹"));
+    });
+
+    await waitFor(() => expect(screen.getByText("记住的卡")).toBeDefined());
+    expect(readMarkdownBatch).toHaveBeenCalledWith(["C:/Notes/复习/a.md"]);
+  });
+
+  it("点「取消」就不再记住它", async () => {
+    localStorage.setItem("knowspace.review-folder", JSON.stringify(folderRow));
+    listReviewFolder.mockResolvedValue({ paths: folderRow.paths });
+    render(<DailyReviewPanel notes={[]} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("自定义文件夹"));
+    });
+    await waitFor(() => expect(screen.getByText("复习")).toBeDefined());
+
+    fireEvent.click(screen.getByText("取消"));
+
+    expect(localStorage.getItem("knowspace.review-folder")).toBeNull();
+    expect(screen.getByText("还没有选择文件夹")).toBeDefined();
+  });
+});

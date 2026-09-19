@@ -6359,6 +6359,46 @@ body:has(.flash-capsule-overlay) {
   margin-bottom: 8px;
 }
 
+/* Which folder the review is reading, and what one may do about it. Shown only
+   while that source is in use: it belongs to the source, not to the header. */
+.dr-folder-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 0 8px;
+  font-size: 10.5px;
+  color: #94a3b8;
+}
+
+.dr-folder-name {
+  overflow: hidden;
+  max-width: 160px;
+  color: #cbd5e1;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: default;
+}
+
+.dr-folder-count {
+  color: #64748b;
+}
+
+.dr-folder-action {
+  padding: 1px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 10.5px;
+  cursor: pointer;
+}
+
+.dr-folder-action:hover {
+  border-color: rgba(255, 255, 255, 0.24);
+  color: #e2e8f0;
+}
+
 /* ── Flashcard ────────────────────────────────────────────────────────── */
 
 .dr-card {

@@ -7,6 +7,7 @@ import {
   Inbox,
   Keyboard,
   AlertCircle,
+  FolderOpen,
 } from "lucide-react";
 import {
   buildReviewQueue,
@@ -18,7 +19,9 @@ import {
   type FsrsRating,
   type FsrsStats,
 } from "../services/fsrsService";
-import { useVaultCards, type ReviewSourceDocument } from "../hooks/useVaultCards";
+import { useVaultCards } from "../hooks/useVaultCards";
+import { useReviewFolder } from "../hooks/useReviewFolder";
+import type { ReviewSourceDocument } from "../services/reviewSources";
 
 type DailyReviewPanelProps = {
   /**
@@ -76,12 +79,18 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
    * Where the cards come from.
    *
    * Space is the default: it is where the app's own capture flow files things,
-   * and the parent already has it loaded. The knowledge base is fetched only
-   * when it is chosen.
+   * and the parent already has it loaded. The knowledge base and a folder of the
+   * reader's own are fetched only when they are chosen — reading every document is
+   * the expensive part, and most sessions draw on Space.
+   *
+   * All three are the same shape on purpose (`activeNotes`), so nothing below this
+   * point knows which one is running.
    */
-  const [reviewSource, setReviewSource] = useState<"space" | "vault">("space");
+  const [reviewSource, setReviewSource] = useState<"space" | "vault" | "folder">("space");
   const vault = useVaultCards();
+  const folder = useReviewFolder();
   const isVaultSource = reviewSource === "vault";
+  const isFolderSource = reviewSource === "folder";
 
   /**
    * The documents this session draws from.
@@ -90,8 +99,18 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
    * queue is derived from this, so changing it rebuilds the queue exactly as a
    * changed note list would.
    */
-  const activeNotes: ReviewSourceDocument[] = isVaultSource ? vault.documents : notes;
-  const isLoading = isVaultSource ? vault.loading : Boolean(loading);
+  const activeNotes: ReviewSourceDocument[] = isVaultSource
+    ? vault.documents
+    : isFolderSource
+      ? folder.documents
+      : notes;
+  const isLoading = isVaultSource
+    ? vault.loading
+    : isFolderSource
+      ? folder.loading
+      : Boolean(loading);
+  /** What went wrong for the source in use, if anything. */
+  const sourceError = isVaultSource ? vault.error : isFolderSource ? folder.error : null;
 
   /**
    * Cards rated in this session, by card id.
@@ -231,7 +250,11 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
         // The parent owns the Space list and refreshes it. The vault documents
         // are this panel's own, so it has to refresh those itself.
         onProgressSaved?.();
+        // The documents the review read are its own to re-read: the parent owns the
+        // Space list, but a workspace's chapters and a chosen folder are fetched here,
+        // and a rating that is not merged on top of the last one would revert it.
         if (isVaultSource) vault.reloadIfLoaded();
+        if (isFolderSource) folder.reloadIfLoaded();
       } catch (err) {
         showToast(`保存失败：${err instanceof Error ? err.message : "未知错误"}`);
       } finally {
@@ -249,7 +272,9 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
       showToast,
       onProgressSaved,
       isVaultSource,
+      isFolderSource,
       vault.reloadIfLoaded,
+      folder.reloadIfLoaded,
     ]
   );
 
@@ -354,7 +379,47 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
           >
             <span>当前知识库</span>
           </button>
+          <button
+            type="button"
+            className={`space-tab-btn ${isFolderSource ? "active" : ""}`}
+            onClick={() => {
+              setReviewSource("folder");
+              // Nothing chosen yet means nothing to read, so the first click asks for
+              // a folder rather than opening an empty review and leaving the reader to
+              // work out why.
+              // `choose` reads the folder it just picked, because a `load` called from
+              // here would still be closed over the choice of the previous render.
+              if (!folder.choice) void folder.choose();
+              else if (!folder.loaded) void folder.load();
+            }}
+            title={
+              folder.choice
+                ? `复习「${folder.choice.name}」里的 ${folder.fileCount} 篇文档`
+                : "选一个文件夹作为卡片来源"
+            }
+          >
+            <span>自定义文件夹</span>
+          </button>
         </div>
+
+        {/* Which folder, and the two things one might want to do about it. Only while
+            that source is in use: it is a row about the source, not a permanent part
+            of the header. */}
+        {isFolderSource && folder.choice ? (
+          <div className="dr-folder-row">
+            <FolderOpen size={12} />
+            <span className="dr-folder-name" title={folder.choice.rootPath}>
+              {folder.choice.name}
+            </span>
+            <span className="dr-folder-count">{folder.fileCount} 篇</span>
+            <button type="button" className="dr-folder-action" onClick={() => void folder.choose()}>
+              更换
+            </button>
+            <button type="button" className="dr-folder-action" onClick={folder.forget}>
+              取消
+            </button>
+          </div>
+        ) : null}
 
         {/* Session progress */}
         <div className="dr-progress-track" aria-label="本轮进度">
@@ -377,20 +442,53 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
         {isLoading ? (
           <div className="space-empty-state">
             <RotateCw size={24} />
-            <p>{isVaultSource ? "正在读取知识库文档..." : "正在载入 Space 闪念库..."}</p>
+            <p>
+              {isFolderSource
+                ? "正在读取这个文件夹..."
+                : isVaultSource
+                  ? "正在读取知识库文档..."
+                  : "正在载入 Space 闪念库..."}
+            </p>
           </div>
-        ) : isVaultSource && vault.error ? (
+        ) : sourceError ? (
           <div className="space-empty-state">
             <AlertCircle size={32} />
-            <p>读取知识库失败</p>
-            <p className="dr-empty-hint">{vault.error}</p>
+            <p>{isFolderSource ? "读取文件夹失败" : "读取知识库失败"}</p>
+            <p className="dr-empty-hint">{sourceError}</p>
+          </div>
+        ) : isFolderSource && !folder.choice ? (
+          <div className="space-empty-state">
+            <FolderOpen size={32} />
+            <p>还没有选择文件夹</p>
+            <p className="dr-empty-hint">
+              挑一个放着笔记的文件夹，它里面的卡片就会进入复习 —— 只是复习，不会把它打开成工作区。
+            </p>
+            <button
+              type="button"
+              className="space-btn-primary"
+              onClick={() => void folder.choose()}
+            >
+              <FolderOpen size={14} />
+              <span>选择文件夹</span>
+            </button>
           </div>
         ) : stats.total === 0 ? (
           <div className="space-empty-state">
             <Inbox size={32} />
-            <p>{isVaultSource ? "知识库里还没有闪卡" : "Space 里还没有闪卡"}</p>
+            <p>
+              {isFolderSource
+                ? "这个文件夹里还没有闪卡"
+                : isVaultSource
+                  ? "知识库里还没有闪卡"
+                  : "Space 里还没有闪卡"}
+            </p>
             <p className="dr-empty-hint">
-              {isVaultSource ? (
+              {isFolderSource ? (
+                <>
+                  在这个文件夹的任意文档里写下 <code>问题 :: 答案</code>、
+                  <code>Q: / A:</code> 或 <code>{"{{c1::答案}}"}</code>，即可生成卡片。
+                </>
+              ) : isVaultSource ? (
                 <>
                   在当前知识库的任意文档里写下 <code>问题 :: 答案</code>、
                   <code>Q: / A:</code> 或 <code>{"{{c1::答案}}"}</code>，即可生成卡片。

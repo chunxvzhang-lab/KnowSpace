@@ -13,6 +13,10 @@ const desktopApi = {
   refreshDirectory: (rootPath) => ipcRenderer.invoke("bookmd:refresh-directory", rootPath),
   readMarkdownFile: (absolutePath) => ipcRenderer.invoke("bookmd:read-markdown-file", absolutePath),
   readMarkdownBatch: (paths) => ipcRenderer.invoke("bookmd:read-markdown-batch", paths),
+  // A folder to revise from: picked, and listed again later, both without opening it
+  // as the workspace.
+  pickReviewFolder: () => ipcRenderer.invoke("bookmd:pick-review-folder"),
+  listReviewFolder: (rootPath) => ipcRenderer.invoke("bookmd:list-review-folder", rootPath),
   // Picking an outline file to import: the dialog and the read both happen in the
   // main process, and what comes back is text rather than a path to write to.
   pickOutlineFile: () => ipcRenderer.invoke("bookmd:pick-outline-file"),

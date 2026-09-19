@@ -358,3 +358,130 @@ describe("DailyReviewPanel - 每日复盘视图", () => {
     expect(screen.getByText("1 张待复习")).toBeDefined();
   });
 });
+
+/**
+ * The parts of the review flow the first round of tests left unexercised: three of
+ * the four rating keys, revealing and un-revealing, and the two ways a save can go
+ * wrong. They are cheap to check and they are what a reader actually presses.
+ */
+describe("DailyReviewPanel - 评分与保存的边角", () => {
+  let saveMarkdownFile: ReturnType<typeof vi.fn>;
+
+  const savedContent = () => String(saveMarkdownFile.mock.calls.at(-1)?.[0]?.content ?? "");
+
+  beforeEach(() => {
+    saveMarkdownFile = vi.fn().mockResolvedValue({ success: true, absolutePath: "x" });
+    (window as unknown as Record<string, unknown>).knowSpaceDesktop = { saveMarkdownFile };
+  });
+
+  afterEach(() => {
+    delete (window as unknown as Record<string, unknown>).knowSpaceDesktop;
+  });
+
+  it("数字键 1（重来）写进的是重学态", () => {
+    render(<DailyReviewPanel notes={THREE_CARDS} />);
+    pressKey(" ");
+
+    pressKey("1");
+
+    // The first rating of a new card, rated Again: relearning, and a lapse counted.
+    expect(savedContent()).toContain("state=relearning");
+    expect(savedContent()).toContain("lapses=1");
+  });
+
+  it("数字键 2（困难）与数字键 4（简单）都能评分", async () => {
+    render(<DailyReviewPanel notes={THREE_CARDS} />);
+    pressKey(" ");
+    pressKey("2");
+    // Waiting for the write to land before going on: the panel is mid-save until
+    // then, and a second keypress while it is would be swallowed by the guard rather
+    // than rating the next card.
+    await waitFor(() => expect(saveMarkdownFile).toHaveBeenCalledTimes(1));
+    expect(savedContent()).toContain("state=review");
+
+    pressKey(" ");
+    pressKey("4");
+    await waitFor(() => expect(saveMarkdownFile).toHaveBeenCalledTimes(2));
+  });
+
+  it("四个按钮上的间隔预览与评分档位同序", () => {
+    render(<DailyReviewPanel notes={THREE_CARDS} />);
+    pressKey(" ");
+
+    const previewDays = (label: string) => {
+      const button = screen.getByText(label).closest("button");
+      const text = button?.querySelector(".dr-rate-interval")?.textContent ?? "";
+      return text === "明天" ? 1 : Number(/(\d+) 天后/.exec(text)?.[1] ?? 0);
+    };
+
+    // The preview is what the reader decides on, so it has to agree with the rating
+    // above it. A "简单" button advertising a shorter wait than "良好" would be
+    // telling them the wrong thing about a choice they are about to make — and the
+    // four previews are computed independently, which is exactly how they could.
+    expect(previewDays("困难")).toBeLessThanOrEqual(previewDays("良好"));
+    expect(previewDays("良好")).toBeLessThanOrEqual(previewDays("简单"));
+    expect(previewDays("简单")).toBeGreaterThan(0);
+  });
+
+  it("再按一次空格翻回正面，评分按钮随之收起", () => {
+    render(<DailyReviewPanel notes={THREE_CARDS} />);
+
+    pressKey(" ");
+    expect(screen.getByText("良好")).toBeDefined();
+
+    pressKey(" ");
+
+    // The card is a question again, and the four buttons are gone with the answer.
+    expect(screen.queryByText("良好")).toBeNull();
+    expect(screen.getByText("显示答案")).toBeDefined();
+  });
+
+  it("卡片聚焦时按回车也能翻面", () => {
+    render(<DailyReviewPanel notes={THREE_CARDS} />);
+
+    const card = screen.getByRole("button", { name: /问题甲/ });
+    fireEvent.keyDown(card, { key: "Enter" });
+
+    expect(screen.getByText("答案甲")).toBeDefined();
+  });
+
+  it("保存抛异常时给出提示，并且不前进", () => {
+    // `{ success: false }` was covered; a rejected promise was not, and it is the
+    // one that arrives unannounced from a disconnected bridge.
+    saveMarkdownFile.mockRejectedValue(new Error("磁盘已满"));
+    render(<DailyReviewPanel notes={THREE_CARDS} />);
+    pressKey(" ");
+
+    fireEvent.click(screen.getByText("良好"));
+
+    return waitFor(() => expect(screen.getByText(/保存失败/)).toBeDefined()).then(() => {
+      // Still on the same card: losing the answer would lose the reader's place too.
+      expect(screen.getByText("问题甲")).toBeDefined();
+      expect(screen.getByText("答案甲")).toBeDefined();
+    });
+  });
+
+  it("评分请求带着 force —— 这是写明的取舍，不是顺手加的", () => {
+    render(<DailyReviewPanel notes={THREE_CARDS} />);
+    pressKey(" ");
+
+    fireEvent.click(screen.getByText("良好"));
+
+    // The review's own metadata is what changes, and a stale-version refusal would
+    // block reviewing entirely. The cost is the other side of that: edits made to the
+    // file elsewhere while a review is open are overwritten by the next rating.
+    // Pinned here so the trade-off is visible to whoever decides to change it.
+    expect(saveMarkdownFile.mock.calls.at(-1)?.[0]).toMatchObject({ force: true });
+  });
+
+  it("连点评分只写一次", async () => {
+    render(<DailyReviewPanel notes={THREE_CARDS} />);
+    pressKey(" ");
+
+    const good = screen.getByText("良好");
+    fireEvent.click(good);
+    fireEvent.click(good);
+
+    await waitFor(() => expect(saveMarkdownFile).toHaveBeenCalledTimes(1));
+  });
+});

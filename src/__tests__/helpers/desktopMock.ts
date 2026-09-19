@@ -83,6 +83,10 @@ export function createDesktopMock() {
       .mockImplementation((paths: string[]) =>
         Promise.resolve(paths.map((p) => sampleSource(`# batch ${p}`, p)))
       ),
+    // A folder to revise from: cancelled by default, so a test that does not care
+    // about it sees the same thing as a reader who closed the dialog.
+    pickReviewFolder: vi.fn().mockResolvedValue({ canceled: true }),
+    listReviewFolder: vi.fn().mockResolvedValue({ paths: [] }),
     createMarkdownFile: vi.fn().mockResolvedValue({
       canceled: true,
     }),
