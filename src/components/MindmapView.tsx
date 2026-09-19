@@ -73,7 +73,11 @@ import {
   setNodePriority,
   setNodeProgress,
   addFloatingTopic,
+  addSummary,
   floatingTopics,
+  removeSummary,
+  setSummaryText,
+  summariesIn,
   moveFloatingTopic,
   removeFloatingTopic,
   setFloatingText,
@@ -83,7 +87,9 @@ import {
   type MindmapSidecar,
 } from "../services/mindmapSidecar";
 import { boundsOfBoxes, unionBounds } from "../core/mindmapBounds";
+import { summaryLabelAnchor } from "../core/mindmapGroups";
 import { MindmapFloatingTopics, type FloatingBox } from "./MindmapFloatingTopics";
+import { MindmapSummaries, type SummaryBox } from "./MindmapSummaries";
 import { findMindmapIcon } from "../core/mindmapIcons";
 import { numberingFor } from "../core/mindmapNumbering";
 import { parseMindmapLink } from "../core/mindmapLinks";
@@ -324,6 +330,10 @@ export const MindmapView = memo(function MindmapView({
    */
   const [selectedFloatingId, setSelectedFloatingId] = useState<string | null>(null);
   const [editingFloatingId, setEditingFloatingId] = useState<string | null>(null);
+
+  /** The summary the reader has picked, and the one whose label is being typed. */
+  const [selectedSummaryId, setSelectedSummaryId] = useState<string | null>(null);
+  const [editingSummaryId, setEditingSummaryId] = useState<string | null>(null);
 
   /**
    * The drag in progress, in a ref rather than in state.
@@ -2077,6 +2087,106 @@ export const MindmapView = memo(function MindmapView({
   const editingFloatingBox =
     floatingBoxes.find((topic) => topic.id === editingFloatingId) ?? null;
 
+  /**
+   * Each summary with the bounds it spans.
+   *
+   * Worked out from the laid-out boxes rather than stored: a summary is about
+   * topics, not about a rectangle, so moving or renaming one of them moves the
+   * bracket with it and nothing has to be kept in step. A summary whose topics
+   * are not all on the canvas — folded away, or renamed since — is drawn over
+   * whatever part of the group is there, and over nothing at all when none of it
+   * is.
+   */
+  const summaryBoxes = useMemo<SummaryBox[]>(() => {
+    return summariesIn(sidecar).map(({ id, summary }) => {
+      const boxes = summary.nodeIds
+        .map((nodeId) => relationBoxes.get(nodeId))
+        .filter((box): box is { x: number; y: number; width: number; height: number } => !!box);
+      return { id, text: summary.text, bounds: boundsOfBoxes(boxes, 0) };
+    });
+  }, [sidecar, relationBoxes]);
+
+  /**
+   * Brackets the selected topics.
+   *
+   * Two or more, because a bracket over one topic says nothing a label on that
+   * topic could not — and the gesture is the same multi-selection relations use,
+   * so there is no new mode to learn.
+   */
+  const handleAddSummary = useCallback(() => {
+    const nodeIds = [...selectedNodeIds];
+    if (nodeIds.length < 2) return;
+    applySidecarEdit(["summaries"], (current) => addSummary(current, nodeIds).sidecar);
+  }, [applySidecarEdit, selectedNodeIds]);
+
+  const handleRemoveSummary = useCallback(() => {
+    if (!selectedSummaryId) return;
+    const id = selectedSummaryId;
+    setSelectedSummaryId(null);
+    applySidecarEdit(["summaries"], (current) => removeSummary(current, id));
+  }, [applySidecarEdit, selectedSummaryId]);
+
+  const handleStartSummaryEdit = useCallback(
+    (id: string) => {
+      const summary = summaryBoxes.find((entry) => entry.id === id);
+      if (!summary) return;
+      setEditingSummaryId(id);
+      setEditingText(summary.text);
+    },
+    [summaryBoxes]
+  );
+
+  const handleCancelSummaryEdit = useCallback(() => setEditingSummaryId(null), []);
+
+  /**
+   * Commits a summary's label. Emptying it leaves the bracket in place, unlike a
+   * free topic's text: what the reader asked for was the bracket, and a bracket
+   * with nothing written on it still says "these belong together".
+   */
+  const handleCommitSummaryEdit = useCallback(() => {
+    const id = editingSummaryId;
+    setEditingSummaryId(null);
+    if (!id) return;
+    applySidecarEdit(["summaries"], (current) => setSummaryText(current, id, editingText));
+  }, [applySidecarEdit, editingSummaryId, editingText]);
+
+  /** The box the label editor is drawing over, sized to the label's own line. */
+  const editingSummaryBox = (() => {
+    const summary = summaryBoxes.find((entry) => entry.id === editingSummaryId);
+    if (!summary?.bounds) return null;
+    const anchor = summaryLabelAnchor(summary.bounds);
+    return {
+      x: anchor.x,
+      y: anchor.y - 11,
+      width: Math.max(120, summary.text.length * 8 + 40),
+      height: 22,
+    };
+  })();
+
+  /**
+   * The one inline editor, and what it is editing.
+   *
+   * One render site rather than one per kind. A node, a free topic and a
+   * summary's label are all a box with text in it, and the editor never wanted
+   * more than that — deciding here, in one place, is also what makes it
+   * impossible for two editors to be open at once.
+   */
+  const inlineEdit = editingNode
+    ? { box: editingNode, onCommit: handleCommitEdit, onCancel: handleCancelEdit }
+    : editingFloatingBox
+      ? {
+          box: editingFloatingBox,
+          onCommit: handleCommitFloatingEdit,
+          onCancel: handleCancelFloatingEdit,
+        }
+      : editingSummaryBox
+        ? {
+            box: editingSummaryBox,
+            onCommit: handleCommitSummaryEdit,
+            onCancel: handleCancelSummaryEdit,
+          }
+        : null;
+
   const selectedIds = [...selectedNodeIds];
   const selectionRelated =
     selectedIds.length === 2 ? areRelated(sidecar, selectedIds[0], selectedIds[1]) : false;
@@ -2686,6 +2796,16 @@ export const MindmapView = memo(function MindmapView({
             })}
           </g>
 
+          {/* Summary brackets, then free topics: both are the reader's own
+              additions and sit above the outline, and a free topic is the one a
+              reader drags over other things. */}
+          <MindmapSummaries
+            summaries={summaryBoxes}
+            selectedId={selectedSummaryId}
+            onSelect={setSelectedSummaryId}
+            onStartEdit={handleStartSummaryEdit}
+          />
+
           {/* Free topics last, so they sit above the outline: they are the
               reader's own additions, and one dragged over a branch should stay
               visible rather than slide underneath it. */}
@@ -2719,32 +2839,18 @@ export const MindmapView = memo(function MindmapView({
         </div>
       )}
 
-      {/* Inline Text Editing Overlay Input */}
-      {editingNode && (
+      {/* Inline text editing, over whatever was asked for: a node's text, a free
+          topic's text, or a summary's label. One editor, because all three are a
+          box with text in it. */}
+      {inlineEdit && (
         <MindmapInlineEditor
-          node={editingNode}
+          node={inlineEdit.box}
           transform={transform}
           value={editingText}
           inputRef={editInputRef}
           onChange={setEditingText}
-          onCommit={handleCommitEdit}
-          onCancel={handleCancelEdit}
-        />
-      )}
-
-      {/* The same editor over a free topic. A free topic has a box and text like
-          any other, so it needs no editor of its own — and only one editor is
-          ever shown, with the node's taking precedence if both were somehow
-          asked for. */}
-      {!editingNode && editingFloatingBox && (
-        <MindmapInlineEditor
-          node={editingFloatingBox}
-          transform={transform}
-          value={editingText}
-          inputRef={editInputRef}
-          onChange={setEditingText}
-          onCommit={handleCommitFloatingEdit}
-          onCancel={handleCancelFloatingEdit}
+          onCommit={inlineEdit.onCommit}
+          onCancel={inlineEdit.onCancel}
         />
       )}
 
@@ -2766,6 +2872,18 @@ export const MindmapView = memo(function MindmapView({
           }}
           selectedCount={selectedIds.length}
           selectionRelated={selectionRelated}
+          canSummarise={selectedIds.length >= 2}
+          onAddSummary={() => {
+            setContextMenu(null);
+            handleAddSummary();
+          }}
+          selectedSummaryText={
+            summaryBoxes.find((summary) => summary.id === selectedSummaryId)?.text || null
+          }
+          onRemoveSummary={() => {
+            setContextMenu(null);
+            handleRemoveSummary();
+          }}
           selectedFloatingText={
             floatingBoxes.find((topic) => topic.id === selectedFloatingId)?.text ?? null
           }

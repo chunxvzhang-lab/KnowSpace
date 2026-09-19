@@ -71,6 +71,14 @@ export interface MindmapSidecar {
    * stays the document's own shape. The document never hears about it.
    */
   floating: Record<string, FloatingTopic>;
+  /**
+   * A bracket spanning a group of topics, with what they add up to.
+   *
+   * Keyed by its own id like a free topic, because unlike a relation it has one:
+   * it can be renamed and the span it covers can change, and neither of those is
+   * a different summary.
+   */
+  summaries: Record<string, MindmapSummary>;
   /** Sections this build does not know about, kept exactly as they were read. */
   [section: string]: unknown;
 }
@@ -101,6 +109,7 @@ const SECTIONS = [
   { name: "markers", read: readMarkerSection },
   { name: "relations", read: readRelationSection },
   { name: "floating", read: readFloatingSection },
+  { name: "summaries", read: readSummarySection },
 ] as const;
 
 /** Just the names, for writing a file and asking whether it holds anything. */
@@ -126,7 +135,62 @@ export function emptySidecar(): MindmapSidecar {
     markers: {},
     relations: [],
     floating: {},
+    summaries: {},
   };
+}
+
+/** A bracket over a group of topics, and the sentence they add up to. */
+export interface MindmapSummary {
+  /**
+   * The topics it spans, by id.
+   *
+   * Kept as given rather than as a range: a summary is about the topics the
+   * reader picked, and a branch that is moved out of the group should take the
+   * bracket's meaning with it rather than silently change what the bracket says.
+   */
+  nodeIds: string[];
+  /** Its label. Empty is allowed — an unlabelled bracket still groups. */
+  text: string;
+  /** Fields a newer version added, kept as they were read. */
+  [field: string]: unknown;
+}
+
+/**
+ * The summaries section.
+ *
+ * The shape rules are the section's own; what the ids *mean* is not. In
+ * particular whether the spanned topics are siblings — the intended use, and what
+ * makes a bracket read as "these together" — is not checked here: this module has
+ * no tree, on purpose, and inventing one to validate a gesture would couple the
+ * file format to the layout.
+ *
+ * A summary that spans nothing is dropped rather than kept as an empty bracket,
+ * since a bracket around nothing is a drawing with no referent.
+ */
+function readSummarySection(value: unknown): Record<string, MindmapSummary> {
+  const section: Record<string, MindmapSummary> = {};
+  if (!isPlainObject(value)) return section;
+
+  for (const [id, entry] of Object.entries(value)) {
+    if (!id || !isPlainObject(entry)) continue;
+
+    const raw = entry.nodeIds;
+    if (!Array.isArray(raw)) continue;
+
+    const nodeIds: string[] = [];
+    for (const nodeId of raw) {
+      if (typeof nodeId === "string" && nodeId && !nodeIds.includes(nodeId)) nodeIds.push(nodeId);
+    }
+    if (nodeIds.length === 0) continue;
+
+    section[id] = {
+      ...entry,
+      nodeIds,
+      text: typeof entry.text === "string" ? entry.text.trim() : "",
+    };
+  }
+
+  return section;
 }
 
 /** A topic on the canvas that no outline owns. */
@@ -535,6 +599,59 @@ export function setNodeProgress(
   progress: number | null
 ): MindmapSidecar {
   return setMarker(sidecar, nodeId, "progress", progress, isProgressInRange);
+}
+
+/** Every summary, with its id. */
+export function summariesIn(sidecar: MindmapSidecar | null): { id: string; summary: MindmapSummary }[] {
+  if (!sidecar) return [];
+  return Object.entries(sidecar.summaries).map(([id, summary]) => ({ id, summary }));
+}
+
+/** A fresh id for a new summary, numbered for the same reason free topics are. */
+export function nextSummaryId(sidecar: MindmapSidecar | null): string {
+  let highest = 0;
+
+  for (const id of Object.keys(sidecar?.summaries ?? {})) {
+    const match = /^summary-(\d+)$/.exec(id);
+    if (match) highest = Math.max(highest, Number(match[1]));
+  }
+
+  return `summary-${highest + 1}`;
+}
+
+/** Brackets a group of topics. Answers with the id it was given. */
+export function addSummary(
+  sidecar: MindmapSidecar,
+  nodeIds: string[],
+  text = ""
+): { sidecar: MindmapSidecar; id: string } {
+  const id = nextSummaryId(sidecar);
+  const summary: MindmapSummary = { nodeIds: [...nodeIds], text: text.trim() };
+  return { sidecar: { ...sidecar, summaries: { ...sidecar.summaries, [id]: summary } }, id };
+}
+
+/**
+ * Relabels a summary.
+ *
+ * Emptying the text does **not** remove it, unlike a free topic: the bracket is
+ * the thing that was asked for, and a bracket with nothing written on it still
+ * says "these belong together". Removal is its own action.
+ */
+export function setSummaryText(sidecar: MindmapSidecar, id: string, text: string): MindmapSidecar {
+  const summary = sidecar.summaries[id];
+  if (!summary) return sidecar;
+  return {
+    ...sidecar,
+    summaries: { ...sidecar.summaries, [id]: { ...summary, text: text.trim() } },
+  };
+}
+
+/** Takes a bracket off the map. */
+export function removeSummary(sidecar: MindmapSidecar, id: string): MindmapSidecar {
+  if (!sidecar.summaries[id]) return sidecar;
+  const summaries = { ...sidecar.summaries };
+  delete summaries[id];
+  return { ...sidecar, summaries };
 }
 
 /** Every floating topic, with its id. */

@@ -1,14 +1,19 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   addFloatingTopic,
+  addSummary,
   allTags,
   areRelated,
   emptySidecar,
   floatingTopics,
   moveFloatingTopic,
   nextFloatingId,
+  nextSummaryId,
   removeFloatingTopic,
+  removeSummary,
   setFloatingText,
+  setSummaryText,
+  summariesIn,
   iconFor,
   loadSidecar,
   linkFor,
@@ -637,6 +642,94 @@ describe("导图伴生文件", () => {
       expect(sidecarIsEmpty(addFloatingTopic(emptySidecar(), "想法", 0, 0).sidecar)).toBe(false);
       expect(floatingTopics(emptySidecar())).toEqual([]);
       expect(floatingTopics(null)).toEqual([]);
+    });
+  });
+
+  describe("概要", () => {
+    it("新建：id 递增，记住它跨的是哪几个主题", () => {
+      const first = addSummary(emptySidecar(), ["node-a", "node-b"]);
+
+      expect(first.id).toBe("summary-1");
+      expect(first.sidecar.summaries["summary-1"]).toEqual({
+        nodeIds: ["node-a", "node-b"],
+        text: "",
+      });
+      // Numbered rather than random, like free topics: the same actions give the
+      // same file, which is what a readable diff needs.
+      expect(nextSummaryId(first.sidecar)).toBe("summary-2");
+    });
+
+    it("改标签；清空文字不等于删除", () => {
+      const { sidecar, id } = addSummary(emptySidecar(), ["node-a", "node-b"], "总述");
+
+      expect(setSummaryText(sidecar, id, "改过的").summaries[id].text).toBe("改过的");
+      // Unlike a free topic, whose text *is* the thing: here what was asked for
+      // was the bracket, and one with nothing on it still groups.
+      const emptied = setSummaryText(sidecar, id, "   ");
+      expect(emptied.summaries[id]).toEqual({ nodeIds: ["node-a", "node-b"], text: "" });
+    });
+
+    it("删除，以及删除不存在的", () => {
+      const { sidecar, id } = addSummary(emptySidecar(), ["node-a", "node-b"]);
+
+      expect(removeSummary(sidecar, id).summaries).toEqual({});
+      expect(removeSummary(sidecar, "summary-不存在")).toBe(sidecar);
+      expect(setSummaryText(sidecar, "summary-不存在", "x")).toBe(sidecar);
+    });
+
+    it("读文件：没有跨度的丢、重复的去掉、坏条目丢、陌生字段留着", () => {
+      const parsed = parseSidecar(
+        JSON.stringify({
+          version: 1,
+          summaries: {
+            "summary-1": { nodeIds: ["a", "b", "a", 7, ""], text: " 总述 ", colour: "amber" },
+            "summary-2": { nodeIds: [], text: "空跨度" },
+            "summary-3": { nodeIds: "a", text: "不是列表" },
+            "summary-4": { text: "没有跨度" },
+            "summary-5": "不是对象",
+          },
+        })
+      );
+
+      expect(parsed?.summaries["summary-1"]).toEqual({
+        nodeIds: ["a", "b"],
+        text: "总述",
+        colour: "amber",
+      });
+      // A bracket around nothing is a drawing with no referent.
+      expect(parsed?.summaries["summary-2"]).toBeUndefined();
+      expect(parsed?.summaries["summary-3"]).toBeUndefined();
+      expect(parsed?.summaries["summary-4"]).toBeUndefined();
+      expect(parsed?.summaries["summary-5"]).toBeUndefined();
+    });
+
+    it("八段一起往返，谁也不丢", () => {
+      let sidecar = addSummary(emptySidecar(), ["node-a", "node-b"], "总述").sidecar;
+      sidecar = addFloatingTopic(sidecar, "画布上的想法", 120, -40).sidecar;
+      sidecar = toggleRelation(sidecar, "node-c", "node-d");
+      sidecar = setNodeTags(sidecar, "node-e", ["api"]);
+      sidecar = setNodeLink(sidecar, "node-f", "#标题");
+      sidecar = setNodeIcon(sidecar, "node-g", "star");
+      sidecar = setNodeNote(sidecar, "node-h", "备注");
+      sidecar = setNodePriority(sidecar, "node-i", 3);
+
+      const back = parseSidecar(serializeSidecar(sidecar)) as MindmapSidecar;
+
+      expect(back.summaries).toEqual({
+        "summary-1": { nodeIds: ["node-a", "node-b"], text: "总述" },
+      });
+      expect(back.floating).toEqual({ "floating-1": { text: "画布上的想法", x: 120, y: -40 } });
+      expect(back.relations).toEqual([{ fromId: "node-c", toId: "node-d" }]);
+      expect(back.tags).toEqual({ "node-e": ["api"] });
+      expect(back.links).toEqual({ "node-f": "#标题" });
+      expect(back.icons).toEqual({ "node-g": "star" });
+      expect(back.notes).toEqual({ "node-h": "备注" });
+      expect(back.markers).toEqual({ "node-i": { priority: 3 } });
+    });
+
+    it("一个概要就算内容", () => {
+      expect(sidecarIsEmpty(addSummary(emptySidecar(), ["a", "b"]).sidecar)).toBe(false);
+      expect(summariesIn(null)).toEqual([]);
     });
   });
 

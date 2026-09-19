@@ -68,6 +68,25 @@ type DecorationRule = {
 };
 
 const DECORATION_RULES: DecorationRule[] = [
+  // Summary brackets and their labels, in the amber the stylesheet gives them.
+  // Without this the bracket arrives as a black stroke and the label as a black
+  // box with black text in it.
+  {
+    selector: ".mindmap-summary-bracket",
+    stroke: { dark: "#f0b429", light: "#d97706" },
+    attributes: { fill: "none", "stroke-width": "1.6" },
+  },
+  {
+    selector: ".mindmap-summary-label-bg",
+    fill: { dark: "#3b2f14", light: "#fef3c7" },
+    stroke: { dark: "#a97e22", light: "#d9a441" },
+    attributes: { "stroke-width": "0.8" },
+  },
+  {
+    selector: ".mindmap-summary-label",
+    fill: { dark: "#fcd34d", light: "#92400e" },
+    font: { size: "11.5px", weight: "600" },
+  },
   // Free topics: the box and its text, dashed as on screen. The fill is the
   // app's own surface rather than the node fill, because a free topic has no
   // branch to take a colour from.
@@ -193,6 +212,7 @@ export function buildStandaloneMindmapSvg(
   // A free topic's selection ring is the same kind of thing: a control, not the
   // picture, and a file that arrived with one would look like a bug.
   clone.querySelectorAll(".mindmap-floating-selection").forEach((el) => el.remove());
+  clone.querySelectorAll(".mindmap-summary-selection").forEach((el) => el.remove());
   clone.querySelectorAll(".mindmap-node-add-btn").forEach((el) => el.remove());
   clone.querySelectorAll(".mindmap-node-resize-handle").forEach((el) => el.remove());
 

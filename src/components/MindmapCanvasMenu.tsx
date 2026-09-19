@@ -1,5 +1,5 @@
 import type { RefObject } from "react";
-import { CornerDownRight, FoldVertical, Link, ListTree, Maximize2, PlusCircle, StickyNote, Trash2, UnfoldVertical, X } from "lucide-react";
+import { Braces, CornerDownRight, FoldVertical, Link, ListTree, Maximize2, PlusCircle, StickyNote, Trash2, UnfoldVertical, X } from "lucide-react";
 
 /**
  * The menu that opens on empty mind map canvas.
@@ -28,12 +28,18 @@ export type MindmapCanvasMenuProps = {
   selectionRelated: boolean;
   /** The floating topic under the cursor, if the reader has picked one. */
   selectedFloatingText: string | null;
+  /** Whether the selection is a group a summary could bracket. */
+  canSummarise: boolean;
+  /** The summary the reader has picked, if any, and its label. */
+  selectedSummaryText: string | null;
   onClose: () => void;
   onNewTopic: () => void;
   onNewFloatingTopic: () => void;
   onRemoveFloatingTopic: () => void;
   onPaste: () => void;
   onToggleRelation: () => void;
+  onAddSummary: () => void;
+  onRemoveSummary: () => void;
   onExpandAll: () => void;
   onCollapseToLevel2: () => void;
   onFitToScreen: () => void;
@@ -47,12 +53,16 @@ export function MindmapCanvasMenu({
   selectedCount,
   selectionRelated,
   selectedFloatingText,
+  canSummarise,
+  selectedSummaryText,
   onClose,
   onNewTopic,
   onNewFloatingTopic,
   onRemoveFloatingTopic,
   onPaste,
   onToggleRelation,
+  onAddSummary,
+  onRemoveSummary,
   onExpandAll,
   onCollapseToLevel2,
   onFitToScreen,
@@ -132,6 +142,31 @@ export function MindmapCanvasMenu({
         <Link size={13} />
         <span>{selectionRelated ? "取消关系线" : "连接这两个主题"}</span>
       </button>
+
+      {/* A summary is about a group the reader picked, so the same selection
+          serves again: two or more topics become a bracket and a sentence. */}
+      <button
+        type="button"
+        className="mindmap-ctx-item"
+        onClick={onAddSummary}
+        disabled={!canSummarise}
+        title={canSummarise ? "为选中的几个主题加一个概要括号" : "先选中两个或更多主题"}
+      >
+        <Braces size={13} />
+        <span>为本组加概要</span>
+      </button>
+
+      {selectedSummaryText !== null ? (
+        <button
+          type="button"
+          className="mindmap-ctx-item"
+          onClick={onRemoveSummary}
+          title={`删除概要「${selectedSummaryText || "（无标签）"}」`}
+        >
+          <Trash2 size={13} />
+          <span>删除概要</span>
+        </button>
+      ) : null}
 
       <div className="mindmap-ctx-divider" />
 
