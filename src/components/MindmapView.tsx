@@ -57,9 +57,12 @@ import {
 import {
   allTags,
   emptySidecar,
+  areRelated,
   iconFor,
   linkFor,
   loadSidecar,
+  mergeSidecar,
+  type SidecarSection,
   markersFor,
   noteFor,
   saveSidecar,
@@ -70,12 +73,14 @@ import {
   setNodeProgress,
   setNodeTags,
   tagsFor,
+  toggleRelation,
   type MindmapSidecar,
 } from "../services/mindmapSidecar";
 import { findMindmapIcon } from "../core/mindmapIcons";
 import { numberingFor } from "../core/mindmapNumbering";
 import { parseMindmapLink } from "../core/mindmapLinks";
 import { NodeLinkMark, NodeMarks, NodeTags } from "./MindmapMarks";
+import { MindmapRelationLines } from "./MindmapRelationLines";
 
 /**
  * How long a note waits before it is written.
@@ -301,14 +306,31 @@ export const MindmapView = memo(function MindmapView({
   const [sidecar, setSidecar] = useState<MindmapSidecar | null>(null);
   const [sidecarSaveFailed, setSidecarSaveFailed] = useState(false);
 
+  /**
+   * The sections the reader has edited since this document was opened.
+   *
+   * Kept so a load that lands late can be merged rather than applied outright:
+   * the reader's edits win for the sections they touched and the file wins for
+   * the rest. Without it, a slow read silently undoes whatever was clicked while
+   * it was in flight — and, worse, the save that follows writes that undo out.
+   */
+  const editedSectionsRef = useRef<Set<SidecarSection>>(new Set());
+
   useEffect(() => {
     let cancelled = false;
+    editedSectionsRef.current = new Set();
     setSidecar(null);
     setSidecarSaveFailed(false);
     if (!documentKey) return;
 
     void loadSidecar(documentKey).then((loaded) => {
-      if (!cancelled) setSidecar(loaded);
+      if (cancelled) return;
+      // Nothing has been touched: the file is simply what is on screen.
+      if (editedSectionsRef.current.size === 0) {
+        setSidecar(loaded);
+        return;
+      }
+      setSidecar((current) => mergeSidecar(loaded, current, editedSectionsRef.current));
     });
     return () => {
       cancelled = true;
@@ -358,7 +380,11 @@ export const MindmapView = memo(function MindmapView({
    * belongs to is decided.
    */
   const applySidecarEdit = useCallback(
-    (edit: (current: MindmapSidecar) => MindmapSidecar) => {
+    (
+      sections: SidecarSection[],
+      edit: (current: MindmapSidecar) => MindmapSidecar
+    ) => {
+      editedSectionsRef.current = new Set([...editedSectionsRef.current, ...sections]);
       const next = edit(sidecar ?? emptySidecar());
       setSidecar(next);
       if (documentKey) scheduleSidecarSave(documentKey, next);
@@ -371,7 +397,8 @@ export const MindmapView = memo(function MindmapView({
    * own; only the disk write waits, which is why the text never lags the typing.
    */
   const handleNoteChange = useCallback(
-    (nodeId: string, text: string) => applySidecarEdit((current) => setNodeNote(current, nodeId, text)),
+    (nodeId: string, text: string) =>
+      applySidecarEdit(["notes"], (current) => setNodeNote(current, nodeId, text)),
     [applySidecarEdit]
   );
 
@@ -380,13 +407,15 @@ export const MindmapView = memo(function MindmapView({
    * it off, which is the only way to say "none" without a menu of its own.
    */
   const handleIconChange = useCallback(
-    (nodeId: string, iconId: string) => applySidecarEdit((current) => setNodeIcon(current, nodeId, iconId)),
+    (nodeId: string, iconId: string) =>
+      applySidecarEdit(["icons"], (current) => setNodeIcon(current, nodeId, iconId)),
     [applySidecarEdit]
   );
 
   /** A node's link, as typed. Stored verbatim; read when someone follows it. */
   const handleLinkChange = useCallback(
-    (nodeId: string, text: string) => applySidecarEdit((current) => setNodeLink(current, nodeId, text)),
+    (nodeId: string, text: string) =>
+      applySidecarEdit(["links"], (current) => setNodeLink(current, nodeId, text)),
     [applySidecarEdit]
   );
 
@@ -453,7 +482,8 @@ export const MindmapView = memo(function MindmapView({
 
   /** A node's tags, replaced wholesale — the list is what the panel edits. */
   const handleTagsChange = useCallback(
-    (nodeId: string, tags: string[]) => applySidecarEdit((current) => setNodeTags(current, nodeId, tags)),
+    (nodeId: string, tags: string[]) =>
+      applySidecarEdit(["tags"], (current) => setNodeTags(current, nodeId, tags)),
     [applySidecarEdit]
   );
 
@@ -473,7 +503,7 @@ export const MindmapView = memo(function MindmapView({
    */
   const handleMarkChange = useCallback(
     (nodeId: string, field: "priority" | "progress", value: number | null) =>
-      applySidecarEdit((current) =>
+      applySidecarEdit(["markers"], (current) =>
         field === "priority"
           ? setNodePriority(current, nodeId, value)
           : setNodeProgress(current, nodeId, value)
@@ -661,6 +691,21 @@ export const MindmapView = memo(function MindmapView({
    * because neither is an input here — only the document's own structure is.
    */
   const numbering = useMemo(() => (showNumbering ? numberingFor(tree) : null), [showNumbering, tree]);
+
+  /** Where each laid-out node is, for the relation lines to be drawn between. */
+  const relationBoxes = useMemo(
+    () =>
+      new Map(
+        layout.nodes.map((node) => [
+          node.id,
+          { x: node.x, y: node.y, width: node.width, height: node.height },
+        ])
+      ),
+    [layout]
+  );
+
+  /** The stored relations, or nothing while the file is still being read. */
+  const relations = sidecar?.relations ?? [];
 
   /**
    * Fits the whole map onto the printed page.
@@ -1849,6 +1894,24 @@ export const MindmapView = memo(function MindmapView({
    * an anchor needs a caller that can jump. The button is offered disabled with
    * the reason, rather than hidden — a control that vanishes teaches nothing.
    */
+  /**
+   * Connects the two selected topics, or disconnects them.
+   *
+   * The selection is the gesture: two topics chosen with Ctrl-click are exactly
+   * what a relation needs, so this reads as "do something with these two" rather
+   * than as a mode the reader has to enter and remember to leave. The pair is
+   * normalised on the way in, so the order they were selected in cannot matter.
+   */
+  const handleToggleRelation = useCallback(() => {
+    const ids = [...selectedNodeIds];
+    if (ids.length !== 2) return;
+    applySidecarEdit(["relations"], (current) => toggleRelation(current, ids[0], ids[1]));
+  }, [applySidecarEdit, selectedNodeIds]);
+
+  const selectedIds = [...selectedNodeIds];
+  const selectionRelated =
+    selectedIds.length === 2 ? areRelated(sidecar, selectedIds[0], selectedIds[1]) : false;
+
   const canOpenPanelLink =
     parsedPanelLink?.kind === "external" ||
     (parsedPanelLink?.kind === "anchor" && !!onJumpToHeading) ||
@@ -1962,6 +2025,10 @@ export const MindmapView = memo(function MindmapView({
           className="mindmap-viewport"
           transform={`translate(${transform.x}, ${transform.y}) scale(${transform.scale})`}
         >
+          {/* Relations first, so they pass under the outline rather than across
+              it — a line over a label costs both of them their legibility. */}
+          <MindmapRelationLines relations={relations} boxes={relationBoxes} />
+
           {/* Render Bezier / Step / Straight Connecting Edges */}
           <g className="mindmap-edges-group">
             {layout.edges.map((edge) => {
@@ -2500,6 +2567,12 @@ export const MindmapView = memo(function MindmapView({
           onPaste={() => {
             setContextMenu(null);
             handlePasteNode();
+          }}
+          selectedCount={selectedIds.length}
+          selectionRelated={selectionRelated}
+          onToggleRelation={() => {
+            setContextMenu(null);
+            handleToggleRelation();
           }}
           onExpandAll={() => {
             setContextMenu(null);

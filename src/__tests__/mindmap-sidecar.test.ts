@@ -1,14 +1,17 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   allTags,
+  areRelated,
   emptySidecar,
   iconFor,
   loadSidecar,
   linkFor,
   markersFor,
+  mergeSidecar,
   noteFor,
   parseSidecar,
   parseTagInput,
+  relationsFor,
   saveSidecar,
   serializeSidecar,
   setNodeIcon,
@@ -20,6 +23,7 @@ import {
   sidecarIsEmpty,
   SIDECAR_SECTIONS,
   tagsFor,
+  toggleRelation,
   type MindmapSidecar,
 } from "../services/mindmapSidecar";
 
@@ -396,11 +400,14 @@ describe("导图伴生文件", () => {
     });
 
     it("空文件判断把每一段都算上", () => {
-      // Asserted as an agreement between the two places rather than as a literal
-      // list: a section added to the service and forgotten in `emptySidecar`
-      // would read as "nothing here", and a literal list would only ever tell me
-      // that it had gone stale.
-      expect(Object.keys(emptySidecar()).sort()).toEqual(
+      // Asserted as an agreement between the places rather than as a literal
+      // list: a section added to the table and forgotten elsewhere would read as
+      // "nothing here", and a literal list would only ever tell me that it had
+      // gone stale.
+      expect(Object.keys(emptySidecar()).sort()).toEqual([...SIDECAR_SECTIONS, "version"].sort());
+      // The same agreement for parsing, which is what makes its table-driven
+      // dispatch's cast safe: whatever the table says, parsing produces.
+      expect(Object.keys(parseSidecar("{}") ?? {}).sort()).toEqual(
         [...SIDECAR_SECTIONS, "version"].sort()
       );
       expect(sidecarIsEmpty(setNodeTags(emptySidecar(), "node-a", ["api"]))).toBe(false);
@@ -454,6 +461,129 @@ describe("导图伴生文件", () => {
       // The agreement between `emptySidecar` and the section list is asserted
       // once, in the tags block; this is the part that concerns links.
       expect(sidecarIsEmpty(setNodeLink(emptySidecar(), "node-a", "#x"))).toBe(false);
+    });
+  });
+
+  describe("关系线", () => {
+    it("连上、再点一次断开", () => {
+      const linked = toggleRelation(emptySidecar(), "node-a", "node-b");
+
+      expect(linked.relations).toEqual([{ fromId: "node-a", toId: "node-b" }]);
+      expect(areRelated(linked, "node-a", "node-b")).toBe(true);
+      // Whichever way round it is asked.
+      expect(areRelated(linked, "node-b", "node-a")).toBe(true);
+
+      const unlinked = toggleRelation(linked, "node-b", "node-a");
+      expect(unlinked.relations).toEqual([]);
+      expect(areRelated(unlinked, "node-a", "node-b")).toBe(false);
+    });
+
+    it("存下来的对是规范顺序，所以两次点击只会有一条线", () => {
+      const first = toggleRelation(emptySidecar(), "z", "a");
+      const second = toggleRelation(first, "a", "z");
+
+      expect(first.relations).toEqual([{ fromId: "a", toId: "z" }]);
+      // The second call found the first one, so it removed it rather than
+      // adding a second line between the same two topics.
+      expect(second.relations).toEqual([]);
+    });
+
+    it("不连自己，也不接受空 id", () => {
+      expect(toggleRelation(emptySidecar(), "node-a", "node-a").relations).toEqual([]);
+      expect(toggleRelation(emptySidecar(), "node-a", "").relations).toEqual([]);
+      expect(toggleRelation(emptySidecar(), "", "").relations).toEqual([]);
+    });
+
+    it("按节点查：连线两端的都可查", () => {
+      const linked = toggleRelation(
+        toggleRelation(emptySidecar(), "node-a", "node-b"),
+        "node-c",
+        "node-a"
+      );
+
+      expect(relationsFor(linked, "node-a")).toHaveLength(2);
+      expect(relationsFor(linked, "node-b")).toEqual([{ fromId: "node-a", toId: "node-b" }]);
+      expect(relationsFor(linked, "node-d")).toEqual([]);
+      expect(relationsFor(null, "node-a")).toEqual([]);
+    });
+
+    it("读文件时丢掉不成对、连自己、重复的条目", () => {
+      const parsed = parseSidecar(
+        JSON.stringify({
+          version: 1,
+          relations: [
+            { fromId: "a", toId: "b" },
+            // The same line, written the other way round and then again.
+            { fromId: "b", toId: "a" },
+            { fromId: "c", toId: "c" },
+            { fromId: "d" },
+            { fromId: "", toId: "e" },
+            "不是一个对象",
+            { fromId: 1, toId: "f" },
+            { fromId: "g", toId: "h" },
+          ],
+        })
+      );
+
+      expect(parsed?.relations).toEqual([
+        { fromId: "a", toId: "b" },
+        { fromId: "g", toId: "h" },
+      ]);
+    });
+
+    it("relations 不是列表时当作没有", () => {
+      expect(parseSidecar(JSON.stringify({ version: 1, relations: {} }))?.relations).toEqual([]);
+      expect(parseSidecar(JSON.stringify({ version: 1, relations: "a-b" }))?.relations).toEqual([]);
+    });
+
+    it("六段一起往返，谁也不丢", () => {
+      let sidecar = toggleRelation(emptySidecar(), "node-a", "node-b");
+      sidecar = setNodeTags(sidecar, "node-c", ["api"]);
+      sidecar = setNodeLink(sidecar, "node-d", "#标题");
+      sidecar = setNodeIcon(sidecar, "node-e", "star");
+      sidecar = setNodeNote(sidecar, "node-f", "备注");
+      sidecar = setNodePriority(sidecar, "node-g", 3);
+
+      const back = parseSidecar(serializeSidecar(sidecar)) as MindmapSidecar;
+
+      expect(back.relations).toEqual([{ fromId: "node-a", toId: "node-b" }]);
+      expect(back.tags).toEqual({ "node-c": ["api"] });
+      expect(back.links).toEqual({ "node-d": "#标题" });
+      expect(back.icons).toEqual({ "node-e": "star" });
+      expect(back.notes).toEqual({ "node-f": "备注" });
+      expect(back.markers).toEqual({ "node-g": { priority: 3 } });
+    });
+
+    it("一条关系就算内容", () => {
+      expect(sidecarIsEmpty(toggleRelation(emptySidecar(), "a", "b"))).toBe(false);
+    });
+  });
+
+  describe("迟到的装载", () => {
+    /**
+     * The race this exists for: the companion file is read while the reader is
+     * already clicking things, and the read lands afterwards. Taking either side
+     * alone loses something — the edit, or everything else the file held.
+     */
+    it("读者碰过的段落归读者，其余归文件", () => {
+      let fromDisk = setNodeTags(emptySidecar(), "node-a", ["api"]);
+      fromDisk = setNodeNote(fromDisk, "node-b", "文件里的备注");
+      const edited = toggleRelation(emptySidecar(), "node-a", "node-b");
+
+      const merged = mergeSidecar(fromDisk, edited, new Set(["relations"]));
+
+      expect(merged?.relations).toEqual([{ fromId: "node-a", toId: "node-b" }]);
+      expect(merged?.tags).toEqual({ "node-a": ["api"] });
+      expect(merged?.notes).toEqual({ "node-b": "文件里的备注" });
+    });
+
+    it("只有一边有东西时就给那一边", () => {
+      const file = setNodeNote(emptySidecar(), "node-a", "备注");
+
+      // Nothing was edited: the file is what is on screen.
+      expect(mergeSidecar(file, null, new Set())).toBe(file);
+      // Nothing was on disk: the edit stands alone.
+      expect(mergeSidecar(null, file, new Set(["notes"]))).toBe(file);
     });
   });
 

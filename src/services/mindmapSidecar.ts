@@ -24,6 +24,7 @@
 
 /** The shape this build writes. A file may carry a different one; see above. */
 import { isPriorityInRange, isProgressInRange } from "../core/mindmapMarkers";
+import { isSameRelation, toRelation, type MindmapRelation } from "../core/mindmapRelations";
 
 export const SIDECAR_VERSION = 1;
 
@@ -55,30 +56,57 @@ export interface MindmapSidecar {
   links: Record<string, string>;
   /** Priority and progress by node id. */
   markers: Record<string, NodeMarkers>;
+  /**
+   * Lines between topics, which the outline itself cannot express.
+   *
+   * A list rather than a map: a relation has no id of its own — what identifies
+   * it *is* the pair of topics it joins, kept in one canonical order.
+   */
+  relations: MindmapRelation[];
   /** Sections this build does not know about, kept exactly as they were read. */
   [section: string]: unknown;
 }
 
 /**
- * The sections this build understands.
+ * The sections this build understands, and how to read each one.
  *
- * Three shapes now: node id to a string (notes, icons), to a list (tags), to a
- * small object (markers, which can say a priority and a progress at once).
+ * Four shapes now: node id to a string (notes, icons, links), to a list (tags),
+ * to a small object (markers), and a plain list of relations whose identity is
+ * the pair they join rather than any key at all.
  *
- * Looked at again when the third arrived, as promised, and deliberately left as
- * a list of names. Reading is the only part that differs by shape, and there each
- * reader has its own type and its own rules — turning them into a table of
- * descriptors would move four different functions behind one signature and buy
- * nothing. Writing and "is this file empty" ask a question no shape can answer
- * differently: does this section hold anything at all.
+ * Looked at again when the fourth arrived, as promised, and this time the list
+ * of names became a table of readers. The earlier reasoning still holds — reading
+ * is where the shapes differ, and each reader keeps its own signature and rules —
+ * but with six sections the dispatch was the duplication: every new section had
+ * to be threaded through parsing, writing and the emptiness check by hand. Now
+ * writing and emptiness use the names, parsing uses the readers, and the two
+ * cannot fall out of step.
  *
- * A *fourth* shape is where that reasoning runs out: dates, links with labels or
- * nested lists would each need more than a name here, and this list would have
- * become the thing to replace rather than to extend.
+ * `emptySidecar` still lists its sections explicitly, because an empty list and
+ * an empty object are not the same thing. A test holds it to this table.
  */
-export const SIDECAR_SECTIONS = ["notes", "icons", "tags", "links", "markers"] as const;
+const SECTIONS = [
+  { name: "notes", read: readStringSection },
+  { name: "icons", read: readStringSection },
+  { name: "links", read: readStringSection },
+  { name: "tags", read: readTagSection },
+  { name: "markers", read: readMarkerSection },
+  { name: "relations", read: readRelationSection },
+] as const;
 
-/** A companion with nothing in it. */
+/** Just the names, for writing a file and asking whether it holds anything. */
+export const SIDECAR_SECTIONS: string[] = SECTIONS.map((section) => section.name);
+
+/** The name of one section, for the places that have to name what they touched. */
+export type SidecarSection = (typeof SECTIONS)[number]["name"];
+
+/**
+ * A companion with nothing in it.
+ *
+ * Written out rather than derived from the table above: relations are a list
+ * while every other section is a map, and a derivation would have to know which
+ * is which — which is the same knowledge, in a less obvious place.
+ */
 export function emptySidecar(): MindmapSidecar {
   return {
     version: SIDECAR_VERSION,
@@ -87,6 +115,7 @@ export function emptySidecar(): MindmapSidecar {
     tags: {},
     links: {},
     markers: {},
+    relations: [],
   };
 }
 
@@ -146,6 +175,38 @@ function readTagSection(value: unknown): Record<string, string[]> {
   }
 
   return section;
+}
+
+/**
+ * The relations section: a list of pairs, with the unusable ones dropped.
+ *
+ * Entries that are not two non-empty ids, that join a topic to itself, or that
+ * repeat a pair already listed are left out — a line to nowhere and a line to
+ * itself say nothing, and the same pair twice would be one relation drawn twice.
+ * The duplicates are compared in canonical order, so `a` to `b` and `b` to `a`
+ * are recognised as the same relation rather than kept as two.
+ */
+function readRelationSection(value: unknown): MindmapRelation[] {
+  if (!Array.isArray(value)) return [];
+
+  const seen = new Set<string>();
+  const relations: MindmapRelation[] = [];
+
+  for (const entry of value) {
+    if (!isPlainObject(entry)) continue;
+    const { fromId, toId } = entry;
+    if (typeof fromId !== "string" || typeof toId !== "string") continue;
+    if (!fromId || !toId || fromId === toId) continue;
+
+    const relation = toRelation(fromId, toId);
+    const key = `${relation.fromId}\u0000${relation.toId}`;
+    if (seen.has(key)) continue;
+
+    seen.add(key);
+    relations.push(relation);
+  }
+
+  return relations;
 }
 
 /**
@@ -210,17 +271,19 @@ export function parseSidecar(text: string | null | undefined): MindmapSidecar | 
 
   if (!isPlainObject(parsed)) return null;
 
-  const notes = readStringSection(parsed.notes);
-  const icons = readStringSection(parsed.icons);
-  const links = readStringSection(parsed.links);
-  const tags = readTagSection(parsed.tags);
-  const markers = readMarkerSection(parsed.markers);
+  const sections = Object.fromEntries(
+    SECTIONS.map((section) => [section.name, section.read(parsed[section.name])])
+  );
 
   const version = typeof parsed.version === "number" ? parsed.version : SIDECAR_VERSION;
 
   // The spread comes first so the sections this build does not know about are
   // carried through, and the normalised fields overwrite whatever was there.
-  return { ...parsed, version, notes, icons, tags, links, markers };
+  // The cast is the price of a table-driven dispatch; the test that parses an
+  // empty object and compares the result's keys against the table is what keeps
+  // it honest — a section added to the table but not to the interface fails
+  // there rather than at the next reader of this file.
+  return { ...parsed, version, ...sections } as MindmapSidecar;
 }
 
 /**
@@ -238,8 +301,7 @@ export function serializeSidecar(sidecar: MindmapSidecar): string {
   const payload: Record<string, unknown> = { ...sidecar };
 
   for (const section of SIDECAR_SECTIONS) {
-    const value = payload[section];
-    if (isPlainObject(value) && Object.keys(value).length === 0) delete payload[section];
+    if (sectionIsEmpty(payload[section])) delete payload[section];
   }
 
   return `${JSON.stringify(payload, null, 2)}\n`;
@@ -425,13 +487,85 @@ export function setNodeProgress(
   return setMarker(sidecar, nodeId, "progress", progress, isProgressInRange);
 }
 
+/**
+ * Two readings of one file: the one that was on disk when a load began, and the
+ * one the reader has since edited.
+ *
+ * Needed because a load is not instant and an edit does not wait for it. The
+ * reader's version wins for the sections they touched — so a slow read cannot
+ * undo what they just did — and the file's version is kept for the rest, so that
+ * same slow read cannot cost the document its other annotations either. Taking
+ * either side alone loses something: the edit, or everything else in the file.
+ */
+export function mergeSidecar(
+  fromDisk: MindmapSidecar | null,
+  edited: MindmapSidecar | null,
+  touched: ReadonlySet<SidecarSection>
+): MindmapSidecar | null {
+  if (!edited) return fromDisk;
+  if (!fromDisk) return edited;
+
+  const merged: Record<string, unknown> = { ...fromDisk };
+  for (const section of touched) {
+    merged[section] = edited[section];
+  }
+  return merged as unknown as MindmapSidecar;
+}
+
+/** The lines touching one topic. */
+export function relationsFor(sidecar: MindmapSidecar | null, nodeId: string): MindmapRelation[] {
+  if (!sidecar) return [];
+  return sidecar.relations.filter(
+    (relation) => relation.fromId === nodeId || relation.toId === nodeId
+  );
+}
+
+/** Whether these two topics are already connected. */
+export function areRelated(sidecar: MindmapSidecar | null, a: string, b: string): boolean {
+  if (!sidecar) return false;
+  return sidecar.relations.some((relation) => isSameRelation(relation, a, b));
+}
+
+/**
+ * Connects two topics, or disconnects them if they already are.
+ *
+ * A toggle, like the icons and the marks: the gesture that draws a line is the
+ * gesture that should take it away. A menu item that said "connect" while the two
+ * were already connected would be lying about what it does.
+ *
+ * A topic cannot be related to itself, so that request is answered by doing
+ * nothing rather than by storing a line from a box to the same box.
+ */
+export function toggleRelation(sidecar: MindmapSidecar, a: string, b: string): MindmapSidecar {
+  if (!a || !b || a === b) return sidecar;
+
+  const relations = areRelated(sidecar, a, b)
+    ? sidecar.relations.filter((relation) => !isSameRelation(relation, a, b))
+    : [...sidecar.relations, toRelation(a, b)];
+
+  return { ...sidecar, relations };
+}
+
+/**
+ * Whether a section holds nothing.
+ *
+ * Two shapes reach here: a map of topics and a list of relations, so both an
+ * empty object and an empty array count as nothing. Missing out the array was a
+ * real bug for one commit's worth of time — `"relations": []` was written into
+ * every file, and a file with a relation in it was reported as empty.
+ */
+function sectionIsEmpty(value: unknown): boolean {
+  if (Array.isArray(value)) return value.length === 0;
+  if (isPlainObject(value)) return Object.keys(value).length === 0;
+  return true;
+}
+
 /** Whether anything is stored at all. */
 export function sidecarIsEmpty(sidecar: MindmapSidecar | null): boolean {
   if (!sidecar) return true;
 
   for (const section of SIDECAR_SECTIONS) {
-    const value = sidecar[section];
-    if (isPlainObject(value) && Object.keys(value).length > 0) return false;
+    if (!sectionIsEmpty(sidecar[section])) return false;
   }
 
   // Only the version and the sections this build knows — and those sections'

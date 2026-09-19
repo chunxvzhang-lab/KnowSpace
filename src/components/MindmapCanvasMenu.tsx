@@ -1,5 +1,5 @@
 import type { RefObject } from "react";
-import { CornerDownRight, FoldVertical, ListTree, Maximize2, PlusCircle, UnfoldVertical, X } from "lucide-react";
+import { CornerDownRight, FoldVertical, Link, ListTree, Maximize2, PlusCircle, UnfoldVertical, X } from "lucide-react";
 
 /**
  * The menu that opens on empty mind map canvas.
@@ -22,9 +22,14 @@ export type MindmapCanvasMenuProps = {
   menuRef: RefObject<HTMLDivElement | null>;
   /** Whether anything has been copied; the paste row is disabled until then. */
   canPaste: boolean;
+  /** How many topics are selected. A relation needs exactly two. */
+  selectedCount: number;
+  /** Whether those two are already connected, which turns the row into a removal. */
+  selectionRelated: boolean;
   onClose: () => void;
   onNewTopic: () => void;
   onPaste: () => void;
+  onToggleRelation: () => void;
   onExpandAll: () => void;
   onCollapseToLevel2: () => void;
   onFitToScreen: () => void;
@@ -35,9 +40,12 @@ export function MindmapCanvasMenu({
   top,
   menuRef,
   canPaste,
+  selectedCount,
+  selectionRelated,
   onClose,
   onNewTopic,
   onPaste,
+  onToggleRelation,
   onExpandAll,
   onCollapseToLevel2,
   onFitToScreen,
@@ -75,6 +83,27 @@ export function MindmapCanvasMenu({
       >
         <CornerDownRight size={13} />
         <span>粘贴</span>
+      </button>
+
+      {/* A relation needs two topics, and two topics are what a Ctrl-click
+          selection already is — so the gesture is the selection the reader
+          already knows rather than a new mode to learn. Disabled with the reason
+          when the selection is not two, like the paste row above. */}
+      <button
+        type="button"
+        className="mindmap-ctx-item"
+        onClick={onToggleRelation}
+        disabled={selectedCount !== 2}
+        title={
+          selectedCount === 2
+            ? selectionRelated
+              ? "取消这两个主题之间的关系线"
+              : "在两个主题之间画一条关系线（只存在导图里，不进文档）"
+            : "先选中两个主题（Ctrl 点第二个）"
+        }
+      >
+        <Link size={13} />
+        <span>{selectionRelated ? "取消关系线" : "连接这两个主题"}</span>
       </button>
 
       <div className="mindmap-ctx-divider" />

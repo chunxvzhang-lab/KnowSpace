@@ -60,9 +60,23 @@ type DecorationRule = {
   stroke?: { dark: string; light: string };
   /** Text needs its size and weight too — neither travels with the file. */
   font?: { size: string; weight: string };
+  /**
+   * Whatever else the stylesheet was saying that matters: a dash pattern, a line
+   * width, and `fill: none` — which is not a colour, so it does not belong above.
+   */
+  attributes?: Record<string, string>;
 };
 
 const DECORATION_RULES: DecorationRule[] = [
+  // Relations between topics. Dashed in the file as on screen, so a line that is
+  // an addition to the outline is not mistaken for part of it.
+  {
+    selector: ".mindmap-relation",
+    stroke: { dark: "#b28ae0", light: "#8b5cf6" },
+    // `fill: none` is not a colour, and a path without it would arrive as a
+    // black shape where the file has no stylesheet to say otherwise.
+    attributes: { fill: "none", "stroke-width": "1.4", "stroke-dasharray": "5 4" },
+  },
   // Note badge, at the node's top-left corner.
   {
     selector: ".mindmap-note-marker circle",
@@ -213,6 +227,11 @@ export function buildStandaloneMindmapSvg(
         element.setAttribute("font-family", EXPORT_FONT_FAMILY);
         element.setAttribute("font-size", rule.font.size);
         element.setAttribute("font-weight", rule.font.weight);
+      }
+      if (rule.attributes) {
+        for (const [name, value] of Object.entries(rule.attributes)) {
+          element.setAttribute(name, value);
+        }
       }
     });
   }
