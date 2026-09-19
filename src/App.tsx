@@ -41,9 +41,10 @@ import { type MermaidTheme } from "./services/mermaid";
 import { extractHeadingsFromSource, renderMarkdown } from "./services/markdown";
 import {
   annotationsFromOutline,
+  bytesFromBase64,
   importFileName,
   outlineToMarkdown,
-  parseOutlineFile,
+  parseOutlineBytes,
 } from "./services/mindmapImport";
 import { parseMarkdownToMindmapTree } from "./services/mindmapService";
 import {
@@ -673,7 +674,12 @@ export function App() {
       notice: string;
       /** What to say when it did not, in the same shape. */
       failureNotice: string;
-    }): Promise<{ absolutePath: string; markdown: string; chapterId: string } | null> => {
+    }): Promise<{
+      absolutePath: string;
+      markdown: string;
+      chapterId: string;
+      title: string;
+    } | null> => {
       const desktop = window.bookMDDesktop;
       if (!desktop) return null;
 
@@ -747,6 +753,7 @@ export function App() {
           absolutePath: result.absolutePath,
           markdown: result.source.markdown,
           chapterId: activeChap.id,
+          title: activeChap.title,
         };
       } catch (err: any) {
         setNotice(options.failureNotice.split("{message}").join(err.message || String(err)));
@@ -795,14 +802,15 @@ export function App() {
 
     const picked = await desktop.pickOutlineFile();
     if (picked.canceled) return;
-    if (!picked.success || typeof picked.content !== "string") {
+    if (!picked.success || typeof picked.contentBase64 !== "string") {
       setNotice(picked.message || "无法读取这个文件。");
       return;
     }
 
-    // Which format it is comes out of the file rather than out of its name: the
-    // same exporter writes .xml for both, and the root element cannot be wrong.
-    const parsed = parseOutlineFile(picked.content);
+    // Which format it is comes out of the file rather than out of its name: one of
+    // them is a ZIP, another writes .xml under two different formats, and the
+    // content is the only thing that cannot be wrong.
+    const parsed = parseOutlineBytes(bytesFromBase64(picked.contentBase64));
     if (!parsed.ok) {
       setNotice(`导入失败：${parsed.message}`);
       return;
@@ -821,6 +829,12 @@ export function App() {
       failureNotice: "导入大纲失败：{message}",
     });
     if (!created) return;
+
+    // What was not imported, said out loud: a file can hold several sheets and a
+    // document is one tree, so "imported" without that would be a half-truth.
+    if (parsed.outline.warning) {
+      setNotice(`已导入为新文档：${created.title} —— ${parsed.outline.warning}`);
+    }
 
     // What the outline carried besides its shape — notes, links — belongs in the
     // document's companion file, keyed by the ids the document just produced.

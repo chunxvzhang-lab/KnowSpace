@@ -1,4 +1,5 @@
 import type { MindmapNode } from "../core/types";
+import { readZipEntry } from "../core/zip";
 
 /**
  * Reading an outline somebody else's app wrote.
@@ -38,14 +39,22 @@ export interface ImportedOutline {
   /**
    * The one root topic the format had, if it had one.
    *
-   * FreeMind has exactly one root and OPML may have any number of top-level
-   * outlines, and the difference is not a detail: a single root *is* the outline,
-   * so it becomes the document — its text names the file and its children are the
-   * document's first level. Kept here rather than folded into `topics` because
-   * its own note and link then have somewhere to go, where a `topics` entry
+   * FreeMind and XMind have exactly one root and OPML may have any number of
+   * top-level outlines, and the difference is not a detail: a single root *is* the
+   * outline, so it becomes the document — its text names the file and its children
+   * are the document's first level. Kept here rather than folded into `topics`
+   * because its own note and link then have somewhere to go, where a `topics` entry
    * standing in for the document would have them attached to nothing.
    */
   root?: ImportedTopic;
+  /**
+   * Something the reader should know about what was *not* imported.
+   *
+   * A file can hold more than one outline — XMind sheets are the case that made
+   * this necessary — and a document is one tree. Importing the first and saying
+   * nothing would look like the rest had never existed.
+   */
+  warning?: string;
 }
 
 export type ImportResult =
@@ -126,7 +135,139 @@ export function parseFreemindOutline(xml: string): ImportResult {
 }
 
 /**
- * Reads an outline file of either format, deciding by what the file *is*.
+ * Reads an XMind file.
+ *
+ * An `.xmind` is a ZIP holding `content.json`: a list of sheets, each with a root
+ * topic and its children. Four things about that are worth stating, because each
+ * is a decision rather than a detail:
+ *
+ * - **The first sheet is the document.** A document here is one tree, and a file
+ *   may hold several sheets; the rest are counted and reported rather than
+ *   silently dropped.
+ * - **Detached topics are not imported.** They are the sheet's floating topics,
+ *   and they carry no position this file states — importing them would stack every
+ *   one of them on the same spot, which is worse than not importing them and
+ *   saying so.
+ * - **The map's own non-tree structures are not imported** — boundaries,
+ *   summaries, relationships, markers, labels. Each needs the correspondence
+ *   between XMind's topic ids and this app's node ids, which the tree walk below
+ *   does establish, so they are the next thing this could read rather than
+ *   something it cannot.
+ * - **A file from XMind 8 or earlier holds `content.xml` instead**, and is refused
+ *   with that said out loud rather than as a parse failure.
+ */
+export function parseXmindOutline(bytes: Uint8Array): ImportResult {
+  const entry = readZipEntry(
+    bytes,
+    (name) => name === "content.json" || name.endsWith("/content.json"),
+    "content.json"
+  );
+
+  if (!entry.ok) {
+    return { ok: false, message: `${entry.message}（XMind 8 及更早版本用的是 content.xml，尚未支持。）` };
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(new TextDecoder("utf-8").decode(entry.bytes));
+  } catch {
+    return { ok: false, message: "这个 .xmind 里的 content.json 不是可以解析的 JSON。" };
+  }
+
+  // A list of sheets, though a file with a single sheet written as one object has
+  // been seen; both are accepted because the difference means nothing here.
+  const sheets = Array.isArray(parsed) ? parsed : [parsed];
+  const sheet = sheets.find((candidate) => isRecord(candidate) && isRecord(candidate.rootTopic));
+  if (!isRecord(sheet)) {
+    return { ok: false, message: "这个 .xmind 里没有可读的画布。" };
+  }
+
+  const rootTopic = sheet.rootTopic as Record<string, unknown>;
+  const root = readXmindTopic(rootTopic);
+  const warning =
+    sheets.length > 1
+      ? `只导入了第 1 张画布，这个文件里还有 ${sheets.length - 1} 张（一篇文档是一棵树）。`
+      : undefined;
+
+  return {
+    ok: true,
+    outline: {
+      title: typeof sheet.title === "string" ? oneLine(sheet.title) : "",
+      topics: [],
+      root,
+      ...(warning ? { warning } : {}),
+    },
+  };
+}
+
+/** Reads one XMind topic and everything attached under it. */
+function readXmindTopic(topic: Record<string, unknown>): ImportedTopic {
+  const children = isRecord(topic.children) ? topic.children : {};
+  const attached = Array.isArray(children.attached) ? children.attached : [];
+
+  return topicFrom(
+    typeof topic.title === "string" ? topic.title : "",
+    xmindNoteText(topic),
+    typeof topic.href === "string" ? topic.href : "",
+    attached.filter(isRecord).map(readXmindTopic)
+  );
+}
+
+/** A topic's note, which XMind keeps both as plain text and as HTML. */
+function xmindNoteText(topic: Record<string, unknown>): string {
+  const notes = isRecord(topic.notes) ? topic.notes : {};
+  const plain = isRecord(notes.plain) ? notes.plain.content : undefined;
+  if (typeof plain === "string" && plain.trim()) return plain;
+
+  // The HTML copy is the same note with its paragraphs marked up, so it is
+  // flattened the same way a FreeMind note is — the note is going into a text
+  // field either way.
+  for (const key of ["realHTML", "html"]) {
+    const html = isRecord(notes[key]) ? notes[key].content : undefined;
+    if (typeof html === "string" && html.trim()) return htmlToText(html);
+  }
+
+  return "";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * The bytes behind the base64 the main process sends.
+ *
+ * Encoded there because this crosses an IPC boundary and an unambiguous string
+ * cannot be mangled by however a given Electron version serializes a typed array.
+ */
+export function bytesFromBase64(base64: string): Uint8Array {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
+}
+
+/**
+ * Reads an outline from a file's bytes, deciding by what the file *is*.
+ *
+ * At this level there are formats whose contents are not text at all, so the first
+ * question is whether this is a ZIP. Then the text formats, where the root element
+ * decides: the same exporter writes `.xml` for both of them, and an `.opml` that is
+ * really a FreeMind map is not unheard of.
+ */
+export function parseOutlineBytes(bytes: Uint8Array): ImportResult {
+  // A ZIP always begins with this, and nothing else this app reads does.
+  if (bytes.length >= 4 && bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 0x03 && bytes[3] === 0x04) {
+    return parseXmindOutline(bytes);
+  }
+
+  return parseOutlineFile(new TextDecoder("utf-8").decode(bytes));
+}
+
+/**
+ * Reads an outline file of either text format, deciding by what the file *is*.
  *
  * By the root element rather than by the extension: the same exporter writes `.xml`
  * for both, an `.opml` that is really a FreeMind map is not unheard of, and the
@@ -205,11 +346,30 @@ function readFreemindTopic(element: Element): ImportedTopic {
 }
 
 /**
+ * A note written as HTML, flattened to text.
+ *
+ * Both formats that carry notes mark them up — FreeMind writes a fragment inside
+ * `<richcontent>`, XMind keeps a second copy of the note as HTML — and both are
+ * going into a text field here. So the paragraphs and line breaks are kept as
+ * text, and the markup, which would only be in the way, is not.
+ */
+function htmlToText(html: string): string {
+  // Parsed as HTML rather than as XML: these fragments are HTML, and they are
+  // frequently not well-formed enough for an XML parser.
+  const container = new DOMParser().parseFromString(html, "text/html").body;
+  container.querySelectorAll("br").forEach((br) => br.replaceWith("\n"));
+  container.querySelectorAll("p, div, li").forEach((block) => block.append("\n"));
+
+  return (container.textContent ?? "")
+    .split("\n")
+    .map((line) => line.replace(/[ \t]+/g, " ").trim())
+    .filter(Boolean)
+    .join("\n");
+}
+
+/**
  * A FreeMind note, which is written as HTML inside `<richcontent TYPE="NOTE">`.
  *
- * It is read as HTML and then flattened to its text: the note is going to live in
- * a text field in this app, so paragraphs and line breaks are kept as text —
- * `<br>` becomes a line break — while the markup itself would only be in the way.
  * A note written as plain text, which the format also allows, comes back as it is.
  */
 function richNoteText(node: Element): string {
@@ -223,17 +383,7 @@ function richNoteText(node: Element): string {
   const html = rich.innerHTML ?? "";
   if (!html.trim()) return oneLine(rich.textContent ?? "");
 
-  // Parsed as HTML rather than as XML: the fragment FreeMind writes is HTML, and
-  // it is frequently not well-formed enough for an XML parser.
-  const container = new DOMParser().parseFromString(html, "text/html").body;
-  container.querySelectorAll("br").forEach((br) => br.replaceWith("\n"));
-  container.querySelectorAll("p, div, li").forEach((block) => block.append("\n"));
-
-  return (container.textContent ?? "")
-    .split("\n")
-    .map((line) => line.replace(/[ \t]+/g, " ").trim())
-    .filter(Boolean)
-    .join("\n");
+  return htmlToText(html) || oneLine(rich.textContent ?? "");
 }
 
 /** One topic out of four parts, with the empties left out. */
@@ -328,7 +478,7 @@ export function annotationsFromOutline(
 
 /** A file name for the imported document, from the outline's title. */
 export function importFileName(outline: ImportedOutline, sourceName: string): string {
-  const extensions = /\.(opml|xml|mm)$/i;
+  const extensions = /\.(opml|xml|mm|xmind)$/i;
   const base =
     outline.title ||
     outline.root?.text ||

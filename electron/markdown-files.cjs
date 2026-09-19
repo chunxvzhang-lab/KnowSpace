@@ -205,15 +205,20 @@ async function readMarkdownSource(absolutePath) {
  * make sense of it.
  */
 async function readOutlineFile(absolutePath) {
-  if (typeof absolutePath !== "string" || !/\.(opml|xml|mm)$/i.test(absolutePath)) {
-    return { success: false, message: "只能导入 .opml、.mm 或 .xml 大纲文件。" };
+  if (typeof absolutePath !== "string" || !/\.(opml|xml|mm|xmind)$/i.test(absolutePath)) {
+    return { success: false, message: "只能导入 .xmind、.mm、.opml 或 .xml 大纲文件。" };
   }
 
   try {
-    // Read as text and handed on as it is: the byte-order mark belongs to the XML
-    // parser's problem, and it is dealt with there.
-    const content = (await fs.readFile(path.resolve(absolutePath))).toString("utf8");
-    return { success: true, content, fileName: path.basename(absolutePath) };
+    // Bytes, encoded for the trip. Not text: an .xmind is a ZIP, and which format
+    // this is has to be decided by what is inside the file — so the main process
+    // hands over the bytes and the renderer, which owns the parsers, decides.
+    //
+    // Base64 rather than the bytes themselves: this crosses an IPC boundary, and
+    // an unambiguous string cannot be mangled by however a given Electron version
+    // chooses to serialize a typed array.
+    const bytes = await fs.readFile(path.resolve(absolutePath));
+    return { success: true, contentBase64: bytes.toString("base64"), fileName: path.basename(absolutePath) };
   } catch (error) {
     return { success: false, message: `无法读取文件：${error.message}` };
   }

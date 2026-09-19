@@ -105,14 +105,17 @@ export type KnowSpaceDesktopAPI = {
    * Asks the reader for an outline file to import, and reads it.
    *
    * The dialog and the read both happen in the main process: the renderer never
-   * names a path, and what comes back is the file's text rather than a handle it
-   * could write to. `canceled` is a normal answer — the reader changed their mind
-   * — and an outline that cannot be read comes back as a message instead.
+   * names a path, and what comes back is the file's bytes rather than a handle it
+   * could write to. Bytes, because one of the formats is a ZIP — so which format
+   * this is gets decided by the content, in the renderer, which owns the parsers.
+   *
+   * `canceled` is a normal answer — the reader changed their mind — and a file that
+   * cannot be read comes back as a message instead.
    */
   pickOutlineFile?: () => Promise<{
     canceled?: boolean;
     success?: boolean;
-    content?: string;
+    contentBase64?: string;
     fileName?: string;
     message?: string;
   }>;

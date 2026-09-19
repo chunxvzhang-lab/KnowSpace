@@ -1,13 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
   annotationsFromOutline,
+  bytesFromBase64,
   importFileName,
   outlineToMarkdown,
   parseFreemindOutline,
   parseOpmlOutline,
+  parseOutlineBytes,
   parseOutlineFile,
+  parseXmindOutline,
   type ImportedOutline,
 } from "../services/mindmapImport";
+import { buildXmind, buildZip } from "./helpers/zipBuilder";
 import { parseMarkdownToMindmapTree } from "../services/mindmapService";
 import type { MindmapNode } from "../core/types";
 
@@ -309,6 +313,147 @@ describe("读 FreeMind", () => {
   });
 });
 
+describe("读 XMind", () => {
+  /** A sheet as XMind writes one, with topic ids this app never sees. */
+  const xmindTopic = (title: string, extra: Record<string, unknown> = {}, attached: unknown[] = []) => ({
+    id: `xmind-${title}`,
+    class: "topic",
+    title,
+    ...extra,
+    ...(attached.length > 0 ? { children: { attached } } : {}),
+  });
+
+  function xmindOf(content: unknown): ImportedOutline {
+    const result = parseXmindOutline(buildXmind(content));
+    if (!result.ok) throw new Error(`这一条本该能解析：${result.message}`);
+    return result.outline;
+  }
+
+  it("一张画布：根主题就是文档，子主题按 attatched 读", () => {
+    const outline = xmindOf([
+      {
+        id: "sheet-1",
+        class: "sheet",
+        title: "我的画布",
+        rootTopic: xmindTopic("中心主题", {}, [
+          xmindTopic("甲"),
+          xmindTopic("乙", {}, [xmindTopic("乙一")]),
+        ]),
+      },
+    ]);
+
+    // The sheet's title is what a reader would call the file, so it names it;
+    // the root topic is the document itself, as in FreeMind.
+    expect(outline.title).toBe("我的画布");
+    expect(outline.root?.text).toBe("中心主题");
+    expect(outline.root?.children.map((t) => t.text)).toEqual(["甲", "乙"]);
+    expect(outline.root?.children[1].children[0].text).toBe("乙一");
+  });
+
+  it("备注读 plain，其次把 realHTML 摊平", () => {
+    // XMind keeps the note twice: as plain text and marked up. Either one that is
+    // there is better than the note going missing.
+    const outline = xmindOf([
+      {
+        title: "画布",
+        rootTopic: xmindTopic("根", {}, [
+          xmindTopic("甲", { notes: { plain: { content: "一段备注" } } }),
+          xmindTopic("乙", {
+            notes: { realHTML: { content: "<p>第一段</p><p>第二段</p>" } },
+          }),
+        ]),
+      },
+    ]);
+
+    expect(outline.root?.children[0].note).toBe("一段备注");
+    expect(outline.root?.children[1].note).toBe("第一段\n第二段");
+  });
+
+  it("链接读 href", () => {
+    const outline = xmindOf([
+      { title: "画布", rootTopic: xmindTopic("根", { href: "https://example.com" }) },
+    ]);
+
+    expect(outline.root?.link).toBe("https://example.com");
+  });
+
+  it("浮动主题不导入，并且说出来", () => {
+    // They are the sheet's detached topics, with no position this file states:
+    // importing them would stack every one on the same spot.
+    const outline = xmindOf([
+      {
+        title: "画布",
+        rootTopic: {
+          title: "根",
+          children: {
+            attached: [xmindTopic("挂着的")],
+            detached: [xmindTopic("飘在一边的")],
+          },
+        },
+      },
+    ]);
+
+    expect(outline.root?.children.map((t) => t.text)).toEqual(["挂着的"]);
+  });
+
+  it("多张画布：只导入第一张，并说清楚还有几张", () => {
+    const outline = xmindOf([
+      { title: "第一张", rootTopic: xmindTopic("甲的根") },
+      { title: "第二张", rootTopic: xmindTopic("乙的根") },
+      { title: "第三张", rootTopic: xmindTopic("丙的根") },
+    ]);
+
+    expect(outline.root?.text).toBe("甲的根");
+    // A document is one tree, so "imported" without this would be a half-truth.
+    expect(outline.warning).toContain("2 张");
+  });
+
+  it("没有 content.json 的时候，XMind 8 的事要说出来", () => {
+    // An older XMind stores content.xml instead, and "no such entry" would leave
+    // the reader with nothing to go on.
+    const zip = buildZip([{ name: "content.xml", data: new TextEncoder().encode("<xmap-content/>") }]);
+
+    const result = parseXmindOutline(zip);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.message).toContain("content.json");
+      expect(result.message).toContain("XMind 8");
+    }
+  });
+
+  it("坏 JSON 与没有根主题：各说各的", () => {
+    const badJson = buildZip([
+      { name: "content.json", data: new TextEncoder().encode("{not json") },
+    ]);
+    const badResult = parseXmindOutline(badJson);
+    expect(badResult.ok).toBe(false);
+    if (!badResult.ok) expect(badResult.message).toContain("JSON");
+
+    const noTopic = parseXmindOutline(buildXmind([{ title: "空的画布" }]));
+    expect(noTopic.ok).toBe(false);
+    if (!noTopic.ok) expect(noTopic.message).toContain("没有可读的画布");
+  });
+
+  it("从字节到一棵树：整条路走通", () => {
+    // The property the import rests on, for the format whose content is not text:
+    // an .xmind becomes Markdown, and the app's own reader turns that back into the
+    // outline the file described.
+    const outline = xmindOf([
+      {
+        title: "我的画布",
+        rootTopic: xmindTopic("中心主题", {}, [
+          xmindTopic("甲"),
+          xmindTopic("乙", {}, [xmindTopic("乙一")]),
+        ]),
+      },
+    ]);
+
+    const tree = parseMarkdownToMindmapTree(outlineToMarkdown(outline), "我的画布");
+
+    expect(shape(tree)).toEqual(["我的画布", "  甲", "  乙", "    乙一"]);
+  });
+});
+
 describe("按内容决定是哪种格式", () => {
   it("根元素说了算，而不是扩展名", () => {
     // The same exporter writes .xml for both, so the extension cannot be trusted
@@ -341,6 +486,28 @@ describe("按内容决定是哪种格式", () => {
       ok: false,
       message: "这个文件不是可以解析的 XML。",
     });
+  });
+
+  it("有字节这一层：压缩包与文本各走各的门", () => {
+    // The one format whose contents are not text at all. Everything else arrives
+    // as bytes too, and is decoded here rather than in the main process, so that
+    // nothing has to be decided before the content can be looked at.
+    const zip = buildXmind([{ title: "画布", rootTopic: { title: "根" } }]);
+    const zipped = parseOutlineBytes(zip);
+    expect(zipped.ok && zipped.outline.root?.text).toBe("根");
+
+    const text = parseOutlineBytes(new TextEncoder().encode('<?xml version="1.0"?><map><node TEXT="甲"/></map>'));
+    expect(text.ok && text.outline.root?.text).toBe("甲");
+  });
+
+  it("base64 送过来的字节，解回来一模一样", () => {
+    // How the file arrives from the main process, base64 and all: a ZIP cannot be
+    // carried as text, and a typed array across an IPC boundary is a thing whose
+    // serialization is not worth doubting.
+    const zip = buildXmind([{ title: "画布", rootTopic: { title: "根" } }]);
+    const base64 = Buffer.from(zip).toString("base64");
+
+    expect(Array.from(bytesFromBase64(base64))).toEqual(Array.from(zip));
   });
 });
 
