@@ -25,6 +25,7 @@
 /** The shape this build writes. A file may carry a different one; see above. */
 import { isPriorityInRange, isProgressInRange } from "../core/mindmapMarkers";
 import { isSameRelation, toRelation, type MindmapRelation } from "../core/mindmapRelations";
+import { isMindmapSide, type MindmapSide } from "../core/mindmapSides";
 
 export const SIDECAR_VERSION = 1;
 
@@ -86,6 +87,14 @@ export interface MindmapSidecar {
    * the group it encloses can change, without becoming a different boundary.
    */
   boundaries: Record<string, MindmapBoundary>;
+  /**
+   * Which side of the root a first-level branch hangs on, in the two-sided layout.
+   *
+   * Stated by the reader rather than worked out by the layout, which balances branches by
+   * height and would otherwise move one to the other side the moment another grew. Only
+   * first-level branches have an entry; the topics under them follow their branch.
+   */
+  sides: Record<string, MindmapSide>;
   /** Sections this build does not know about, kept exactly as they were read. */
   [section: string]: unknown;
 }
@@ -118,6 +127,7 @@ const SECTIONS = [
   { name: "floating", read: readFloatingSection },
   { name: "summaries", read: readSummarySection },
   { name: "boundaries", read: readBoundarySection },
+  { name: "sides", read: readSideSection },
 ] as const;
 
 /** Just the names, for writing a file and asking whether it holds anything. */
@@ -145,6 +155,7 @@ export function emptySidecar(): MindmapSidecar {
     floating: {},
     summaries: {},
     boundaries: {},
+    sides: {},
   };
 }
 
@@ -225,6 +236,27 @@ function readSummarySection(value: unknown): Record<string, MindmapSummary> {
 
 function readBoundarySection(value: unknown): Record<string, MindmapBoundary> {
   return readSpanSection<MindmapBoundary>(value);
+}
+
+/**
+ * A side per node, for the two-sided layout.
+ *
+ * Only the two words this build knows are kept, unlike an icon id or a colour — where an
+ * unknown value is what a newer version's palette looks like, and dropping it is what
+ * makes going back to that version lossy. A side is a position, and there is no third one
+ * to keep: a value this build cannot read is a placement it cannot draw, so the branch
+ * falls back to being balanced by the layout, which is where it would have been anyway.
+ */
+function readSideSection(value: unknown): Record<string, MindmapSide> {
+  const section: Record<string, MindmapSide> = {};
+  if (!isPlainObject(value)) return section;
+
+  for (const [id, side] of Object.entries(value)) {
+    if (!id) continue;
+    if (isMindmapSide(side)) section[id] = side;
+  }
+
+  return section;
 }
 
 /** A topic on the canvas that no outline owns. */
