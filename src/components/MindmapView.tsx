@@ -96,10 +96,11 @@ import { boundaryTitleAnchor, summaryLabelAnchor } from "../core/mindmapGroups";
 import { MindmapFloatingTopics, type FloatingBox } from "./MindmapFloatingTopics";
 import { MindmapSummaries, type SummaryBox } from "./MindmapSummaries";
 import { MindmapBoundaries, type BoundaryBox } from "./MindmapBoundaries";
+import { MindmapFloatingAnnotationMenu } from "./MindmapFloatingAnnotationMenu";
 import { findMindmapIcon } from "../core/mindmapIcons";
 import { numberingFor } from "../core/mindmapNumbering";
 import { parseMindmapLink } from "../core/mindmapLinks";
-import { NodeLinkMark, NodeMarks, NodeTags } from "./MindmapMarks";
+import { NodeIcon, NodeLinkMark, NodeMarks, NodeNoteMark, NodeTags } from "./MindmapMarks";
 import { MindmapRelationLines } from "./MindmapRelationLines";
 
 /**
@@ -119,13 +120,6 @@ const NOTE_SAVE_DELAY = 600;
  * snapshots exist to stop exactly that kind of drift. An id this build does not
  * know draws nothing rather than breaking the map.
  */
-function NodeIcon({ iconId, height }: { iconId: string; height: number }) {
-  const icon = findMindmapIcon(iconId);
-  if (!icon) return null;
-  const Icon = icon.Icon;
-  return <Icon className="mindmap-node-icon" size={16} x={-22} y={(height - 16) / 2} strokeWidth={1.8} />;
-}
-
 export type MindmapViewProps = {
   title: string;
   headings?: Heading[];
@@ -614,8 +608,16 @@ export const MindmapView = memo(function MindmapView({
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
+    /**
+     * The topic this menu is about — a topic in the outline, or, when `floating`
+     * is set, one the outline does not own. The field is named for the map's
+     * topics rather than for the tree's nodes, because both kinds are topics and
+     * a panel only ever needs the id to write by.
+     */
     nodeId: string;
     isCanvas?: boolean;
+    /** True when this menu is about a floating topic, which has its own panel. */
+    floating?: boolean;
   } | null>(null);
 
   /** Marquee selection, in canvas coordinates, while dragging on empty space. */
@@ -758,7 +760,23 @@ export const MindmapView = memo(function MindmapView({
         level: 1,
         children: [],
       });
-      return { id, text: topic.text, lines, x: topic.x, y: topic.y, width, height };
+      return {
+        id,
+        text: topic.text,
+        lines,
+        x: topic.x,
+        y: topic.y,
+        width,
+        height,
+        // What it carries, read here rather than in the component: a floating
+        // topic's annotations live in the same sections as a node's, so the view
+        // reads them the same way and the component draws boxes.
+        iconId: iconFor(sidecar, id),
+        markers: markersFor(sidecar, id),
+        hasNote: Boolean(noteFor(sidecar, id)),
+        hasLink: Boolean(parseMindmapLink(linkFor(sidecar, id))),
+        tags: tagsFor(sidecar, id),
+      };
     });
   }, [sidecar]);
 
@@ -2078,6 +2096,31 @@ export const MindmapView = memo(function MindmapView({
   }, [applySidecarEdit, selectedFloatingId]);
 
   /**
+   * A right click on a floating topic: its own panel, where the cursor is.
+   *
+   * The same shape as the node handler — select it if it is not selected, then
+   * open the panel at the cursor — because it is the same gesture about a
+   * different kind of topic, and a reader should not have to learn a second one.
+   */
+  const handleFloatingContextMenu = useCallback((id: string, event: React.MouseEvent) => {
+    setSelectedFloatingId(id);
+    const containerRect = containerRef.current?.getBoundingClientRect();
+    const x = containerRect ? event.clientX - containerRect.left : event.clientX;
+    const y = containerRect ? event.clientY - containerRect.top : event.clientY;
+    setContextMenu({ x, y, nodeId: id, floating: true });
+  }, []);
+
+  /** Deletes the floating topic a panel is about, by id rather than by selection. */
+  const handleDeleteFloatingTopic = useCallback(
+    (id: string) => {
+      setContextMenu(null);
+      setSelectedFloatingId(null);
+      applySidecarEdit(["floating"], (current) => removeFloatingTopic(current, id));
+    },
+    [applySidecarEdit]
+  );
+
+  /**
    * Puts a free topic where the reader right-clicked.
    *
    * The menu's coordinates are the container's, and the canvas behind it may be
@@ -2282,6 +2325,21 @@ export const MindmapView = memo(function MindmapView({
     parsedPanelLink?.kind === "external" ||
     (parsedPanelLink?.kind === "anchor" && !!onJumpToHeading) ||
     (parsedPanelLink?.kind === "wiki" && !!onWikiLinkClick);
+
+  /**
+   * Where a floating topic's link can go.
+   *
+   * The same question minus the anchor: `#标题` is followed by looking the heading
+   * up in the outline, and a topic that is not in the outline has no heading to
+   * find. Saying so in the panel is better than offering the button and then
+   * doing nothing.
+   */
+  const canOpenFloatingLink =
+    parsedPanelLink?.kind === "external" || (parsedPanelLink?.kind === "wiki" && !!onWikiLinkClick);
+
+  /** The floating topic the menu is about, for a title and a delete. */
+  const contextTargetFloating =
+    floatingBoxes.find((topic) => topic.id === contextMenu?.nodeId) ?? null;
 
   return (
     <div
@@ -2753,7 +2811,9 @@ export const MindmapView = memo(function MindmapView({
                   })()}
 
                   {/* What the node carries but the document cannot say: an icon
-                      on its leading edge, a note badge and the marks on its corners. */}
+                      on its leading edge, a note badge and the marks on its corners.
+                      The same drawings a floating topic wears — see
+                      MindmapFloatingTopics, which is handed the same decorations. */}
                   <NodeIcon iconId={iconFor(sidecar, node.id)} height={node.height} />
                   <NodeMarks width={node.width} markers={markersFor(sidecar, node.id)} />
                   <NodeTags height={node.height} tags={tagsFor(sidecar, node.id)} />
@@ -2780,12 +2840,7 @@ export const MindmapView = memo(function MindmapView({
                   {/* A note is the one thing about a node the document cannot
                       show, so the map says where one is: a badge on the node's
                       leading corner, drawn for the eye rather than the cursor. */}
-                  {noteFor(sidecar, node.id) ? (
-                    <g className="mindmap-note-marker" transform="translate(-4, -4)" aria-label="有备注">
-                      <circle r="4.6" />
-                      <path d="M -2 -0.8 H 2 M -2 1.4 H 0.4" />
-                    </g>
-                  ) : null}
+                  {noteFor(sidecar, node.id) ? <NodeNoteMark /> : null}
 
                   {/* Children Collapse/Expand Toggle Button (+ / - geometrically centered via SVG vector lines).
                       Hung off the edge the children are actually on: the default layout grows
@@ -2912,7 +2967,8 @@ export const MindmapView = memo(function MindmapView({
             onSelect={setSelectedFloatingId}
             onStartEdit={handleStartFloatingEdit}
             onStartDrag={handleFloatingDragStart}
-          />
+            onOpenMenu={handleFloatingContextMenu}
+            />
         </g>
       </svg>
 
@@ -3029,7 +3085,7 @@ export const MindmapView = memo(function MindmapView({
 
       {/* Right Click Appearance & Typography Customization Context Menu */}
       <MindmapNodeStyleMenu
-        open={!!contextMenu && !contextMenu.isCanvas}
+        open={!!contextMenu && !contextMenu.isCanvas && !contextMenu.floating}
         position={menuPos}
         menuRef={menuRef}
         nodeId={contextMenu?.nodeId ?? tree.id}
@@ -3057,6 +3113,36 @@ export const MindmapView = memo(function MindmapView({
         onAddSibling={handleAddSibling}
         onStartRename={startEditing}
         onFreezeTheme={handleFreezeTheme}
+        onClose={() => setContextMenu(null)}
+      />
+
+      {/* Right Click on a Floating Topic: its own panel. The annotations are the
+          same five as a node's, read from the same sections of the same file by
+          the same expressions above — only the header and the one action are this
+          panel's own. */}
+      <MindmapFloatingAnnotationMenu
+        open={!!contextMenu?.floating}
+        position={menuPos}
+        menuRef={menuRef}
+        topicText={contextTargetFloating?.text ?? ""}
+        nodeId={panelNodeId}
+        isBatchMode={false}
+        icon={iconFor(sidecar, panelNodeId)}
+        note={noteFor(sidecar, panelNodeId)}
+        link={panelLink}
+        parsedLink={parsedPanelLink}
+        canOpenLink={canOpenFloatingLink}
+        tags={tagsFor(sidecar, panelNodeId)}
+        knownTags={documentTags}
+        markers={markersFor(sidecar, panelNodeId)}
+        saveFailed={sidecarSaveFailed}
+        onIconChange={handleIconChange}
+        onNoteChange={handleNoteChange}
+        onLinkChange={handleLinkChange}
+        onOpenLink={(nodeId) => handleOpenLink(tree, nodeId)}
+        onTagsChange={handleTagsChange}
+        onMarkChange={handleMarkChange}
+        onDelete={() => handleDeleteFloatingTopic(panelNodeId)}
         onClose={() => setContextMenu(null)}
       />
     </div>

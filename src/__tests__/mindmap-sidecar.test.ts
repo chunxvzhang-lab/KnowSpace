@@ -651,6 +651,63 @@ describe("导图伴生文件", () => {
     });
   });
 
+  describe("自由主题名下的标注", () => {
+    it("删除主题时，写在它上面的都一起走", () => {
+      let sidecar = addFloatingTopic(emptySidecar(), "想法", 10, 20).sidecar;
+      sidecar = setNodeNote(sidecar, "floating-1", "写过的");
+      sidecar = setNodeIcon(sidecar, "floating-1", "star");
+      sidecar = setNodePriority(sidecar, "floating-1", 2);
+      sidecar = setNodeTags(sidecar, "floating-1", ["api"]);
+      sidecar = setNodeLink(sidecar, "floating-1", "https://example.com");
+
+      const after = removeFloatingTopic(sidecar, "floating-1");
+
+      // A floating topic's id is handed out by a counter and never comes back, so
+      // none of this could ever be claimed again — keeping it would leave a file
+      // that says it has content when what it has is orphans.
+      expect(after.floating).toEqual({});
+      expect(after.notes).toEqual({});
+      expect(after.icons).toEqual({});
+      expect(after.markers).toEqual({});
+      expect(after.tags).toEqual({});
+      expect(after.links).toEqual({});
+      expect(sidecarIsEmpty(after)).toBe(true);
+    });
+
+    it("只清它自己的，别人的不动", () => {
+      let sidecar = addFloatingTopic(emptySidecar(), "甲", 10, 20).sidecar;
+      sidecar = addFloatingTopic(sidecar, "乙", 40, 60).sidecar;
+      sidecar = setNodeNote(sidecar, "floating-1", "甲的");
+      sidecar = setNodeNote(sidecar, "floating-2", "乙的");
+
+      const after = removeFloatingTopic(sidecar, "floating-1");
+
+      expect(after.notes).toEqual({ "floating-2": "乙的" });
+    });
+
+    it("删一个不存在的，什么都不变", () => {
+      const sidecar = setNodeNote(
+        addFloatingTopic(emptySidecar(), "想法", 10, 20).sidecar,
+        "floating-1",
+        "写过的"
+      );
+
+      expect(removeFloatingTopic(sidecar, "floating-不存在")).toBe(sidecar);
+    });
+
+    it("概要跨到它也不动跨度：跨度是读者挑过的清单", () => {
+      // Deleting the topic shrinks the drawing on its own, since an id that
+      // resolves to nothing contributes no bounds. Pruning the list would be this
+      // module editing a record of what the reader picked.
+      let sidecar = addFloatingTopic(emptySidecar(), "想法", 10, 20).sidecar;
+      sidecar = addSummary(sidecar, ["floating-1", "node-a"], "总述").sidecar;
+
+      const after = removeFloatingTopic(sidecar, "floating-1");
+
+      expect(after.summaries["summary-1"].nodeIds).toEqual(["floating-1", "node-a"]);
+    });
+  });
+
   describe("概要", () => {
     it("新建：id 递增，记住它跨的是哪几个主题", () => {
       const first = addSummary(emptySidecar(), ["node-a", "node-b"]);

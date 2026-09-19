@@ -1,4 +1,5 @@
 import { findPriorityMark, findProgressMark, progressSlicePath } from "../core/mindmapMarkers";
+import { findMindmapIcon } from "../core/mindmapIcons";
 import type { NodeMarkers } from "../services/mindmapSidecar";
 
 /** At most this many tags on a node's chip row. */
@@ -79,6 +80,50 @@ export function NodeTags({ height, tags }: { height: number; tags: string[] }) {
         </g>
       ))}
     </g>
+  );
+}
+
+/**
+ * The badge for a node that carries a note.
+ *
+ * At the top-left, with the link's at the bottom-left: both say "there is more
+ * here than the text", and opposite corners mean a topic can wear both without
+ * either hiding the other. A mark rather than a control — notes are read and
+ * written in the panel.
+ */
+export function NodeNoteMark() {
+  return (
+    <g className="mindmap-note-marker" transform="translate(-4, -4)" aria-label="有备注">
+      <circle r="4.6" />
+      {/* Two lines of writing, shortened to the two strokes that read as text. */}
+      <path d="M -2 -0.8 H 2 M -2 1.4 H 0.4" />
+    </g>
+  );
+}
+
+/**
+ * The icon a topic wears, on its leading edge and outside its box.
+ *
+ * Outside on purpose: a topic's size belongs to the layout, and growing the box
+ * to fit a drawing would move every topic in the map — the golden layout
+ * snapshots exist to stop exactly that kind of drift. An id this build does not
+ * know draws nothing rather than breaking the map.
+ *
+ * Here rather than in the view because it is worn by both a topic in the outline
+ * and one floating beside it, and the two have to wear it the same way.
+ */
+export function NodeIcon({ iconId, height }: { iconId: string; height: number }) {
+  const icon = findMindmapIcon(iconId);
+  if (!icon) return null;
+  const Icon = icon.Icon;
+  return (
+    <Icon
+      className="mindmap-node-icon"
+      size={16}
+      x={-22}
+      y={(height - 16) / 2}
+      strokeWidth={1.8}
+    />
   );
 }
 

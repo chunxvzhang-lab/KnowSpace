@@ -1,11 +1,15 @@
+import type { NodeMarkers } from "../services/mindmapSidecar";
+import { NodeIcon, NodeLinkMark, NodeMarks, NodeNoteMark, NodeTags } from "./MindmapMarks";
+
 /**
  * Topics that no outline owns, drawn beside it.
  *
  * Same shape as a branch node and measured by the same function, because they
  * are the same thing to look at — the difference is where they come from, and
- * that is not something a reader needs to see. What they do not carry is the
- * annotations: an icon or a note belongs to a topic in the document, and a
- * floating topic's own annotations have no panel to edit them in yet.
+ * that is not something a reader needs to see. They carry the same annotations
+ * too, drawn by the same components: an icon, marks, tags, and the two badges,
+ * all keyed by the topic's id in the companion file, which does not care whether
+ * the id belongs to a topic in the document or one beside it.
  *
  * The box is a capsule whatever the theme says. A floating topic has no level,
  * no parent and no branch colour to inherit from, so the one shape that needs no
@@ -19,6 +23,12 @@ export interface FloatingBox {
   y: number;
   width: number;
   height: number;
+  /** What the topic carries beyond its text; drawn as it is on a branch node. */
+  iconId: string;
+  markers: NodeMarkers;
+  hasNote: boolean;
+  hasLink: boolean;
+  tags: string[];
 }
 
 export function MindmapFloatingTopics({
@@ -27,12 +37,15 @@ export function MindmapFloatingTopics({
   onSelect,
   onStartEdit,
   onStartDrag,
+  onOpenMenu,
 }: {
   topics: FloatingBox[];
   selectedId: string | null;
   onSelect: (id: string) => void;
   onStartEdit: (id: string) => void;
   onStartDrag: (id: string, event: React.MouseEvent) => void;
+  /** A right click: the topic's own panel, as a right click on a node opens one. */
+  onOpenMenu: (id: string, event: React.MouseEvent) => void;
 }) {
   if (topics.length === 0) return null;
 
@@ -57,6 +70,11 @@ export function MindmapFloatingTopics({
             onDoubleClick={(e) => {
               e.stopPropagation();
               onStartEdit(topic.id);
+            }}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onOpenMenu(topic.id, e);
             }}
           >
             {isSelected ? (
@@ -87,6 +105,15 @@ export function MindmapFloatingTopics({
                 {line}
               </text>
             ))}
+
+            {/* The same decorations, in the same places, as a topic in the
+                outline wears — a reader should not have to learn two vocabularies
+                for "this one has a note". */}
+            <NodeIcon iconId={topic.iconId} height={topic.height} />
+            <NodeMarks width={topic.width} markers={topic.markers} />
+            <NodeTags height={topic.height} tags={topic.tags} />
+            {topic.hasLink ? <NodeLinkMark height={topic.height} /> : null}
+            {topic.hasNote ? <NodeNoteMark /> : null}
           </g>
         );
       })}

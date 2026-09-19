@@ -12264,6 +12264,16 @@ body:has(.flash-capsule-overlay) {
    cramped; the groups' labels are small enough to scan past or read.
    ─────────────────────────────────────────────────────────────────────────── */
 
+/* The one failure any annotation control can cause, said once at the top of the
+   section rather than under each control that could have caused it. */
+.mindmap-annotation-notice {
+  padding: 5px 10px;
+  color: #f43f5e;
+  font-size: 11px;
+  font-weight: 500;
+  border-bottom: 1px solid color-mix(in srgb, #f43f5e 25%, transparent);
+}
+
 .mindmap-icon-group {
   display: flex;
   flex-direction: column;

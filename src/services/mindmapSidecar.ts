@@ -768,6 +768,39 @@ export function removeSummary(sidecar: MindmapSidecar, id: string): MindmapSidec
   return { ...sidecar, summaries };
 }
 
+/**
+ * Takes a floating topic off the canvas, along with what was written on it.
+ *
+ * Unlike a topic in the outline, whose note is kept when the topic disappears
+ * because the document may bring it back — the same heading gives the same id —
+ * a floating topic's id is handed out by a counter and never comes back. Its
+ * annotations could therefore never be claimed again, and keeping them would be
+ * keeping a file that says it has content when what it has is orphans.
+ *
+ * A summary or a boundary that spanned the topic keeps its span as it was: a span
+ * is a list of what the reader picked, and nothing here prunes one. The drawing
+ * already copes — an id that resolves to nothing contributes no bounds.
+ */
+export function removeFloatingTopic(sidecar: MindmapSidecar, id: string): MindmapSidecar {
+  if (!sidecar.floating[id]) return sidecar;
+
+  const floating = { ...sidecar.floating };
+  delete floating[id];
+
+  const notes = { ...sidecar.notes };
+  const icons = { ...sidecar.icons };
+  const markers = { ...sidecar.markers };
+  const tags = { ...sidecar.tags };
+  const links = { ...sidecar.links };
+  delete notes[id];
+  delete icons[id];
+  delete markers[id];
+  delete tags[id];
+  delete links[id];
+
+  return { ...sidecar, floating, notes, icons, markers, tags, links };
+}
+
 /** Every floating topic, with its id. */
 export function floatingTopics(sidecar: MindmapSidecar | null): { id: string; topic: FloatingTopic }[] {
   if (!sidecar) return [];
@@ -830,14 +863,6 @@ export function setFloatingText(sidecar: MindmapSidecar, id: string, text: strin
   const trimmed = text.trim();
   if (!trimmed) return removeFloatingTopic(sidecar, id);
   return { ...sidecar, floating: { ...sidecar.floating, [id]: { ...topic, text: trimmed } } };
-}
-
-/** Takes a topic off the canvas. */
-export function removeFloatingTopic(sidecar: MindmapSidecar, id: string): MindmapSidecar {
-  if (!sidecar.floating[id]) return sidecar;
-  const floating = { ...sidecar.floating };
-  delete floating[id];
-  return { ...sidecar, floating };
 }
 
 /**
