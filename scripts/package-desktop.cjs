@@ -28,27 +28,30 @@ async function main() {
   console.log("3. Copying unpacked binaries into release/KnowSpace-win-x64...");
   await fs.mkdir(releaseRoot, { recursive: true });
 
-  // Clean the target folder — and make sure it is really gone before copying into it.
-  //
-  // copyDirectory merges into whatever is already there, so a deletion that fails
-  // quietly does not fail the build: it produces a folder that is part old and part
-  // new, and the new files sitting beside the old ones look perfectly fine. That is
-  // how two v2.3.0 installers (293 MB of them) rode along inside the v2.6.0 portable
-  // zip — they had been in this folder since 09-16, the retry loop below gave up
-  // without saying anything, and every later version's files were copied in next to
-  // them. A wrong file that looks right is worse than a build that stops.
-  let removed = false;
-  for (let attempt = 0; attempt < 5 && !removed; attempt++) {
+  // "Gone, or empty" — and empty is the right rule, not a loophole. copyDirectory
+  // merges, so the thing that matters is that there is nothing left for it to merge
+  // with; a folder that survived but holds nothing is exactly as safe as one that was
+  // removed. It also happens for real: a process can hold a directory handle (some
+  // sandboxes do), and then the folder cannot be deleted at all, however empty it is.
+  let cleared = false;
+  for (let attempt = 0; attempt < 5 && !cleared; attempt++) {
     try {
       await fs.rm(appDir, { recursive: true, force: true });
-      removed = !(await pathExists(appDir));
     } catch (err) {
       await new Promise((r) => setTimeout(r, 500));
     }
+    // Read the folder whatever happened above — and the reason it is written this
+    // way: a removal that throws does not mean the folder still holds anything. A
+    // directory handle held elsewhere makes fs.rm fail on a folder that is already
+    // empty, and then "it threw" and "there is something in there" are two different
+    // facts. The first version of this check had the read on the line after the rm,
+    // inside the same try, so the throw skipped it and an empty folder was treated
+    // as a full one — which reads as caution and behaves as a bug.
+    cleared = await isEmptyOrMissing(appDir);
   }
-  if (!removed) {
+  if (!cleared) {
     throw new Error(
-      `Could not remove ${appDir} — close whatever is using it (a running KnowSpace.exe, an editor, an open zip) and run again. Refusing to copy into it: whatever survived would be an older version's file wearing this version's name.`
+      `Could not clear ${appDir} — close whatever is using it (a running KnowSpace.exe, an editor, an open zip) and run again. Refusing to copy into it while anything from an older build is still there: whatever survives would be last version's files wearing this version's name.`
     );
   }
 
@@ -204,12 +207,13 @@ async function assertExists(filePath, message) {
   }
 }
 
-async function pathExists(filePath) {
+async function isEmptyOrMissing(dirPath) {
   try {
-    await fs.access(filePath);
-    return true;
+    const entries = await fs.readdir(dirPath);
+    return entries.length === 0;
   } catch {
-    return false;
+    // Missing counts: there is nothing there to merge with.
+    return true;
   }
 }
 
