@@ -14,6 +14,7 @@ import {
   AlignJustify,
   RotateCcw,
   Snowflake,
+  ArrowLeftRight,
 } from "lucide-react";
 import type {
   MindmapLineStyle,
@@ -55,6 +56,14 @@ export type MindmapNodeStyleMenuProps = {
   onAddChild: (parentId?: string) => void;
   onAddSibling: (targetId?: string) => void;
   onStartRename: (nodeId: string) => void;
+  /**
+   * Moves this branch to the other side of the root.
+   *
+   * Absent wherever there are no sides to speak of: the other four layouts have none, and
+   * a topic that is not a first-level branch follows its branch rather than being placed.
+   * The caller decides that, not this panel — the panel draws the row it is told to draw.
+   */
+  onMoveToSide?: (nodeId: string) => void;
   /**
    * Writes the current theme's appearance into these nodes as their own styles.
    *
@@ -227,6 +236,7 @@ export function MindmapNodeStyleMenu({
   onAddChild,
   onAddSibling,
   onStartRename,
+  onMoveToSide,
   onFreezeTheme,
   icon,
   note,
@@ -583,6 +593,20 @@ export function MindmapNodeStyleMenu({
               <Edit3 size={13} />
               <span>重命名 (F2)</span>
             </button>
+            {onMoveToSide && (
+              <button
+                type="button"
+                className="mindmap-ctx-action-item"
+                onClick={() => {
+                  const nid = nodeId;
+                  onClose();
+                  onMoveToSide(nid);
+                }}
+              >
+                <ArrowLeftRight size={13} />
+                <span>换到另一侧</span>
+              </button>
+            )}
           </>
         )}
         {(target?.customWidth || target?.customHeight) && (

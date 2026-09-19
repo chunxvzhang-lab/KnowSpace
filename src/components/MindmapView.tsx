@@ -1292,6 +1292,23 @@ export const MindmapView = memo(function MindmapView({
   }, [source, tree, onSourceChange]);
 
   // Interactive Topic Actions
+  /**
+   * Moves a first-level branch to the other side of the root.
+   *
+   * "The other side" is read off the layout rather than off the companion file, because a
+   * branch nobody has placed still has a side — the layout chose one — and the branch that
+   * moves has to be the one the reader is looking at. Only the two horizontal values are
+   * meaningful here; this row is offered by the two-sided layout alone.
+   */
+  const handleMoveToSide = useCallback(
+    (nodeId: string) => {
+      const node = layout.nodes.find((entry) => entry.id === nodeId);
+      if (!node) return;
+      handleSideChange(nodeId, oppositeSide(node.side === "left" ? "left" : "right"));
+    },
+    [layout, handleSideChange]
+  );
+
   const handleAddChild = useCallback(
     (parentId?: string, side?: MindmapSide) => {
       if (!editable) return;
@@ -3403,6 +3420,14 @@ export const MindmapView = memo(function MindmapView({
         onAddChild={handleAddChild}
         onAddSibling={handleAddSibling}
         onStartRename={startEditing}
+        // Offered only where a side is a thing: the two-sided layout, for a first-level
+        // branch. A deeper topic follows its branch, so it has no other side of its own to
+        // be moved to.
+        onMoveToSide={
+          activeLayoutId === "bidirectional" && tree.children.some((child) => child.id === panelNodeId)
+            ? handleMoveToSide
+            : undefined
+        }
         onFreezeTheme={handleFreezeTheme}
         onClose={() => setContextMenu(null)}
       />
