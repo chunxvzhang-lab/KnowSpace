@@ -11798,6 +11798,19 @@ body:has(.flash-capsule-overlay) {
   color: #f43f5e;
 }
 
+/* ── Mind map outline numbering ─────────────────────────────────────────
+   Drawn beside the node, never in its text: the text is what gets written back
+   to the document, so a number inside it would be one the reader never typed.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+.mindmap-node-number {
+  pointer-events: none;
+  fill: color-mix(in srgb, #38bdf8 70%, var(--text-primary, #e2e8f0));
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ── Mind map node links ────────────────────────────────────────────────
    A badge on the node that says "this goes somewhere", and the field that
    writes it. The badge mirrors the note one across the box: both mean "there is

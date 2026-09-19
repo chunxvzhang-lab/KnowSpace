@@ -8,6 +8,7 @@ const PREFS_KEY = "bookmd.preferences.v1";
 const MINDMAP_COLLAPSED_KEY = "bookmd.mindmap.collapsed.v1";
 const MINDMAP_THEME_KEY = "bookmd.mindmap.theme.v1";
 const MINDMAP_LAYOUT_KEY = "bookmd.mindmap.layout.v1";
+const MINDMAP_NUMBERING_KEY = "bookmd.mindmap.numbering.v1";
 
 /**
  * Duplicated from the theme module rather than imported.
@@ -171,6 +172,35 @@ export function saveMindmapLayout(docKey: string, layoutId: string): void {
     all[docKey] = layoutId;
   }
   writeRecord(MINDMAP_LAYOUT_KEY, all);
+}
+
+/**
+ * Whether outline numbers are shown for a document.
+ *
+ * Per document, like the layout and the theme, and for the same sort of reason:
+ * whether a map wants numbering is a judgement about that map's contents rather
+ * than about the application. Off is the default, so off is stored as the
+ * absence of an entry — a document nobody has numbered leaves no trace behind.
+ *
+ * Kept as view state rather than in the companion file, although the plan listed
+ * it as a switch to live there. It decides how the map is drawn and nothing about
+ * what the document carries, which is the line the companion file is drawn
+ * along; the same reading moved the folds here in M0.7, and the consequence is
+ * the same — a reader who opens the document elsewhere loses the preference and
+ * nothing else.
+ */
+export function loadMindmapNumbering(docKey: string): boolean {
+  return readRecord<boolean>(MINDMAP_NUMBERING_KEY)[docKey] === true;
+}
+
+export function saveMindmapNumbering(docKey: string, on: boolean): void {
+  const all = readRecord<boolean>(MINDMAP_NUMBERING_KEY);
+  if (on) {
+    all[docKey] = true;
+  } else {
+    delete all[docKey];
+  }
+  writeRecord(MINDMAP_NUMBERING_KEY, all);
 }
 
 export function loadMindmapCollapsed(docKey: string): string[] {

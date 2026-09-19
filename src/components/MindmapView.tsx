@@ -32,6 +32,8 @@ import {
   saveMindmapTheme,
   loadMindmapLayout,
   saveMindmapLayout,
+  loadMindmapNumbering,
+  saveMindmapNumbering,
 } from "../services/storage";
 import { buildStandaloneMindmapSvg } from "../services/mindmapSvgExport";
 import { MindmapCanvasMenu } from "./MindmapCanvasMenu";
@@ -71,6 +73,7 @@ import {
   type MindmapSidecar,
 } from "../services/mindmapSidecar";
 import { findMindmapIcon } from "../core/mindmapIcons";
+import { numberingFor } from "../core/mindmapNumbering";
 import { parseMindmapLink } from "../core/mindmapLinks";
 import { NodeLinkMark, NodeMarks, NodeTags } from "./MindmapMarks";
 
@@ -266,6 +269,26 @@ export const MindmapView = memo(function MindmapView({
     },
     [documentKey]
   );
+
+  /**
+   * Whether outline numbers are drawn beside the nodes.
+   *
+   * A view state, remembered per document like the layout and the theme: some
+   * maps are read as outlines and want numbers, others are read as pictures and
+   * do not. Nothing about the tree changes either way — the numbers are drawn,
+   * never written — so there is nothing to undo when it is switched off.
+   */
+  const [showNumbering, setShowNumbering] = useState(false);
+
+  useEffect(() => {
+    setShowNumbering(documentKey ? loadMindmapNumbering(documentKey) : false);
+  }, [documentKey]);
+
+  const handleToggleNumbering = useCallback(() => {
+    const next = !showNumbering;
+    setShowNumbering(next);
+    if (documentKey) saveMindmapNumbering(documentKey, next);
+  }, [documentKey, showNumbering]);
 
   /**
    * The document's companion file: what the map knows that the document does not.
@@ -629,6 +652,15 @@ export const MindmapView = memo(function MindmapView({
   const layout = useMemo(() => {
     return layoutMindmap(tree, collapsedIds, activeLayoutId);
   }, [tree, collapsedIds, activeLayoutId]);
+
+  /**
+   * Numbers by node id, or nothing while the switch is off.
+   *
+   * Derived from the tree rather than from the layout, which is the point of the
+   * split: folding a branch or changing the layout cannot renumber anything,
+   * because neither is an input here — only the document's own structure is.
+   */
+  const numbering = useMemo(() => (showNumbering ? numberingFor(tree) : null), [showNumbering, tree]);
 
   /**
    * Fits the whole map onto the printed page.
@@ -1877,6 +1909,8 @@ export const MindmapView = memo(function MindmapView({
         onExpandAll={handleExpandAll}
         onPickTheme={handlePickTheme}
         onPickLayout={handlePickLayout}
+        numbering={showNumbering}
+        onToggleNumbering={handleToggleNumbering}
         onZoomStep={handleZoomStep}
         onFitToScreen={handleFitToScreen}
         onExportPng={handleExportPng}
@@ -2286,6 +2320,18 @@ export const MindmapView = memo(function MindmapView({
                       that is not a link still shows in the panel, with the hint. */}
                   {parseMindmapLink(linkFor(sidecar, node.id)) ? (
                     <NodeLinkMark height={node.height} />
+                  ) : null}
+
+                  {/* Outline numbering, drawn above the node's left corner.
+                      Beside the text and not inside it: the text is what gets
+                      written back to the document, and a number in it would be
+                      a number the reader never typed. The corner is the one
+                      place nothing else claims — the note badge sits on it, the
+                      marks are opposite, and the icon is further left. */}
+                  {numbering?.[node.id] ? (
+                    <text className="mindmap-node-number" x={4} y={-5}>
+                      {numbering[node.id]}
+                    </text>
                   ) : null}
 
                   {/* A note is the one thing about a node the document cannot

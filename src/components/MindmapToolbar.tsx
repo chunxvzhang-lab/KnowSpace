@@ -6,6 +6,7 @@ import {
   ListTree,
   MoreHorizontal,
   Network,
+  ListOrdered,
   Palette,
   PlusCircle,
   RefreshCw,
@@ -48,6 +49,8 @@ export type MindmapToolbarProps = {
   scale: number;
   themeId: string;
   layoutId: string;
+  /** Whether outline numbers are drawn beside the nodes. */
+  numbering: boolean;
   /** Passed through to the search group, which owns none of its own state. */
   search: MindmapSearchGroupProps;
   onSyncToDocument: () => void;
@@ -64,6 +67,7 @@ export type MindmapToolbarProps = {
   onExpandAll: () => void;
   onPickTheme: (themeId: string) => void;
   onPickLayout: (layoutId: string) => void;
+  onToggleNumbering: () => void;
   onZoomStep: (factor: number) => void;
   onFitToScreen: () => void;
   onExportPng: () => void;
@@ -85,6 +89,7 @@ export function MindmapToolbar({
   scale,
   themeId,
   layoutId,
+  numbering,
   search,
   onSyncToDocument,
   onAddSibling,
@@ -95,6 +100,7 @@ export function MindmapToolbar({
   onExpandAll,
   onPickTheme,
   onPickLayout,
+  onToggleNumbering,
   onZoomStep,
   onFitToScreen,
   onExportPng,
@@ -369,6 +375,20 @@ export function MindmapToolbar({
             ))}
           </select>
         </div>
+
+        {/* Outline numbering: a toggle rather than a picker, because the useful
+            states are two. It sits with the view controls, not with the export
+            ones — it changes how the map is drawn and nothing else. */}
+        <button
+          type="button"
+          className={`mindmap-tool-btn text-btn highlight-btn ${numbering ? "active" : ""}`}
+          onClick={onToggleNumbering}
+          title="显示/隐藏分支编号（只影响显示，不改动文档）"
+          aria-pressed={numbering}
+        >
+          <ListOrdered size={14} />
+          <span>编号</span>
+        </button>
 
         <MindmapZoomGroup scale={scale} onStep={onZoomStep} onFitToScreen={onFitToScreen} />
       </div>
