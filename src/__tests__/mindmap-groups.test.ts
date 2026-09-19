@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  BOUNDARY_PADDING,
+  BOUNDARY_TITLE_BAND,
+  DEFAULT_BOUNDARY_COLOR,
+  MINDMAP_BOUNDARY_COLORS,
   SUMMARY_BRACKET_GAP,
   SUMMARY_HOOK,
+  boundaryRect,
+  boundaryTitleAnchor,
+  findBoundaryColor,
   summaryBracketPath,
   summaryLabelAnchor,
 } from "../core/mindmapGroups";
@@ -49,6 +56,47 @@ describe("概要括号", () => {
 
     expect(anchor.x).toBeGreaterThan(bracketX);
     expect(anchor.y).toBe(GROUP.minY + GROUP.height / 2);
+  });
+
+  it("边界：四面留白，上方还多留出标题带", () => {
+    const rect = boundaryRect(GROUP);
+
+    // Air on every side, so the box is around the group rather than on it.
+    expect(rect.x).toBe(GROUP.minX - BOUNDARY_PADDING);
+    expect(rect.y).toBe(GROUP.minY - BOUNDARY_PADDING - BOUNDARY_TITLE_BAND);
+    expect(rect.width).toBe(GROUP.width + BOUNDARY_PADDING * 2);
+    expect(rect.height).toBe(GROUP.height + BOUNDARY_PADDING * 2 + BOUNDARY_TITLE_BAND);
+  });
+
+  it("边界把组装在里面，且标题带在最上面的主题之上", () => {
+    // The property that matters, stated so a change to either constant cannot
+    // quietly put the title over the first topic.
+    const rect = boundaryRect(GROUP);
+
+    expect(rect.x).toBeLessThan(GROUP.minX);
+    expect(rect.y + rect.height).toBeGreaterThan(GROUP.minY + GROUP.height);
+    expect(boundaryTitleAnchor(GROUP).y).toBeLessThan(GROUP.minY - BOUNDARY_PADDING + 1);
+  });
+
+  it("边界与括号在同一组上互不遮挡", () => {
+    // Both may be drawn over one group, and telling them apart should not need
+    // reading them: the bracket stands off to the right, past the box's edge.
+    const rect = boundaryRect(GROUP);
+    const bracketX = GROUP.minX + GROUP.width + SUMMARY_BRACKET_GAP;
+
+    expect(bracketX).toBeGreaterThan(rect.x + rect.width);
+  });
+
+  it("边界的颜色：认识的就用它，不认识的落回默认而不是不画", () => {
+    // The opposite of the icon table on purpose: an icon is a decoration and
+    // omitting it loses nothing, while the box *is* what the reader asked for.
+    expect(findBoundaryColor("emerald").color).toBe("#34d399");
+    expect(findBoundaryColor("未来的颜色")).toBe(DEFAULT_BOUNDARY_COLOR);
+    expect(findBoundaryColor(undefined)).toBe(DEFAULT_BOUNDARY_COLOR);
+
+    // Ids go in the file, so they have to be distinct and stable.
+    const ids = MINDMAP_BOUNDARY_COLORS.map((entry) => entry.id);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 
   it("组的形状随便变，括号都跟着", () => {

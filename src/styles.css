@@ -11798,6 +11798,67 @@ body:has(.flash-capsule-overlay) {
   color: #f43f5e;
 }
 
+/* ── Mind map boundaries ────────────────────────────────────────────────
+   A box around a group of topics, with its title in the band above them. The
+   colour is written onto the elements rather than set here, so that it is the
+   reader's choice rather than the theme's — and so that an export, which is
+   built by cloning the canvas, keeps it.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* The box is a background, not a control: it can cover a large part of the
+   canvas, and one that took clicks would make the space inside a group useless
+   for panning. The title is what the reader picks a boundary by. */
+.mindmap-boundary-box {
+  pointer-events: none;
+}
+
+.mindmap-boundary-title {
+  font-size: 12px;
+  font-weight: 600;
+  cursor: text;
+}
+
+/* Drawn outside the boundary rather than recolouring it: a boundary's stroke is
+   the reader's colour, and changing it would read as a state of the boundary. */
+.mindmap-boundary-selection {
+  fill: none;
+  stroke: #38bdf8;
+  stroke-width: 1.3;
+  stroke-dasharray: 5 4;
+  pointer-events: none;
+}
+
+/* The colour row in the canvas menu: six swatches and the way to remove the
+   boundary beside them, since both are about the boundary as a whole. */
+.mindmap-boundary-colors {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px 5px;
+}
+
+.mindmap-boundary-color {
+  width: 15px;
+  height: 15px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.mindmap-boundary-color:hover {
+  transform: translateY(-1px);
+}
+
+.mindmap-boundary-color.is-active {
+  box-shadow: 0 0 0 1.5px var(--surface-1, #1e293b), 0 0 0 3px currentColor;
+}
+
+.mindmap-ctx-item-inline {
+  margin-left: auto;
+  padding: 2px 4px;
+}
+
 /* ── Mind map summaries ─────────────────────────────────────────────────
    A bracket over a group of topics, and the sentence they add up to. A bracket
    rather than a box: a box around a group is a boundary, which says something

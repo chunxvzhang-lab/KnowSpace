@@ -79,6 +79,13 @@ export interface MindmapSidecar {
    * a different summary.
    */
   summaries: Record<string, MindmapSummary>;
+  /**
+   * A box drawn around a group of topics, with a title.
+   *
+   * Its own id like a summary, and for the same reasons: it can be renamed, and
+   * the group it encloses can change, without becoming a different boundary.
+   */
+  boundaries: Record<string, MindmapBoundary>;
   /** Sections this build does not know about, kept exactly as they were read. */
   [section: string]: unknown;
 }
@@ -110,6 +117,7 @@ const SECTIONS = [
   { name: "relations", read: readRelationSection },
   { name: "floating", read: readFloatingSection },
   { name: "summaries", read: readSummarySection },
+  { name: "boundaries", read: readBoundarySection },
 ] as const;
 
 /** Just the names, for writing a file and asking whether it holds anything. */
@@ -136,6 +144,7 @@ export function emptySidecar(): MindmapSidecar {
     relations: [],
     floating: {},
     summaries: {},
+    boundaries: {},
   };
 }
 
@@ -156,7 +165,11 @@ export interface MindmapSummary {
 }
 
 /**
- * The summaries section.
+ * The shape a summary and a boundary both have: which topics, and a label.
+ *
+ * Written once because the second one arrived, which is the point at which a
+ * shape is worth naming rather than copying. What differs between the two is a
+ * field or two, and each of those is handled by its own caller.
  *
  * The shape rules are the section's own; what the ids *mean* is not. In
  * particular whether the spanned topics are siblings — the intended use, and what
@@ -164,11 +177,13 @@ export interface MindmapSummary {
  * no tree, on purpose, and inventing one to validate a gesture would couple the
  * file format to the layout.
  *
- * A summary that spans nothing is dropped rather than kept as an empty bracket,
- * since a bracket around nothing is a drawing with no referent.
+ * A span of nothing is dropped rather than kept, since a drawing around nothing
+ * has no referent — and a span written twice is a span of one, so duplicates go.
  */
-function readSummarySection(value: unknown): Record<string, MindmapSummary> {
-  const section: Record<string, MindmapSummary> = {};
+function readSpanSection<T extends { nodeIds: string[]; text: string }>(
+  value: unknown
+): Record<string, T> {
+  const section: Record<string, T> = {};
   if (!isPlainObject(value)) return section;
 
   for (const [id, entry] of Object.entries(value)) {
@@ -183,14 +198,33 @@ function readSummarySection(value: unknown): Record<string, MindmapSummary> {
     }
     if (nodeIds.length === 0) continue;
 
-    section[id] = {
+    const span = {
       ...entry,
       nodeIds,
       text: typeof entry.text === "string" ? entry.text.trim() : "",
     };
+
+    // A colour that is not a string is no colour; an unknown id, on the other
+    // hand, is kept — it is what a newer version's palette looks like, and
+    // dropping it because this build has not caught up is what makes going back
+    // to the newer version lossy.
+    if ("color" in span) {
+      if (typeof span.color === "string" && span.color.trim()) span.color = span.color.trim();
+      else delete span.color;
+    }
+
+    section[id] = span as T;
   }
 
   return section;
+}
+
+function readSummarySection(value: unknown): Record<string, MindmapSummary> {
+  return readSpanSection<MindmapSummary>(value);
+}
+
+function readBoundarySection(value: unknown): Record<string, MindmapBoundary> {
+  return readSpanSection<MindmapBoundary>(value);
 }
 
 /** A topic on the canvas that no outline owns. */
@@ -601,6 +635,93 @@ export function setNodeProgress(
   return setMarker(sidecar, nodeId, "progress", progress, isProgressInRange);
 }
 
+/** A box drawn around a group of topics, with a title and a colour. */
+export interface MindmapBoundary {
+  /** The topics it encloses, by id. */
+  nodeIds: string[];
+  /** Its title. Empty is allowed — a box with nothing written on it still groups. */
+  text: string;
+  /** A colour id from the map's own table. Absent means the default. */
+  color?: string;
+  /** Fields a newer version added, kept as they were read. */
+  [field: string]: unknown;
+}
+
+/** Numbered so the same actions give the same file — the same rule as the rest. */
+function nextSpanId(ids: string[], prefix: string): string {
+  let highest = 0;
+
+  for (const id of ids) {
+    const match = new RegExp(`^${prefix}-(\\d+)$`).exec(id);
+    if (match) highest = Math.max(highest, Number(match[1]));
+  }
+
+  return `${prefix}-${highest + 1}`;
+}
+
+/** Every boundary, with its id. */
+export function boundariesIn(
+  sidecar: MindmapSidecar | null
+): { id: string; boundary: MindmapBoundary }[] {
+  if (!sidecar) return [];
+  return Object.entries(sidecar.boundaries).map(([id, boundary]) => ({ id, boundary }));
+}
+
+export function nextBoundaryId(sidecar: MindmapSidecar | null): string {
+  return nextSpanId(Object.keys(sidecar?.boundaries ?? {}), "boundary");
+}
+
+/** Draws a box around a group of topics. Answers with the id it was given. */
+export function addBoundary(
+  sidecar: MindmapSidecar,
+  nodeIds: string[],
+  text = ""
+): { sidecar: MindmapSidecar; id: string } {
+  const id = nextBoundaryId(sidecar);
+  const boundary: MindmapBoundary = { nodeIds: [...nodeIds], text: text.trim() };
+  return { sidecar: { ...sidecar, boundaries: { ...sidecar.boundaries, [id]: boundary } }, id };
+}
+
+/**
+ * Retitles a boundary, or recolours it.
+ *
+ * Emptying the title leaves the box in place, like a summary and unlike a free
+ * topic: the box is what was asked for. A colour id is stored as given, even one
+ * this build does not know — the colour table's job is to decide what to draw,
+ * and the file's job is to remember what the reader chose.
+ */
+export function setBoundaryText(sidecar: MindmapSidecar, id: string, text: string): MindmapSidecar {
+  const boundary = sidecar.boundaries[id];
+  if (!boundary) return sidecar;
+  return {
+    ...sidecar,
+    boundaries: { ...sidecar.boundaries, [id]: { ...boundary, text: text.trim() } },
+  };
+}
+
+export function setBoundaryColor(
+  sidecar: MindmapSidecar,
+  id: string,
+  color: string
+): MindmapSidecar {
+  const boundary = sidecar.boundaries[id];
+  if (!boundary) return sidecar;
+
+  const next: MindmapBoundary = { ...boundary };
+  if (color) next.color = color;
+  else delete next.color;
+
+  return { ...sidecar, boundaries: { ...sidecar.boundaries, [id]: next } };
+}
+
+/** Takes a box off the map. */
+export function removeBoundary(sidecar: MindmapSidecar, id: string): MindmapSidecar {
+  if (!sidecar.boundaries[id]) return sidecar;
+  const boundaries = { ...sidecar.boundaries };
+  delete boundaries[id];
+  return { ...sidecar, boundaries };
+}
+
 /** Every summary, with its id. */
 export function summariesIn(sidecar: MindmapSidecar | null): { id: string; summary: MindmapSummary }[] {
   if (!sidecar) return [];
@@ -609,14 +730,7 @@ export function summariesIn(sidecar: MindmapSidecar | null): { id: string; summa
 
 /** A fresh id for a new summary, numbered for the same reason free topics are. */
 export function nextSummaryId(sidecar: MindmapSidecar | null): string {
-  let highest = 0;
-
-  for (const id of Object.keys(sidecar?.summaries ?? {})) {
-    const match = /^summary-(\d+)$/.exec(id);
-    if (match) highest = Math.max(highest, Number(match[1]));
-  }
-
-  return `summary-${highest + 1}`;
+  return nextSpanId(Object.keys(sidecar?.summaries ?? {}), "summary");
 }
 
 /** Brackets a group of topics. Answers with the id it was given. */

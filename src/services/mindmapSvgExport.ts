@@ -213,6 +213,7 @@ export function buildStandaloneMindmapSvg(
   // picture, and a file that arrived with one would look like a bug.
   clone.querySelectorAll(".mindmap-floating-selection").forEach((el) => el.remove());
   clone.querySelectorAll(".mindmap-summary-selection").forEach((el) => el.remove());
+  clone.querySelectorAll(".mindmap-boundary-selection").forEach((el) => el.remove());
   clone.querySelectorAll(".mindmap-node-add-btn").forEach((el) => el.remove());
   clone.querySelectorAll(".mindmap-node-resize-handle").forEach((el) => el.remove());
 

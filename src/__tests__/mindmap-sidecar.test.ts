@@ -1,12 +1,18 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  addBoundary,
   addFloatingTopic,
   addSummary,
   allTags,
   areRelated,
+  boundariesIn,
   emptySidecar,
   floatingTopics,
   moveFloatingTopic,
+  nextBoundaryId,
+  removeBoundary,
+  setBoundaryColor,
+  setBoundaryText,
   nextFloatingId,
   nextSummaryId,
   removeFloatingTopic,
@@ -703,8 +709,56 @@ describe("导图伴生文件", () => {
       expect(parsed?.summaries["summary-5"]).toBeUndefined();
     });
 
-    it("八段一起往返，谁也不丢", () => {
+    it("边界：加、改标题、换颜色、删", () => {
+      const added = addBoundary(emptySidecar(), ["node-a"], "第一组");
+      expect(added.id).toBe("boundary-1");
+      expect(added.sidecar.boundaries["boundary-1"]).toEqual({
+        nodeIds: ["node-a"],
+        text: "第一组",
+      });
+
+      const titled = setBoundaryText(added.sidecar, added.id, "改过的标题");
+      expect(titled.boundaries[added.id].text).toBe("改过的标题");
+
+      const coloured = setBoundaryColor(titled, added.id, "emerald");
+      expect(coloured.boundaries[added.id].color).toBe("emerald");
+      // Back to the default rather than to no colour at all.
+      expect(setBoundaryColor(coloured, added.id, "").boundaries[added.id].color).toBeUndefined();
+
+      expect(removeBoundary(coloured, added.id).boundaries).toEqual({});
+      expect(removeBoundary(coloured, "boundary-不存在")).toBe(coloured);
+      expect(boundariesIn(null)).toEqual([]);
+
+      // One topic is enough, so the numbering starts the same way a summary's does.
+      expect(nextBoundaryId(coloured)).toBe("boundary-2");
+    });
+
+    it("读文件：颜色不是字符串就不算颜色，不认识的 id 留着", () => {
+      const parsed = parseSidecar(
+        JSON.stringify({
+          version: 1,
+          boundaries: {
+            "boundary-1": { nodeIds: ["a"], text: " 标题 ", color: " violet " },
+            "boundary-2": { nodeIds: ["b"], text: "", color: 7 },
+            "boundary-3": { nodeIds: [], text: "空跨度" },
+          },
+        })
+      );
+
+      expect(parsed?.boundaries["boundary-1"]).toEqual({
+        nodeIds: ["a"],
+        text: "标题",
+        color: "violet",
+      });
+      // A colour this build cannot place is a string like any other: the table
+      // decides what to draw, the file remembers what the reader chose.
+      expect(parsed?.boundaries["boundary-2"]).toEqual({ nodeIds: ["b"], text: "" });
+      expect(parsed?.boundaries["boundary-3"]).toBeUndefined();
+    });
+
+    it("十段一起往返，谁也不丢", () => {
       let sidecar = addSummary(emptySidecar(), ["node-a", "node-b"], "总述").sidecar;
+      sidecar = addBoundary(sidecar, ["node-c"], "一组").sidecar;
       sidecar = addFloatingTopic(sidecar, "画布上的想法", 120, -40).sidecar;
       sidecar = toggleRelation(sidecar, "node-c", "node-d");
       sidecar = setNodeTags(sidecar, "node-e", ["api"]);
@@ -718,6 +772,7 @@ describe("导图伴生文件", () => {
       expect(back.summaries).toEqual({
         "summary-1": { nodeIds: ["node-a", "node-b"], text: "总述" },
       });
+      expect(back.boundaries).toEqual({ "boundary-1": { nodeIds: ["node-c"], text: "一组" } });
       expect(back.floating).toEqual({ "floating-1": { text: "画布上的想法", x: 120, y: -40 } });
       expect(back.relations).toEqual([{ fromId: "node-c", toId: "node-d" }]);
       expect(back.tags).toEqual({ "node-e": ["api"] });

@@ -72,10 +72,15 @@ import {
   setNodeNote,
   setNodePriority,
   setNodeProgress,
+  addBoundary,
   addFloatingTopic,
   addSummary,
+  boundariesIn,
   floatingTopics,
+  removeBoundary,
   removeSummary,
+  setBoundaryColor,
+  setBoundaryText,
   setSummaryText,
   summariesIn,
   moveFloatingTopic,
@@ -87,9 +92,10 @@ import {
   type MindmapSidecar,
 } from "../services/mindmapSidecar";
 import { boundsOfBoxes, unionBounds } from "../core/mindmapBounds";
-import { summaryLabelAnchor } from "../core/mindmapGroups";
+import { boundaryTitleAnchor, summaryLabelAnchor } from "../core/mindmapGroups";
 import { MindmapFloatingTopics, type FloatingBox } from "./MindmapFloatingTopics";
 import { MindmapSummaries, type SummaryBox } from "./MindmapSummaries";
+import { MindmapBoundaries, type BoundaryBox } from "./MindmapBoundaries";
 import { findMindmapIcon } from "../core/mindmapIcons";
 import { numberingFor } from "../core/mindmapNumbering";
 import { parseMindmapLink } from "../core/mindmapLinks";
@@ -334,6 +340,10 @@ export const MindmapView = memo(function MindmapView({
   /** The summary the reader has picked, and the one whose label is being typed. */
   const [selectedSummaryId, setSelectedSummaryId] = useState<string | null>(null);
   const [editingSummaryId, setEditingSummaryId] = useState<string | null>(null);
+
+  /** The same pair for boundaries, which are picked and titled by their title. */
+  const [selectedBoundaryId, setSelectedBoundaryId] = useState<string | null>(null);
+  const [editingBoundaryId, setEditingBoundaryId] = useState<string | null>(null);
 
   /**
    * The drag in progress, in a ref rather than in state.
@@ -2150,6 +2160,77 @@ export const MindmapView = memo(function MindmapView({
     applySidecarEdit(["summaries"], (current) => setSummaryText(current, id, editingText));
   }, [applySidecarEdit, editingSummaryId, editingText]);
 
+  /** Each boundary with the bounds it encloses, the same way summaries are built. */
+  const boundaryBoxes = useMemo<BoundaryBox[]>(() => {
+    return boundariesIn(sidecar).map(({ id, boundary }) => {
+      const boxes = boundary.nodeIds
+        .map((nodeId) => relationBoxes.get(nodeId))
+        .filter((box): box is { x: number; y: number; width: number; height: number } => !!box);
+      return { id, text: boundary.text, colorId: boundary.color, bounds: boundsOfBoxes(boxes, 0) };
+    });
+  }, [sidecar, relationBoxes]);
+
+  /**
+   * Draws a box around the selection.
+   *
+   * One topic is enough, unlike a summary: a box around a single topic says "this
+   * one is its own thing", which a bracket could never say — a bracket over one
+   * topic is just a line beside it.
+   */
+  const handleAddBoundary = useCallback(() => {
+    const nodeIds = [...selectedNodeIds];
+    if (nodeIds.length === 0) return;
+    applySidecarEdit(["boundaries"], (current) => addBoundary(current, nodeIds).sidecar);
+  }, [applySidecarEdit, selectedNodeIds]);
+
+  const handleRemoveBoundary = useCallback(() => {
+    if (!selectedBoundaryId) return;
+    const id = selectedBoundaryId;
+    setSelectedBoundaryId(null);
+    applySidecarEdit(["boundaries"], (current) => removeBoundary(current, id));
+  }, [applySidecarEdit, selectedBoundaryId]);
+
+  const handleBoundaryColorChange = useCallback(
+    (colorId: string) => {
+      if (!selectedBoundaryId) return;
+      const id = selectedBoundaryId;
+      applySidecarEdit(["boundaries"], (current) => setBoundaryColor(current, id, colorId));
+    },
+    [applySidecarEdit, selectedBoundaryId]
+  );
+
+  const handleStartBoundaryEdit = useCallback(
+    (id: string) => {
+      const boundary = boundaryBoxes.find((entry) => entry.id === id);
+      if (!boundary) return;
+      setEditingBoundaryId(id);
+      setEditingText(boundary.text);
+    },
+    [boundaryBoxes]
+  );
+
+  const handleCancelBoundaryEdit = useCallback(() => setEditingBoundaryId(null), []);
+
+  const handleCommitBoundaryEdit = useCallback(() => {
+    const id = editingBoundaryId;
+    setEditingBoundaryId(null);
+    if (!id) return;
+    applySidecarEdit(["boundaries"], (current) => setBoundaryText(current, id, editingText));
+  }, [applySidecarEdit, editingBoundaryId, editingText]);
+
+  /** The box the title editor is drawing over, in the band above the group. */
+  const editingBoundaryBox = (() => {
+    const boundary = boundaryBoxes.find((entry) => entry.id === editingBoundaryId);
+    if (!boundary?.bounds) return null;
+    const anchor = boundaryTitleAnchor(boundary.bounds);
+    return {
+      x: anchor.x - 2,
+      y: anchor.y - 10,
+      width: Math.max(120, boundary.text.length * 8 + 40),
+      height: 20,
+    };
+  })();
+
   /** The box the label editor is drawing over, sized to the label's own line. */
   const editingSummaryBox = (() => {
     const summary = summaryBoxes.find((entry) => entry.id === editingSummaryId);
@@ -2185,7 +2266,13 @@ export const MindmapView = memo(function MindmapView({
             onCommit: handleCommitSummaryEdit,
             onCancel: handleCancelSummaryEdit,
           }
-        : null;
+        : editingBoundaryBox
+          ? {
+              box: editingBoundaryBox,
+              onCommit: handleCommitBoundaryEdit,
+              onCancel: handleCancelBoundaryEdit,
+            }
+          : null;
 
   const selectedIds = [...selectedNodeIds];
   const selectionRelated =
@@ -2304,7 +2391,17 @@ export const MindmapView = memo(function MindmapView({
           className="mindmap-viewport"
           transform={`translate(${transform.x}, ${transform.y}) scale(${transform.scale})`}
         >
-          {/* Relations first, so they pass under the outline rather than across
+          {/* Boundaries are the backmost layer, since a box is a background for
+              the group it encloses: the branches leaving those topics pass over
+              it, as they do on paper. */}
+          <MindmapBoundaries
+            boundaries={boundaryBoxes}
+            selectedId={selectedBoundaryId}
+            onSelect={setSelectedBoundaryId}
+            onStartEdit={handleStartBoundaryEdit}
+          />
+
+          {/* Relations next, so they pass under the outline rather than across
               it — a line over a label costs both of them their legibility. */}
           <MindmapRelationLines relations={relations} boxes={relationBoxes} />
 
@@ -2872,6 +2969,22 @@ export const MindmapView = memo(function MindmapView({
           }}
           selectedCount={selectedIds.length}
           selectionRelated={selectionRelated}
+          canBound={selectedIds.length >= 1}
+          onAddBoundary={() => {
+            setContextMenu(null);
+            handleAddBoundary();
+          }}
+          selectedBoundary={
+            boundaryBoxes.find((boundary) => boundary.id === selectedBoundaryId) ?? null
+          }
+          onBoundaryColorChange={(colorId) => {
+            setContextMenu(null);
+            handleBoundaryColorChange(colorId);
+          }}
+          onRemoveBoundary={() => {
+            setContextMenu(null);
+            handleRemoveBoundary();
+          }}
           canSummarise={selectedIds.length >= 2}
           onAddSummary={() => {
             setContextMenu(null);

@@ -1,5 +1,6 @@
 import type { RefObject } from "react";
-import { Braces, CornerDownRight, FoldVertical, Link, ListTree, Maximize2, PlusCircle, StickyNote, Trash2, UnfoldVertical, X } from "lucide-react";
+import { Braces, CornerDownRight, FoldVertical, Link, ListTree, Maximize2, PlusCircle, SquareDashed, StickyNote, Trash2, UnfoldVertical, X } from "lucide-react";
+import { MINDMAP_BOUNDARY_COLORS } from "../core/mindmapGroups";
 
 /**
  * The menu that opens on empty mind map canvas.
@@ -30,6 +31,13 @@ export type MindmapCanvasMenuProps = {
   selectedFloatingText: string | null;
   /** Whether the selection is a group a summary could bracket. */
   canSummarise: boolean;
+  /** Whether anything is selected at all — one topic is enough for a boundary. */
+  canBound: boolean;
+  /** The boundary the reader has picked, if any. */
+  selectedBoundary: { id: string; text: string; colorId?: string } | null;
+  onBoundaryColorChange: (colorId: string) => void;
+  onRemoveBoundary: () => void;
+  onAddBoundary: () => void;
   /** The summary the reader has picked, if any, and its label. */
   selectedSummaryText: string | null;
   onClose: () => void;
@@ -54,6 +62,11 @@ export function MindmapCanvasMenu({
   selectionRelated,
   selectedFloatingText,
   canSummarise,
+  canBound,
+  selectedBoundary,
+  onBoundaryColorChange,
+  onRemoveBoundary,
+  onAddBoundary,
   selectedSummaryText,
   onClose,
   onNewTopic,
@@ -166,6 +179,48 @@ export function MindmapCanvasMenu({
           <Trash2 size={13} />
           <span>删除概要</span>
         </button>
+      ) : null}
+
+      {/* A boundary takes one topic as readily as ten: a box around a single
+          topic says "this one is its own thing", which a bracket cannot say. */}
+      <button
+        type="button"
+        className="mindmap-ctx-item"
+        onClick={onAddBoundary}
+        disabled={!canBound}
+        title={canBound ? "把选中的主题框起来" : "先选中一个或更多主题"}
+      >
+        <SquareDashed size={13} />
+        <span>为本组加边界</span>
+      </button>
+
+      {/* The colour row appears only once there is a boundary to colour, since it
+          is a row of swatches with nothing to explain it otherwise. */}
+      {selectedBoundary ? (
+        <div className="mindmap-boundary-colors" title="边界颜色">
+          {MINDMAP_BOUNDARY_COLORS.map((entry) => (
+            <button
+              key={entry.id}
+              type="button"
+              className={`mindmap-boundary-color ${
+                (selectedBoundary.colorId ?? "") === entry.id ? "is-active" : ""
+              }`}
+              style={{ background: entry.color }}
+              onClick={() => onBoundaryColorChange(entry.id)}
+              title={entry.label}
+              aria-label={`边界颜色 ${entry.label}`}
+            />
+          ))}
+          <button
+            type="button"
+            className="mindmap-ctx-item mindmap-ctx-item-inline"
+            onClick={onRemoveBoundary}
+            title={`删除边界「${selectedBoundary.text || "（无标题）"}」`}
+          >
+            <Trash2 size={12} />
+            <span>删除边界</span>
+          </button>
+        </div>
       ) : null}
 
       <div className="mindmap-ctx-divider" />
