@@ -884,6 +884,10 @@ theme?: ThemeMode;
 
 **校验结果**：**1086 项 / 87 文件 / 100%**，`tsc`、`node --check`、构建全部通过；App chunk 706.05 KB。
 
-**推送状态（写清楚，因为它不等同于"提交成功"）**：校验这一段与上一段 `.xmind` 各有一个提交**只在本地**（`ahead 2`）—— 推送两次都因网络失败（`Could not connect to github.com port 443`）。**这一句是校验之后补的**：先前写的是"已补推"，而那次推送其实失败了；记录里不留一句不成立的话。网络恢复后 `git push` 即可。
+**推送状态（写清楚，因为它不等同于"提交成功"）**：校验这一段与上一段 `.xmind` 的提交都曾**只在本地**，直连推送多次失败（`Could not connect to github.com port 443`）。**这一句最初写的是"已补推"，而那次推送其实失败了** —— 记录里不留一句不成立的话，所以当时单独提交了一次更正。
+
+**后来的处置（也就是正确的那条路）**：这台机器上跑着 **`clash-verge` / `verge-mihomo`**，混合端口 **`127.0.0.1:7897`**；经它推送成功（`git -c http.proxy=http://127.0.0.1:7897 -c https.proxy=… push`，**用 `-c` 只作用于这一次，没有改动任何 git 配置**）。**直连 GitHub 在这台机器上是不通的，要走本地代理** —— 这条值得记在这里，免得下次再当成"网络抽风"查一遍。
+
+**找代理的方法也记一笔**：`netstat -ano | Select-String LISTENING` 按**进程名**（`clash|v2ray|verge|mihomo|sing-box`…）反查 PID 的监听端口，比挨个猜端口可靠；确认之前先用 `curl.exe -x http://127.0.0.1:7897 -sS -o NUL -w "%{http_code}" https://github.com` 验一次，免得白怪 git。
 
 <!-- end progress -->
