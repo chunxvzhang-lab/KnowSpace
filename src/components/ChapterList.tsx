@@ -1,4 +1,4 @@
-import { ChevronRight, FileText, Folder, FolderOpen, FolderMinus, Edit3, ListTree, Boxes } from "lucide-react";
+import { ChevronRight, FileText, Folder, FolderOpen, FolderMinus, Edit3, Import, ListTree, Boxes } from "lucide-react";
 import { memo, useEffect, useMemo, useState } from "react";
 import type { BookManifest, ChapterManifest } from "../core/types";
 
@@ -10,6 +10,14 @@ type ChapterListProps = {
   onRenameChapter?: (chapter: ChapterManifest) => void;
   onNewMindmap?: () => void;
   onNewCanvas?: () => void;
+  /**
+   * Imports an outline another app wrote, as a new document.
+   *
+   * Offered beside the other ways of making a document rather than in the mind
+   * map's own toolbar, because that is what it does: it adds a document to the
+   * directory, and the map of it is whatever the outline says.
+   */
+  onImportOutline?: () => void;
 };
 
 type TreeNode = {
@@ -27,6 +35,7 @@ export const ChapterList = memo(function ChapterList({
   onRenameChapter,
   onNewMindmap,
   onNewCanvas,
+  onImportOutline,
 }: ChapterListProps) {
   const activeChapter = useMemo(
     () => manifest.chapters.find((chapter) => chapter.id === activeChapterId),
@@ -83,6 +92,17 @@ export const ChapterList = memo(function ChapterList({
               aria-label="新建空间白板"
             >
               <Boxes size={13} />
+            </button>
+          )}
+          {onImportOutline && (
+            <button
+              type="button"
+              className="tree-action-btn"
+              onClick={onImportOutline}
+              title="导入大纲（OPML）为新文档"
+              aria-label="导入大纲"
+            >
+              <Import size={13} />
             </button>
           )}
           {openFolders.size > 0 && (

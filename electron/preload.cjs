@@ -13,6 +13,9 @@ const desktopApi = {
   refreshDirectory: (rootPath) => ipcRenderer.invoke("bookmd:refresh-directory", rootPath),
   readMarkdownFile: (absolutePath) => ipcRenderer.invoke("bookmd:read-markdown-file", absolutePath),
   readMarkdownBatch: (paths) => ipcRenderer.invoke("bookmd:read-markdown-batch", paths),
+  // Picking an outline file to import: the dialog and the read both happen in the
+  // main process, and what comes back is text rather than a path to write to.
+  pickOutlineFile: () => ipcRenderer.invoke("bookmd:pick-outline-file"),
   // The mind map's companion file: what a Markdown document cannot hold.
   readMindmapSidecar: (params) => ipcRenderer.invoke("bookmd:read-mindmap-sidecar", params),
   saveMindmapSidecar: (params) => ipcRenderer.invoke("bookmd:save-mindmap-sidecar", params),

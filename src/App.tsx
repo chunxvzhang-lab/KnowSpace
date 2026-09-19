@@ -39,6 +39,19 @@ import { resolveBookmark } from "./services/bookmarks";
 import { loadChapterMarkdown } from "./services/bookSource";
 import { type MermaidTheme } from "./services/mermaid";
 import { extractHeadingsFromSource, renderMarkdown } from "./services/markdown";
+import {
+  annotationsFromOutline,
+  importFileName,
+  outlineToMarkdown,
+  parseOpmlOutline,
+} from "./services/mindmapImport";
+import { parseMarkdownToMindmapTree } from "./services/mindmapService";
+import {
+  emptySidecar,
+  saveSidecar,
+  setNodeLink,
+  setNodeNote,
+} from "./services/mindmapSidecar";
 
 import {
   loadPreferences,
@@ -637,30 +650,48 @@ export function App() {
     guardAction({ type: "new-canvas" });
   }, [guardAction]);
 
-  const handleCreateCanvasExtractNote = useCallback(
-    async (extractedMarkdown: string, defaultDocTitle?: string) => {
-      if (!window.bookMDDesktop) {
-        navigator.clipboard?.writeText(extractedMarkdown);
-        setNotice("专著内容已复制到剪贴板。");
-        return;
-      }
+  /**
+   * Writes a new document holding this content, and opens it.
+   *
+   * One place does it, because two features now produce a document rather than
+   * edit one — extracting a note from a canvas, and importing an outline another
+   * app wrote — and both need the same three things afterwards: the file on disk,
+   * the listing refreshed so it appears there, and a session opened on it. A copy
+   * of that sequence per feature is a copy that has to keep agreeing with the
+   * manifest's shape.
+   *
+   * Answers with what was created, or null when it was not: the import writes the
+   * document's annotations afterwards, and needs to know where it landed. Failure
+   * is reported as a notice rather than thrown — this is called from a click, and
+   * a document that could not be created should say so rather than vanish.
+   */
+  const createDocumentFromContent = useCallback(
+    async (options: {
+      content: string;
+      defaultName: string;
+      /** What to say when it worked. `{title}` is the document's own title. */
+      notice: string;
+      /** What to say when it did not, in the same shape. */
+      failureNotice: string;
+    }): Promise<{ absolutePath: string; markdown: string; chapterId: string } | null> => {
+      const desktop = window.bookMDDesktop;
+      if (!desktop) return null;
 
       try {
         const rootPath = manifest?.rootPath;
-        const name = defaultDocTitle ? `${defaultDocTitle}.md` : "白板萃取专著.md";
-        const result = await window.bookMDDesktop.createMarkdownFile({
+        const result = await desktop.createMarkdownFile({
           rootPath,
-          defaultName: name,
-          initialContent: extractedMarkdown,
+          defaultName: options.defaultName,
+          initialContent: options.content,
         });
         if (result.canceled || !result.success) {
           if (!result.canceled && result.message) setNotice(result.message);
-          return;
+          return null;
         }
 
         let nextManifest = manifest;
-        if (rootPath && window.bookMDDesktop.refreshDirectory) {
-          nextManifest = await window.bookMDDesktop.refreshDirectory(rootPath);
+        if (rootPath && desktop.refreshDirectory) {
+          nextManifest = await desktop.refreshDirectory(rootPath);
         } else {
           const newChapter = result.chapter;
           nextManifest = {
@@ -711,13 +742,105 @@ export function App() {
           hasBom: result.source.hasBom,
           lineEnding: result.source.lineEnding,
         });
-        setNotice(`已生成并打开萃取专著：${activeChap.title}`);
+        setNotice(options.notice.split("{title}").join(activeChap.title));
+        return {
+          absolutePath: result.absolutePath,
+          markdown: result.source.markdown,
+          chapterId: activeChap.id,
+        };
       } catch (err: any) {
-        setNotice(`生成萃取专著失败：${err.message || String(err)}`);
+        setNotice(options.failureNotice.split("{message}").join(err.message || String(err)));
+        return null;
       }
     },
     [manifest, openSession]
   );
+
+  const handleCreateCanvasExtractNote = useCallback(
+    async (extractedMarkdown: string, defaultDocTitle?: string) => {
+      if (!window.bookMDDesktop) {
+        navigator.clipboard?.writeText(extractedMarkdown);
+        setNotice("专著内容已复制到剪贴板。");
+        return;
+      }
+
+      await createDocumentFromContent({
+        content: extractedMarkdown,
+        defaultName: defaultDocTitle ? `${defaultDocTitle}.md` : "白板萃取专著.md",
+        notice: "已生成并打开萃取专著：{title}",
+        failureNotice: "生成萃取专著失败：{message}",
+      });
+    },
+    [createDocumentFromContent]
+  );
+
+  /**
+   * Imports an outline another app wrote, as a new document.
+   *
+   * As a new document rather than into the one on screen, and that is the decision
+   * this feature rests on: a document is a file, and merging two outlines into one
+   * would leave every later question about it — which structure is the real one,
+   * which parts came from where — without an answer.
+   *
+   * The imported file is read once and never consulted again; the Markdown this
+   * writes becomes the source of truth like any other document's, which is why the
+   * translation is the whole of the import.
+   */
+  const handleImportOutline = useCallback(async () => {
+    const desktop = window.bookMDDesktop;
+    if (!desktop?.pickOutlineFile) {
+      setNotice("导入大纲需要桌面版。");
+      return;
+    }
+
+    const picked = await desktop.pickOutlineFile();
+    if (picked.canceled) return;
+    if (!picked.success || typeof picked.content !== "string") {
+      setNotice(picked.message || "无法读取这个文件。");
+      return;
+    }
+
+    const parsed = parseOpmlOutline(picked.content);
+    if (!parsed.ok) {
+      setNotice(`导入失败：${parsed.message}`);
+      return;
+    }
+
+    const markdown = outlineToMarkdown(parsed.outline);
+    if (!markdown) {
+      setNotice("这个大纲是空的，没有可导入的主题。");
+      return;
+    }
+
+    const created = await createDocumentFromContent({
+      content: markdown,
+      defaultName: importFileName(parsed.outline, picked.fileName ?? ""),
+      notice: "已导入为新文档：{title}",
+      failureNotice: "导入大纲失败：{message}",
+    });
+    if (!created) return;
+
+    // What the outline carried besides its shape — notes, links — belongs in the
+    // document's companion file, keyed by the ids the document just produced.
+    // Written after the document exists and not before: a sidecar with no document
+    // beside it is a file nothing would ever read.
+    const annotations = annotationsFromOutline(
+      parsed.outline,
+      parseMarkdownToMindmapTree(created.markdown, created.absolutePath)
+    );
+    if (Object.keys(annotations.notes).length === 0 && Object.keys(annotations.links).length === 0) {
+      return;
+    }
+
+    let sidecar = emptySidecar();
+    for (const [nodeId, text] of Object.entries(annotations.notes)) {
+      sidecar = setNodeNote(sidecar, nodeId, text);
+    }
+    for (const [nodeId, text] of Object.entries(annotations.links)) {
+      sidecar = setNodeLink(sidecar, nodeId, text);
+    }
+    await saveSidecar(created.absolutePath, sidecar);
+  }, [createDocumentFromContent]);
 
   // ── Bookmarks (R1 batch B3b-7) ────────────────────────────────────────────
   //
@@ -1744,6 +1867,7 @@ export function App() {
                 onRenameChapter={handleRenameChapter}
                 onNewMindmap={window.bookMDDesktop ? createNewMindmap : undefined}
                 onNewCanvas={window.bookMDDesktop ? createNewCanvas : undefined}
+                onImportOutline={window.bookMDDesktop?.pickOutlineFile ? handleImportOutline : undefined}
               />
             </div>
           ) : (

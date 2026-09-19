@@ -10,6 +10,7 @@ const {
   saveMarkdownFile,
   readMindmapSidecar,
   saveMindmapSidecar,
+  readOutlineFile,
   registerPath,
   isValidMarkdownPath,
 } = require("./markdown-files.cjs");
@@ -1622,6 +1623,31 @@ ipcMain.handle("bookmd:create-manual-snapshot", async (_event, params = {}) => {
     content: params.content,
     reason: "manual",
   });
+});
+
+// An outline file to import — an .opml another app wrote.
+//
+// The path comes from a native dialog rather than from the renderer, which is why
+// this is allowed to read a file that is not one of this app's documents: the
+// reader picked it, in a dialog this process drew, and the answer is a one-off
+// string rather than a path the renderer may write back to.
+ipcMain.handle("bookmd:pick-outline-file", async (event) => {
+  const targetWin = getWindowFromEvent(event);
+  const result = await dialog.showOpenDialog(targetWin || undefined, {
+    title: "导入大纲（OPML）",
+    filters: [
+      { name: "OPML 大纲", extensions: ["opml", "xml"] },
+      { name: "所有文件", extensions: ["*"] },
+    ],
+    properties: ["openFile"],
+  });
+
+  if (result.canceled || result.filePaths.length === 0) {
+    return { canceled: true };
+  }
+
+  const read = await readOutlineFile(result.filePaths[0]);
+  return read.success ? { ...read, canceled: false } : read;
 });
 
 ipcMain.handle("bookmd:create-markdown-file", async (event, options = {}) => {

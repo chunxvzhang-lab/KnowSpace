@@ -101,6 +101,21 @@ export type KnowSpaceDesktopAPI = {
    * The path is not passed in: the renderer names a document it has open, and
    * the main process derives the companion's name from it.
    */
+  /**
+   * Asks the reader for an outline file to import, and reads it.
+   *
+   * The dialog and the read both happen in the main process: the renderer never
+   * names a path, and what comes back is the file's text rather than a handle it
+   * could write to. `canceled` is a normal answer — the reader changed their mind
+   * — and an outline that cannot be read comes back as a message instead.
+   */
+  pickOutlineFile?: () => Promise<{
+    canceled?: boolean;
+    success?: boolean;
+    content?: string;
+    fileName?: string;
+    message?: string;
+  }>;
   readMindmapSidecar?: (params: {
     documentPath: string;
   }) => Promise<{ success?: boolean; exists?: boolean; content?: string; message?: string }>;

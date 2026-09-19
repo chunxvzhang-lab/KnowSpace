@@ -195,6 +195,30 @@ async function readMarkdownSource(absolutePath) {
   return source;
 }
 
+/**
+ * Reads a file the reader picked to import — an outline another app wrote.
+ *
+ * Read once and not cached: it becomes a document of this app's own, and after
+ * that it is somebody else's file again. The extensions are checked because this
+ * is the one read path in the app whose path comes from a dialog rather than from
+ * a document already open, and a wrong pick should fail before the parser has to
+ * make sense of it.
+ */
+async function readOutlineFile(absolutePath) {
+  if (typeof absolutePath !== "string" || !/\.(opml|xml)$/i.test(absolutePath)) {
+    return { success: false, message: "只能导入 .opml 或 .xml 大纲文件。" };
+  }
+
+  try {
+    // Read as text and handed on as it is: the byte-order mark belongs to the XML
+    // parser's problem, and it is dealt with there.
+    const content = (await fs.readFile(path.resolve(absolutePath))).toString("utf8");
+    return { success: true, content, fileName: path.basename(absolutePath) };
+  } catch (error) {
+    return { success: false, message: `无法读取文件：${error.message}` };
+  }
+}
+
 async function readMarkdownSourcesBatch(absolutePaths) {
   if (!Array.isArray(absolutePaths) || absolutePaths.length === 0) {
     return [];
@@ -443,6 +467,7 @@ module.exports = {
   sidecarPathFor,
   readMindmapSidecar,
   saveMindmapSidecar,
+  readOutlineFile,
   generateStableChapterId,
   titleFromRelativePath,
   collectMarkdownFiles,

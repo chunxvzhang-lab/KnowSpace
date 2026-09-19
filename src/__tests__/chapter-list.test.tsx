@@ -37,6 +37,30 @@ describe("ChapterList Component Sub-function Tests", () => {
     expect(onSelect).toHaveBeenCalledWith("c1");
   });
 
+  it("导入大纲：有这条通道时出现，没有时不出现", () => {
+    // Offered beside the other ways of making a document, because that is what it
+    // does — it adds a document to the directory. And like them it appears only
+    // when the app can actually carry it out.
+    const onImportOutline = vi.fn();
+    const { unmount } = render(
+      <ChapterList
+        manifest={manifest}
+        activeChapterId="c1"
+        onSelectChapter={vi.fn()}
+        onImportOutline={onImportOutline}
+      />
+    );
+
+    const button = screen.getByRole("button", { name: "导入大纲" });
+    expect(button.getAttribute("title")).toContain("OPML");
+    fireEvent.click(button);
+    expect(onImportOutline).toHaveBeenCalledTimes(1);
+
+    unmount();
+    render(<ChapterList manifest={manifest} activeChapterId="c1" onSelectChapter={vi.fn()} />);
+    expect(screen.queryByRole("button", { name: "导入大纲" })).toBeNull();
+  });
+
   it("shows space notes when current active chapter is in space/", () => {
     render(
       <ChapterList
