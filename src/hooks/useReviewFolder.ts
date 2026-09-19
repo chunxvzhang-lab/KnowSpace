@@ -155,11 +155,12 @@ export function useReviewFolder() {
   const load = useCallback(() => readFolder(choice), [readFolder, choice]);
 
   /**
-   * Asks for a folder, and reads it.
+   * Asks for a folder, and hands it to whoever reads it.
    *
-   * Reading is part of it rather than the caller's next step, because the caller's
-   * `load` is closed over the choice of the render it came from — which is not this
-   * folder yet. A cancelled pick and a failed one both leave things as they were.
+   * A cancelled pick and a failed one both leave things as they were. What is picked
+   * is not read here: `readFolder` takes its folder as an argument precisely so that a
+   * caller can hand it one no render has seen, and the panel's effect — which loads
+   * whichever source is in use — is that caller.
    */
   const choose = useCallback(async (): Promise<void> => {
     if (!bridge?.pickReviewFolder) {
@@ -181,10 +182,11 @@ export function useReviewFolder() {
     };
     setChoice(next);
     writeStoredChoice(next);
-    // This one is freshly listed, so the effect above has nothing to add.
+    // Freshly listed, so the re-listing effect has nothing to add; and not yet read, so
+    // the panel's loading effect has something to do.
     restoredRef.current = false;
-    await readFolder(next);
-  }, [bridge, readFolder]);
+    setLoaded(false);
+  }, [bridge]);
 
   /** Forgets the folder, so the panel goes back to asking for one. */
   const forget = useCallback(() => {

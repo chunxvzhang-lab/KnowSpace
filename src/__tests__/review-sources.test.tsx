@@ -197,6 +197,74 @@ describe("DailyReviewPanel - 卡片来源", () => {
 });
 
 /**
+ * Which source the panel opens on.
+ *
+ * Remembering it is the difference between a reader who reviews a folder getting there
+ * in one click and getting there in four, every session.
+ */
+describe("DailyReviewPanel - 记住上次的来源", () => {
+  let readMarkdownBatch: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    readMarkdownBatch = vi.fn().mockResolvedValue([]);
+    (window as unknown as Record<string, unknown>).knowSpaceDesktop = {
+      saveMarkdownFile: vi.fn().mockResolvedValue({ success: true }),
+      readMarkdownBatch,
+      pickReviewFolder: vi.fn().mockResolvedValue({ canceled: true }),
+      listReviewFolder: vi.fn().mockResolvedValue({ paths: [] }),
+    };
+    useVaultStore.setState({ ...pristineVault, manifest: VAULT });
+  });
+
+  afterEach(() => {
+    delete (window as unknown as Record<string, unknown>).knowSpaceDesktop;
+  });
+
+  it("上次用的是知识库：这次直接打开它，并且已经读好了", async () => {
+    readMarkdownBatch.mockResolvedValue(batch([["C:/Vault/c1.md", "上次的卡 :: 答案"]]));
+    const first = render(<DailyReviewPanel notes={[SPACE_NOTE]} />);
+    await act(async () => {
+      fireEvent.click(screen.getByText("当前知识库"));
+    });
+    await waitFor(() => expect(screen.getByText("上次的卡")).toBeDefined());
+    first.unmount();
+
+    render(<DailyReviewPanel notes={[SPACE_NOTE]} />);
+
+    // No click this time, and the documents are read anyway — a remembered source was
+    // never clicked, which is why the loading cannot live in the click handlers.
+    await waitFor(() => expect(screen.getByText("上次的卡")).toBeDefined());
+    expect(screen.queryByText("闪念问题")).toBeNull();
+  });
+
+  it("记住的知识库这次没打开：回到 Space，而不是空复习", async () => {
+    readMarkdownBatch.mockResolvedValue(batch([["C:/Vault/c1.md", "上次的卡 :: 答案"]]));
+    const first = render(<DailyReviewPanel notes={[SPACE_NOTE]} />);
+    await act(async () => {
+      fireEvent.click(screen.getByText("当前知识库"));
+    });
+    await waitFor(() => expect(screen.getByText("上次的卡")).toBeDefined());
+    first.unmount();
+
+    // No workspace open this time. The remembered source cannot be used, so the panel
+    // opens on the one that always exists, with the Space cards in front of the reader.
+    useVaultStore.setState({ ...pristineVault, manifest: null });
+    render(<DailyReviewPanel notes={[SPACE_NOTE]} />);
+
+    await waitFor(() => expect(screen.getByText("闪念问题")).toBeDefined());
+  });
+
+  it("记住的文件夹已经被取消：回到 Space", async () => {
+    // Stored as the plain source name — that is what the panel writes.
+    localStorage.setItem("knowspace.review-source", "folder");
+    render(<DailyReviewPanel notes={[SPACE_NOTE]} />);
+
+    await waitFor(() => expect(screen.getByText("闪念问题")).toBeDefined());
+    expect(screen.queryByText("还没有选择文件夹")).toBeNull();
+  });
+});
+
+/**
  * The fourth source: the document the reader has open.
  *
  * Nothing is fetched for this one — the workspace already holds the text — so what is

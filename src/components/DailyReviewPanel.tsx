@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   RotateCw,
   GraduationCap,
@@ -57,6 +57,29 @@ type DailyReviewPanelProps = {
   tabsSlot?: React.ReactNode;
 };
 
+/** The four places cards can come from. */
+type ReviewSourceKind = "space" | "vault" | "folder" | "document";
+
+const REVIEW_SOURCE_KEY = "knowspace.review-source";
+
+/**
+ * The source the reader was last using.
+ *
+ * Reviewing usually draws on the same place — a folder of their own, or the whole
+ * workspace — and starting on Space every time is a click nobody asked for. An
+ * unreadable or unrecognised value falls back rather than failing: this is a
+ * convenience, and it is not allowed to be the reason the panel does not open.
+ */
+function readStoredSource(): ReviewSourceKind {
+  try {
+    const raw = localStorage.getItem(REVIEW_SOURCE_KEY);
+    if (raw === "vault" || raw === "folder" || raw === "document") return raw;
+  } catch {
+    // Storage can be unavailable; Space is always there.
+  }
+  return "space";
+}
+
 /** Rating labels, matching FSRS semantics (1 = forgot, 4 = trivial). */
 const RATING_META: Record<FsrsRating, { key: string; label: string; hint: string; className: string }> = {
   1: { key: "1", label: "重来", hint: "完全没想起来", className: "again" },
@@ -110,9 +133,7 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
    * All three are the same shape on purpose (`activeNotes`), so nothing below this
    * point knows which one is running.
    */
-  const [reviewSource, setReviewSource] = useState<"space" | "vault" | "folder" | "document">(
-    "space"
-  );
+  const [reviewSource, setReviewSource] = useState<ReviewSourceKind>(() => readStoredSource());
   const vault = useVaultCards();
   const folder = useReviewFolder();
   const isVaultSource = reviewSource === "vault";
@@ -134,6 +155,58 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
       ? "这一篇有未保存的改动，先保存再复习"
       : null;
   const canReviewDocument = documentSourceRefusal === null;
+
+  // Remember what the reader was using, so the next session opens where they left off.
+  useEffect(() => {
+    try {
+      localStorage.setItem(REVIEW_SOURCE_KEY, reviewSource);
+    } catch {
+      // Storage being unavailable is not worth telling them about; it only costs the
+      // convenience back.
+    }
+  }, [reviewSource]);
+
+  /** Whether the fallback below has already had its say. */
+  const startedSourceRef = useRef(false);
+
+  /**
+   * Loads whichever source is in use, and — once, at the start — steps back to Space
+   * when the remembered one is not there.
+   *
+   * Loading lives here rather than in the click handlers so that it happens for a
+   * source nobody clicked, which is the whole point of remembering one; a handler that
+   * also loaded would read everything twice for a source that *was* clicked.
+   *
+   * The fallback happens only on that first pass. A source the reader picks during the
+   * session is theirs: a document that becomes unsaved under them is answered by the
+   * panel saying so, not by taking the choice away mid-review.
+   */
+  useEffect(() => {
+    if (!startedSourceRef.current) {
+      startedSourceRef.current = true;
+      const remembered = reviewSource;
+      const unavailable =
+        (remembered === "vault" && vault.chapterCount === 0) ||
+        (remembered === "folder" && !folder.choice) ||
+        (remembered === "document" && !canReviewDocument);
+      if (unavailable) {
+        setReviewSource("space");
+        return;
+      }
+    }
+
+    if (reviewSource === "vault" && vault.chapterCount > 0 && !vault.loaded) void vault.load();
+    if (reviewSource === "folder" && folder.choice && !folder.loaded) void folder.load();
+  }, [
+    reviewSource,
+    vault.chapterCount,
+    vault.loaded,
+    vault.load,
+    folder.choice,
+    folder.loaded,
+    folder.load,
+    canReviewDocument,
+  ]);
 
   /**
    * The documents this session draws from.
@@ -548,13 +621,9 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
           <button
             type="button"
             className={`space-tab-btn ${reviewSource === "vault" ? "active" : ""}`}
-            onClick={() => {
-              setReviewSource("vault");
-              // Fetched the first time it is asked for rather than on mount:
-              // reading every chapter is the expensive part here, and most
-              // sessions draw on Space.
-              if (!vault.loaded) void vault.load();
-            }}
+            // Reading happens in the effect above, so that a remembered source and a
+            // clicked one are loaded by the same code.
+            onClick={() => setReviewSource("vault")}
             disabled={vault.chapterCount === 0}
             title={
               vault.chapterCount === 0
@@ -569,13 +638,11 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
             className={`space-tab-btn ${isFolderSource ? "active" : ""}`}
             onClick={() => {
               setReviewSource("folder");
-              // Nothing chosen yet means nothing to read, so the first click asks for
-              // a folder rather than opening an empty review and leaving the reader to
-              // work out why.
-              // `choose` reads the folder it just picked, because a `load` called from
-              // here would still be closed over the choice of the previous render.
+              // Nothing chosen yet means nothing to read, so the first click asks for a
+              // folder rather than opening an empty review and leaving the reader to
+              // work out why. `choose` reads the folder it just picked; a picked folder
+              // needs no second read, and the effect above handles the rest.
               if (!folder.choice) void folder.choose();
-              else if (!folder.loaded) void folder.load();
             }}
             title={
               folder.choice

@@ -276,6 +276,15 @@ export function App() {
    * document has unsaved changes — see DailyReviewPanel, which explains why that is a
    * rule rather than a warning.
    */
+  /**
+   * A counter for "start a review", bumped by the command palette.
+   *
+   * The review lives behind the Space panel's own tab, which the workspace does not
+   * otherwise control — so the request travels as a changing number it can watch,
+   * rather than as a flag it might already be showing.
+   */
+  const [reviewRequest, setReviewRequest] = useState(0);
+
   const reviewableDocument = useMemo(() => {
     if (!session?.absolutePath) return null;
     const fileName = session.fileName.toLowerCase();
@@ -1305,6 +1314,20 @@ export function App() {
           }),
       },
       {
+        id: "cmd-start-review",
+        title: "开始复习：闪卡",
+        description: "打开侧栏的复盘视图，从上次用过的来源继续",
+        category: "复习",
+        run: () => {
+          // Opened rather than toggled: asking to start a review while the Space panel
+          // is already open on another tab should still open the review, which the
+          // sidebar's own toggle would not do.
+          setSidebarTab("space");
+          setSidebarOpen(true);
+          setReviewRequest((n) => n + 1);
+        },
+      },
+      {
         id: "cmd-toggle-graph",
         title: "切换知识图谱分栏",
         description: "开启或收起右侧全局双向引用关系图谱",
@@ -1902,6 +1925,7 @@ export function App() {
                     onReviewActiveChange={handleReviewActiveChange}
                     onMergeIntoDocument={handleMergeFlashNote}
                     currentDocument={reviewableDocument}
+                    openReviewRequest={reviewRequest}
                   />
                 </section>
               ) : (

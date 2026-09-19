@@ -22,6 +22,14 @@ type SpaceTimelinePanelProps = {
    * already holds, so it travels down as a prop rather than being read again.
    */
   currentDocument?: { filePath: string; content: string; dirty: boolean } | null;
+  /**
+   * A request from outside to open the review tab — the command palette's "开始复习".
+   *
+   * A number rather than a boolean, and it is compared by value rather than by
+   * truthiness: asking twice has to work twice, and a flag that is already true says
+   * nothing the second time.
+   */
+  openReviewRequest?: number;
 };
 
 export const SpaceTimelinePanel: React.FC<SpaceTimelinePanelProps> = ({
@@ -29,6 +37,7 @@ export const SpaceTimelinePanel: React.FC<SpaceTimelinePanelProps> = ({
   onMergeIntoDocument,
   onReviewActiveChange,
   currentDocument = null,
+  openReviewRequest = 0,
 }) => {
   const [notes, setNotes] = useState<FlashNoteSummaryItem[]>([]);
   const [spaceDir, setSpaceDir] = useState<string>("");
@@ -45,6 +54,12 @@ export const SpaceTimelinePanel: React.FC<SpaceTimelinePanelProps> = ({
       if (isReviewActive) onReviewActiveChange?.(false);
     };
   }, [isReviewActive, onReviewActiveChange]);
+
+  // Opened from outside — the command palette, which should be able to start a review
+  // without the reader first finding the Space panel and then the tab inside it.
+  useEffect(() => {
+    if (openReviewRequest > 0) setActiveTab("review");
+  }, [openReviewRequest]);
   const [todoFilter, setTodoFilter] = useState<"all" | "pending" | "done">("pending");
   const [feedback, setFeedback] = useState<string>("");
 

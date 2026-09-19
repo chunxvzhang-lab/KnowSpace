@@ -72,4 +72,44 @@ describe("SpaceTimelinePanel - 复盘时让出空间", () => {
 
     expect(screen.getByText("每日复盘")).toBeDefined();
   });
+
+  it("外部请求开始复习：面板直接切到复盘", () => {
+    // The command palette's "开始复习" arrives as this prop. Without it, the review is
+    // three clicks deep — open the sidebar, find the Space panel, find the tab — which
+    // is where a feature nobody knows about lives.
+    const onReviewActiveChange = vi.fn();
+    const { rerender } = render(
+      <SpaceTimelinePanel onReviewActiveChange={onReviewActiveChange} openReviewRequest={0} />
+    );
+    expect(onReviewActiveChange).toHaveBeenLastCalledWith(false);
+
+    rerender(
+      <SpaceTimelinePanel onReviewActiveChange={onReviewActiveChange} openReviewRequest={1} />
+    );
+
+    expect(onReviewActiveChange).toHaveBeenLastCalledWith(true);
+  });
+
+  it("同一个请求号只算一次，而下一个请求仍然有效", () => {
+    // A counter rather than a flag: asking twice has to work twice, and re-rendering
+    // with the number it already has must not pull the reader back out of the timeline.
+    const onReviewActiveChange = vi.fn();
+    const { rerender } = render(
+      <SpaceTimelinePanel onReviewActiveChange={onReviewActiveChange} openReviewRequest={1} />
+    );
+    expect(onReviewActiveChange).toHaveBeenLastCalledWith(true);
+
+    fireEvent.click(screen.getByText("时间轴"));
+    expect(onReviewActiveChange).toHaveBeenLastCalledWith(false);
+
+    rerender(
+      <SpaceTimelinePanel onReviewActiveChange={onReviewActiveChange} openReviewRequest={1} />
+    );
+    expect(onReviewActiveChange).toHaveBeenLastCalledWith(false);
+
+    rerender(
+      <SpaceTimelinePanel onReviewActiveChange={onReviewActiveChange} openReviewRequest={2} />
+    );
+    expect(onReviewActiveChange).toHaveBeenLastCalledWith(true);
+  });
 });

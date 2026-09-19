@@ -1,4 +1,6 @@
 // Setup test environment
+import { afterEach } from "vitest";
+
 class MemoryStorage implements Storage {
   private store = new Map<string, string>();
 
@@ -41,6 +43,20 @@ if (typeof window !== "undefined") {
     configurable: true,
   });
 }
+
+/**
+ * Every test starts with empty storage.
+ *
+ * One shared instance, and for a long time nothing wrote to it — until the review
+ * began remembering which source the reader was using and which folder they chose.
+ * Without this, one test's choice becomes the next test's starting state, and the
+ * failures that produces look like the feature itself being broken: a panel that
+ * opens on the wrong source, a document read twice. Clearing between tests is what
+ * keeps the order they run in from being part of what they assert.
+ */
+afterEach(() => {
+  storageInstance.clear();
+});
 
 // ─── jsdom gaps ──────────────────────────────────────────────────────────────
 //
