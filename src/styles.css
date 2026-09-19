@@ -9256,8 +9256,19 @@ body:has(.flash-capsule-overlay) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-bottom: 8px;
-  margin-bottom: 8px;
+  /* The menu scrolls when it is tall, and these menus are tall: the header stays put, so
+     a reader scrolling down to the colours still knows which node they belong to. It is
+     also the thing that makes scrolling the menu feel like scrolling a menu — without it
+     the title slid away and the panel read as a loose column of rows.
+     The negative offsets pull it flush over the menu's own 10px padding, and the radius
+     follows the menu's so the corners do not square off while it covers them. */
+  position: sticky;
+  top: -10px;
+  z-index: 1;
+  margin: -10px -10px 8px;
+  padding: 10px 10px 8px;
+  background: var(--surface);
+  border-radius: 10px 10px 0 0;
   border-bottom: 1px solid var(--border);
 }
 
@@ -11814,6 +11825,36 @@ body:has(.flash-capsule-overlay) {
 
 .mindmap-canvas-menu {
   min-width: 172px;
+}
+
+/* ── One visual language for the three mind map menus ──────────────────────────
+   They sit one click apart from each other, but the rows had drifted: 12.5px against
+   11.5px, radius 6 against 5, and — the part that is not merely untidy — the canvas
+   menu's hover was written in a fixed cyan while the node menu's asked the theme. In the
+   light and e-ink themes that cyan is simply wrong; a hover colour is a theme's business,
+   so all of them ask for the accent now.
+   Written once at the end rather than edited into both blocks: same specificity, later in
+   the file, and the delete row (three classes) still outranks it and keeps its red. */
+.mindmap-ctx-item,
+.mindmap-ctx-action-item {
+  min-height: 28px;
+  border-radius: 6px;
+  font-size: 12px;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+
+.mindmap-ctx-item:hover:not(:disabled),
+.mindmap-ctx-action-item:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+}
+
+/* The menus are reachable by keyboard, so they have to show where the keyboard is. */
+.mindmap-ctx-item:focus-visible,
+.mindmap-ctx-action-item:focus-visible,
+.mindmap-ctx-close:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  outline-offset: 1px;
 }
 
 /* ── End mind map canvas context menu ── */
