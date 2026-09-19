@@ -22,6 +22,7 @@ import {
   searchMindmapNodes,
   exportMindmapToOpml,
   exportMindmapToFreeMind,
+  exportMindmapToXmind,
   exportMindmapToMarkdownOutline,
   calculateNodeDimensions,
 } from "../services/mindmapService";
@@ -1910,6 +1911,34 @@ export const MindmapView = memo(function MindmapView({
     URL.revokeObjectURL(url);
   }, [tree, title, collapsedIds]);
 
+  /**
+   * The map as an `.xmind` file, which is also the one export the app can read.
+   *
+   * Bytes rather than text, because the format is a ZIP: the same download the
+   * other exports use, with a different type on the blob. Everything the companion
+   * file holds that XMind has a counterpart for goes with it — the tree alone would
+   * be the smaller half of the map.
+   */
+  const handleExportXmind = useCallback(() => {
+    const bytes = exportMindmapToXmind(tree, { sidecar, sheetTitle: tree.text || title });
+    // A view is not a buffer, so the blob is built from a copy of exactly these
+    // bytes — the array this came from may be a window onto a larger one, and the
+    // file would then carry whatever else was in it.
+    const buffer = bytes.buffer.slice(
+      bytes.byteOffset,
+      bytes.byteOffset + bytes.byteLength
+    ) as ArrayBuffer;
+    const blob = new Blob([buffer], { type: "application/zip" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${title || "mindmap"}.xmind`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [tree, sidecar, title]);
+
   const handleExportMarkdownOutline = useCallback(() => {
     const md = exportMindmapToMarkdownOutline(tree);
     const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
@@ -2549,6 +2578,7 @@ export const MindmapView = memo(function MindmapView({
         onPrintPdf={handlePrintPdf}
         onExportOpml={handleExportOpml}
         onExportFreeMind={handleExportFreeMind}
+        onExportXmind={handleExportXmind}
         onExportMarkdownOutline={handleExportMarkdownOutline}
       />
 

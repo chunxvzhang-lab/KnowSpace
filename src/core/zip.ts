@@ -53,6 +53,90 @@ function readDirectoryLocation(bytes: Uint8Array): { offset: number; count: numb
   return null;
 }
 
+/** An entry to write: a name, and the bytes it holds. */
+export interface ZipEntryInput {
+  name: string;
+  bytes: Uint8Array;
+}
+
+/**
+ * Builds a ZIP holding these entries.
+ *
+ * Every entry is **stored**, not deflated. A ZIP may hold uncompressed entries —
+ * that is part of the format, not a shortcut through it — and the alternative was
+ * writing a compressor, which is a considerably larger thing than the feature
+ * needs. What it costs is size: an outline is a few kilobytes of JSON, and the
+ * kind of file this sits beside in a folder is already holding photographs.
+ *
+ * No data descriptors, no ZIP64, and no comment: all three are things a reader has
+ * to cope with, and a writer that does not produce them is a reader's easier day.
+ */
+export function writeZip(entries: ZipEntryInput[]): Uint8Array {
+  const encoder = new TextEncoder();
+  const bytes: number[] = [];
+  const push16 = (value: number) => bytes.push(value & 0xff, (value >> 8) & 0xff);
+  const push32 = (value: number) =>
+    bytes.push(value & 0xff, (value >> 8) & 0xff, (value >> 16) & 0xff, (value >>> 24) & 0xff);
+
+  const written: { name: string; bytes: Uint8Array; offset: number; checksum: number }[] = [];
+
+  for (const entry of entries) {
+    const nameBytes = encoder.encode(entry.name);
+    const checksum = crc32(entry.bytes);
+    const offset = bytes.length;
+
+    push32(0x04034b50);
+    push16(20); // version needed
+    push16(0); // flags: no descriptor follows, the sizes are here
+    push16(0); // method: stored
+    push16(0); // time
+    push16(0); // date
+    push32(checksum);
+    push32(entry.bytes.length);
+    push32(entry.bytes.length);
+    push16(nameBytes.length);
+    push16(0); // extra
+    bytes.push(...nameBytes);
+    bytes.push(...entry.bytes);
+
+    written.push({ name: entry.name, bytes: entry.bytes, offset, checksum });
+  }
+
+  const directoryOffset = bytes.length;
+  for (const entry of written) {
+    const nameBytes = encoder.encode(entry.name);
+    push32(0x02014b50);
+    push16(20); // version made by
+    push16(20); // version needed
+    push16(0); // flags
+    push16(0); // method
+    push16(0); // time
+    push16(0); // date
+    push32(entry.checksum);
+    push32(entry.bytes.length);
+    push32(entry.bytes.length);
+    push16(nameBytes.length);
+    push16(0); // extra
+    push16(0); // comment
+    push16(0); // disk
+    push16(0); // internal attributes
+    push32(0); // external attributes
+    push32(entry.offset);
+    bytes.push(...nameBytes);
+  }
+
+  push32(0x06054b50);
+  push16(0);
+  push16(0);
+  push16(written.length);
+  push16(written.length);
+  push32(bytes.length - directoryOffset);
+  push32(directoryOffset);
+  push16(0); // comment length
+
+  return Uint8Array.from(bytes);
+}
+
 /** One entry as the central directory describes it. */
 interface ZipEntry {
   name: string;

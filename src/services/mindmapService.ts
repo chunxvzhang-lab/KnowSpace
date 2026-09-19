@@ -1178,5 +1178,6 @@ export {
   escapeXml,
   exportMindmapToOpml,
   exportMindmapToFreeMind,
+  exportMindmapToXmind,
   exportMindmapToMarkdownOutline,
 } from "./mindmapExport";

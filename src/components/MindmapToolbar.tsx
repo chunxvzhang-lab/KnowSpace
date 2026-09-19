@@ -73,6 +73,14 @@ export type MindmapToolbarProps = {
   onExportPng: () => void;
   onExportSvg: () => void;
   onPrintPdf: () => void;
+  /**
+   * The map as an `.xmind` file: the one export this app can also read.
+   *
+   * Offered alongside the other outline formats because that is what it is, ahead
+   * of them because it is the only one that carries what the map knows beyond its
+   * tree — the notes, the lines, the brackets.
+   */
+  onExportXmind: () => void;
   onExportOpml: () => void;
   onExportFreeMind: () => void;
   onExportMarkdownOutline: () => void;
@@ -106,6 +114,7 @@ export function MindmapToolbar({
   onExportPng,
   onExportSvg,
   onPrintPdf,
+  onExportXmind,
   onExportOpml,
   onExportFreeMind,
   onExportMarkdownOutline,
@@ -408,6 +417,10 @@ export function MindmapToolbar({
         onPrintPdf={() => {
           setIsExportMenuOpen(false);
           onPrintPdf();
+        }}
+        onExportXmind={() => {
+          setIsExportMenuOpen(false);
+          onExportXmind();
         }}
         onExportOpml={() => {
           setIsExportMenuOpen(false);

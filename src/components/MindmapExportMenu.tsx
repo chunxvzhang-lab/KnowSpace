@@ -26,6 +26,13 @@ export type MindmapExportMenuProps = {
    * PDF.
    */
   onPrintPdf: () => void;
+  /**
+   * The map as an `.xmind` file — bytes rather than text, since the format is a ZIP.
+   *
+   * First among the outline formats here because it is the one that carries what
+   * the map knows beyond its tree, and the only one this app can read back.
+   */
+  onExportXmind: () => void;
   onExportOpml: () => void;
   onExportFreeMind: () => void;
   onExportMarkdownOutline: () => void;
@@ -38,6 +45,7 @@ export function MindmapExportMenu({
   onExportPng,
   onExportSvg,
   onPrintPdf,
+  onExportXmind,
   onExportOpml,
   onExportFreeMind,
   onExportMarkdownOutline,
@@ -55,6 +63,11 @@ export function MindmapExportMenu({
       title: "打印 / 导出 PDF",
       description: "整张导图缩放到纸张上；在打印对话框里可存为 PDF",
       run: onPrintPdf,
+    },
+    {
+      title: "导出 XMind (.xmind)",
+      description: "带备注、标签、关系线与概要边界，可被本应用再读回来",
+      run: onExportXmind,
     },
     { title: "导出 OPML 2.0", description: "兼容 MindNode、OmniOutliner (.opml)", run: onExportOpml },
     {
