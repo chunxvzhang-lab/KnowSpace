@@ -28,14 +28,28 @@ async function main() {
   console.log("3. Copying unpacked binaries into release/KnowSpace-win-x64...");
   await fs.mkdir(releaseRoot, { recursive: true });
 
-  // Clean old target folder
-  for (let attempt = 0; attempt < 5; attempt++) {
+  // Clean the target folder — and make sure it is really gone before copying into it.
+  //
+  // copyDirectory merges into whatever is already there, so a deletion that fails
+  // quietly does not fail the build: it produces a folder that is part old and part
+  // new, and the new files sitting beside the old ones look perfectly fine. That is
+  // how two v2.3.0 installers (293 MB of them) rode along inside the v2.6.0 portable
+  // zip — they had been in this folder since 09-16, the retry loop below gave up
+  // without saying anything, and every later version's files were copied in next to
+  // them. A wrong file that looks right is worse than a build that stops.
+  let removed = false;
+  for (let attempt = 0; attempt < 5 && !removed; attempt++) {
     try {
       await fs.rm(appDir, { recursive: true, force: true });
-      break;
+      removed = !(await pathExists(appDir));
     } catch (err) {
       await new Promise((r) => setTimeout(r, 500));
     }
+  }
+  if (!removed) {
+    throw new Error(
+      `Could not remove ${appDir} — close whatever is using it (a running KnowSpace.exe, an editor, an open zip) and run again. Refusing to copy into it: whatever survived would be an older version's file wearing this version's name.`
+    );
   }
 
   await copyDirectory(winUnpacked, appDir);
@@ -187,6 +201,15 @@ async function assertExists(filePath, message) {
     await fs.access(filePath);
   } catch {
     throw new Error(message);
+  }
+}
+
+async function pathExists(filePath) {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
   }
 }
 
