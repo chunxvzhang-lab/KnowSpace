@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import type { BookManifest, Bookmark } from "../core/types";
+import type { BookManifest, Bookmark, ChapterManifest } from "../core/types";
+import { samePath } from "../core/paths";
 import { createBacklinkIndex, type BacklinkIndexData } from "../services/backlinkIndex";
 import { buildVaultSearchIndex, type VaultSearchIndex } from "../services/searchIndexService";
 import { saveBookmarks } from "../services/storage";
@@ -68,6 +69,53 @@ type VaultActions = {
 };
 
 export type VaultStore = VaultState & VaultActions;
+
+/**
+ * The listing after a document was written into it, when there is no folder to
+ * re-read.
+ *
+ * Re-reading the folder is the ordinary path, and this is the fallback: a folder on
+ * disk is the authority on what is in it, and a listing assembled out of guesses is
+ * how the two come to disagree. It is a fallback with rules, though — a listing that
+ * exists keeps everything it had and gains a chapter, and one that does not is built
+ * around this file alone, with an id that says where it came from rather than one
+ * that pretends to be a folder.
+ *
+ * Kept as a copy of the whole listing rather than a rebuilt object of four fields,
+ * which is what it used to be: rebuilding silently dropped whatever else a manifest
+ * carries — its description, today — and a shape that is copied cannot lose a field
+ * it does not know about.
+ */
+export function listingWithNewChapter(
+  manifest: BookManifest | null,
+  chapter: ChapterManifest,
+  absolutePath: string
+): BookManifest {
+  if (manifest) return { ...manifest, chapters: [...manifest.chapters, chapter] };
+
+  return {
+    id: `directory:${absolutePath}`,
+    title: chapter.title,
+    rootPath: undefined,
+    chapters: [chapter],
+  };
+}
+
+/**
+ * The chapter a file just written became, by path.
+ *
+ * Null when the listing has no chapter for it, which is the caller's cue to use the
+ * chapter the write itself reported: the listing is the authority when it knows, and
+ * the write's own answer is the authority when it does not. A fresh listing has not
+ * been re-read yet, so this is the question that decides whether the path the bridge
+ * returned is one the listing already has under another name.
+ */
+export function chapterForFile(
+  manifest: BookManifest | null,
+  absolutePath: string
+): ChapterManifest | null {
+  return manifest?.chapters.find((chapter) => samePath(chapter.absolutePath, absolutePath)) ?? null;
+}
 
 export const useVaultStore = create<VaultStore>()((set, get) => ({
   manifest: null,

@@ -1,7 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { useVaultStore } from "../store/useVaultStore";
+import {
+  chapterForFile,
+  listingWithNewChapter,
+  useVaultStore,
+} from "../store/useVaultStore";
 import { loadBookmarks } from "../services/storage";
-import type { BookManifest, Bookmark } from "../core/types";
+import type { BookManifest, Bookmark, ChapterManifest } from "../core/types";
 
 const manifest: BookManifest = {
   id: "vault-1",
@@ -168,5 +172,88 @@ describe("useVaultStore - vault state", () => {
       expect(useVaultStore.getState().activeSearchMatchId).toBeNull();
       expect(useVaultStore.getState().searchQuery).toBe("关键词");
     });
+  });
+});
+
+/**
+ * The listing after a file was written into it, when there is no folder to re-read.
+ *
+ * A fallback, but a fallback with rules — and the rules are the kind that only show
+ * up in a listing that has more in it than the four fields the old inline version
+ * rebuilt by hand.
+ */
+describe("新的文件写进清单之后", () => {
+  const newChapter: ChapterManifest = {
+    id: "ch-2",
+    title: "第二章",
+    src: "ch-2.md",
+    absolutePath: "C:\\Vault\\ch-2.md",
+  };
+
+  it("清单还在：它的一切都留着，只是多了一章", () => {
+    const listed = listingWithNewChapter(
+      { ...manifest, description: "一本测试用的书" },
+      newChapter,
+      "C:\\Vault\\ch-2.md"
+    );
+
+    expect(listed.chapters.map((chapter) => chapter.id)).toEqual(["ch-1", "ch-2"]);
+    // The field the old rebuild dropped: it assembled the listing out of four
+    // fields it knew about, and a manifest carries more than four. A copy cannot
+    // lose a field it does not know about.
+    expect(listed.description).toBe("一本测试用的书");
+    expect(listed.id).toBe("vault-1");
+    expect(listed.rootPath).toBe("C:\\Vault");
+  });
+
+  it("清单不存在：围着这一个文件建起来，id 说明它从哪来", () => {
+    const listed = listingWithNewChapter(null, newChapter, "C:\\Vault\\ch-2.md");
+
+    expect(listed).toEqual({
+      id: "directory:C:\\Vault\\ch-2.md",
+      title: "第二章",
+      // No folder was open, so the listing has none — saying the file's own path
+      // here would make every later refresh look for a folder that is not one.
+      rootPath: undefined,
+      chapters: [newChapter],
+    });
+  });
+});
+
+/**
+ * Which chapter a file that was just written became.
+ *
+ * Null when the listing does not know the path, which is the caller's cue to use the
+ * chapter the write itself reported: the listing is the authority when it knows, and
+ * the write's answer is when it does not.
+ */
+describe("刚写下的文件是哪一章", () => {
+  const listed: BookManifest = {
+    ...manifest,
+    chapters: [
+      { id: "ch-1", title: "第一章", src: "ch-1.md", absolutePath: "C:\\Vault\\ch-1.md" },
+    ],
+  };
+
+  it("按路径找到它，大小写不算区别", () => {
+    // A folder re-read hands back the path in the platform's own casing, which is
+    // not always the casing the write reported.
+    expect(chapterForFile(listed, "c:\\vault\\CH-1.MD")?.id).toBe("ch-1");
+  });
+
+  it("清单不认识这个路径：null，交给调用方", () => {
+    expect(chapterForFile(listed, "C:\\Vault\\别的.md")).toBeNull();
+    expect(chapterForFile(null, "C:\\Vault\\ch-1.md")).toBeNull();
+  });
+
+  it("章节自己没有路径时，不会跟一个没路径的请求凑成一对", () => {
+    // The rule from samePath, seen from this side: a chapter that has no file is not
+    // the file that was just written, however little there is to tell them apart.
+    const noPaths: BookManifest = {
+      ...manifest,
+      chapters: [{ id: "ch-1", title: "第一章", src: "ch-1.md" }],
+    };
+
+    expect(chapterForFile(noPaths, "C:\\Vault\\ch-1.md")).toBeNull();
   });
 });

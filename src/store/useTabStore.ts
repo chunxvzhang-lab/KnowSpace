@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { TabItem } from "../components/TabBar";
+import { samePath } from "../core/paths";
 
 /**
  * Tab state: which documents are open, which one is active, and which one the
@@ -43,20 +44,48 @@ export const RECENT_DOC_LIMIT = 15;
 /**
  * Index of the tab that represents `tab`, or -1.
  *
- * Matching goes by id, then by absolute path, then by title when neither side
- * has a path. That order lets a document opened from disk find the tab it
+ * Matching goes by id, then by absolute path, then by title when **at most one**
+ * side has a path. That order lets a document opened from disk find the tab it
  * already has, while a document created in-app — which has no path yet — still
  * finds its tab by title.
+ *
+ * "At most one" rather than "neither", and this comment said "neither" until a test
+ * written against the comment failed against the code: the case the title clause
+ * exists for is precisely the one where the sides differ — a tab that has a file and
+ * a document that does not have one yet are the same document, and their paths can
+ * never say so. Two documents that *both* have paths are told apart by their paths,
+ * which is why a title match between those is not a match.
  */
 export function findTabIndex(tabs: TabMeta[], tab: TabMeta): number {
   return tabs.findIndex(
     (candidate) =>
       candidate.id === tab.id ||
-      (candidate.absolutePath &&
-        tab.absolutePath &&
-        candidate.absolutePath.toLowerCase() === tab.absolutePath.toLowerCase()) ||
+      samePath(candidate.absolutePath, tab.absolutePath) ||
       (candidate.title === tab.title && (!candidate.absolutePath || !tab.absolutePath))
   );
+}
+
+/**
+ * The tabs after a document was opened at this chapter.
+ *
+ * The same list, unchanged, when that document is already open — opening the file
+ * the reader already has in front of them should not grow a second tab for it. Which
+ * is what `findTabIndex` answers, and the reason this defers to it rather than
+ * repeating the comparison: there is one rule for "which tab is this document", and
+ * everything that has to answer it asks the same question.
+ */
+export function tabsWithNewDocument(
+  tabs: TabMeta[],
+  chapter: { id: string; title: string; src: string; absolutePath?: string },
+  absolutePath: string | undefined
+): TabMeta[] {
+  const tab: TabMeta = {
+    id: chapter.id,
+    title: chapter.title,
+    relativePath: chapter.src,
+    ...(absolutePath ? { absolutePath } : {}),
+  };
+  return findTabIndex(tabs, tab) === -1 ? [...tabs, tab] : tabs;
 }
 
 /**

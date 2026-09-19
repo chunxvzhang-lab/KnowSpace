@@ -60,11 +60,13 @@ import { useUiStore } from "./store/useUiStore";
 import {
   useTabStore,
   tabsWithDirtyFlags,
+  tabsWithNewDocument,
   nextActiveAfterClose,
   tabsAfterClosingRight,
   type TabMeta,
 } from "./store/useTabStore";
-import { useVaultStore } from "./store/useVaultStore";
+import { chapterForFile, listingWithNewChapter, useVaultStore } from "./store/useVaultStore";
+import { samePath } from "./core/paths";
 
 type PendingAction =
   | { type: "select-chapter"; chapterId: string }
@@ -349,25 +351,7 @@ export function App() {
             setSidebarTab("toc");
           }
           if (targetChap) {
-            setTabs((prev) => {
-              const exists = prev.some(
-                (t) =>
-                  t.id === targetChap.id ||
-                  (t.absolutePath &&
-                    targetChap.absolutePath &&
-                    t.absolutePath.toLowerCase() === targetChap.absolutePath.toLowerCase())
-              );
-              if (exists) return prev;
-              return [
-                ...prev,
-                {
-                  id: targetChap.id,
-                  title: targetChap.title,
-                  relativePath: targetChap.src,
-                  absolutePath: targetChap.absolutePath,
-                },
-              ];
-            });
+            setTabs((prev) => tabsWithNewDocument(prev, targetChap, targetChap.absolutePath));
           }
           break;
         }
@@ -624,7 +608,7 @@ export function App() {
 
   const openDesktopMarkdownPath = useCallback(
     (absolutePath: string, preloadedSource?: ChapterSource | null) => {
-      if (session?.absolutePath && session.absolutePath.toLowerCase() === absolutePath.toLowerCase()) {
+      if (samePath(session?.absolutePath, absolutePath)) {
         return;
       }
       guardAction({ type: "open-desktop-file", absolutePath, preloadedSource });
@@ -692,45 +676,24 @@ export function App() {
           return null;
         }
 
-        let nextManifest = manifest;
-        if (rootPath && desktop.refreshDirectory) {
-          nextManifest = await desktop.refreshDirectory(rootPath);
-        } else {
-          const newChapter = result.chapter;
-          nextManifest = {
-            id: manifest?.id ?? `directory:${result.absolutePath}`,
-            title: manifest?.title ?? result.chapter.title,
-            rootPath: manifest?.rootPath,
-            chapters: manifest ? [...manifest.chapters, newChapter] : [newChapter],
-          };
-        }
+        // Re-read the folder when there is one — the disk is the authority on what is
+        // in it — and otherwise assemble the listing around the new file. Both rules
+        // live with the listing, not here: see listingWithNewChapter.
+        const nextManifest =
+          rootPath && desktop.refreshDirectory
+            ? await desktop.refreshDirectory(rootPath)
+            : listingWithNewChapter(manifest, result.chapter, result.absolutePath);
 
-        const activeChap =
-          nextManifest.chapters.find(
-            (c) => c.absolutePath && c.absolutePath.toLowerCase() === result.absolutePath.toLowerCase()
-          ) ?? result.chapter;
+        // The listing is the authority on what the file became when it knows the
+        // path; the write's own answer is when it does not.
+        const activeChap = chapterForFile(nextManifest, result.absolutePath) ?? result.chapter;
 
         setManifest(nextManifest);
         setChapterId(activeChap.id);
-        setTabs((prev) => {
-          const exists = prev.some(
-            (t) =>
-              t.id === activeChap.id ||
-              (t.absolutePath &&
-                activeChap.absolutePath &&
-                t.absolutePath.toLowerCase() === activeChap.absolutePath.toLowerCase())
-          );
-          if (exists) return prev;
-          return [
-            ...prev,
-            {
-              id: activeChap.id,
-              title: activeChap.title,
-              relativePath: activeChap.src,
-              absolutePath: result.absolutePath,
-            },
-          ];
-        });
+        // Opening the document the reader already has in front of them does not grow
+        // a second tab for it — see tabsWithNewDocument, which is also where the file
+        // that a command palette jump opens goes through.
+        setTabs((prev) => tabsWithNewDocument(prev, activeChap, result.absolutePath));
         setViewMode("split");
         activeLoadedChapterIdRef.current = activeChap.id;
 
@@ -995,11 +958,7 @@ export function App() {
     let cancelled = false;
     const targetAbsPath = targetChapter?.absolutePath || targetTab?.absolutePath;
 
-    if (
-      session?.absolutePath &&
-      targetAbsPath &&
-      session.absolutePath.toLowerCase() === targetAbsPath.toLowerCase()
-    ) {
+    if (samePath(session?.absolutePath, targetAbsPath)) {
       activeLoadedChapterIdRef.current = chapterId;
       return;
     }
@@ -1753,10 +1712,7 @@ export function App() {
       // 5. Update tabs
       setTabs((prev) =>
         prev.map((t) => {
-          if (
-            t.id === chapter.id ||
-            (t.absolutePath && chapter.absolutePath && t.absolutePath.toLowerCase() === chapter.absolutePath.toLowerCase())
-          ) {
+          if (t.id === chapter.id || samePath(t.absolutePath, chapter.absolutePath)) {
             return {
               ...t,
               title: newTitle,

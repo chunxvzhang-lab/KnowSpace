@@ -3,6 +3,7 @@ import {
   useTabStore,
   findTabIndex,
   tabsWithDirtyFlags,
+  tabsWithNewDocument,
   nextActiveAfterClose,
   tabsAfterClosingRight,
   RECENT_DOC_LIMIT,
@@ -267,5 +268,73 @@ describe("useTabStore - tab state", () => {
       expect(useTabStore.getState().activeTabId).toBe("a");
       expect(useTabStore.getState().dualSplitTabId).toBe("b");
     });
+  });
+});
+
+/**
+ * Opening a document into the tab list.
+ *
+ * The same call serves the two ways a document can be opened — a chapter picked out
+ * of the listing, and a file that was just written — because they are the same
+ * question: is this document already open?
+ */
+describe("开一个文档时，标签页怎么变", () => {
+  const chapter = {
+    id: "ch-2",
+    title: "第二章",
+    src: "ch-2.md",
+    absolutePath: "C:\\Vault\\ch-2.md",
+  };
+
+  it("还没开的文档：添一个标签页，形状与其它地方一致", () => {
+    const tabs = [tab("ch-1")];
+
+    expect(tabsWithNewDocument(tabs, chapter, chapter.absolutePath)).toEqual([
+      tab("ch-1"),
+      {
+        id: "ch-2",
+        title: "第二章",
+        relativePath: "ch-2.md",
+        absolutePath: "C:\\Vault\\ch-2.md",
+      },
+    ]);
+  });
+
+  it("已经开着的文档：把原来那个列表原样还回来", () => {
+    // Identity, not just equality: the caller sets this straight into state, and a
+    // fresh array that happens to be equal is a re-render for nothing.
+    const tabs = [tab("ch-1"), tab("elsewhere", { absolutePath: "c:\\vault\\CH-2.md" })];
+
+    expect(tabsWithNewDocument(tabs, chapter, chapter.absolutePath)).toBe(tabs);
+  });
+
+  it("同一个 id 但路径不同：认 id，不添一个", () => {
+    // A chapter whose id the listing has already given out is the document that id
+    // belongs to, whatever path the write reported.
+    const tabs = [tab("ch-2", { absolutePath: "C:\\Vault\\老的路径.md" })];
+
+    expect(tabsWithNewDocument(tabs, chapter, chapter.absolutePath)).toBe(tabs);
+  });
+
+  it("只要有一边还没有路径，标题说了算", () => {
+    // The clause that exists for the in-app case: a document created here has no
+    // path yet, so it can only find its tab by title — even when the tab it has to
+    // find was opened from disk and therefore does have one.
+    const tabs = [tab("别的", { title: "第二章", absolutePath: "C:\\Vault\\旧的.md" })];
+
+    expect(
+      tabsWithNewDocument(tabs, { ...chapter, id: "另一个 id", absolutePath: undefined }, undefined)
+    ).toBe(tabs);
+  });
+
+  it("两边都有路径、标题也一样：路径说了算，不合并", () => {
+    // Two documents that both have files are told apart by their files. Sharing a
+    // title is not sharing an identity — two chapters can be called the same thing,
+    // and merging them would put one file's edits into the other's tab.
+    const tabs = [tab("别的", { title: "第二章", absolutePath: "C:\\Vault\\旧的.md" })];
+
+    expect(
+      tabsWithNewDocument(tabs, { ...chapter, id: "另一个 id" }, "C:\\Vault\\ch-2.md")
+    ).toHaveLength(2);
   });
 });
