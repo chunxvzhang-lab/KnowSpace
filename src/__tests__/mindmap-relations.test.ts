@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  MINDMAP_RELATION_ARROWS,
+  MINDMAP_RELATION_STYLES,
+  arrowEnds,
+  arrowHeadPath,
   boxEdgePoint,
+  findRelationArrow,
+  findRelationStyle,
   isSameRelation,
+  relationGeometry,
   relationKey,
   relationPath,
   toRelation,
@@ -108,3 +115,97 @@ describe("两条关系是不是同一条", () => {
     expect(isSameRelation(toRelation("a", "b"), "a", "c")).toBe(false);
   });
 });
+
+describe("关系线的标签与箭头", () => {
+  const OTHER: RelationBox = { x: 400, y: 260, width: 80, height: 40 };
+
+  it("标签的位置是一条纯函数给出来的，且落在两点之间", () => {
+    // A label placed by the component would be a second opinion about where the
+    // line goes; this is the same function that drew it.
+    const { start, end, apex } = relationGeometry(BOX, OTHER);
+
+    const minX = Math.min(start.x, end.x);
+    const maxX = Math.max(start.x, end.x);
+    const minY = Math.min(start.y, end.y);
+    const maxY = Math.max(start.y, end.y);
+    expect(apex.x).toBeGreaterThanOrEqual(minX);
+    expect(apex.x).toBeLessThanOrEqual(maxX);
+    expect(apex.y).toBeGreaterThanOrEqual(minY);
+    expect(apex.y).toBeLessThanOrEqual(maxY);
+  });
+
+  it("路径还是那条路径：几何里带的与单独画的是同一个", () => {
+    for (const to of [OTHER, { x: -300, y: -120, width: 60, height: 60 }, BOX]) {
+      expect(relationGeometry(BOX, to).path).toBe(relationPath(BOX, to));
+    }
+  });
+
+  it("箭头：尖端在点上，尾在来向的后方", () => {
+    const points = points2(arrowHeadPath({ x: 100, y: 50 }, 0, 10));
+
+    // Angle zero means the line arrives travelling right, so the tip is the
+    // rightmost point and the two barbs are behind it, one above and one below.
+    expect(points[0]).toEqual({ x: 100, y: 50 });
+    expect(points[1].x).toBeLessThan(100);
+    expect(points[2].x).toBeLessThan(100);
+    expect(points[1].y).toBeGreaterThan(50);
+    expect(points[2].y).toBeLessThan(50);
+  });
+
+  it("箭头跟着方向走：两个倒钩对称地分在轴的两侧", () => {
+    const right = points2(arrowHeadPath({ x: 0, y: 0 }, 0));
+    const down = points2(arrowHeadPath({ x: 0, y: 0 }, Math.PI / 2));
+
+    // Travelling right: the tip is at the point, both barbs are behind it, and
+    // they straddle the axis — one above, one below.
+    expect(right[0]).toEqual({ x: 0, y: 0 });
+    expect(right[1].x).toBeLessThan(0);
+    expect(right[2].x).toBeLessThan(0);
+    expect(right[1].y).toBeCloseTo(-right[2].y, 6);
+    expect(Math.abs(right[1].y)).toBeGreaterThan(0);
+
+    // Travelling down: the same three facts, turned.
+    expect(down[0]).toEqual({ x: 0, y: 0 });
+    expect(down[1].y).toBeLessThan(0);
+    expect(down[2].y).toBeLessThan(0);
+    expect(down[1].x).toBeCloseTo(-down[2].x, 6);
+    expect(Math.abs(down[1].x)).toBeGreaterThan(0);
+  });
+
+  it("哪一端有箭头：与存储的顺序相对，而不是与主题相对", () => {
+    expect(arrowEnds(undefined)).toEqual({ atStart: false, atEnd: false });
+    expect(arrowEnds("none")).toEqual({ atStart: false, atEnd: false });
+    expect(arrowEnds("forward")).toEqual({ atStart: false, atEnd: true });
+    expect(arrowEnds("backward")).toEqual({ atStart: true, atEnd: false });
+    expect(arrowEnds("both")).toEqual({ atStart: true, atEnd: true });
+  });
+
+  it("形态与箭头：不认识的就用默认，且默认确实在表里", () => {
+    // The table decides what to draw, the file remembers what the reader chose —
+    // so an unknown id draws the default rather than nothing at all.
+    expect(findRelationStyle(undefined).id).toBe("dashed");
+    expect(findRelationStyle("未来的形态").id).toBe("dashed");
+    expect(findRelationArrow("future").id).toBe("none");
+
+    // The default's dash has to match what the stylesheet draws, since the
+    // drawing always writes it onto the element.
+    expect(MINDMAP_RELATION_STYLES[0].dash).toBe("5 4");
+    // Solid is spelled as a keyword, because an empty attribute would leave the
+    // dash to the stylesheet — which is exactly what "solid" must not do.
+    expect(findRelationStyle("solid").dash).toBe("none");
+    expect(new Set(MINDMAP_RELATION_ARROWS.map((a) => a.id)).size).toBe(
+      MINDMAP_RELATION_ARROWS.length
+    );
+    expect(new Set(MINDMAP_RELATION_STYLES.map((s) => s.id)).size).toBe(
+      MINDMAP_RELATION_STYLES.length
+    );
+  });
+});
+
+/** The points of an arrowhead path, as pairs. */
+function points2(path: string): { x: number; y: number }[] {
+  const numbers = pathNumbers(path);
+  const points: { x: number; y: number }[] = [];
+  for (let i = 0; i + 1 < numbers.length; i += 2) points.push({ x: numbers[i], y: numbers[i + 1] });
+  return points;
+}

@@ -81,6 +81,8 @@ import {
   removeSummary,
   setBoundaryColor,
   setBoundaryText,
+  relationBetween,
+  setRelationFields,
   setSummaryText,
   summariesIn,
   moveFloatingTopic,
@@ -91,6 +93,7 @@ import {
   toggleRelation,
   type MindmapSidecar,
 } from "../services/mindmapSidecar";
+import { relationGeometry } from "../core/mindmapRelations";
 import { boundsOfBoxes, unionBounds } from "../core/mindmapBounds";
 import { boundaryTitleAnchor, summaryLabelAnchor } from "../core/mindmapGroups";
 import { MindmapFloatingTopics, type FloatingBox } from "./MindmapFloatingTopics";
@@ -338,6 +341,22 @@ export const MindmapView = memo(function MindmapView({
   /** The same pair for boundaries, which are picked and titled by their title. */
   const [selectedBoundaryId, setSelectedBoundaryId] = useState<string | null>(null);
   const [editingBoundaryId, setEditingBoundaryId] = useState<string | null>(null);
+
+  /**
+   * The line the reader has picked, and the one whose label is being typed.
+   *
+   * Held as the pair rather than as a key, because everything done to a line is
+   * addressed by the two topics it joins — the canonical order is a storage rule,
+   * and nothing outside the file has to know it.
+   */
+  const [selectedRelation, setSelectedRelation] = useState<{
+    fromId: string;
+    toId: string;
+  } | null>(null);
+  const [editingRelation, setEditingRelation] = useState<{
+    fromId: string;
+    toId: string;
+  } | null>(null);
 
   /**
    * The drag in progress, in a ref rather than in state.
@@ -1169,6 +1188,10 @@ export const MindmapView = memo(function MindmapView({
       const start = marqueeStartRef.current;
       const containerRect = containerRef.current?.getBoundingClientRect();
       if (!start || !containerRect) return;
+
+      // Pressing on bare canvas puts the picked line down, as it does the picked
+      // group: there is one selection on this map, and the reader has moved on.
+      setSelectedRelation(null);
 
       const rect = {
         x1: start.x,
@@ -2010,6 +2033,91 @@ export const MindmapView = memo(function MindmapView({
   }, [applySidecarEdit, selectedNodeIds]);
 
   /**
+   * Changes what the picked line says or how it is drawn.
+   *
+   * One handler for the label and the three ids, because they differ only in
+   * which field they touch — and because the line's other settings have to
+   * survive each one, which is the service's patch for.
+   */
+  const handleRelationChange = useCallback(
+    (field: "label" | "arrow" | "style" | "color", value: string) => {
+      if (!selectedRelation) return;
+      const { fromId, toId } = selectedRelation;
+      applySidecarEdit(["relations"], (current) =>
+        setRelationFields(current, fromId, toId, { [field]: value })
+      );
+    },
+    [applySidecarEdit, selectedRelation]
+  );
+
+  /**
+   * A right click on a line: the canvas menu, with the line as its subject.
+   *
+   * The same shape as a right click on a floating topic — pick the thing, then
+   * open the menu about it at the cursor — and a line has no surface of its own
+   * to hang a panel off, so the rows it needs appear inside that menu.
+   */
+  const handleRelationContextMenu = useCallback(
+    (relation: { fromId: string; toId: string }, event: React.MouseEvent) => {
+      setSelectedRelation({ fromId: relation.fromId, toId: relation.toId });
+      const containerRect = containerRef.current?.getBoundingClientRect();
+      const x = containerRect ? event.clientX - containerRect.left : event.clientX;
+      const y = containerRect ? event.clientY - containerRect.top : event.clientY;
+      setContextMenu({ x, y, nodeId: tree.id, isCanvas: true });
+    },
+    [tree.id]
+  );
+
+  const handleRemoveSelectedRelation = useCallback(() => {
+    if (!selectedRelation) return;
+    const { fromId, toId } = selectedRelation;
+    setSelectedRelation(null);
+    setEditingRelation(null);
+    applySidecarEdit(["relations"], (current) => toggleRelation(current, fromId, toId));
+  }, [applySidecarEdit, selectedRelation]);
+
+  const handleStartRelationEdit = useCallback(
+    (relation: { fromId: string; toId: string; label?: string }) => {
+      setSelectedRelation({ fromId: relation.fromId, toId: relation.toId });
+      setEditingRelation({ fromId: relation.fromId, toId: relation.toId });
+      setEditingText(relation.label ?? "");
+    },
+    []
+  );
+
+  const handleCancelRelationEdit = useCallback(() => setEditingRelation(null), []);
+
+  const handleCommitRelationEdit = useCallback(() => {
+    const relation = editingRelation;
+    setEditingRelation(null);
+    if (!relation) return;
+    applySidecarEdit(["relations"], (current) =>
+      setRelationFields(current, relation.fromId, relation.toId, { label: editingText })
+    );
+  }, [applySidecarEdit, editingRelation, editingText]);
+
+  /**
+   * The box the label editor is drawing over: the line's own middle.
+   *
+   * Worked out from the same geometry the line is drawn with, so the editor lands
+   * on the curve rather than beside it — a label written two pixels off the line
+   * it belongs to is the kind of thing that reads as a bug.
+   */
+  const editingRelationBox = (() => {
+    if (!editingRelation) return null;
+    const from = relationBoxes.get(editingRelation.fromId);
+    const to = relationBoxes.get(editingRelation.toId);
+    if (!from || !to) return null;
+    const { apex } = relationGeometry(from, to);
+    return {
+      x: apex.x - 60,
+      y: apex.y - 11,
+      width: 120,
+      height: 22,
+    };
+  })();
+
+  /**
    * The drag, listened for on the window.
    *
    * On the window rather than on the box, because once a drag has started the
@@ -2315,7 +2423,13 @@ export const MindmapView = memo(function MindmapView({
               onCommit: handleCommitBoundaryEdit,
               onCancel: handleCancelBoundaryEdit,
             }
-          : null;
+          : editingRelationBox
+            ? {
+                box: editingRelationBox,
+                onCommit: handleCommitRelationEdit,
+                onCancel: handleCancelRelationEdit,
+              }
+            : null;
 
   const selectedIds = [...selectedNodeIds];
   const selectionRelated =
@@ -2340,6 +2454,36 @@ export const MindmapView = memo(function MindmapView({
   /** The floating topic the menu is about, for a title and a delete. */
   const contextTargetFloating =
     floatingBoxes.find((topic) => topic.id === contextMenu?.nodeId) ?? null;
+
+  /** Every topic's text by id, for naming the two ends of a picked line. */
+  const topicTexts = useMemo(() => {
+    const texts = new Map<string, string>();
+    for (const node of layout.nodes) texts.set(node.id, node.text);
+    for (const topic of floatingBoxes) texts.set(topic.id, topic.text);
+    return texts;
+  }, [layout.nodes, floatingBoxes]);
+
+  /**
+   * The picked line as the menu needs it: what it says, and what it joins.
+   *
+   * Read from the file rather than remembered when the line was clicked, so the
+   * menu shows what is stored — a font of the label being typed, a colour going
+   * back to the theme, both arrive here as soon as they are written.
+   */
+  const selectedRelationInfo = useMemo(() => {
+    if (!selectedRelation) return null;
+    const relation = relationBetween(sidecar, selectedRelation.fromId, selectedRelation.toId);
+    if (!relation) return null;
+
+    return {
+      label: relation.label ?? "",
+      arrow: relation.arrow ?? "",
+      style: relation.style ?? "",
+      color: relation.color ?? "",
+      fromText: topicTexts.get(relation.fromId) ?? relation.fromId,
+      toText: topicTexts.get(relation.toId) ?? relation.toId,
+    };
+  }, [selectedRelation, sidecar, topicTexts]);
 
   return (
     <div
@@ -2461,7 +2605,16 @@ export const MindmapView = memo(function MindmapView({
 
           {/* Relations next, so they pass under the outline rather than across
               it — a line over a label costs both of them their legibility. */}
-          <MindmapRelationLines relations={relations} boxes={relationBoxes} />
+          <MindmapRelationLines
+            relations={relations}
+            boxes={relationBoxes}
+            selectedKey={
+              selectedRelation ? `${selectedRelation.fromId}\u0000${selectedRelation.toId}` : null
+            }
+            onSelect={setSelectedRelation}
+            onStartLabelEdit={handleStartRelationEdit}
+            onOpenMenu={handleRelationContextMenu}
+          />
 
           {/* Render Bezier / Step / Straight Connecting Edges */}
           <g className="mindmap-edges-group">
@@ -3040,6 +3193,15 @@ export const MindmapView = memo(function MindmapView({
           onRemoveBoundary={() => {
             setContextMenu(null);
             handleRemoveBoundary();
+          }}
+          selectedRelation={selectedRelationInfo}
+          onEditRelationLabel={() => {
+            if (selectedRelation) handleStartRelationEdit(selectedRelation);
+          }}
+          onRelationChange={handleRelationChange}
+          onRemoveRelation={() => {
+            setContextMenu(null);
+            handleRemoveSelectedRelation();
           }}
           canSummarise={selectedIds.length >= 2}
           onAddSummary={() => {

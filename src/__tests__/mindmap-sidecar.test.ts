@@ -10,9 +10,11 @@ import {
   floatingTopics,
   moveFloatingTopic,
   nextBoundaryId,
+  relationBetween,
   removeBoundary,
   setBoundaryColor,
   setBoundaryText,
+  setRelationFields,
   nextFloatingId,
   nextSummaryId,
   removeFloatingTopic,
@@ -648,6 +650,123 @@ describe("导图伴生文件", () => {
       expect(sidecarIsEmpty(addFloatingTopic(emptySidecar(), "想法", 0, 0).sidecar)).toBe(false);
       expect(floatingTopics(emptySidecar())).toEqual([]);
       expect(floatingTopics(null)).toEqual([]);
+    });
+  });
+
+  describe("关系线的设置", () => {
+    it("一次改一样，别的都留着", () => {
+      const joined = toggleRelation(emptySidecar(), "b", "a");
+
+      const labelled = setRelationFields(joined, "a", "b", { label: "取决于" });
+      expect(labelled.relations[0]).toEqual({ fromId: "a", toId: "b", label: "取决于" });
+
+      const arrowed = setRelationFields(labelled, "b", "a", { arrow: "forward" });
+      expect(arrowed.relations[0]).toEqual({
+        fromId: "a",
+        toId: "b",
+        label: "取决于",
+        arrow: "forward",
+      });
+
+      const coloured = setRelationFields(arrowed, "a", "b", { color: "emerald" });
+      expect(coloured.relations[0].color).toBe("emerald");
+      expect(coloured.relations[0].label).toBe("取决于");
+    });
+
+    it("空值就是把这一项收回默认", () => {
+      let sidecar = toggleRelation(emptySidecar(), "a", "b");
+      sidecar = setRelationFields(sidecar, "a", "b", { label: "写字", color: "rose" });
+
+      const cleared = setRelationFields(sidecar, "a", "b", { label: "  ", color: "" });
+
+      // Not an empty string left behind: absent is what "the default look" means,
+      // and a file that spelled it two ways would be a file two readers disagree
+      // about.
+      expect(cleared.relations[0]).toEqual({ fromId: "a", toId: "b" });
+    });
+
+    it("两个主题之间没有线时，什么都不改", () => {
+      const sidecar = toggleRelation(emptySidecar(), "a", "b");
+      const after = setRelationFields(sidecar, "b", "c", { label: "不存在" });
+
+      expect(after.relations).toEqual([{ fromId: "a", toId: "b" }]);
+    });
+
+    it("查询：有没有、是哪一条", () => {
+      const sidecar = setRelationFields(toggleRelation(emptySidecar(), "a", "b"), "a", "b", {
+        label: "取决于",
+      });
+
+      expect(relationBetween(sidecar, "b", "a")?.label).toBe("取决于");
+      expect(relationBetween(sidecar, "a", "c")).toBeNull();
+      expect(relationBetween(null, "a", "b")).toBeNull();
+    });
+
+    it("读文件：四项都读，不认识的值留着，坏值当没写", () => {
+      const parsed = parseSidecar(
+        JSON.stringify({
+          version: 1,
+          relations: [
+            {
+              fromId: "a",
+              toId: "b",
+              label: " 取决于 ",
+              arrow: "both",
+              style: "未来的形态",
+              color: "violet",
+              note: "更早版本没有的字段",
+            },
+            { fromId: "c", toId: "d", label: 7, arrow: "", color: null },
+          ],
+        })
+      );
+
+      expect(parsed?.relations[0]).toEqual({
+        fromId: "a",
+        toId: "b",
+        label: "取决于",
+        arrow: "both",
+        // An id this build cannot place is kept: the table decides what to draw,
+        // and dropping it here is what would make going back lossy.
+        style: "未来的形态",
+        color: "violet",
+        note: "更早版本没有的字段",
+      });
+      // Not a string is the same as not written.
+      expect(parsed?.relations[1]).toEqual({ fromId: "c", toId: "d" });
+    });
+
+    it("往返之后，设置还在", () => {
+      let sidecar = toggleRelation(emptySidecar(), "a", "b");
+      sidecar = setRelationFields(sidecar, "a", "b", {
+        label: "取决于",
+        arrow: "backward",
+        style: "dotted",
+        color: "sky",
+      });
+
+      const back = parseSidecar(serializeSidecar(sidecar));
+
+      expect(back?.relations[0]).toEqual({
+        fromId: "a",
+        toId: "b",
+        label: "取决于",
+        arrow: "backward",
+        style: "dotted",
+        color: "sky",
+      });
+    });
+
+    it("删掉自由主题时，连到它的线不动：线是读者挑过的记录", () => {
+      // The same rule as a summary's span. The drawing skips a line whose
+      // endpoint is missing, so this costs nothing visible — and pruning it would
+      // be this module editing what the reader asked for.
+      let sidecar = addFloatingTopic(emptySidecar(), "想法", 10, 20).sidecar;
+      sidecar = toggleRelation(sidecar, "floating-1", "node-a");
+
+      const after = removeFloatingTopic(sidecar, "floating-1");
+
+      expect(after.relations).toHaveLength(1);
     });
   });
 

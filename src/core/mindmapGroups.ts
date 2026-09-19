@@ -88,35 +88,7 @@ export function boundaryTitleAnchor(bounds: Bounds, padding = BOUNDARY_PADDING):
   return { x: bounds.minX - padding + 10, y: bounds.minY - padding - BOUNDARY_TITLE_BAND / 2 };
 }
 
-/**
- * The colours a boundary can be drawn in.
- *
- * A short list rather than a picker: a boundary's job is to group, and a map with
- * six boundaries in six hues is a map nobody can read. The id is what goes in the
- * file, for the same reason icon ids are — the hex value is a rendering decision
- * and may change; which colour the reader picked may not.
- */
-export const MINDMAP_BOUNDARY_COLORS = [
-  { id: "slate", label: "灰", color: "#94a3b8" },
-  { id: "sky", label: "蓝", color: "#38bdf8" },
-  { id: "emerald", label: "绿", color: "#34d399" },
-  { id: "amber", label: "琥珀", color: "#f59e0b" },
-  { id: "rose", label: "玫红", color: "#fb7185" },
-  { id: "violet", label: "紫", color: "#a78bfa" },
-] as const;
-
-export const DEFAULT_BOUNDARY_COLOR = MINDMAP_BOUNDARY_COLORS[0];
-
-/**
- * A boundary's colour, by id.
- *
- * An id this build does not know falls back to the default rather than drawing
- * nothing — the opposite of the icon table, and deliberately: an icon *is* a
- * decoration and omitting it loses nothing, while a boundary's box *is* the thing
- * the reader asked for, so it has to be drawn whatever colour it can be.
- */
-export function findBoundaryColor(
-  id?: string
-): (typeof MINDMAP_BOUNDARY_COLORS)[number] {
-  return MINDMAP_BOUNDARY_COLORS.find((entry) => entry.id === id) ?? DEFAULT_BOUNDARY_COLOR;
-}
+// The colours a boundary is drawn in are not the boundary's own: a relation's
+// line is marked up by the reader in exactly the same way, so the palette lives
+// in mindmapPalette.ts — named for what it is (a hand mark on the map) rather
+// than for the first feature that needed it.

@@ -1,6 +1,55 @@
 import type { RefObject } from "react";
-import { Braces, CornerDownRight, FoldVertical, Link, ListTree, Maximize2, PlusCircle, SquareDashed, StickyNote, Trash2, UnfoldVertical, X } from "lucide-react";
-import { MINDMAP_BOUNDARY_COLORS } from "../core/mindmapGroups";
+import { Braces, CornerDownRight, FoldVertical, Link, ListTree, Maximize2, PlusCircle, SquareDashed, StickyNote, Trash2, Type, UnfoldVertical, X } from "lucide-react";
+import { MINDMAP_MARK_COLORS } from "../core/mindmapPalette";
+import { MINDMAP_RELATION_ARROWS, MINDMAP_RELATION_STYLES } from "../core/mindmapRelations";
+
+/**
+ * The swatches for a mark's colour, shared by the boundary's box and a relation's
+ * line. One row for both because it is one palette: a reader picks a colour the
+ * same way whatever the shape is, and the two rows would otherwise drift apart.
+ */
+function MarkColorSwatches({
+  activeId,
+  labelPrefix,
+  onPick,
+}: {
+  activeId: string;
+  labelPrefix: string;
+  onPick: (colorId: string) => void;
+}) {
+  return (
+    <>
+      {MINDMAP_MARK_COLORS.map((entry) => (
+        <button
+          key={entry.id}
+          type="button"
+          className={`mindmap-boundary-color ${activeId === entry.id ? "is-active" : ""}`}
+          style={{ background: entry.color }}
+          onClick={() => onPick(entry.id)}
+          title={entry.label}
+          aria-label={`${labelPrefix} ${entry.label}`}
+        />
+      ))}
+    </>
+  );
+}
+
+/**
+ * A direction the reader can read, from a direction only the file can.
+ *
+ * `forward` and `backward` are relative to the stored pair, whose order is an
+ * accident of how the two ids are spelled — so the button says which topics it
+ * means rather than which way round the pair happens to be.
+ */
+function relationArrowLabel(
+  id: string,
+  relation: { fromText: string; toText: string }
+): string {
+  if (id === "forward") return `${relation.fromText} → ${relation.toText}`;
+  if (id === "backward") return `${relation.toText} → ${relation.fromText}`;
+  if (id === "both") return "双向";
+  return "无";
+}
 
 /**
  * The menu that opens on empty mind map canvas.
@@ -38,6 +87,24 @@ export type MindmapCanvasMenuProps = {
   onBoundaryColorChange: (colorId: string) => void;
   onRemoveBoundary: () => void;
   onAddBoundary: () => void;
+  /**
+   * The line the reader has picked, if any, with what it joins.
+   *
+   * The two topics' names come along because the arrow's directions are stored
+   * relative to the pair's canonical order, and "forward" is not something a
+   * reader can be asked to translate — the menu says "甲 → 乙" instead.
+   */
+  selectedRelation: {
+    label: string;
+    arrow: string;
+    style: string;
+    color: string;
+    fromText: string;
+    toText: string;
+  } | null;
+  onEditRelationLabel: () => void;
+  onRelationChange: (field: "arrow" | "style" | "color", value: string) => void;
+  onRemoveRelation: () => void;
   /** The summary the reader has picked, if any, and its label. */
   selectedSummaryText: string | null;
   onClose: () => void;
@@ -67,6 +134,10 @@ export function MindmapCanvasMenu({
   onBoundaryColorChange,
   onRemoveBoundary,
   onAddBoundary,
+  selectedRelation,
+  onEditRelationLabel,
+  onRelationChange,
+  onRemoveRelation,
   selectedSummaryText,
   onClose,
   onNewTopic,
@@ -198,19 +269,11 @@ export function MindmapCanvasMenu({
           is a row of swatches with nothing to explain it otherwise. */}
       {selectedBoundary ? (
         <div className="mindmap-boundary-colors" title="边界颜色">
-          {MINDMAP_BOUNDARY_COLORS.map((entry) => (
-            <button
-              key={entry.id}
-              type="button"
-              className={`mindmap-boundary-color ${
-                (selectedBoundary.colorId ?? "") === entry.id ? "is-active" : ""
-              }`}
-              style={{ background: entry.color }}
-              onClick={() => onBoundaryColorChange(entry.id)}
-              title={entry.label}
-              aria-label={`边界颜色 ${entry.label}`}
-            />
-          ))}
+          <MarkColorSwatches
+            activeId={selectedBoundary.colorId ?? ""}
+            labelPrefix="边界颜色"
+            onPick={onBoundaryColorChange}
+          />
           <button
             type="button"
             className="mindmap-ctx-item mindmap-ctx-item-inline"
@@ -220,6 +283,92 @@ export function MindmapCanvasMenu({
             <Trash2 size={12} />
             <span>删除边界</span>
           </button>
+        </div>
+      ) : null}
+
+      {/* A picked line, and everything that can be said about it. Its label is
+          offered as a row as well as by double-clicking the line: the row is how
+          the feature is found, and the double click is how it is used. */}
+      {selectedRelation ? (
+        <div className="mindmap-relation-panel">
+          <button
+            type="button"
+            className="mindmap-ctx-item"
+            onClick={onEditRelationLabel}
+            title="双击那条线也一样"
+          >
+            <Type size={13} />
+            <span>{selectedRelation.label ? `改标签「${selectedRelation.label}」` : "为这条线写字"}</span>
+          </button>
+
+          <div className="mindmap-ctx-label-row">
+            <span className="mindmap-ctx-label">箭头</span>
+          </div>
+          <div className="mindmap-mark-row">
+            {MINDMAP_RELATION_ARROWS.map((entry) => (
+              <button
+                key={entry.id}
+                type="button"
+                className={`mindmap-relation-btn ${
+                  (selectedRelation.arrow || "none") === entry.id ? "is-active" : ""
+                }`}
+                onClick={() => onRelationChange("arrow", entry.id === "none" ? "" : entry.id)}
+                title={
+                  entry.id === "forward"
+                    ? `从「${selectedRelation.fromText}」指向「${selectedRelation.toText}」`
+                    : entry.id === "backward"
+                      ? `从「${selectedRelation.toText}」指向「${selectedRelation.fromText}」`
+                      : entry.label
+                }
+                aria-label={relationArrowLabel(entry.id, selectedRelation)}
+              >
+                {relationArrowLabel(entry.id, selectedRelation)}
+              </button>
+            ))}
+          </div>
+
+          <div className="mindmap-ctx-label-row">
+            <span className="mindmap-ctx-label">线条</span>
+          </div>
+          <div className="mindmap-mark-row">
+            {MINDMAP_RELATION_STYLES.map((entry) => (
+              <button
+                key={entry.id}
+                type="button"
+                className={`mindmap-relation-btn ${
+                  (selectedRelation.style || "dashed") === entry.id ? "is-active" : ""
+                }`}
+                onClick={() => onRelationChange("style", entry.id === "dashed" ? "" : entry.id)}
+                title={entry.label}
+                aria-label={`线条 ${entry.label}`}
+              >
+                {entry.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="mindmap-ctx-label-row">
+            <span className="mindmap-ctx-label">颜色</span>
+            <span className="mindmap-ctx-hint">
+              {selectedRelation.color ? "" : "跟随主题"}
+            </span>
+          </div>
+          <div className="mindmap-boundary-colors">
+            <MarkColorSwatches
+              activeId={selectedRelation.color}
+              labelPrefix="线条颜色"
+              onPick={(colorId) => onRelationChange("color", colorId)}
+            />
+            <button
+              type="button"
+              className="mindmap-ctx-item mindmap-ctx-item-inline"
+              onClick={onRemoveRelation}
+              title="断开这条线（线与它的标签一起消失）"
+            >
+              <Trash2 size={12} />
+              <span>断开</span>
+            </button>
+          </div>
         </div>
       ) : null}
 

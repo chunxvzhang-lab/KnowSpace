@@ -11941,17 +11941,100 @@ body:has(.flash-capsule-overlay) {
 /* ── Mind map relation lines ────────────────────────────────────────────
    A line the reader drew between two topics. Dashed, and in a muted violet: it
    is an addition to the outline, and a solid line in the same weight as the
-   connectors would read as one of them.
+   connectors would read as one of them. These are the defaults — a line whose
+   reader chose a dash or a colour carries it on the element instead.
    ─────────────────────────────────────────────────────────────────────────── */
 
-.mindmap-relation {
+.mindmap-relation-line {
   fill: none;
   stroke: color-mix(in srgb, #a855f7 60%, transparent);
   stroke-width: 1.4;
   stroke-dasharray: 5 4;
   /* A line is not a control: it must not swallow the click that pans the canvas
-     or selects the node underneath it. */
+     or selects the node underneath it. The hit path below is the control. */
   pointer-events: none;
+}
+
+/* The target a reader actually clicks: the same curve, wide and invisible. A
+   one-pixel line is not something anyone hits on purpose, and the pointer is the
+   only way to reach a line at all. */
+.mindmap-relation-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 14;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+.mindmap-relation-arrow {
+  fill: color-mix(in srgb, #a855f7 85%, transparent);
+  pointer-events: none;
+}
+
+.mindmap-relation-label-group {
+  cursor: pointer;
+}
+
+.mindmap-relation-label-bg {
+  fill: var(--surface-1, #1e293b);
+  stroke: color-mix(in srgb, #a855f7 30%, transparent);
+  stroke-width: 0.8;
+}
+
+.mindmap-relation-label {
+  fill: #d8b4fe;
+  font-size: 11px;
+  font-weight: 500;
+  pointer-events: none;
+}
+
+/* Picked: brighter and heavier, which is as much as a line can say about being
+   chosen — a second outline around a curve would only look like a mistake. */
+.mindmap-relation.is-selected .mindmap-relation-line {
+  stroke: #c084fc;
+  stroke-width: 2.4;
+}
+
+/* What a picked line can be told, in the canvas menu. The pills wrap rather than
+   sitting in the marks' nine-column grid: an arrow's label can be a topic's own
+   name, and those are as long as they are. */
+.mindmap-relation-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.mindmap-relation-panel .mindmap-mark-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0 10px 2px;
+}
+
+.mindmap-relation-btn {
+  padding: 3px 7px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-secondary, #cbd5e1);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.mindmap-relation-btn:hover {
+  border-color: #c084fc;
+  color: #e9d5ff;
+}
+
+.mindmap-relation-btn.is-active {
+  background: color-mix(in srgb, #a855f7 20%, var(--surface-2));
+  border-color: #a855f7;
+  color: #e9d5ff;
+}
+
+.mindmap-relation-btn:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 1px;
 }
 
 /* ── Mind map outline numbering ─────────────────────────────────────────

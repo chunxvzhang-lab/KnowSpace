@@ -2,13 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   BOUNDARY_PADDING,
   BOUNDARY_TITLE_BAND,
-  DEFAULT_BOUNDARY_COLOR,
-  MINDMAP_BOUNDARY_COLORS,
   SUMMARY_BRACKET_GAP,
   SUMMARY_HOOK,
   boundaryRect,
   boundaryTitleAnchor,
-  findBoundaryColor,
   summaryBracketPath,
   summaryLabelAnchor,
 } from "../core/mindmapGroups";
@@ -85,18 +82,6 @@ describe("概要括号", () => {
     const bracketX = GROUP.minX + GROUP.width + SUMMARY_BRACKET_GAP;
 
     expect(bracketX).toBeGreaterThan(rect.x + rect.width);
-  });
-
-  it("边界的颜色：认识的就用它，不认识的落回默认而不是不画", () => {
-    // The opposite of the icon table on purpose: an icon is a decoration and
-    // omitting it loses nothing, while the box *is* what the reader asked for.
-    expect(findBoundaryColor("emerald").color).toBe("#34d399");
-    expect(findBoundaryColor("未来的颜色")).toBe(DEFAULT_BOUNDARY_COLOR);
-    expect(findBoundaryColor(undefined)).toBe(DEFAULT_BOUNDARY_COLOR);
-
-    // Ids go in the file, so they have to be distinct and stable.
-    const ids = MINDMAP_BOUNDARY_COLORS.map((entry) => entry.id);
-    expect(new Set(ids).size).toBe(ids.length);
   });
 
   it("组的形状随便变，括号都跟着", () => {

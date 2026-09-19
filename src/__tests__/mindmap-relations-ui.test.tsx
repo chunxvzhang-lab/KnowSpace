@@ -228,10 +228,14 @@ describe("关系线", () => {
       { bounds: layoutMindmap(parseMarkdownToMindmapTree(SOURCE, "测试")).bounds, dark: true }
     )!;
     const doc = new DOMParser().parseFromString(built.svg, "image/svg+xml");
-    const line = doc.querySelector(".mindmap-relation");
+    // The line itself, not the group around it: the group carries the selection
+    // state and the line carries the drawing.
+    const line = doc.querySelector(".mindmap-relation-line");
 
     // Without these the file would draw a black filled shape where a line should
-    // be: the stylesheet that paints it does not travel with the file.
+    // be: the stylesheet that paints it does not travel with the file. The dash
+    // is on the element already — the drawing always writes it — and the colour
+    // is this line's default, since it has none of its own.
     expect(line?.getAttribute("fill")).toBe("none");
     expect(line?.getAttribute("stroke-dasharray")).toBe("5 4");
     expect(line?.getAttribute("stroke")).toBe("#b28ae0");

@@ -1,5 +1,6 @@
 import type { Bounds } from "../core/mindmapBounds";
-import { boundaryRect, boundaryTitleAnchor, findBoundaryColor } from "../core/mindmapGroups";
+import { boundaryRect, boundaryTitleAnchor } from "../core/mindmapGroups";
+import { findMarkColor } from "../core/mindmapPalette";
 
 /**
  * The boxes drawn around groups of topics, underneath the outline.
@@ -46,7 +47,7 @@ export function MindmapBoundaries({
         const bounds = boundary.bounds as Bounds;
         const rect = boundaryRect(bounds);
         const title = boundaryTitleAnchor(bounds);
-        const color = findBoundaryColor(boundary.colorId);
+        const color = findMarkColor(boundary.colorId);
         const isSelected = boundary.id === selectedId;
 
         return (

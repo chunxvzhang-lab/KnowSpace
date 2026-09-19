@@ -101,14 +101,31 @@ const DECORATION_RULES: DecorationRule[] = [
     fill: { dark: "#e2e8f0", light: "#0f172a" },
     font: { size: "13px", weight: "500" },
   },
-  // Relations between topics. Dashed in the file as on screen, so a line that is
-  // an addition to the outline is not mistaken for part of it.
+  // Relations between topics. The colour and the dash are only defaults: a line
+  // whose reader chose either carries it on the element, and the loop above
+  // leaves that alone. No dash is forced here for the same reason — the component
+  // always writes the dash, including the default one, so this must not.
   {
-    selector: ".mindmap-relation",
+    selector: ".mindmap-relation-line",
     stroke: { dark: "#b28ae0", light: "#8b5cf6" },
     // `fill: none` is not a colour, and a path without it would arrive as a
     // black shape where the file has no stylesheet to say otherwise.
-    attributes: { fill: "none", "stroke-width": "1.4", "stroke-dasharray": "5 4" },
+    attributes: { fill: "none", "stroke-width": "1.4" },
+  },
+  {
+    selector: ".mindmap-relation-arrow",
+    fill: { dark: "#b28ae0", light: "#8b5cf6" },
+  },
+  {
+    selector: ".mindmap-relation-label-bg",
+    fill: { dark: "#1e293b", light: "#ffffff" },
+    stroke: { dark: "#6b4c96", light: "#c4b5fd" },
+    attributes: { "stroke-width": "0.8" },
+  },
+  {
+    selector: ".mindmap-relation-label",
+    fill: { dark: "#d8b4fe", light: "#6d28d9" },
+    font: { size: "11px", weight: "500" },
   },
   // Note badge, at the node's top-left corner.
   {
@@ -214,6 +231,11 @@ export function buildStandaloneMindmapSvg(
   clone.querySelectorAll(".mindmap-floating-selection").forEach((el) => el.remove());
   clone.querySelectorAll(".mindmap-summary-selection").forEach((el) => el.remove());
   clone.querySelectorAll(".mindmap-boundary-selection").forEach((el) => el.remove());
+  // A picked line is drawn heavier, which is a class on the line itself rather
+  // than a separate element — so there is nothing to remove, only to forget.
+  clone
+    .querySelectorAll(".mindmap-relation.is-selected")
+    .forEach((el) => el.classList.remove("is-selected"));
   clone.querySelectorAll(".mindmap-node-add-btn").forEach((el) => el.remove());
   clone.querySelectorAll(".mindmap-node-resize-handle").forEach((el) => el.remove());
 
@@ -254,13 +276,43 @@ export function buildStandaloneMindmapSvg(
     textEl.setAttribute("font-weight", customFontWeight || (isRootText ? "700" : "500"));
   });
 
+  /**
+   * Whether an element's own colour is one this file can keep.
+   *
+   * Empty means it has none; `currentColor` means it has a relation to one it can
+   * no longer be resolved against — true of every lucide icon, which arrives
+   * saying `currentColor` and would otherwise be left to resolve against black.
+   */
+  const isOwnColour = (value: string | null) => Boolean(value) && value !== "currentColor";
+
+  /**
+   * What each element said about its own colours before any rule ran.
+   *
+   * Read first, and not during the loop, for two reasons that meet here. A colour
+   * the app put on an element — a mark the reader chose — has to beat the stylesheet
+   * default, or the file opens in the wrong colour. And the rules still have to
+   * override each other in order — a chip's specific rule beats the general one
+   * that ran before it — so a colour written by an earlier rule must not look like
+   * the element's own.
+   */
+  const ownColours = new WeakMap<Element, Set<string>>();
+  clone.querySelectorAll("*").forEach((element) => {
+    const own = new Set<string>();
+    if (isOwnColour(element.getAttribute("fill"))) own.add("fill");
+    if (isOwnColour(element.getAttribute("stroke"))) own.add("stroke");
+    ownColours.set(element, own);
+  });
+
   for (const rule of DECORATION_RULES) {
     const fill = options.dark ? rule.fill?.dark : rule.fill?.light;
     const stroke = options.dark ? rule.stroke?.dark : rule.stroke?.light;
 
     clone.querySelectorAll(rule.selector).forEach((element) => {
-      if (fill) element.setAttribute("fill", fill);
-      if (stroke) element.setAttribute("stroke", stroke);
+      // A rule paints what the element did not come in with. The snapshot above is
+      // what makes that possible without stopping one rule from overriding another.
+      const own = ownColours.get(element);
+      if (fill && !own?.has("fill")) element.setAttribute("fill", fill);
+      if (stroke && !own?.has("stroke")) element.setAttribute("stroke", stroke);
       if (rule.font) {
         element.setAttribute("font-family", EXPORT_FONT_FAMILY);
         element.setAttribute("font-size", rule.font.size);

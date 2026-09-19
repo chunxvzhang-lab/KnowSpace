@@ -334,6 +334,22 @@ function readTagSection(value: unknown): Record<string, string[]> {
  * The duplicates are compared in canonical order, so `a` to `b` and `b` to `a`
  * are recognised as the same relation rather than kept as two.
  */
+/**
+ * Trims a known optional text field, and drops it if it holds nothing.
+ *
+ * One rule for four fields — a label and the three ids — because they differ only
+ * in what they are called: any of them written as something other than a
+ * non-empty string is the same as not written, and a field that is not there
+ * means the default. An id this build does not know, on the other hand, is kept:
+ * the table decides what to draw, the file remembers what the reader chose.
+ */
+function normaliseOptionalText(record: Record<string, unknown>, field: string): void {
+  const value = record[field];
+  if (value === undefined) return;
+  if (typeof value === "string" && value.trim()) record[field] = value.trim();
+  else delete record[field];
+}
+
 function readRelationSection(value: unknown): MindmapRelation[] {
   if (!Array.isArray(value)) return [];
 
@@ -346,7 +362,13 @@ function readRelationSection(value: unknown): MindmapRelation[] {
     if (typeof fromId !== "string" || typeof toId !== "string") continue;
     if (!fromId || !toId || fromId === toId) continue;
 
-    const relation = toRelation(fromId, toId);
+    // The spread first, so a field a newer version added to a line is carried
+    // through, and the canonical pair overwrites whatever order was written.
+    const relation: MindmapRelation = { ...entry, ...toRelation(fromId, toId) };
+    for (const field of ["label", "arrow", "style", "color"]) {
+      normaliseOptionalText(relation, field);
+    }
+
     const key = `${relation.fromId}\u0000${relation.toId}`;
     if (seen.has(key)) continue;
 
@@ -896,6 +918,44 @@ export function relationsFor(sidecar: MindmapSidecar | null, nodeId: string): Mi
   return sidecar.relations.filter(
     (relation) => relation.fromId === nodeId || relation.toId === nodeId
   );
+}
+
+/**
+ * Changes what a line says or how it is drawn.
+ *
+ * A patch rather than a value per field, because the panel edits one thing at a
+ * time and the line's other settings have to survive it. An empty value in the
+ * patch clears that field, which for every field here means "back to the default
+ * look" — that is how a colour goes back to following the theme.
+ *
+ * Does nothing to a pair that is not joined: a line's settings belong to a line.
+ */
+export function setRelationFields(
+  sidecar: MindmapSidecar,
+  a: string,
+  b: string,
+  patch: { label?: string; arrow?: string; style?: string; color?: string }
+): MindmapSidecar {
+  const relations = sidecar.relations.map((relation) => {
+    if (!isSameRelation(relation, a, b)) return relation;
+
+    const merged: Record<string, unknown> = { ...relation, ...patch };
+    for (const field of ["label", "arrow", "style", "color"]) {
+      normaliseOptionalText(merged, field);
+    }
+    return merged as MindmapRelation;
+  });
+
+  return { ...sidecar, relations };
+}
+
+/** The line between two topics with its settings, or null when there is none. */
+export function relationBetween(
+  sidecar: MindmapSidecar | null,
+  a: string,
+  b: string
+): MindmapRelation | null {
+  return sidecar?.relations.find((relation) => isSameRelation(relation, a, b)) ?? null;
 }
 
 /** Whether these two topics are already connected. */
