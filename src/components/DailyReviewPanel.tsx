@@ -11,21 +11,55 @@ import {
   Undo2,
 } from "lucide-react";
 import {
-  buildReviewQueue,
+  addParsedNote,
+  buildQueueFromParsed,
+  emptyParsedSource,
   parseFlashcards,
   parseFsrsMetadata,
+  parseNote,
   review,
   serializeFsrsMetadata,
-  summarize,
+  summarizeParsed,
   upsertFsrsMetadata,
   type FsrsCardKind,
   type FsrsProgress,
   type FsrsRating,
-  type FsrsStats,
+  type ParsedNote,
+  type ParsedReviewSource,
 } from "../services/fsrsService";
 import { useVaultCards } from "../hooks/useVaultCards";
 import { MAX_REVIEW_FOLDERS, useReviewFolders } from "../hooks/useReviewFolders";
 import type { ReviewSourceDocument } from "../services/reviewSources";
+
+/**
+ * The parsed notes that belong to the active source, in the order the source lists
+ * them.
+ *
+ * Order matters and is the source's, not the cache's: the first note to carry a card
+ * id is the one whose progress and text win, so building this in any other order
+ * would change which note a card is attributed to when the same question appears in
+ * two documents.
+ *
+ * `written` is what this panel has already saved into a note. It has to win over the
+ * text the source was handed: the Space source is a prop, and the parent's copy of a
+ * note cannot know about a rating that happened a moment ago — so without this, the
+ * next rating would merge into the note as it was before the review started and the
+ * first rating would be silently written away.
+ */
+function sourceFrom(
+  notes: ReviewSourceDocument[],
+  cache: Map<string, { content: string; parsed: ParsedNote }>,
+  written: Map<string, string>
+): ParsedReviewSource {
+  const source = emptyParsedSource();
+  for (const note of notes) {
+    const entry = cache.get(note.filePath);
+    if (!entry) continue;
+    const saved = written.get(note.filePath);
+    addParsedNote(source, saved === undefined ? entry.parsed : { ...entry.parsed, content: saved });
+  }
+  return source;
+}
 
 type DailyReviewPanelProps = {
   /**
@@ -226,15 +260,28 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
           ? [{ filePath: currentDocument.filePath, content: currentDocument.content }]
           : []
         : notes;
+  /**
+   * How far the card-finding has got, when it is running.
+   *
+   * Declared before the loading state because that state needs it: to the reader,
+   * reading the files and finding the cards in them are one wait, and the second is
+   * the longer one by far.
+   */
+  const [parseProgress, setParseProgress] = useState<{ done: number; total: number } | null>(null);
+
   // The open document needs no fetching — its text is already here — so it is never
   // in a loading state, whatever the Space list above is doing.
-  const isLoading = isVaultSource
-    ? vault.loading
-    : isFolderSource
-      ? folder.loading
-      : isDocumentSource
-        ? false
-        : Boolean(loading);
+  //
+  // Parsing is folded in here rather than reported separately, for the reason above.
+  const isLoading =
+    parseProgress !== null ||
+    (isVaultSource
+      ? vault.loading
+      : isFolderSource
+        ? folder.loading
+        : isDocumentSource
+          ? false
+          : Boolean(loading));
   /** What went wrong for the source in use, if anything. */
   const sourceError = isVaultSource ? vault.error : isFolderSource ? folder.error : null;
 
@@ -261,42 +308,137 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
   }, []);
 
   /**
-   * Derived review data.
+   * The parsed source, built a few notes at a time.
    *
-   * `buildReviewQueue` returns cards without their originating note, so the
-   * card id → note mapping is built alongside it. It is needed on every rating
-   * to merge the new scheduling state back into the right file.
+   * This is the expensive part of the panel, and the reason for its shape. A vault
+   * is tens of megabytes and every line of every document has to be looked at; on
+   * the render thread that was **7.5 seconds** of a window that did not answer for a
+   * 5.8 MB vault, and longer for a real one — the reason a vault-sized source looked
+   * like a freeze. Worse, it happened three times over, because the panel parsed
+   * every note and then `buildReviewQueue` and `summarize` each parsed them again.
+   *
+   * So: parse once, in slices, handing the thread back between them and saying how
+   * far along it is. Parsed notes are kept by path, so a rating re-parses the one
+   * note it wrote to instead of the whole vault, and an array that arrives with a new
+   * identity but the same contents costs one comparison rather than a full parse.
    */
-  const { queue: initialQueue, stats, sourceMap } = useMemo(() => {
-    const inputs: Array<{ path: string; content: string }> = [];
-    const sources = new Map<string, { path: string; content: string }>();
+  const parsedNotes = useRef(new Map<string, { content: string; parsed: ParsedNote }>());
+  /**
+   * What this panel last wrote for a note.
+   *
+   * The Space source is a prop and the vault and folder sources are lists the panel
+   * reads once; none of them can know about a rating that happened a moment ago, and
+   * two ratings on one note have to land on top of each other rather than on top of
+   * the file as it was when the review opened.
+   */
+  const writtenContent = useRef(new Map<string, string>());
+  const publishedKey = useRef<string | null>(null);
+  const [parsed, setParsed] = useState<ParsedReviewSource>(() => emptyParsedSource());
+  /**
+   * Bumped when the cache is edited behind the effect's back.
+   *
+   * A rating re-parses the one note it wrote to and files it straight into the cache —
+   * waiting for the effect to notice would mean publishing on the next render for a
+   * reason the effect cannot see. This is the effect being told.
+   */
+  const [parseRevision, setParseRevision] = useState(0);
 
-    for (const note of activeNotes) {
-      inputs.push({ path: note.filePath, content: note.content });
+  useEffect(() => {
+    let cancelled = false;
+    const cache = parsedNotes.current;
+    const key = activeNotes.map((note) => note.filePath).join("\u0000");
 
-      // Every card of one note shares a single mutable holder, which is where the
-      // last thing written to that note is kept. A rating merges into a fresh read of
-      // the file rather than into this, so the holder is not what makes two ratings of
-      // one note accumulate any more — it is what the merge falls back on when the file
-      // cannot be read, and what the panel's own view of the note stays consistent
-      // with while a write is in flight.
-      const holder = { path: note.filePath, content: note.content };
-
-      for (const card of parseFlashcards(note.content)) {
-        // First occurrence wins: a duplicated card id across notes is resolved
-        // deterministically rather than flip-flopping between renders.
-        if (!sources.has(card.id)) sources.set(card.id, holder);
-      }
+    const present = new Set(activeNotes.map((note) => note.filePath));
+    for (const path of Array.from(cache.keys())) {
+      if (!present.has(path)) cache.delete(path);
     }
 
-    const emptyStats: FsrsStats = { total: 0, due: 0, fresh: 0, learning: 0, review: 0, tracked: 0 };
+    const stale = activeNotes.filter((note) => {
+      const wanted = writtenContent.current.get(note.filePath) ?? note.content;
+      return cache.get(note.filePath)?.content !== wanted;
+    });
+    if (stale.length === 0) {
+      // Same notes, same contents, same order: what is published is still true, and
+      // republishing it would re-render the panel for nothing — which, on a source
+      // whose array gets a fresh identity on every render, is a loop rather than a
+      // saving.
+      if (publishedKey.current === key) return undefined;
+      setParsed(sourceFrom(activeNotes, cache, writtenContent.current));
+      publishedKey.current = key;
+      setParseProgress(null);
+      return undefined;
+    }
+
+    setParseProgress({ done: 0, total: stale.length });
+    let index = 0;
+    const step = () => {
+      if (cancelled) return;
+      const startedAt = performance.now();
+      // Eight milliseconds is about half a frame: long enough that the parsing is not
+      // dominated by the handovers, short enough that the window keeps answering.
+      while (index < stale.length && performance.now() - startedAt < 8) {
+        const note = stale[index];
+        const wanted = writtenContent.current.get(note.filePath) ?? note.content;
+        cache.set(note.filePath, {
+          content: wanted,
+          parsed: parseNote({ path: note.filePath, content: wanted }),
+        });
+        index += 1;
+      }
+      if (index < stale.length) {
+        setParseProgress({ done: index, total: stale.length });
+        setTimeout(step, 0);
+        return;
+      }
+      setParsed(sourceFrom(activeNotes, cache, writtenContent.current));
+      publishedKey.current = key;
+      setParseProgress(null);
+    };
+    step();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeNotes, parseRevision]);
+
+  /**
+   * Files what was just written to a note back into the panel's own view of it.
+   *
+   * A rating and an undo both write one note and both know exactly what it now says,
+   * and the sources this panel was handed cannot: the Space source is a prop, and the
+   * vault and folder lists were read once. Recording it here is what makes a second
+   * rating merge on top of the first instead of reverting it, and what makes the
+   * queue and the counters say something true about what the reader just did —
+   * without re-reading anything.
+   */
+  const noteWritten = useCallback((filePath: string, content: string) => {
+    writtenContent.current.set(filePath, content);
+    parsedNotes.current.set(filePath, {
+      content,
+      parsed: parseNote({ path: filePath, content }),
+    });
+    publishedKey.current = null;
+    setParseRevision((revision) => revision + 1);
+  }, []);
+
+  /**
+   * Everything the render needs, from the finished parse.
+   *
+   * Cheap by construction: the parsing has happened, and this walks the cards once.
+   * The card id → note mapping is needed on every rating, to merge the new
+   * scheduling state back into the right file.
+   */
+  const { queue: initialQueue, stats, sourceMap } = useMemo(() => {
+    const sources = new Map<string, { path: string; content: string }>();
+    for (const [cardId, note] of parsed.owner) {
+      sources.set(cardId, { path: note.path, content: note.content });
+    }
 
     return {
-      queue: buildReviewQueue(inputs),
-      stats: inputs.length > 0 ? summarize(inputs) : emptyStats,
+      queue: buildQueueFromParsed(parsed),
+      stats: summarizeParsed(parsed),
       sourceMap: sources,
     };
-  }, [activeNotes]);
+  }, [parsed]);
 
   /**
    * The card being asked about: the first one in the queue that has not been
@@ -391,6 +533,11 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
         // the new content so a second rating on the same note merges on top of
         // it rather than reverting the first.
         source.content = updatedContent;
+        // The parsed view of that one note is brought up to date as well, and the
+        // published source rebuilt from it: the queue and the counters are derived from
+        // it, and a rating is exactly the thing they should be saying something new
+        // about. One note re-parsed — not the vault, and not on the render thread.
+        noteWritten(source.path, updatedContent);
         setLog((prev) => [
           ...prev,
           {
@@ -408,11 +555,13 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
         // The parent owns the Space list and refreshes it. The vault documents
         // are this panel's own, so it has to refresh those itself.
         onProgressSaved?.();
-        // The documents the review read are its own to re-read: the parent owns the
-        // Space list, but a workspace's chapters and a chosen folder are fetched here,
-        // and a rating that is not merged on top of the last one would revert it.
-        if (isVaultSource) vault.reloadIfLoaded();
-        if (isFolderSource) folder.reloadIfLoaded();
+        // Updated in place, not re-read. The panel knows what it just wrote, and
+        // re-reading a vault to learn it again is the cost that made a rating on a
+        // large vault take a second or two — and, before the parsing was split up,
+        // freeze the window while it did. The one document that changed is the one
+        // answer that changed.
+        if (isVaultSource) vault.applySaved(source.path, updatedContent);
+        if (isFolderSource) folder.applySaved(source.path, updatedContent);
       } catch (err) {
         showToast(`保存失败：${err instanceof Error ? err.message : "未知错误"}`);
       } finally {
@@ -431,8 +580,9 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
       onProgressSaved,
       isVaultSource,
       isFolderSource,
-      vault.reloadIfLoaded,
-      folder.reloadIfLoaded,
+      vault.applySaved,
+      folder.applySaved,
+      noteWritten,
     ]
   );
 
@@ -479,9 +629,10 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
       if (restoreIsRemoval) progress.delete(last.cardId);
       else progress.set(last.cardId, last.previous);
 
+      const undoneContent = serializeFsrsMetadata(baseContent, progress);
       const res = await desktop.saveMarkdownFile({
         absolutePath: last.filePath,
-        content: serializeFsrsMetadata(baseContent, progress),
+        content: undoneContent,
         force: true,
       });
       if (!res?.success) throw new Error(res?.message || "保存失败");
@@ -494,10 +645,11 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
       });
       setRevealed(false);
       // The sources hold their own copies, so they are told the same way a rating
-      // tells them.
+      // tells them: one note, updated in place rather than re-read.
       onProgressSaved?.();
-      if (isVaultSource) vault.reloadIfLoaded();
-      if (isFolderSource) folder.reloadIfLoaded();
+      noteWritten(last.filePath, undoneContent);
+      if (isVaultSource) vault.applySaved(last.filePath, undoneContent);
+      if (isFolderSource) folder.applySaved(last.filePath, undoneContent);
       showToast("已撤销上一次评分");
     } catch (err) {
       showToast(`撤销失败：${err instanceof Error ? err.message : "未知错误"}`);
@@ -506,14 +658,15 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
     }
   }, [
     desktop,
-    folder.reloadIfLoaded,
+    folder.applySaved,
     isFolderSource,
     isVaultSource,
     log,
+    noteWritten,
     onProgressSaved,
     saving,
     showToast,
-    vault.reloadIfLoaded,
+    vault.applySaved,
   ]);
 
   // Keyboard review flow: Space reveals, 1-4 grade. Guarded against firing while
@@ -595,9 +748,22 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
               type="button"
               className="space-icon-btn"
               onClick={() => {
+                // A new round, read from the sources as they are: the notes this panel
+                // wrote to belong to the sources again, and what was written is still on
+                // disk, so nothing is undone by forgetting it here. What it does undo is
+                // the panel's own view — without this, a card rated a moment ago would
+                // stay out of the round even though the file it came from is the one the
+                // round is reading.
+                writtenContent.current.clear();
+                parsedNotes.current.clear();
+                publishedKey.current = null;
+                setParseRevision((revision) => revision + 1);
                 setReviewedIds(new Set());
                 setRevealed(false);
                 setLog([]);
+                if (isVaultSource) vault.reloadIfLoaded();
+                if (isFolderSource) folder.reloadIfLoaded();
+                onProgressSaved?.();
                 showToast("已重新排队");
               }}
               title="重新开始本轮"
@@ -736,6 +902,11 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
                   ? "正在读取知识库文档..."
                   : "正在载入 Space 闪念库..."}
             </p>
+            {parseProgress && (
+              <p className="dr-empty-hint">
+                正在查找卡片 {parseProgress.done} / {parseProgress.total} 篇…
+              </p>
+            )}
           </div>
         ) : sourceError ? (
           <div className="space-empty-state">

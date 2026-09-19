@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { samePath } from "../core/paths";
 import {
   readReviewDocuments,
   type ReviewSourceDocument,
@@ -271,6 +272,18 @@ export function useReviewFolders() {
     if (loaded) void load();
   }, [loaded, load]);
 
+  /**
+   * The content of one document as it now stands.
+   *
+   * Same reason as the vault source's: a rating knows what it wrote, and re-reading
+   * every file in every chosen folder to learn it again is work nobody asked for.
+   */
+  const applySaved = useCallback((filePath: string, content: string) => {
+    setDocuments((prev) =>
+      prev.map((doc) => (samePath(doc.filePath, filePath) ? { ...doc, content } : doc))
+    );
+  }, []);
+
   const fileCount = choices.reduce((total, choice) => total + choice.paths.length, 0);
 
   return {
@@ -285,5 +298,6 @@ export function useReviewFolders() {
     canAddMore: choices.length < MAX_REVIEW_FOLDERS,
     load,
     reloadIfLoaded,
+    applySaved,
   };
 }

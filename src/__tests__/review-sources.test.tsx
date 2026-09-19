@@ -460,23 +460,43 @@ describe("DailyReviewPanel - 自定义文件夹来源", () => {
     expect(readMarkdownBatch).toHaveBeenCalledWith(["C:/Notes/复习/新.md"]);
   });
 
-  it("评分之后重新读一遍，同一文件夹的第二张卡才不会把第一张抹掉", async () => {
+  it("同一文件夹的第二张卡不会把第一张抹掉，而且不为此刻重读整个文件夹", async () => {
     pickReviewFolder.mockResolvedValue({ canceled: false, ...folderRow });
-    readMarkdownBatch.mockResolvedValue(batch([["C:/Notes/复习/a.md", "文件夹里的问题 :: 答案"]]));
+    // Two cards in one file. The second rating has to merge on top of the first, and the
+    // panel is what knows what the first one wrote — so it merges on top of that rather
+    // than on top of the file as it was when the review opened.
+    //
+    // This used to be arranged by re-reading the whole folder after every rating, which
+    // is the mechanism the old version of this test asserted. That mechanism is gone on
+    // purpose: it is also what made a rating cost seconds on a large vault. The outcome
+    // is what matters, so the outcome is what is asserted — including that the folder was
+    // read once, not once per rating.
+    readMarkdownBatch.mockResolvedValue(
+      batch([["C:/Notes/复习/a.md", "文件夹里的第一张 :: 答案一\n\n文件夹里的第二张 :: 答案二"]])
+    );
     render(<DailyReviewPanel notes={[]} />);
 
     await act(async () => {
       fireEvent.click(screen.getByText("自定义文件夹"));
     });
-    await waitFor(() => expect(screen.getByText("文件夹里的问题")).toBeDefined());
+    await waitFor(() => expect(screen.getByText("文件夹里的第一张")).toBeDefined());
 
     fireEvent.click(screen.getByText("显示答案"));
     await act(async () => {
       fireEvent.click(screen.getByText("良好"));
     });
-
     await waitFor(() => expect(saveMarkdownFile).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(readMarkdownBatch).toHaveBeenCalledTimes(2));
+
+    fireEvent.click(screen.getByText("显示答案"));
+    await act(async () => {
+      fireEvent.click(screen.getByText("良好"));
+    });
+    await waitFor(() => expect(saveMarkdownFile).toHaveBeenCalledTimes(2));
+
+    const secondWrite = saveMarkdownFile.mock.calls[1][0].content as string;
+    const rows = secondWrite.split("\n").filter((line) => line.startsWith("fsrs-"));
+    expect(rows.length).toBe(2);
+    expect(readMarkdownBatch).toHaveBeenCalledTimes(1);
   });
 
   it("重新列一遍失败时，不清空已经记住的文件夹", async () => {

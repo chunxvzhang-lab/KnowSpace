@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { samePath } from "../core/paths";
 import { useVaultStore } from "../store/useVaultStore";
 import {
   readReviewDocuments,
@@ -64,5 +65,20 @@ export function useVaultCards() {
     if (loaded) void load();
   }, [loaded, load]);
 
-  return { documents, loading, error, loaded, chapterCount, load, reloadIfLoaded };
+  /**
+   * The content of one document as it now stands.
+   *
+   * A rating writes into a file, and the panel already knows what it wrote — so
+   * re-reading the whole vault to learn it again is the one thing not to do. On a real
+   * vault that is tens of megabytes read off disk, parsed, and handed over IPC, after
+   * every single rating. Patching the one document answers the same question for the
+   * price of a list walk, and the note that changed is the only one whose answer did.
+   */
+  const applySaved = useCallback((filePath: string, content: string) => {
+    setDocuments((prev) =>
+      prev.map((doc) => (samePath(doc.filePath, filePath) ? { ...doc, content } : doc))
+    );
+  }, []);
+
+  return { documents, loading, error, loaded, chapterCount, load, reloadIfLoaded, applySaved };
 }

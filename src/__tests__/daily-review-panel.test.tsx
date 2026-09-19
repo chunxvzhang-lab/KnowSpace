@@ -306,8 +306,13 @@ describe("DailyReviewPanel - 每日复盘视图", () => {
   it("点击刷新重新开始本轮", async () => {
     render(<DailyReviewPanel notes={THREE_CARDS} />);
     fireEvent.click(screen.getByText("显示答案"));
+    // 「重来」 rather than 「良好」, and the choice is the point of the test: a card rated
+    // 良好 is scheduled out of today, so restarting the round cannot bring it back — and
+    // should not now that the panel believes what it just wrote rather than the note as
+    // it was when the review opened. A lapsed card is still due today, which is what
+    // "restart this round" is for.
     await act(async () => {
-      fireEvent.click(screen.getByText("良好"));
+      fireEvent.click(screen.getByText("重来"));
     });
     await waitFor(() => expect(screen.getByText("问题乙")).toBeDefined());
 
