@@ -1625,18 +1625,21 @@ ipcMain.handle("bookmd:create-manual-snapshot", async (_event, params = {}) => {
   });
 });
 
-// An outline file to import — an .opml another app wrote.
+// An outline file to import, written by another app — OPML or FreeMind.
 //
 // The path comes from a native dialog rather than from the renderer, which is why
 // this is allowed to read a file that is not one of this app's documents: the
 // reader picked it, in a dialog this process drew, and the answer is a one-off
 // string rather than a path the renderer may write back to.
+//
+// Both formats are offered in one entry because which one a file is, is decided by
+// what is inside it — the renderer reads the root element, not the extension.
 ipcMain.handle("bookmd:pick-outline-file", async (event) => {
   const targetWin = getWindowFromEvent(event);
   const result = await dialog.showOpenDialog(targetWin || undefined, {
-    title: "导入大纲（OPML）",
+    title: "导入大纲（OPML / FreeMind）",
     filters: [
-      { name: "OPML 大纲", extensions: ["opml", "xml"] },
+      { name: "大纲文件", extensions: ["opml", "mm", "xml"] },
       { name: "所有文件", extensions: ["*"] },
     ],
     properties: ["openFile"],

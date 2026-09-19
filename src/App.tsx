@@ -43,7 +43,7 @@ import {
   annotationsFromOutline,
   importFileName,
   outlineToMarkdown,
-  parseOpmlOutline,
+  parseOutlineFile,
 } from "./services/mindmapImport";
 import { parseMarkdownToMindmapTree } from "./services/mindmapService";
 import {
@@ -800,7 +800,9 @@ export function App() {
       return;
     }
 
-    const parsed = parseOpmlOutline(picked.content);
+    // Which format it is comes out of the file rather than out of its name: the
+    // same exporter writes .xml for both, and the root element cannot be wrong.
+    const parsed = parseOutlineFile(picked.content);
     if (!parsed.ok) {
       setNotice(`导入失败：${parsed.message}`);
       return;

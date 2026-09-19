@@ -35,6 +35,17 @@ export interface ImportedOutline {
   title: string;
   /** The top-level topics, exactly as many as the file had. */
   topics: ImportedTopic[];
+  /**
+   * The one root topic the format had, if it had one.
+   *
+   * FreeMind has exactly one root and OPML may have any number of top-level
+   * outlines, and the difference is not a detail: a single root *is* the outline,
+   * so it becomes the document — its text names the file and its children are the
+   * document's first level. Kept here rather than folded into `topics` because
+   * its own note and link then have somewhere to go, where a `topics` entry
+   * standing in for the document would have them attached to nothing.
+   */
+  root?: ImportedTopic;
 }
 
 export type ImportResult =
@@ -56,30 +67,9 @@ function oneLine(text: string): string {
   return text.replace(/\s+/g, " ").trim();
 }
 
-/** Reads one `<outline>` and everything under it. */
-function readTopic(element: Element): ImportedTopic {
-  // `text` is OPML 2.0's own; `title` is what some exporters write instead, and
-  // the element's text content is the last place a label can be hiding.
-  const label =
-    element.getAttribute("text") ??
-    element.getAttribute("title") ??
-    element.textContent ??
-    "";
-
-  const note = element.getAttribute("_note") ?? element.getAttribute("note") ?? "";
-  const url = element.getAttribute("url") ?? "";
-
-  return {
-    text: oneLine(label) || UNNAMED,
-    ...(oneLine(note) ? { note: oneLine(note) } : {}),
-    ...(oneLine(url) ? { link: oneLine(url) } : {}),
-    children: directOutlines(element).map(readTopic),
-  };
-}
-
-/** The `<outline>` children of an element — not its grandchildren. */
-function directOutlines(element: Element): Element[] {
-  return Array.from(element.children).filter((child) => child.tagName.toLowerCase() === "outline");
+/** An element's children with a given tag name — not its grandchildren. */
+function directChildren(element: Element, tagName: string): Element[] {
+  return Array.from(element.children).filter((child) => child.tagName.toLowerCase() === tagName);
 }
 
 /**
@@ -91,34 +81,174 @@ function directOutlines(element: Element): Element[] {
  * an outline wants the outline, not a report about their exporter.
  */
 export function parseOpmlOutline(xml: string): ImportResult {
+  const parsed = parseXmlDocument(xml);
+  if (!parsed.ok) return parsed;
+
+  const body = parsed.document.querySelector("body");
+  if (!body || parsed.document.documentElement.tagName.toLowerCase() !== "opml") {
+    return { ok: false, message: "这个文件不是 OPML 大纲（没有 <opml><body>）。" };
+  }
+
+  const topics = directChildren(body, "outline").map(readOpmlTopic);
+  const headTitle = oneLine(parsed.document.querySelector("head > title")?.textContent ?? "");
+
+  return { ok: true, outline: { title: headTitle, topics } };
+}
+
+/**
+ * Reads a FreeMind map.
+ *
+ * The differences from OPML are all in the details, and each one is decided by the
+ * format rather than chosen: the label is `TEXT` — an attribute spelled in
+ * capitals, which is what the format's own name for it is — the children are
+ * `<node>` elements, a note arrives as an HTML fragment, and there is exactly one
+ * root, whose text is therefore the outline's name.
+ *
+ * What is *not* read: FreeMind's icon set (a Java client's drawings, with no
+ * counterpart in this app's table), and the fold state, which belongs to the
+ * reader's session here rather than to the document.
+ */
+export function parseFreemindOutline(xml: string): ImportResult {
+  const parsed = parseXmlDocument(xml);
+  if (!parsed.ok) return parsed;
+
+  const root = parsed.document.documentElement;
+  if (root.tagName.toLowerCase() !== "map") {
+    return { ok: false, message: "这个文件不是 FreeMind 导图（没有 <map>）。" };
+  }
+
+  const rootNode = directChildren(root, "node")[0];
+  if (!rootNode) {
+    return { ok: false, message: "这份 FreeMind 导图里没有主题。" };
+  }
+
+  return { ok: true, outline: { title: "", topics: [], root: readFreemindTopic(rootNode) } };
+}
+
+/**
+ * Reads an outline file of either format, deciding by what the file *is*.
+ *
+ * By the root element rather than by the extension: the same exporter writes `.xml`
+ * for both, an `.opml` that is really a FreeMind map is not unheard of, and the
+ * content is the thing that cannot be wrong. The answer when neither matches says
+ * what this build can read, because "not OPML" is not useful news if FreeMind was
+ * the format the reader had in mind.
+ */
+export function parseOutlineFile(xml: string): ImportResult {
+  const parsed = parseXmlDocument(xml);
+  if (!parsed.ok) return parsed;
+
+  const root = parsed.document.documentElement.tagName.toLowerCase();
+  if (root === "opml") return parseOpmlOutline(xml);
+  if (root === "map") return parseFreemindOutline(xml);
+
+  return {
+    ok: false,
+    message: `认不出这个大纲的格式（根元素是 <${root}>）。目前可以读 OPML (.opml) 与 FreeMind (.mm)。`,
+  };
+}
+
+/**
+ * The XML every reader above starts with.
+ *
+ * The byte-order mark is stripped here rather than wherever the text came from:
+ * it is the parser's problem — an XML declaration with a character in front of it
+ * is not an XML declaration — and stripping it at the source would leave the next
+ * caller to rediscover that.
+ *
+ * A parse error is not thrown: the browser hands back a document containing
+ * `<parsererror>`, which is why it has to be looked for rather than caught.
+ */
+function parseXmlDocument(xml: string): { ok: true; document: Document } | { ok: false; message: string } {
   if (!xml.trim()) return { ok: false, message: "文件是空的。" };
 
   let document: Document;
   try {
-    // The byte-order mark is stripped here rather than wherever the text came
-    // from: it is the parser's problem — an XML declaration with a character in
-    // front of it is not an XML declaration — and stripping it at the source
-    // would leave the next caller to rediscover that.
     document = new DOMParser().parseFromString(xml.replace(/^\uFEFF/, ""), "text/xml");
   } catch {
     return { ok: false, message: "这个文件不是可以解析的 XML。" };
   }
 
-  // A parser error is not thrown: the browser hands back a document containing
-  // `<parsererror>`, which is why it has to be looked for rather than caught.
   if (document.querySelector("parsererror")) {
     return { ok: false, message: "这个文件不是可以解析的 XML。" };
   }
 
-  const body = document.querySelector("body");
-  if (!body || document.documentElement.tagName.toLowerCase() !== "opml") {
-    return { ok: false, message: "这个文件不是 OPML 大纲（没有 <opml><body>）。" };
-  }
+  return { ok: true, document };
+}
 
-  const topics = directOutlines(body).map(readTopic);
-  const headTitle = oneLine(document.querySelector("head > title")?.textContent ?? "");
+/** Reads one OPML `<outline>` and everything under it. */
+function readOpmlTopic(element: Element): ImportedTopic {
+  // `text` is OPML 2.0's own; `title` is what some exporters write instead, and
+  // the element's text content is the last place a label can be hiding.
+  const label =
+    element.getAttribute("text") ??
+    element.getAttribute("title") ??
+    element.textContent ??
+    "";
 
-  return { ok: true, outline: { title: headTitle, topics } };
+  return topicFrom(
+    label,
+    element.getAttribute("_note") ?? element.getAttribute("note") ?? "",
+    element.getAttribute("url") ?? "",
+    directChildren(element, "outline").map(readOpmlTopic)
+  );
+}
+
+/** Reads one FreeMind `<node>` and everything under it. */
+function readFreemindTopic(element: Element): ImportedTopic {
+  return topicFrom(
+    element.getAttribute("TEXT") ?? element.getAttribute("text") ?? "",
+    richNoteText(element),
+    element.getAttribute("LINK") ?? "",
+    directChildren(element, "node").map(readFreemindTopic)
+  );
+}
+
+/**
+ * A FreeMind note, which is written as HTML inside `<richcontent TYPE="NOTE">`.
+ *
+ * It is read as HTML and then flattened to its text: the note is going to live in
+ * a text field in this app, so paragraphs and line breaks are kept as text —
+ * `<br>` becomes a line break — while the markup itself would only be in the way.
+ * A note written as plain text, which the format also allows, comes back as it is.
+ */
+function richNoteText(node: Element): string {
+  const rich = Array.from(node.children).find(
+    (child) =>
+      child.tagName.toLowerCase() === "richcontent" &&
+      (child.getAttribute("TYPE") ?? child.getAttribute("type") ?? "").toUpperCase() === "NOTE"
+  );
+  if (!rich) return "";
+
+  const html = rich.innerHTML ?? "";
+  if (!html.trim()) return oneLine(rich.textContent ?? "");
+
+  // Parsed as HTML rather than as XML: the fragment FreeMind writes is HTML, and
+  // it is frequently not well-formed enough for an XML parser.
+  const container = new DOMParser().parseFromString(html, "text/html").body;
+  container.querySelectorAll("br").forEach((br) => br.replaceWith("\n"));
+  container.querySelectorAll("p, div, li").forEach((block) => block.append("\n"));
+
+  return (container.textContent ?? "")
+    .split("\n")
+    .map((line) => line.replace(/[ \t]+/g, " ").trim())
+    .filter(Boolean)
+    .join("\n");
+}
+
+/** One topic out of four parts, with the empties left out. */
+function topicFrom(
+  label: string,
+  note: string,
+  link: string,
+  children: ImportedTopic[]
+): ImportedTopic {
+  return {
+    text: oneLine(label) || UNNAMED,
+    ...(oneLine(note) ? { note: note.trim() } : {}),
+    ...(oneLine(link) ? { link: oneLine(link) } : {}),
+    children,
+  };
 }
 
 /**
@@ -136,9 +266,16 @@ export function outlineToMarkdown(outline: ImportedOutline): string {
     for (const child of topic.children) write(child, depth + 1);
   };
 
-  for (const topic of outline.topics) write(topic, 0);
+  // The document's own topics: a format with one root contributes that root's
+  // children, since the root itself is the document.
+  for (const topic of topicsOf(outline)) write(topic, 0);
 
   return lines.length > 0 ? `${lines.join("\n")}\n` : "";
+}
+
+/** The topics that become the document's first level, whichever shape the file had. */
+function topicsOf(outline: ImportedOutline): ImportedTopic[] {
+  return outline.root ? outline.root.children : outline.topics;
 }
 
 /**
@@ -172,9 +309,15 @@ export function annotationsFromOutline(
     }
   };
 
-  // The document's root is the document's own name, which came from the file's
-  // title rather than from the outline — so the walk starts at the top-level
-  // topics, which are the root's children.
+  // A format with one root names the document after that root, so the document's
+  // own root *is* the imported root — and its note and link belong there. A format
+  // with several top-level outlines has no such topic, and the walk starts one
+  // level down.
+  if (outline.root) {
+    walk(root, outline.root);
+    return { notes, links };
+  }
+
   const count = Math.min(root.children.length, outline.topics.length);
   for (let index = 0; index < count; index += 1) {
     walk(root.children[index], outline.topics[index]);
@@ -185,7 +328,12 @@ export function annotationsFromOutline(
 
 /** A file name for the imported document, from the outline's title. */
 export function importFileName(outline: ImportedOutline, sourceName: string): string {
-  const base = outline.title || sourceName.replace(/\.(opml|xml)$/i, "") || "导入的大纲";
+  const extensions = /\.(opml|xml|mm)$/i;
+  const base =
+    outline.title ||
+    outline.root?.text ||
+    sourceName.replace(extensions, "") ||
+    "导入的大纲";
   // A name that is not a name: either a separator or a control character would
   // make the file it names unreachable on one platform or another.
   const safe = base.replace(/[\\/:*?"<>|\u0000-\u001f]/g, " ").replace(/\s+/g, " ").trim();

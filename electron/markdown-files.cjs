@@ -205,8 +205,8 @@ async function readMarkdownSource(absolutePath) {
  * make sense of it.
  */
 async function readOutlineFile(absolutePath) {
-  if (typeof absolutePath !== "string" || !/\.(opml|xml)$/i.test(absolutePath)) {
-    return { success: false, message: "只能导入 .opml 或 .xml 大纲文件。" };
+  if (typeof absolutePath !== "string" || !/\.(opml|xml|mm)$/i.test(absolutePath)) {
+    return { success: false, message: "只能导入 .opml、.mm 或 .xml 大纲文件。" };
   }
 
   try {

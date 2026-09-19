@@ -99,7 +99,7 @@ export const ChapterList = memo(function ChapterList({
               type="button"
               className="tree-action-btn"
               onClick={onImportOutline}
-              title="导入大纲（OPML）为新文档"
+              title="导入大纲（OPML / FreeMind）为新文档"
               aria-label="导入大纲"
             >
               <Import size={13} />

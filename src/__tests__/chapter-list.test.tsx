@@ -53,6 +53,7 @@ describe("ChapterList Component Sub-function Tests", () => {
 
     const button = screen.getByRole("button", { name: "导入大纲" });
     expect(button.getAttribute("title")).toContain("OPML");
+    expect(button.getAttribute("title")).toContain("FreeMind");
     fireEvent.click(button);
     expect(onImportOutline).toHaveBeenCalledTimes(1);
 
