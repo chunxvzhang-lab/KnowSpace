@@ -372,16 +372,16 @@ export function review(
   const intervalDays = nextInterval(stability, options.requestRetention, options.maximumInterval);
   const lapsed = rating === 1;
 
-  let state: FsrsState;
-  if (lapsed) {
-    state = "relearning";
-  } else if (isFirstReview || progress.state === "learning" || progress.state === "relearning") {
-    // Graduating out of the learning phase takes more than one look — unless the
-    // first rating was Easy, in which case the card is already well known.
-    state = !isFirstReview && intervalDays < 1 ? progress.state : "review";
-  } else {
-    state = "review";
-  }
+  // This build schedules by whole days, so there is no learning phase to be in: a
+  // card is `new` until its first rating and in `review` from then on, and a
+  // forgotten one is `relearning` until its next successful day.
+  //
+  // The branch that used to be here tested `intervalDays < 1`, which `nextInterval`
+  // cannot return — dead code, under a comment describing a learning phase the app
+  // does not have. `learning` is still *read*: another build may have written it
+  // into a file, and such a card graduates on its next successful review like any
+  // other. It is no longer claimed to be producible from a rating, because it is not.
+  const state: FsrsState = lapsed ? "relearning" : "review";
 
   return {
     progress: {
@@ -821,6 +821,12 @@ export interface FsrsQueueItem {
  * Cards are ordered by retrievability ascending — the ones most likely to be
  * forgotten come first — with never-seen cards placed ahead of everything else
  * so new material is never starved by a backlog.
+ *
+ * A card's identity is its content (`computeCardId`), so the same question written
+ * into two notes is **one card**: the first note that carries it supplies the
+ * progress, and the duplicate is not queued again. It was queued twice before, and
+ * the panel — which skips a card id it has already rated — could only ever show the
+ * first of the two, so the header promised a card the session could not deliver.
  */
 export function buildReviewQueue(
   notes: Array<{ path: string; content: string }>,
@@ -828,6 +834,7 @@ export function buildReviewQueue(
 ): FsrsQueueItem[] {
   const today = toDateKey(now);
   const items: FsrsQueueItem[] = [];
+  const seen = new Set<string>();
 
   for (const note of notes) {
     const cards = parseFlashcards(note.content);
@@ -835,6 +842,9 @@ export function buildReviewQueue(
     const progress = parseFsrsMetadata(note.content);
 
     for (const card of cards) {
+      if (seen.has(card.id)) continue;
+      seen.add(card.id);
+
       const entry = progress.get(card.id) ?? createNewProgress(today);
       if (entry.due > today) continue;
       items.push({
@@ -867,9 +877,17 @@ export interface FsrsStats {
   tracked: number;
 }
 
-/** Summarises a set of notes for the review dashboard. */
+/**
+ * Summarises a set of notes for the review dashboard.
+ *
+ * Counts cards, not occurrences: the same question in two notes is one card, the
+ * same way `buildReviewQueue` queues it once. Counting it twice made the header
+ * disagree with the session — "共 2 张" above a caption that could only ever reach
+ * "1 / 1".
+ */
 export function summarize(notes: Array<{ path: string; content: string }>, now = new Date()): FsrsStats {
   const stats: FsrsStats = { total: 0, due: 0, fresh: 0, learning: 0, review: 0, tracked: 0 };
+  const seen = new Set<string>();
 
   for (const note of notes) {
     const cards = parseFlashcards(note.content);
@@ -877,6 +895,9 @@ export function summarize(notes: Array<{ path: string; content: string }>, now =
     const progress = parseFsrsMetadata(note.content);
 
     for (const card of cards) {
+      if (seen.has(card.id)) continue;
+      seen.add(card.id);
+
       stats.total += 1;
       const entry = progress.get(card.id);
       if (!entry) {

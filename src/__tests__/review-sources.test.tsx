@@ -27,13 +27,27 @@ const SPACE_NOTE = {
 
 const pristineVault = useVaultStore.getState();
 
+/**
+ * A batch answer shaped the way the bridge shapes it.
+ *
+ * One entry per path, each carrying **the path it is about** — that is the real
+ * shape, and leaving the paths out is what hid a defect through four releases of
+ * these tests: the panel's hook paired results with paths by position, which is only
+ * ever right while nothing is dropped.
+ */
+function batch(entries: Array<[string, string]>) {
+  return entries.map(([absolutePath, markdown]) => ({ absolutePath, markdown, baseUrl: "" }));
+}
+
 describe("DailyReviewPanel - 卡片来源", () => {
   let readMarkdownBatch: ReturnType<typeof vi.fn>;
+  let saveMarkdownFile: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     readMarkdownBatch = vi.fn().mockResolvedValue([]);
+    saveMarkdownFile = vi.fn().mockResolvedValue({ success: true });
     (window as unknown as Record<string, unknown>).knowSpaceDesktop = {
-      saveMarkdownFile: vi.fn().mockResolvedValue({ success: true }),
+      saveMarkdownFile,
       readMarkdownBatch,
     };
     useVaultStore.setState({ ...pristineVault, manifest: VAULT });
@@ -65,10 +79,12 @@ describe("DailyReviewPanel - 卡片来源", () => {
   });
 
   it("切换后复习的是知识库文档里的卡片", async () => {
-    readMarkdownBatch.mockResolvedValue([
-      { markdown: "知识库问题 :: 知识库答案" },
-      { markdown: "这一篇只是普通段落，没有卡片。" },
-    ]);
+    readMarkdownBatch.mockResolvedValue(
+      batch([
+        ["C:/Vault/c1.md", "知识库问题 :: 知识库答案"],
+        ["C:/Vault/c2.md", "这一篇只是普通段落，没有卡片。"],
+      ])
+    );
     render(<DailyReviewPanel notes={[SPACE_NOTE]} />);
 
     await act(async () => {
@@ -81,7 +97,7 @@ describe("DailyReviewPanel - 卡片来源", () => {
   });
 
   it("切回 Space 时不需要重新读取", async () => {
-    readMarkdownBatch.mockResolvedValue([{ markdown: "知识库问题 :: 知识库答案" }]);
+    readMarkdownBatch.mockResolvedValue(batch([["C:/Vault/c1.md", "知识库问题 :: 知识库答案"]]));
     render(<DailyReviewPanel notes={[SPACE_NOTE]} />);
 
     await act(async () => {
@@ -120,7 +136,7 @@ describe("DailyReviewPanel - 卡片来源", () => {
   });
 
   it("知识库里没有卡片时给出针对该来源的引导", async () => {
-    readMarkdownBatch.mockResolvedValue([{ markdown: "没有卡片的普通段落" }]);
+    readMarkdownBatch.mockResolvedValue(batch([["C:/Vault/c1.md", "没有卡片的普通段落"]]));
     render(<DailyReviewPanel notes={[SPACE_NOTE]} />);
 
     await act(async () => {
@@ -141,7 +157,7 @@ describe("DailyReviewPanel - 卡片来源", () => {
         ],
       },
     });
-    readMarkdownBatch.mockResolvedValue([{ markdown: "只有一篇 :: 也能复习" }]);
+    readMarkdownBatch.mockResolvedValue(batch([["C:/Vault/c1.md", "只有一篇 :: 也能复习"]]));
     render(<DailyReviewPanel notes={[]} />);
 
     await act(async () => {
@@ -150,5 +166,32 @@ describe("DailyReviewPanel - 卡片来源", () => {
 
     await waitFor(() => expect(screen.getByText("只有一篇")).toBeDefined());
     expect(readMarkdownBatch).toHaveBeenCalledWith(["C:/Vault/c1.md"]);
+  });
+
+  it("批量结果少了一项时，后面的章节不会张冠李戴", async () => {
+    // The bridge drops what it cannot return — a file it could not read, and any
+    // chapter that is not Markdown at all (a `.canvas`) — so its answer is not as long
+    // as the question. Pairing by position is how the second chapter ends up showing
+    // the first one's text, and — because the card's source path is what a rating
+    // writes to — how progress is saved into the wrong document.
+    readMarkdownBatch.mockResolvedValue(
+      batch([["C:/Vault/c2.md", "第二章的问题 :: 第二章的答案"]])
+    );
+    render(<DailyReviewPanel notes={[]} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("当前知识库"));
+    });
+    await waitFor(() => expect(screen.getByText("第二章的问题")).toBeDefined());
+
+    fireEvent.click(screen.getByText("显示答案"));
+    await act(async () => {
+      fireEvent.click(screen.getByText("良好"));
+    });
+
+    // The card came out of c2, so c2 is the file that gets its progress.
+    expect(saveMarkdownFile).toHaveBeenCalledWith(
+      expect.objectContaining({ absolutePath: "C:/Vault/c2.md" })
+    );
   });
 });
