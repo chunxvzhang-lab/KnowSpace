@@ -150,8 +150,24 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
               <span className="about-changelog-version-badge">v{__APP_VERSION__}</span>
             </div>
             <div className="about-changelog-list">
-              {/* v2.5.0 */}
+              {/* v2.6.0 */}
               <div className="about-changelog-group">
+                <div className="about-changelog-group-label">
+                  <Sparkles size={12} className="text-cyan" />
+                  <span>v2.6.0 导图导入导出闭环 · 闪卡的来源、撤销与写回安全</span>
+                </div>
+                <ul className="about-changelog-items">
+                  <li>🧠 <strong>思维导图导入导出补齐</strong>：新增 <strong><code>.xmind</code> 导出与导入</strong>（DEFLATE 解压与 ZIP 读写为自写实现，且是<strong>唯一一种本应用能读回来</strong>的格式），并补上 <strong>SVG / 打印即 PDF</strong> 导出 —— 导出共 <strong>7 种</strong>、导入 <strong>3 种</strong>（<code>.opml</code> / <code>.mm</code> / <code>.xmind</code>，导入为新文档并带回备注、链接、关系线、概要与边界）。</li>
+                  <li>📂 <strong>闪卡四种来源</strong>：闪念 Space / 当前知识库 / <strong>自定义文件夹（最多 5 个）</strong> / 当前文档，并<strong>记住上次用过的来源</strong>；「当前文档」在<strong>有未保存改动时不可选</strong>并说明原因 —— 评分要写进文件，而没有自动保存，之后那次保存会把进度覆盖掉。</li>
+                  <li>↩️ <strong>评分可撤销一步</strong>：按错键（<code>重来</code> 与 <code>良好</code> 只隔一个键位）时点撤销按钮或按 <code>Ctrl/Cmd + Z</code>；从没复习过的卡片会把那一行整个收回，<strong>一篇只评过一次就被撤销的笔记与从未评过时逐字节相同</strong>。</li>
+                  <li>⌨️ <strong>两个新入口</strong>：命令面板（<code>Ctrl+K</code>）一步「开始复习：闪卡」；编辑器里 <code>/闪卡</code> 直接插入问答 / 行内 / 挖空三种模板，光标落在示例文字上。</li>
+                  <li>🛡️ <strong>写回改为合并</strong>：写回前重读文件，只把自己那一行合并进<strong>文件当下的内容</strong> —— 复习期间别处的改动不会被覆盖，被删掉的卡片不再写回，读不到文件时明确报错而不硬写。同时修复三处缺陷：知识库来源此前<strong>按位置配对</strong>（会把进度<strong>写进别的文档</strong>）、同一张卡出现在两篇笔记时被重复计数、撤销唯一一次评分会留下空行。</li>
+                  <li>🧪 <strong>测试规模</strong>：<strong>94 个测试套件、1208 项</strong>单元与集成测试 100% 通过。</li>
+                </ul>
+              </div>
+
+              {/* v2.5.0 */}
+              <div className="about-changelog-group" style={{ marginTop: 10, opacity: 0.9 }}>
                 <div className="about-changelog-group-label">
                   <Sparkles size={12} className="text-cyan" />
                   <span>v2.5.0 FSRS-5 间隔重复闪卡与架构减负</span>

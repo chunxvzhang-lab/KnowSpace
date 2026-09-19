@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-v2.5.0-1D9BF0?style=flat-square&logo=github" alt="Version 2.5.0" />
+  <img src="https://img.shields.io/badge/Version-v2.6.0-1D9BF0?style=flat-square&logo=github" alt="Version 2.6.0" />
   <img src="https://img.shields.io/badge/Presentation-Mode_2.3_Clockwise_Cycles-8B5CF6?style=flat-square" alt="Presentation Mode 2.3" />
   <img src="https://img.shields.io/badge/FSRS-5_Spaced_Repetition-F59E0B?style=flat-square" alt="FSRS-5 Spaced Repetition" />
   <img src="https://img.shields.io/badge/Mind_Map-Non--Destructive_Sync-00BA7C?style=flat-square" alt="Non-Destructive Mindmap Sync" />
@@ -18,14 +18,14 @@
   <img src="https://img.shields.io/badge/Multimodal-Canvas_Media_Cards-F59E0B?style=flat-square" alt="Multimodal Canvas" />
   <img src="https://img.shields.io/badge/Routing-AABB_Obstacle_Avoidance-00BA7C?style=flat-square" alt="AABB Obstacle Avoidance" />
   <img src="https://img.shields.io/badge/Performance-120FPS_Instant_Load-00BA7C?style=flat-square" alt="120FPS Instant Load" />
-  <img src="https://img.shields.io/badge/Tests-619_Passing_100%25-00BA7C?style=flat-square" alt="619 Passing Tests" />
+  <img src="https://img.shields.io/badge/Tests-1208_Passing_100%25-00BA7C?style=flat-square" alt="1208 Passing Tests" />
   <img src="https://img.shields.io/badge/Canvas-JSON_Canvas_1.0-00BA7C?style=flat-square" alt="Infinite Canvas" />
   <img src="https://img.shields.io/badge/Snapshots-Ctrl%2BShift%2BH-1D9BF0?style=flat-square" alt="Version History" />
   <img src="https://img.shields.io/badge/Search-Hybrid_Vault_Index-8B5CF6?style=flat-square" alt="Hybrid Vault Search" />
   <img src="https://img.shields.io/badge/Command_Palette-Ctrl%2BK-00BA7C?style=flat-square" alt="Command Palette" />
   <img src="https://img.shields.io/badge/Slash_Commands-%2F-00BA7C?style=flat-square" alt="Slash Commands" />
   <img src="https://img.shields.io/badge/PDF_Print-Ctrl%2BP-8B5CF6?style=flat-square" alt="PDF Print" />
-  <img src="https://img.shields.io/badge/Mind_Map-OPML%20%7C%20FreeMind-00BA7C?style=flat-square" alt="Mind Map" />
+  <img src="https://img.shields.io/badge/Mind_Map-OPML%20%7C%20FreeMind%20%7C%20XMind-00BA7C?style=flat-square" alt="Mind Map" />
   <img src="https://img.shields.io/badge/Graph-1--Hop%20%7C%202--Hop%20%7C%20Clusters-8B5CF6?style=flat-square" alt="Knowledge Graph" />
   <img src="https://img.shields.io/badge/Flash_Notes-Alt%2BSpace-F59E0B?style=flat-square" alt="Flash Notes" />
   <img src="https://img.shields.io/badge/Theme-E--ink%20Paper%20%7C%20Geek%20Dark-1D9BF0?style=flat-square" alt="Themes" />
@@ -42,7 +42,7 @@
 
 <p align="center">
   <a href="https://github.com/chunxvzhang-lab/KnowSpace/releases">🚀 下载最新版本 (Releases)</a> •
-  <a href="docs/全功能高清图片手册.md">🖼️ 全功能高清图片手册 (Picture Manual)</a> •
+  <a href="docs/PICTURE_MANUAL.md">🖼️ 全功能高清图片手册 (Picture Manual)</a> •
   <a href="docs/USER_MANUAL.md">📖 操作手册 (User Manual)</a> •
   <a href="docs/knowspace-roadmap-v2.0-v3.0.md">🪐 演进路线图 (Roadmap)</a> •
   <a href="#-核心能力体系">核心体系</a> •
@@ -60,10 +60,10 @@
 
 ## 🏛️ 核心能力体系
 
-- **🧠 Mind Map 2.3（思维导图双端非破坏性同步体系与响应式工具栏 · v2.3.0 升级）**：Markdown 架构一键转化为交互式思维脑图（`Ctrl+M`），**核心无损同步算法 `syncMindmapToDocument`** 彻底攻克导图编辑抹杀正文段落的历史顽疾，基于 AST 章节区块映射进行增量标题结构同步，**100% 完整保全所有正文文字、代码块、表格与数学公式**；顶栏增设「🔄 同步到文档」按键、脏状态感知与绿色呼吸脉冲徽标、支持 `Ctrl+S` / `Cmd+S` 快捷同步与反向自动联动；移除节点旁冗余悬浮加号，界面清爽无杂音；**顶栏按钮自适应换行排版（Responsive Wrapped Toolbar）**，小窗口或高系统缩放比例下功能按钮不溢出、不被截断；支持**分支拖拽改变层级/同级重排（防环闭环保护）**、**导图内搜索与运镜聚焦**、**标准 OPML 2.0 / FreeMind (.mm) / Markdown / 视网膜级 PNG 透明底高清导出**。
+- **🧠 Mind Map 2.3（思维导图双端非破坏性同步体系与响应式工具栏 · v2.3.0 升级）**：Markdown 架构一键转化为交互式思维脑图（`Ctrl+M`），**核心无损同步算法 `syncMindmapToDocument`** 彻底攻克导图编辑抹杀正文段落的历史顽疾，基于 AST 章节区块映射进行增量标题结构同步，**100% 完整保全所有正文文字、代码块、表格与数学公式**；顶栏增设「🔄 同步到文档」按键、脏状态感知与绿色呼吸脉冲徽标、支持 `Ctrl+S` / `Cmd+S` 快捷同步与反向自动联动；移除节点旁冗余悬浮加号，界面清爽无杂音；**顶栏按钮自适应换行排版（Responsive Wrapped Toolbar）**，小窗口或高系统缩放比例下功能按钮不溢出、不被截断；支持**分支拖拽改变层级/同级重排（防环闭环保护）**、**导图内搜索与运镜聚焦**、**标准 OPML 2.0 / FreeMind (.mm) / Markdown / 视网膜级 PNG 透明底高清导出**；**v2.6.0 补齐「导出 × 导入」闭环**：新增 **SVG / 打印即 PDF** 导出与 **`.xmind` 导出、导入**（DEFLATE 解压与 ZIP 读写自写实现，是**唯一一种本应用能读回来**的格式），导出共 **7 种**、导入 **3 种**（`.opml` / `.mm` / `.xmind`，导入为新文档并带回备注、链接、关系线、概要与边界）。
 - **🌐 Graph & Backlinks 2.2（知识图谱深度、交互解耦与视觉升维 · v2.2.0 重构）**：60FPS 极速拓扑图谱，**单击与双击交互精准解耦**（单击节点仅高亮 1-hop 邻域并展示详情卡片，绝不在左侧打开文件；双击 350ms 内平滑打开对应笔记；点击空白背景清空高亮）；**重塑 280px 结构化毛玻璃文件夹详情卡片**（顶部 Meta 徽标行 + 专属标题行 + 路径行 + 3 列指标微型网格），彻底告别文字挤压与换行折叠；引入 **Cytoscape 0.18s 补间平滑过渡动效** 与 **悬停探灯连线点亮机制（Hover Headlight）**；支持 `1-Hop` 直接关联 / `2-Hop` 扩展网络局部深度控制、目录语义色彩聚类、MOC 核心枢纽节点挖掘与未链接孤岛发现。
 - **🎨 Infinite Canvas 2.4（空间多模态无限白板 · 交互式排布间距调校 · 导出链路工业级加固 · v2.4.0 重磅升级）**：标准开放的二维空间思维白板（`Ctrl+Shift+C`），**多模态媒体卡片自由挂载**（剪贴板截图 `Ctrl+V` 一键自动存入 `assets/` 落地为媒体卡片、**右键菜单一键插入图片/视频/音频并按点击位置精准落卡**、**双击媒体卡片全屏预览（灯箱支持视频播放与音频播放器，✕ / Esc 关闭）**、桌面图片/音视频文件批量拖拽投放、富文本 Markdown、嵌入文档滚动预览、逻辑分组容器），**智能正交折线 AABB 绕障避障寻路算法**（自动检测卡片包围盒与 +14px 安全边距，**多障碍链式包络合并绕行（相邻卡片串一次绕开，不再穿透后续障碍）**，5 段平滑正交绕行，彻底杜绝线条穿透遮挡卡片文字，标签中心点自适应吸附），**F5 沉浸式分镜全屏演示模式 2.3**（**同一容器优先顺序演播**、**深入子例程推演与自然归栈**、**先单卡后环形分支演播策略**、**成环卡片组顺时针完整演播与环外延伸分支演播**、**跨容器上下文感知复现**、电影级平滑聚焦运镜、当前演播卡片脉冲呼吸发光光晕、背景优雅弱化、悬浮控制台全键盘调度与自动播放），**高精度 4 锚点几何中心对齐与贝塞尔/正交折线/直线矢量连线**，支持**环形对齐（Ring Layout · 真实平滑圆形弧线闭环）与矩形网格对齐（Rectangular Grid Layout · 闭环以矩形直线框呈现）**、**交互式排布间距调校（环半径滑块 + 直接拖拽环上卡片实时调距 · 网格行列间距拖拽微调 · 多选组中心空白区整体平移 · 手势结束仅记一条历史）**、**折线手柄平移拖拽**、**防冲天平滑曲线**、**上下分层垂直优先路由**、**12 色专业调色盘（标准 6 色 + 靛蓝/粉樱/玫瑰/青碧/青柠/石板灰扩展色）与单条连线·批量卡片·批量连线自定义 HEX 颜色拾取器（拖动即时预览，防抖提交单条历史，杜绝取色闪退）**、**连线成环卡片视觉解耦（对外发射连线独立着色，消除视觉混淆）**、**一对多发起源全景识别（起点锚固圆点、发起源徽章、高亮辉光与多选动态标注）**、**连线多选与底部批量工具栏**、**多选卡片一键断开连线**、**120FPS 硬件栅格化与视口视锥剔除（Viewport Frustum Culling）**；**PNG 高清位图导出与剪贴板复制链路工业级加固（渲染进程栅格化失败时自动改用主进程离屏 `capturePage()` 出图，绝不悄悄降级格式；剪贴板改走系统原生 API 直写；导出配色与屏幕主题 1:1 一致；媒体相对路径按画布目录解析，图片卡片不再显示破图）**；**连线图层下沉至卡片之下，线条永不遮挡卡片文字**；配备右下角缩略雷达小地图与全景聚焦控制；**独创画布逆向拓扑萃取长文算法**，一键将白板因果关系逆向萃取为逻辑严密的 Markdown 专著。
-- **🃏 FSRS-5 间隔重复闪卡（知识内化闭环 · v2.5.0 全新能力）**：补齐「记录 → 整理 → 连接 → **内化**」的最后一环。基于 **FSRS-5 DSR 记忆模型**（稳定性 S / 难度 D / 可回忆性 R 三变量，遗忘曲线 `R(t,S) = (1 + FACTOR·t/S)^DECAY`）逐卡调度复习，**保持率恰好降到 90% 的那一刻就是该复习的时刻**；**三种零侵入语法**（`Q:`/`A:` 问答块、`front :: back` 行内卡、`{{c1::答案}}` 与 `==高亮==` 挖空卡）直接写在普通 Markdown 里，**不污染正文、不与第三方编辑器冲突**（进度存于单条 HTML 注释中，一卡一行）；每日复盘面板按「到期 / 新卡 / 已排期」分组，**四个评分按钮实时预览各自的下次间隔**，全程纯 CPU 毫秒级计算，**无需 GPU、无需联网**。
+- **🃏 FSRS-5 间隔重复闪卡（知识内化闭环 · v2.5.0 全新能力）**：补齐「记录 → 整理 → 连接 → **内化**」的最后一环。基于 **FSRS-5 DSR 记忆模型**（稳定性 S / 难度 D / 可回忆性 R 三变量，遗忘曲线 `R(t,S) = (1 + FACTOR·t/S)^DECAY`）逐卡调度复习，**保持率恰好降到 90% 的那一刻就是该复习的时刻**；**三种零侵入语法**（`Q:`/`A:` 问答块、`front :: back` 行内卡、`{{c1::答案}}` 与 `==高亮==` 挖空卡）直接写在普通 Markdown 里，**不污染正文、不与第三方编辑器冲突**（进度存于单条 HTML 注释中，一卡一行）；每日复盘面板按「到期 / 新卡 / 已排期」分组，**四个评分按钮实时预览各自的下次间隔**，全程纯 CPU 毫秒级计算，**无需 GPU、无需联网**。**v2.6.0 扩展**：**四种卡片来源**（闪念 Space / 当前知识库 / **自定义文件夹（最多 5 个）** / 当前文档）并**记住上次用过的来源**；评分**可撤销一步**（`Ctrl/Cmd + Z`）；命令面板一步「开始复习」、斜杠命令 `/闪卡` 给出三条可直接插入的模板；**写回是合并而非覆盖** —— 只把自己那一行合并进文件当下的内容。
 - **🚀 Instant Load & 120FPS Engine（秒开体验与工业级高刷引擎）**：彻底攻克大型知识库与包含数百篇笔记文件夹的打开性能瓶颈！引入**协作式空闲时间片调度器（Cooperative Idle-Sliced Background Indexer）**，首屏活动文档优先 <50ms 秒开呈现，后台全量索引 600ms 初始防抖与 20ms 退避分片让出时间片，保证 0 dropped frames；配合 **Electron 批量并发读取 IPC（`readMarkdownBatch`）**与 **32MB 内存 LRU 缓存（256 篇常驻）**，二次切换零磁盘 I/O。
 - **⏳ Local Version History（本地时间旅行与版本快照历史）**：运行在本地知识库根目录隐藏空间（`.knowspace/snapshots/`）的无感版本防丢卫士（`Ctrl+Shift+H`），**30秒去抖静默捕获与 SHA-256 哈希去重**，配备直观版本时间轴；**左右双栏 Side-by-Side 与统一 Unified 视图**，Myers LCS 逐行与行内字符微粒度高亮，**一键无损安全还原与手动里程碑快照**。
 - **🔍 Hybrid Vault Search（全库毫秒级混合检索引擎）**：全新文档级与段落级倒排索引（Inverted Index），万篇笔记键盘键入即刻（< 15ms）出结果。**深度支持结构化检索语法**：`tag:#架构`、`link:[[分布式协议]]`、`"严格短语"`、`-排除词`、时间范围过滤，提供「当前章节」与「全库检索」一键无缝切换、语法快捷辅助芯片与物理行微光脉冲联动。
@@ -98,7 +98,7 @@
 - **📥 闭环并入正文**：闪念卡片支持一键在编辑器打开、一键以规范引用块直接并入当前编辑文档光标处、一键复制全文与安全清理。
 - **⚡ 即时通信响应**：闪念胶囊按 `Ctrl + Enter` 保存后，主窗口看板无需手动刷新，最新灵感即刻呈现。
 
-#### 🃏 每日复盘 · FSRS-5 间隔重复闪卡（v2.5.0 全新）
+#### 🃏 每日复盘 · FSRS-5 间隔重复闪卡（v2.5.0 全新 · v2.6.0 扩展来源、撤销与斜杠命令）
 
 > 记下来的知识会随时间遗忘。这是 KnowSpace 第一次回答「**如何让读到的东西真正留下来**」。
 
@@ -111,6 +111,11 @@
 - **💾 进度存于单条 HTML 注释**：所有调度状态写入文档末尾一处 `<!-- fsrs:begin … fsrs:end -->` 注释块，**一卡一行**，因此在任何第三方 Markdown 编辑器里都只是一个普通注释，Git diff 也保持可读；删除的卡片会在写回时自动清除。
 - **🔑 卡片 ID 由内容派生**：重排笔记顺序**不会**让卡片丢失历史，只有真正修改问题才会重置。
 - **⚡ 纯 CPU、毫秒级、零联网**：不依赖 GPU、不调用端侧 AI、不产生任何网络请求 —— 评分响应预算 < 50ms（已固化为守护测试）。
+- **📂 四种卡片来源，并记住上次用过的**：闪念 Space（默认）/ 当前知识库 / **自定义文件夹（最多 5 个；记住的是路径，下次重新列一遍，新写的卡因此进得来）** / 当前文档（**仅在该文档已保存时可选** —— 评分要写进文件，而没有自动保存，之后那次保存会把进度覆盖掉）。
+- **↩️ 评分可撤销一步**：按错键（`重来` 与 `良好` 只隔一个键位）时点标题栏的撤销按钮或按 `Ctrl/Cmd + Z`（在输入框里仍是编辑器自己的撤销）。撤销写回**评分前**的调度；从没复习过的卡片则把那一行整个收回 —— 一篇只评过一次就被撤销的笔记，与从未评过时**逐字节相同**。
+- **⌨️ 三个入口**：侧栏「闪念 Space → 复盘」、命令面板（`Ctrl+K`）→「开始复习：闪卡」一步直达、编辑器里输入 `/闪卡` 直接插入问答 / 行内 / 挖空三种模板（光标落在示例文字上）。
+- **🛡️ 写回是合并，不是覆盖**：写回前重新读一次文件，只把自己那一行合并进**文件当下的内容** —— 复习期间在别处（编辑器、同步盘、闪念胶囊）对同一文件的改动**不会被覆盖**；复习期间被删掉的卡片，它的进度行也会被丢弃；文件读不到时明确报错并留在原地，不拿旧副本硬写。
+- **🧩 同一张卡只算一次**：卡片身份由内容派生，所以同一个问题写进两篇笔记**就是一张卡**（按首次出现的笔记归属）—— 队列、统计与进度条因此始终一致。
 
 ---
 
@@ -525,20 +530,20 @@
 
 ## 📦 安装程序与便携版下载 (Downloads & Release Assets)
 
-本项目为 Windows 64 位系统深度优化，提供图形化安装程序、标准 MSI 安装包与免安装便携版，最新 `v2.5.0` 资产已发布：
+本项目为 Windows 64 位系统深度优化，提供图形化安装程序、标准 MSI 安装包与免安装便携版，最新 `v2.6.0` 资产已发布：
 
-> 🌐 **GitHub 官方发布主页**：[GitHub Releases · v2.5.0](https://github.com/chunxvzhang-lab/KnowSpace/releases/tag/v2.5.0)
+> 🌐 **GitHub 官方发布主页**：[GitHub Releases · v2.6.0](https://github.com/chunxvzhang-lab/KnowSpace/releases/tag/v2.6.0)
 
 ### 1. Windows 图形化安装程序（推荐）
-- **安装文件**：[`KnowSpace-Setup-2.5.0.exe`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.5.0/KnowSpace-Setup-2.5.0.exe)
+- **安装文件**：[`KnowSpace-Setup-2.6.0.exe`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.6.0/KnowSpace-Setup-2.6.0.exe)
 - **特点**：双击即可向导式安装，支持自定义安装目录，自动创建桌面快捷方式与开始菜单官方品牌图标，深度集成系统级 `.md` 与 `.canvas` 文件关联，内置标准卸载程序。
 
 ### 2. Windows MSI 标准安装包
-- **安装文件**：[`KnowSpace-2.5.0.msi`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.5.0/KnowSpace-2.5.0.msi)
+- **安装文件**：[`KnowSpace-2.6.0.msi`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.6.0/KnowSpace-2.6.0.msi)
 - **特点**：Windows Installer 官方格式，适合企业批量部署、组策略分发与企业级静默安装，支持标准控制面板卸载。
 
 ### 3. Windows 绿色免安装便携版
-- **便携文件**：[`KnowSpace-win-x64-portable.zip`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.5.0/KnowSpace-win-x64-portable.zip)
+- **便携文件**：[`KnowSpace-win-x64-portable.zip`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.6.0/KnowSpace-win-x64-portable.zip)
 - **直接运行**：解压后双击 `KnowSpace.exe` 即可直接使用完整功能。
 - **特点**：解压即用、随身携带（支持装入 U 盘或移动硬盘）；完全自包含 Electron 运行时与全套本地依赖，无需配置任何外部开发环境；支持右键「打开方式」关联 Markdown 与白板文档。
 
@@ -565,7 +570,7 @@
 
 ### Key Features
 
-- **🃏 FSRS-5 Spaced Repetition (`v2.5.0`, New)**: The missing half of the loop — KnowSpace could record, organise and connect; now it helps you *internalise*. Cards are scheduled by the **FSRS-5 DSR model** (stability, difficulty and retrievability against the forgetting curve `R(t,S) = (1 + FACTOR·t/S)^DECAY`), so the moment your recall probability reaches 90% is exactly when the card comes back. Three inline syntaxes — `Q:`/`A:` blocks, `front :: back`, and `{{c1::answer}}` / `==highlight==` clozes — live inside ordinary Markdown, so nothing is polluted and no third-party editor breaks. Scheduling state is written to a single HTML comment at the end of the document, one card per line, which every other editor sees as an ordinary comment. Card ids derive from content, so reordering a note never detaches a card from its history. Four rating buttons each preview the interval they would produce. Pure CPU, no GPU, no network — the sub-50ms evaluation budget is enforced by a guard test.
+- **🃏 FSRS-5 Spaced Repetition (`v2.5.0`, New)**: The missing half of the loop — KnowSpace could record, organise and connect; now it helps you *internalise*. Cards are scheduled by the **FSRS-5 DSR model** (stability, difficulty and retrievability against the forgetting curve `R(t,S) = (1 + FACTOR·t/S)^DECAY`), so the moment your recall probability reaches 90% is exactly when the card comes back. Three inline syntaxes — `Q:`/`A:` blocks, `front :: back`, and `{{c1::answer}}` / `==highlight==` clozes — live inside ordinary Markdown, so nothing is polluted and no third-party editor breaks. Scheduling state is written to a single HTML comment at the end of the document, one card per line, which every other editor sees as an ordinary comment. Card ids derive from content, so reordering a note never detaches a card from its history. Four rating buttons each preview the interval they would produce. Pure CPU, no GPU, no network — the sub-50ms evaluation budget is enforced by a guard test. **v2.6.0** adds four card sources (Space, the open workspace, up to five folders of your own, and the document in front of you) and remembers the last one you used; one step of undo (`Ctrl/Cmd + Z`); a *Start a review* command in the palette and `/闪卡` slash commands that insert ready-made templates; and writes that merge into the file as it is — edits made elsewhere during a review are never overwritten, and a card deleted meanwhile stops being written back.
 - **🚀 Instant Load & 120FPS Performance Engine**:
   - *Cooperative Idle-Sliced Background Indexer*: Eliminates UI freezing when opening large directories or switching files. Active document renders immediately (<50ms), while full-vault indexing is deferred and chunked in the background with cooperative 20ms yields. Zero dropped frames!
   - *Batch IPC File Content Reader (`readMarkdownBatch`)*: High-throughput parallel reads in Node.js worker threads bypass redundant sequential IPC calls, delivering >10× faster disk reads.
@@ -613,7 +618,7 @@
   - *Responsive Wrapped Toolbar (v2.3.0 Upgrade)*: Fluid responsive button bar wraps automatically on narrow displays, split-screen views, or high DPI scaling, eliminating button clipping or horizontal overflowing.
   - *Explicit Sync Toolbar & Dirty Sensing*: Topbar `🔄 Sync to Document` button with emerald glow and breathing pulse indicator, `Ctrl+S` / `Cmd+S` keyboard sync, and automatic reverse sync when editing markdown headings.
   - *Pure Minimalist UI*: Eliminated floating plus button next to node collapse/expand toggles, keeping clean native border circles `(+)` / `(-)`.
-  - *Multi-Format Export*: Export 2× Retina transparent PNG diagrams, standard OPML 2.0 (`.opml`) for MindNode / OmniOutliner / Logseq, FreeMind 1.0.1 XML (`.mm`) for XMind / Freeplane with preserved node colors, and structured Markdown outlines.
+  - *Multi-Format Export*: Export 2× Retina transparent PNG diagrams, standard OPML 2.0 (`.opml`) for MindNode / OmniOutliner / Logseq, FreeMind 1.0.1 XML (`.mm`) for XMind / Freeplane with preserved node colors, and structured Markdown outlines. Since **v2.6.0** also SVG and print-to-PDF, plus `.xmind` (a ZIP with DEFLATE written here — the one format this app can read back); the matching imports (`.opml`, `.mm`, `.xmind`) arrive as new documents carrying their notes, links, relations, summaries and boundaries.
   - *Drag-and-Drop Reparenting*: Intuitive reorganization with cycle detection and snap glow.
   - *In-Canvas Search & Smooth Focus*: Dynamic keyword highlight and viewport centering.
   - *Full Keyboard Flow*: `Tab` (add subtopic), `Enter` (add sibling), `Delete` (remove topic), `F2` / Double-Click (in-place rename with Chinese IME support), Arrow Keys (smooth navigation), `Ctrl+Z` / `Ctrl+Y` (undo / redo).
@@ -663,7 +668,7 @@
   - *Conflict Detection*: Automatic alert when files are modified externally.
 - **🧪 Sub-function Ecosystem & 100% Test Coverage**:
   - *Full Spectrum Granular Sub-functions*: Zoomable Media Lightbox (0.2×~6×, smooth pan, download, Esc), Typography Status Bar (word/char count, reading time estimation, dirty state, readonly lock), Backlinks & Unlinked Mentions with 1-click upgrade to `[[wikilinks]]`, External File Conflict Arbitrator (`FileConflictDialog`), Unsaved Changes Protector (`UnsavedChangesDialog`), Dynamic TOC & Cross-Chapter Bookmark Resolver, Space Flash Note Directory Isolation, Web Snapshot FIFO Pruning (30-cap), and Mermaid Base64 entity-safe SVG rendering with graceful error fallbacks.
-  - *Rock-Solid Reliability*: 55 test suites, **619** automated unit and integration tests passing with a 100% success rate!
+  - *Rock-Solid Reliability*: 94 test suites, **1208** automated unit and integration tests passing with a 100% success rate!
 
 ---
 
