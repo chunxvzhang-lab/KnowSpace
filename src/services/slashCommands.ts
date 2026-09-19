@@ -4,7 +4,10 @@ export type SlashCommandCategory =
   | "代码与结构"
   | "图表与公式"
   | "高级卡片"
-  | "知识连接";
+  | "知识连接"
+  // Not "高级卡片", which is callouts: a flashcard is a thing the app will *ask* you
+  // about later, and the two have nothing to do with each other beyond the word.
+  | "复习闪卡";
 
 export interface SlashCommand {
   id: string;
@@ -267,6 +270,53 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     category: "知识连接",
     keywords: ["time", "sj", "shijian", "date", "now", "riqi"],
     template: "", // Dynamic
+  },
+
+  // 7. 复习闪卡
+  //
+  // The three syntaxes the review reads, here because this is where cards are written
+  // and the syntaxes are otherwise something the reader has to remember. Each template
+  // is already a card the moment it is inserted, and the cursor lands where the reader
+  // starts typing.
+  {
+    id: "card_qa",
+    title: "闪卡：问答",
+    description: "复习时会问「问题」，答完再翻面看「答案」",
+    icon: "🎴",
+    category: "复习闪卡",
+    keywords: ["card", "flashcard", "shanqia", "ka", "wenda", "qa", "复习", "fuxi", "beisong"],
+    template: "Q: 问题\nA: 答案\n",
+    cursorOffset: 3,
+  },
+  {
+    id: "card_inline",
+    title: "闪卡：一行一问一答",
+    description: "问题在左、答案在右，写在一行里",
+    icon: "💬",
+    category: "复习闪卡",
+    keywords: ["card", "flashcard", "shanqia", "ka", "hangnei", "inline", "::", "复习", "fuxi"],
+    template: "- 问题 :: 答案\n",
+    cursorOffset: 2,
+  },
+  {
+    id: "card_cloze",
+    title: "闪卡：挖空",
+    description: "把句子里的关键部分挖空（==高亮== 同样算挖空）",
+    icon: "✂️",
+    category: "复习闪卡",
+    keywords: [
+      "card",
+      "flashcard",
+      "shanqia",
+      "ka",
+      "wakong",
+      "cloze",
+      "tiankong",
+      "复习",
+      "fuxi",
+    ],
+    template: "把要考的写成 {{c1::答案}}，其余照常。\n",
+    cursorOffset: 13,
   },
 ];
 
