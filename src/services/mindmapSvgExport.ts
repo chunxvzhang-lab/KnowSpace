@@ -68,6 +68,20 @@ type DecorationRule = {
 };
 
 const DECORATION_RULES: DecorationRule[] = [
+  // Free topics: the box and its text, dashed as on screen. The fill is the
+  // app's own surface rather than the node fill, because a free topic has no
+  // branch to take a colour from.
+  {
+    selector: ".mindmap-floating-rect",
+    fill: { dark: "#1e293b", light: "#f8fafc" },
+    stroke: { dark: "#3f7fa8", light: "#7cb6d6" },
+    attributes: { "stroke-width": "1.2", "stroke-dasharray": "4 3" },
+  },
+  {
+    selector: ".mindmap-floating-text",
+    fill: { dark: "#e2e8f0", light: "#0f172a" },
+    font: { size: "13px", weight: "500" },
+  },
   // Relations between topics. Dashed in the file as on screen, so a line that is
   // an addition to the outline is not mistaken for part of it.
   {
@@ -176,6 +190,9 @@ export function buildStandaloneMindmapSvg(
   // Interactive-only elements: a selection ring or a resize handle is a control,
   // not part of the drawing.
   clone.querySelectorAll(".mindmap-node-selection-ring").forEach((el) => el.remove());
+  // A free topic's selection ring is the same kind of thing: a control, not the
+  // picture, and a file that arrived with one would look like a bug.
+  clone.querySelectorAll(".mindmap-floating-selection").forEach((el) => el.remove());
   clone.querySelectorAll(".mindmap-node-add-btn").forEach((el) => el.remove());
   clone.querySelectorAll(".mindmap-node-resize-handle").forEach((el) => el.remove());
 

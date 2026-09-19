@@ -63,6 +63,14 @@ export interface MindmapSidecar {
    * it *is* the pair of topics it joins, kept in one canonical order.
    */
   relations: MindmapRelation[];
+  /**
+   * Topics that no outline owns, by their own id.
+   *
+   * The clearest case of the additional layer: a topic dragged onto the canvas
+   * belongs to the map rather than to the document, so it lives here and the tree
+   * stays the document's own shape. The document never hears about it.
+   */
+  floating: Record<string, FloatingTopic>;
   /** Sections this build does not know about, kept exactly as they were read. */
   [section: string]: unknown;
 }
@@ -92,6 +100,7 @@ const SECTIONS = [
   { name: "tags", read: readTagSection },
   { name: "markers", read: readMarkerSection },
   { name: "relations", read: readRelationSection },
+  { name: "floating", read: readFloatingSection },
 ] as const;
 
 /** Just the names, for writing a file and asking whether it holds anything. */
@@ -116,7 +125,48 @@ export function emptySidecar(): MindmapSidecar {
     links: {},
     markers: {},
     relations: [],
+    floating: {},
   };
+}
+
+/** A topic on the canvas that no outline owns. */
+export interface FloatingTopic {
+  text: string;
+  /** Canvas coordinates: where the box's top-left corner sits. */
+  x: number;
+  y: number;
+  /** Fields a newer version added, kept as they were read. */
+  [field: string]: unknown;
+}
+
+/**
+ * The floating section: topics by their own id.
+ *
+ * A topic with no text is dropped rather than kept as an empty box — an unlabelled
+ * box is one nobody can identify or select on purpose, and the reader who empties
+ * one is asking for it to go. Coordinates that are not finite numbers fall back to
+ * the origin rather than dropping the topic: a topic in the wrong place can be
+ * dragged, but one that vanished cannot be found.
+ */
+function readFloatingSection(value: unknown): Record<string, FloatingTopic> {
+  const section: Record<string, FloatingTopic> = {};
+  if (!isPlainObject(value)) return section;
+
+  for (const [id, entry] of Object.entries(value)) {
+    if (!id || !isPlainObject(entry)) continue;
+
+    const text = typeof entry.text === "string" ? entry.text.trim() : "";
+    if (!text) continue;
+
+    section[id] = {
+      ...entry,
+      text,
+      x: typeof entry.x === "number" && Number.isFinite(entry.x) ? entry.x : 0,
+      y: typeof entry.y === "number" && Number.isFinite(entry.y) ? entry.y : 0,
+    };
+  }
+
+  return section;
 }
 
 /** One section as read from a file: an empty map if the file's copy is unusable. */
@@ -485,6 +535,78 @@ export function setNodeProgress(
   progress: number | null
 ): MindmapSidecar {
   return setMarker(sidecar, nodeId, "progress", progress, isProgressInRange);
+}
+
+/** Every floating topic, with its id. */
+export function floatingTopics(sidecar: MindmapSidecar | null): { id: string; topic: FloatingTopic }[] {
+  if (!sidecar) return [];
+  return Object.entries(sidecar.floating).map(([id, topic]) => ({ id, topic }));
+}
+
+/**
+ * A fresh id for a new floating topic.
+ *
+ * Prefixed so it can never collide with a node's id, and **numbered rather than
+ * random**: creating the same topics in the same order produces the same file
+ * twice, which is what makes a diff in a version-controlled vault readable, and
+ * what makes this testable at all.
+ */
+export function nextFloatingId(sidecar: MindmapSidecar | null): string {
+  let highest = 0;
+
+  for (const id of Object.keys(sidecar?.floating ?? {})) {
+    const match = /^floating-(\d+)$/.exec(id);
+    if (match) highest = Math.max(highest, Number(match[1]));
+  }
+
+  return `floating-${highest + 1}`;
+}
+
+/** Puts a new topic on the canvas, and answers with the id it was given. */
+export function addFloatingTopic(
+  sidecar: MindmapSidecar,
+  text: string,
+  x: number,
+  y: number
+): { sidecar: MindmapSidecar; id: string } {
+  const id = nextFloatingId(sidecar);
+  const floating = { ...sidecar.floating, [id]: { text: text.trim(), x, y } };
+  return { sidecar: { ...sidecar, floating }, id };
+}
+
+/** Moves a topic. Called on every frame of a drag, so it does the least it can. */
+export function moveFloatingTopic(
+  sidecar: MindmapSidecar,
+  id: string,
+  x: number,
+  y: number
+): MindmapSidecar {
+  const topic = sidecar.floating[id];
+  if (!topic) return sidecar;
+  return { ...sidecar, floating: { ...sidecar.floating, [id]: { ...topic, x, y } } };
+}
+
+/**
+ * Renames a topic, or removes it when the text is emptied.
+ *
+ * Emptying is how a reader says "this box should go" — the same reading the
+ * section's own reader takes, so what is on screen and what a later version reads
+ * back cannot disagree about what an empty topic means.
+ */
+export function setFloatingText(sidecar: MindmapSidecar, id: string, text: string): MindmapSidecar {
+  const topic = sidecar.floating[id];
+  if (!topic) return sidecar;
+  const trimmed = text.trim();
+  if (!trimmed) return removeFloatingTopic(sidecar, id);
+  return { ...sidecar, floating: { ...sidecar.floating, [id]: { ...topic, text: trimmed } } };
+}
+
+/** Takes a topic off the canvas. */
+export function removeFloatingTopic(sidecar: MindmapSidecar, id: string): MindmapSidecar {
+  if (!sidecar.floating[id]) return sidecar;
+  const floating = { ...sidecar.floating };
+  delete floating[id];
+  return { ...sidecar, floating };
 }
 
 /**

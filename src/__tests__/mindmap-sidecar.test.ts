@@ -1,8 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  addFloatingTopic,
   allTags,
   areRelated,
   emptySidecar,
+  floatingTopics,
+  moveFloatingTopic,
+  nextFloatingId,
+  removeFloatingTopic,
+  setFloatingText,
   iconFor,
   loadSidecar,
   linkFor,
@@ -536,13 +542,14 @@ describe("导图伴生文件", () => {
       expect(parseSidecar(JSON.stringify({ version: 1, relations: "a-b" }))?.relations).toEqual([]);
     });
 
-    it("六段一起往返，谁也不丢", () => {
+    it("七段一起往返，谁也不丢", () => {
       let sidecar = toggleRelation(emptySidecar(), "node-a", "node-b");
       sidecar = setNodeTags(sidecar, "node-c", ["api"]);
       sidecar = setNodeLink(sidecar, "node-d", "#标题");
       sidecar = setNodeIcon(sidecar, "node-e", "star");
       sidecar = setNodeNote(sidecar, "node-f", "备注");
       sidecar = setNodePriority(sidecar, "node-g", 3);
+      sidecar = addFloatingTopic(sidecar, "画布上的想法", 120, -40).sidecar;
 
       const back = parseSidecar(serializeSidecar(sidecar)) as MindmapSidecar;
 
@@ -552,10 +559,84 @@ describe("导图伴生文件", () => {
       expect(back.icons).toEqual({ "node-e": "star" });
       expect(back.notes).toEqual({ "node-f": "备注" });
       expect(back.markers).toEqual({ "node-g": { priority: 3 } });
+      expect(back.floating).toEqual({ "floating-1": { text: "画布上的想法", x: 120, y: -40 } });
     });
 
     it("一条关系就算内容", () => {
       expect(sidecarIsEmpty(toggleRelation(emptySidecar(), "a", "b"))).toBe(false);
+    });
+  });
+
+  describe("自由主题", () => {
+    it("新建：id 递增，位置就是给的位置", () => {
+      const first = addFloatingTopic(emptySidecar(), "想法", 120, -40);
+
+      expect(first.id).toBe("floating-1");
+      expect(first.sidecar.floating["floating-1"]).toEqual({ text: "想法", x: 120, y: -40 });
+
+      const second = addFloatingTopic(first.sidecar, "另一个", 0, 0);
+      expect(second.id).toBe("floating-2");
+      // Numbered rather than random, so the same actions produce the same file —
+      // which is what makes a diff in a version-controlled vault readable.
+      expect(nextFloatingId(second.sidecar)).toBe("floating-3");
+      expect(nextFloatingId(null)).toBe("floating-1");
+    });
+
+    it("拖动只改坐标，文字一动不动", () => {
+      const { sidecar, id } = addFloatingTopic(emptySidecar(), "想法", 0, 0);
+      const moved = moveFloatingTopic(sidecar, id, 300, 200);
+
+      expect(moved.floating[id]).toEqual({ text: "想法", x: 300, y: 200 });
+      // An id that is not there is answered with the map unchanged, so a drag
+      // that outlives its topic cannot resurrect it.
+      expect(moveFloatingTopic(moved, "floating-不存在", 1, 1)).toBe(moved);
+    });
+
+    it("改名；把文字清空就等于删掉", () => {
+      const { sidecar, id } = addFloatingTopic(emptySidecar(), "想法", 0, 0);
+
+      expect(setFloatingText(sidecar, id, "改过的").floating[id].text).toBe("改过的");
+      // The section's own reader takes an empty topic to mean "gone"; the screen
+      // says the same thing, so the two cannot disagree about it.
+      expect(setFloatingText(sidecar, id, "   ").floating).toEqual({});
+    });
+
+    it("删除", () => {
+      const { sidecar, id } = addFloatingTopic(emptySidecar(), "想法", 0, 0);
+
+      expect(removeFloatingTopic(sidecar, id).floating).toEqual({});
+      expect(removeFloatingTopic(sidecar, "floating-不存在")).toBe(sidecar);
+    });
+
+    it("读文件：没文字的丢、坏坐标归零、不认识的字段留着", () => {
+      const parsed = parseSidecar(
+        JSON.stringify({
+          version: 1,
+          floating: {
+            "floating-1": { text: " 想法 ", x: 10, y: 20, pinned: true },
+            "floating-2": { text: "   ", x: 1, y: 1 },
+            "floating-3": { text: "坏坐标", x: "左边", y: null },
+            "floating-4": "不是对象",
+          },
+        })
+      );
+
+      expect(parsed?.floating["floating-1"]).toEqual({
+        text: "想法",
+        x: 10,
+        y: 20,
+        pinned: true,
+      });
+      expect(parsed?.floating["floating-2"]).toBeUndefined();
+      // A topic in the wrong place can be dragged; one that vanished cannot.
+      expect(parsed?.floating["floating-3"]).toEqual({ text: "坏坐标", x: 0, y: 0 });
+      expect(parsed?.floating["floating-4"]).toBeUndefined();
+    });
+
+    it("一个自由主题就算内容", () => {
+      expect(sidecarIsEmpty(addFloatingTopic(emptySidecar(), "想法", 0, 0).sidecar)).toBe(false);
+      expect(floatingTopics(emptySidecar())).toEqual([]);
+      expect(floatingTopics(null)).toEqual([]);
     });
   });
 

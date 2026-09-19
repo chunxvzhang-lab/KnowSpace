@@ -11798,6 +11798,45 @@ body:has(.flash-capsule-overlay) {
   color: #f43f5e;
 }
 
+/* ── Mind map free topics ───────────────────────────────────────────────
+   Topics the reader put on the canvas rather than in the document. Dashed like
+   the relation lines, and for the same reason: a dashed outline is this map's
+   way of saying "this is the layer you added", as against the solid work of the
+   document itself.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+.mindmap-floating-topic {
+  cursor: grab;
+}
+
+.mindmap-floating-topic:active {
+  cursor: grabbing;
+}
+
+.mindmap-floating-rect {
+  fill: var(--surface-2);
+  stroke: color-mix(in srgb, #38bdf8 35%, transparent);
+  stroke-width: 1.2;
+  stroke-dasharray: 4 3;
+}
+
+.mindmap-floating-text {
+  fill: var(--text-primary, #e2e8f0);
+  font-size: 13px;
+  font-weight: 500;
+  /* The box is the handle: a drag that started on the text would otherwise be a
+     drag on the text. */
+  pointer-events: none;
+}
+
+.mindmap-floating-selection {
+  fill: none;
+  stroke: #38bdf8;
+  stroke-width: 1.5;
+  stroke-dasharray: 6 4;
+  pointer-events: none;
+}
+
 /* ── Mind map relation lines ────────────────────────────────────────────
    A line the reader drew between two topics. Dashed, and in a muted violet: it
    is an addition to the outline, and a solid line in the same weight as the

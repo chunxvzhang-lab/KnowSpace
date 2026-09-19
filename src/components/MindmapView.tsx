@@ -23,6 +23,7 @@ import {
   exportMindmapToOpml,
   exportMindmapToFreeMind,
   exportMindmapToMarkdownOutline,
+  calculateNodeDimensions,
 } from "../services/mindmapService";
 import type { MindmapNode } from "../core/types";
 import {
@@ -71,11 +72,18 @@ import {
   setNodeNote,
   setNodePriority,
   setNodeProgress,
+  addFloatingTopic,
+  floatingTopics,
+  moveFloatingTopic,
+  removeFloatingTopic,
+  setFloatingText,
   setNodeTags,
   tagsFor,
   toggleRelation,
   type MindmapSidecar,
 } from "../services/mindmapSidecar";
+import { boundsOfBoxes, unionBounds } from "../core/mindmapBounds";
+import { MindmapFloatingTopics, type FloatingBox } from "./MindmapFloatingTopics";
 import { findMindmapIcon } from "../core/mindmapIcons";
 import { numberingFor } from "../core/mindmapNumbering";
 import { parseMindmapLink } from "../core/mindmapLinks";
@@ -305,6 +313,28 @@ export const MindmapView = memo(function MindmapView({
    */
   const [sidecar, setSidecar] = useState<MindmapSidecar | null>(null);
   const [sidecarSaveFailed, setSidecarSaveFailed] = useState(false);
+
+  /**
+   * The free topic the reader has picked, if any.
+   *
+   * Kept apart from the tree's selection deliberately. Everything that acts on
+   * selected nodes — delete, style, relate, batch — assumes its ids are nodes,
+   * and one of them forgetting would act on the wrong thing; a second piece of
+   * state is cheaper than auditing all of them.
+   */
+  const [selectedFloatingId, setSelectedFloatingId] = useState<string | null>(null);
+  const [editingFloatingId, setEditingFloatingId] = useState<string | null>(null);
+
+  /**
+   * The drag in progress, in a ref rather than in state.
+   *
+   * A ref because the window listeners below are attached once and must read the
+   * current drag without being re-attached on every frame of it, and because a
+   * drag updating state on each move would re-render for something that is
+   * already visible.
+   */
+  const [draggingFloatingId, setDraggingFloatingId] = useState<string | null>(null);
+  const draggingFloatingOffsetRef = useRef<{ x: number; y: number } | null>(null);
 
   /**
    * The sections the reader has edited since this document was opened.
@@ -692,6 +722,39 @@ export const MindmapView = memo(function MindmapView({
    */
   const numbering = useMemo(() => (showNumbering ? numberingFor(tree) : null), [showNumbering, tree]);
 
+  /**
+   * The floating topics, measured the same way the layout measures nodes.
+   *
+   * Measured rather than stored: a topic's box follows its text, so renaming one
+   * resizes it and the file never has to hold a size its own text contradicts.
+   * The measurement is the service's, so a free topic looks like the branches
+   * beside it instead of like a second opinion about the theme.
+   */
+  const floatingBoxes = useMemo<FloatingBox[]>(() => {
+    return floatingTopics(sidecar).map(({ id, topic }) => {
+      const { width, height, lines } = calculateNodeDimensions({
+        id,
+        text: topic.text,
+        level: 1,
+        children: [],
+      });
+      return { id, text: topic.text, lines, x: topic.x, y: topic.y, width, height };
+    });
+  }, [sidecar]);
+
+  /**
+   * The bounds anything framing the canvas has to use.
+   *
+   * The layout's bounds cover the tree and nothing else — it has never heard of a
+   * free topic — so the export, the printed page and "fit to screen" all take the
+   * union. Without it, a topic dragged into open space would be cropped out of the
+   * very picture meant to show it.
+   */
+  const frameBounds = useMemo(() => {
+    const floating = boundsOfBoxes(floatingBoxes, 60);
+    return floating ? unionBounds(layout.bounds, floating) : layout.bounds;
+  }, [floatingBoxes, layout.bounds]);
+
   /** Where each laid-out node is, for the relation lines to be drawn between. */
   const relationBoxes = useMemo(
     () =>
@@ -729,7 +792,7 @@ export const MindmapView = memo(function MindmapView({
 
     const handleBeforePrint = () => {
       restore = svg.getAttribute("viewBox");
-      const { minX, minY, width, height } = layout.bounds;
+      const { minX, minY, width, height } = frameBounds;
       svg.setAttribute("viewBox", `${minX} ${minY} ${width} ${height}`);
     };
 
@@ -746,7 +809,7 @@ export const MindmapView = memo(function MindmapView({
       window.removeEventListener("afterprint", handleAfterPrint);
       handleAfterPrint();
     };
-  }, [layout.bounds]);
+  }, [frameBounds]);
 
   // Drag-and-drop reparenting state
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
@@ -850,7 +913,7 @@ export const MindmapView = memo(function MindmapView({
 
     const cWidth = container.clientWidth;
     const cHeight = container.clientHeight;
-    const { width: lWidth, height: lHeight, minX, minY } = layout.bounds;
+    const { width: lWidth, height: lHeight, minX, minY } = frameBounds;
 
     if (lWidth === 0 || lHeight === 0) return;
 
@@ -1667,7 +1730,7 @@ export const MindmapView = memo(function MindmapView({
     // resolved first. That is one function, shared with the SVG export — the PNG
     // below is that SVG rasterised, so the two formats cannot drift apart.
     const built = buildStandaloneMindmapSvg(svgEl, {
-      bounds: layout.bounds,
+      bounds: frameBounds,
       dark: isDarkUi(theme),
     });
     if (!built) return;
@@ -1718,7 +1781,7 @@ export const MindmapView = memo(function MindmapView({
    */
   const handleExportSvg = useCallback(() => {
     const built = buildStandaloneMindmapSvg(svgRef.current, {
-      bounds: layout.bounds,
+      bounds: frameBounds,
       dark: isDarkUi(theme),
     });
     if (!built) return;
@@ -1907,6 +1970,112 @@ export const MindmapView = memo(function MindmapView({
     if (ids.length !== 2) return;
     applySidecarEdit(["relations"], (current) => toggleRelation(current, ids[0], ids[1]));
   }, [applySidecarEdit, selectedNodeIds]);
+
+  /**
+   * The drag, listened for on the window.
+   *
+   * On the window rather than on the box, because once a drag has started the
+   * pointer leaves the box almost immediately and a gesture that stopped
+   * tracking at its edge would drop the topic wherever the reader's hand happened
+   * to leave the shape. Moves are written into the map's state and the file
+   * follows on its usual pause: the debounce collapses a whole drag into one
+   * write, which is the only way a drag should ever reach the disk.
+   */
+  useEffect(() => {
+    if (!draggingFloatingId) return;
+
+    const handleMove = (event: MouseEvent) => {
+      const containerRect = containerRef.current?.getBoundingClientRect();
+      const offset = draggingFloatingOffsetRef.current;
+      if (!containerRect || !offset) return;
+
+      const x = (event.clientX - containerRect.left - transform.x) / transform.scale - offset.x;
+      const y = (event.clientY - containerRect.top - transform.y) / transform.scale - offset.y;
+      applySidecarEdit(["floating"], (current) =>
+        moveFloatingTopic(current, draggingFloatingId, Math.round(x), Math.round(y))
+      );
+    };
+
+    const handleUp = () => setDraggingFloatingId(null);
+
+    window.addEventListener("mousemove", handleMove);
+    window.addEventListener("mouseup", handleUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMove);
+      window.removeEventListener("mouseup", handleUp);
+    };
+  }, [applySidecarEdit, draggingFloatingId, transform.scale, transform.x, transform.y]);
+
+  /**
+   * Starts a drag from wherever in the box the pointer went down.
+   *
+   * The offset is what stops a topic grabbed near its right edge from jumping so
+   * that its corner sits under the cursor.
+   */
+  const handleFloatingDragStart = useCallback(
+    (id: string, event: React.MouseEvent) => {
+      const box = floatingBoxes.find((topic) => topic.id === id);
+      const containerRect = containerRef.current?.getBoundingClientRect();
+      if (!box || !containerRect) return;
+
+      const pointerX = (event.clientX - containerRect.left - transform.x) / transform.scale;
+      const pointerY = (event.clientY - containerRect.top - transform.y) / transform.scale;
+      draggingFloatingOffsetRef.current = { x: pointerX - box.x, y: pointerY - box.y };
+      setDraggingFloatingId(id);
+    },
+    [floatingBoxes, transform.scale, transform.x, transform.y]
+  );
+
+  const handleStartFloatingEdit = useCallback(
+    (id: string) => {
+      const box = floatingBoxes.find((topic) => topic.id === id);
+      if (!box) return;
+      setEditingFloatingId(id);
+      setEditingText(box.text);
+    },
+    [floatingBoxes]
+  );
+
+  const handleCancelFloatingEdit = useCallback(() => setEditingFloatingId(null), []);
+
+  /**
+   * Commits a free topic's text. Emptying it takes the topic away, which is what
+   * the section's own reader takes an empty topic to mean — one reading, written
+   * once, so the screen and a later version cannot disagree about it.
+   */
+  const handleCommitFloatingEdit = useCallback(() => {
+    const id = editingFloatingId;
+    setEditingFloatingId(null);
+    if (!id) return;
+    applySidecarEdit(["floating"], (current) => setFloatingText(current, id, editingText));
+  }, [applySidecarEdit, editingFloatingId, editingText]);
+
+  const handleRemoveFloatingTopic = useCallback(() => {
+    if (!selectedFloatingId) return;
+    const id = selectedFloatingId;
+    setSelectedFloatingId(null);
+    applySidecarEdit(["floating"], (current) => removeFloatingTopic(current, id));
+  }, [applySidecarEdit, selectedFloatingId]);
+
+  /**
+   * Puts a free topic where the reader right-clicked.
+   *
+   * The menu's coordinates are the container's, and the canvas behind it may be
+   * panned and zoomed, so they go through the same conversion the marquee uses —
+   * otherwise the topic would land somewhere other than where it was asked for.
+   */
+  const handleNewFloatingTopic = useCallback(() => {
+    const x = (menuPos.left - transform.x) / transform.scale;
+    const y = (menuPos.top - transform.y) / transform.scale;
+    applySidecarEdit(
+      ["floating"],
+      (current) => addFloatingTopic(current, "新主题", Math.round(x), Math.round(y)).sidecar
+    );
+  }, [applySidecarEdit, menuPos.left, menuPos.top, transform.scale, transform.x, transform.y]);
+
+  /** The box the floating editor is drawing over, if one is open. */
+  const editingFloatingBox =
+    floatingBoxes.find((topic) => topic.id === editingFloatingId) ?? null;
 
   const selectedIds = [...selectedNodeIds];
   const selectionRelated =
@@ -2516,6 +2685,17 @@ export const MindmapView = memo(function MindmapView({
               );
             })}
           </g>
+
+          {/* Free topics last, so they sit above the outline: they are the
+              reader's own additions, and one dragged over a branch should stay
+              visible rather than slide underneath it. */}
+          <MindmapFloatingTopics
+            topics={floatingBoxes}
+            selectedId={selectedFloatingId}
+            onSelect={setSelectedFloatingId}
+            onStartEdit={handleStartFloatingEdit}
+            onStartDrag={handleFloatingDragStart}
+          />
         </g>
       </svg>
 
@@ -2552,6 +2732,22 @@ export const MindmapView = memo(function MindmapView({
         />
       )}
 
+      {/* The same editor over a free topic. A free topic has a box and text like
+          any other, so it needs no editor of its own — and only one editor is
+          ever shown, with the node's taking precedence if both were somehow
+          asked for. */}
+      {!editingNode && editingFloatingBox && (
+        <MindmapInlineEditor
+          node={editingFloatingBox}
+          transform={transform}
+          value={editingText}
+          inputRef={editInputRef}
+          onChange={setEditingText}
+          onCommit={handleCommitFloatingEdit}
+          onCancel={handleCancelFloatingEdit}
+        />
+      )}
+
       {/* Canvas menu, for a right-click on empty space. */}
       {contextMenu?.isCanvas && (
         <MindmapCanvasMenu
@@ -2570,6 +2766,17 @@ export const MindmapView = memo(function MindmapView({
           }}
           selectedCount={selectedIds.length}
           selectionRelated={selectionRelated}
+          selectedFloatingText={
+            floatingBoxes.find((topic) => topic.id === selectedFloatingId)?.text ?? null
+          }
+          onNewFloatingTopic={() => {
+            setContextMenu(null);
+            handleNewFloatingTopic();
+          }}
+          onRemoveFloatingTopic={() => {
+            setContextMenu(null);
+            handleRemoveFloatingTopic();
+          }}
           onToggleRelation={() => {
             setContextMenu(null);
             handleToggleRelation();

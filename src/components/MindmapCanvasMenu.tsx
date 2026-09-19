@@ -1,5 +1,5 @@
 import type { RefObject } from "react";
-import { CornerDownRight, FoldVertical, Link, ListTree, Maximize2, PlusCircle, UnfoldVertical, X } from "lucide-react";
+import { CornerDownRight, FoldVertical, Link, ListTree, Maximize2, PlusCircle, StickyNote, Trash2, UnfoldVertical, X } from "lucide-react";
 
 /**
  * The menu that opens on empty mind map canvas.
@@ -26,8 +26,12 @@ export type MindmapCanvasMenuProps = {
   selectedCount: number;
   /** Whether those two are already connected, which turns the row into a removal. */
   selectionRelated: boolean;
+  /** The floating topic under the cursor, if the reader has picked one. */
+  selectedFloatingText: string | null;
   onClose: () => void;
   onNewTopic: () => void;
+  onNewFloatingTopic: () => void;
+  onRemoveFloatingTopic: () => void;
   onPaste: () => void;
   onToggleRelation: () => void;
   onExpandAll: () => void;
@@ -42,8 +46,11 @@ export function MindmapCanvasMenu({
   canPaste,
   selectedCount,
   selectionRelated,
+  selectedFloatingText,
   onClose,
   onNewTopic,
+  onNewFloatingTopic,
+  onRemoveFloatingTopic,
   onPaste,
   onToggleRelation,
   onExpandAll,
@@ -71,6 +78,26 @@ export function MindmapCanvasMenu({
         <PlusCircle size={13} />
         <span>新建主题</span>
       </button>
+
+      {/* Free topics. Created where the reader right-clicked, which is the one
+          place in this menu whose position means something — so the menu's own
+          coordinates are handed over rather than a default spot. */}
+      <button type="button" className="mindmap-ctx-item" onClick={onNewFloatingTopic}>
+        <StickyNote size={13} />
+        <span>新建自由主题</span>
+      </button>
+
+      {selectedFloatingText ? (
+        <button
+          type="button"
+          className="mindmap-ctx-item"
+          onClick={onRemoveFloatingTopic}
+          title={`删除自由主题「${selectedFloatingText}」`}
+        >
+          <Trash2 size={13} />
+          <span>删除自由主题</span>
+        </button>
+      ) : null}
 
       <button
         type="button"
