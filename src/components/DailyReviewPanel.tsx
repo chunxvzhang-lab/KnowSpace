@@ -32,6 +32,15 @@ type DailyReviewPanelProps = {
    * in as-is — it has no date, time or tag list for the caller to invent.
    */
   notes: ReviewSourceDocument[];
+  /**
+   * The document the reader has open, as a card source of its own.
+   *
+   * `dirty` is what the review needs to know about it: a rating writes into the file,
+   * and a document saved afterwards from a buffer loaded before the review would write
+   * that progress away. Null when nothing is open, or when what is open is not a
+   * Markdown document.
+   */
+  currentDocument?: { filePath: string; content: string; dirty: boolean } | null;
   loading?: boolean;
   onOpenNoteFile?: (filePath: string) => void;
   /** Called after a rating is persisted, so the parent can refresh its summary. */
@@ -67,6 +76,7 @@ type ReviewLogEntry = {
 
 export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
   notes,
+  currentDocument = null,
   loading = false,
   onOpenNoteFile,
   onProgressSaved,
@@ -86,11 +96,30 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
    * All three are the same shape on purpose (`activeNotes`), so nothing below this
    * point knows which one is running.
    */
-  const [reviewSource, setReviewSource] = useState<"space" | "vault" | "folder">("space");
+  const [reviewSource, setReviewSource] = useState<"space" | "vault" | "folder" | "document">(
+    "space"
+  );
   const vault = useVaultCards();
   const folder = useReviewFolder();
   const isVaultSource = reviewSource === "vault";
   const isFolderSource = reviewSource === "folder";
+  const isDocumentSource = reviewSource === "document";
+
+  /**
+   * Whether the open document can be reviewed, and why not when it cannot.
+   *
+   * It cannot while it has unsaved changes, and that is not a warning but a rule: a
+   * rating writes its scheduling into the file, and there is no autosave here — so the
+   * reader's next save, made from a buffer that was loaded before the review ran, would
+   * write the progress away again. Reviewing the saved document, and saying so while it
+   * is not saved, makes that impossible rather than merely warned about.
+   */
+  const documentSourceRefusal = !currentDocument
+    ? "没有打开的文档"
+    : currentDocument.dirty
+      ? "这一篇有未保存的改动，先保存再复习"
+      : null;
+  const canReviewDocument = documentSourceRefusal === null;
 
   /**
    * The documents this session draws from.
@@ -103,12 +132,20 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
     ? vault.documents
     : isFolderSource
       ? folder.documents
-      : notes;
+      : isDocumentSource
+        ? canReviewDocument && currentDocument
+          ? [{ filePath: currentDocument.filePath, content: currentDocument.content }]
+          : []
+        : notes;
+  // The open document needs no fetching — its text is already here — so it is never
+  // in a loading state, whatever the Space list above is doing.
   const isLoading = isVaultSource
     ? vault.loading
     : isFolderSource
       ? folder.loading
-      : Boolean(loading);
+      : isDocumentSource
+        ? false
+        : Boolean(loading);
   /** What went wrong for the source in use, if anything. */
   const sourceError = isVaultSource ? vault.error : isFolderSource ? folder.error : null;
 
@@ -378,7 +415,7 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
         {/* Card source. Space is where the capture flow files things; the vault
             is everything else the app can already read. Reuses the tab styling
             so the two switch rows read as the same kind of control. */}
-        <div className="space-tab-switcher" role="group" aria-label="卡片来源">
+        <div className="space-tab-switcher dr-source-switcher" role="group" aria-label="卡片来源">
           <button
             type="button"
             className={`space-tab-btn ${reviewSource === "space" ? "active" : ""}`}
@@ -425,6 +462,19 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
             }
           >
             <span>自定义文件夹</span>
+          </button>
+          <button
+            type="button"
+            className={`space-tab-btn ${isDocumentSource ? "active" : ""}`}
+            onClick={() => setReviewSource("document")}
+            disabled={!canReviewDocument}
+            title={
+              documentSourceRefusal
+                ? documentSourceRefusal
+                : `只复习《${currentDocument?.filePath.split(/[\\/]/).pop() ?? ""}》里的卡片`
+            }
+          >
+            <span>当前文档</span>
           </button>
         </div>
 
@@ -481,6 +531,25 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
             <AlertCircle size={32} />
             <p>{isFolderSource ? "读取文件夹失败" : "读取知识库失败"}</p>
             <p className="dr-empty-hint">{sourceError}</p>
+          </div>
+        ) : isDocumentSource && documentSourceRefusal ? (
+          <div className="space-empty-state">
+            <AlertCircle size={32} />
+            <p>{documentSourceRefusal}</p>
+            <p className="dr-empty-hint">
+              {currentDocument?.dirty
+                ? "复习会把进度写进文件，而保存会用手里的文字覆盖它 —— 先保存，两件事就都对了。"
+                : "打开一篇 Markdown 文档，就能只复习它里面的卡片。"}
+            </p>
+          </div>
+        ) : stats.total === 0 && isDocumentSource ? (
+          <div className="space-empty-state">
+            <Inbox size={32} />
+            <p>这一篇里还没有闪卡</p>
+            <p className="dr-empty-hint">
+              在这篇文档里写下 <code>问题 :: 答案</code>、<code>Q: / A:</code> 或{" "}
+              <code>{"{{c1::答案}}"}</code>，保存后即可复习。
+            </p>
           </div>
         ) : isFolderSource && !folder.choice ? (
           <div className="space-empty-state">

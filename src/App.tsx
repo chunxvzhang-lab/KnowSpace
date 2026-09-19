@@ -264,6 +264,24 @@ export function App() {
     () => tabsWithDirtyFlags(tabs, chapterId, isDirty),
     [tabs, chapterId, isDirty]
   );
+
+  /**
+   * The open document as the review can use it, or null.
+   *
+   * Null for anything that is not Markdown: the review's progress is a comment block
+   * appended to the file, and a canvas document or a mind map's companion is not a
+   * place to append one.
+   *
+   * `dirty` travels with it, because the review turns this source down while the
+   * document has unsaved changes — see DailyReviewPanel, which explains why that is a
+   * rule rather than a warning.
+   */
+  const reviewableDocument = useMemo(() => {
+    if (!session?.absolutePath) return null;
+    const fileName = session.fileName.toLowerCase();
+    if (!fileName.endsWith(".md") && !fileName.endsWith(".markdown")) return null;
+    return { filePath: session.absolutePath, content: session.source, dirty: isDirty };
+  }, [session?.absolutePath, session?.fileName, session?.source, isDirty]);
   const activeChapter = useMemo(() => {
     const fromManifest = manifest?.chapters.find((item) => item.id === chapterId);
     if (fromManifest) return fromManifest;
@@ -1883,6 +1901,7 @@ export function App() {
                     }}
                     onReviewActiveChange={handleReviewActiveChange}
                     onMergeIntoDocument={handleMergeFlashNote}
+                    currentDocument={reviewableDocument}
                   />
                 </section>
               ) : (

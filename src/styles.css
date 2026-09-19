@@ -6359,6 +6359,18 @@ body:has(.flash-capsule-overlay) {
   margin-bottom: 8px;
 }
 
+/* The review's source row, which is the one that carries four labels rather than
+   two: four equal shares of a narrow sidebar wraps every one of them, so they are
+   laid out two by two instead. */
+.dr-source-switcher {
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+.dr-source-switcher .space-tab-btn {
+  flex: 1 1 44%;
+}
+
 /* Which folder the review is reading, and what one may do about it. Shown only
    while that source is in use: it belongs to the source, not to the header. */
 .dr-folder-row {

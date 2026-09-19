@@ -197,6 +197,116 @@ describe("DailyReviewPanel - 卡片来源", () => {
 });
 
 /**
+ * The fourth source: the document the reader has open.
+ *
+ * Nothing is fetched for this one — the workspace already holds the text — so what is
+ * worth testing is the rule that guards it: a rating writes into the file, there is no
+ * autosave, and a save from a buffer loaded before the review would write the progress
+ * away. So an unsaved document is turned down rather than warned about.
+ */
+describe("DailyReviewPanel - 当前文档来源", () => {
+  const NOTE = { filePath: "C:/Vault/open.md", content: "眼前的问题 :: 眼前的答案" };
+
+  beforeEach(() => {
+    localStorage.clear();
+    (window as unknown as Record<string, unknown>).knowSpaceDesktop = {
+      saveMarkdownFile: vi.fn().mockResolvedValue({ success: true }),
+    };
+  });
+
+  afterEach(() => {
+    delete (window as unknown as Record<string, unknown>).knowSpaceDesktop;
+    localStorage.clear();
+  });
+
+  const documentTab = () =>
+    screen.getByRole("button", { name: "当前文档" }) as HTMLButtonElement;
+
+  it("没有打开文档时不可选，并说明原因", () => {
+    render(<DailyReviewPanel notes={[]} />);
+
+    expect(documentTab().disabled).toBe(true);
+    expect(documentTab().title).toBe("没有打开的文档");
+  });
+
+  it("打开且已保存时：只复习这一篇的卡片", async () => {
+    render(
+      <DailyReviewPanel
+        notes={[SPACE_NOTE]}
+        currentDocument={{ ...NOTE, dirty: false }}
+      />
+    );
+
+    await act(async () => {
+      fireEvent.click(documentTab());
+    });
+
+    expect(screen.getByText("眼前的问题")).toBeDefined();
+    // Not the Space note it was given beside it.
+    expect(screen.queryByText("闪念问题")).toBeNull();
+  });
+
+  it("评分写回这一篇自己的文件", async () => {
+    const saveMarkdownFile = vi.fn().mockResolvedValue({ success: true });
+    (window as unknown as Record<string, unknown>).knowSpaceDesktop = { saveMarkdownFile };
+    render(<DailyReviewPanel notes={[]} currentDocument={{ ...NOTE, dirty: false }} />);
+
+    await act(async () => {
+      fireEvent.click(documentTab());
+    });
+    fireEvent.click(screen.getByText("显示答案"));
+    await act(async () => {
+      fireEvent.click(screen.getByText("良好"));
+    });
+
+    await waitFor(() => expect(saveMarkdownFile).toHaveBeenCalledTimes(1));
+    expect(saveMarkdownFile.mock.calls.at(-1)?.[0]).toMatchObject({
+      absolutePath: "C:/Vault/open.md",
+    });
+  });
+
+  it("有未保存改动时不可选，并说清为什么", () => {
+    render(<DailyReviewPanel notes={[]} currentDocument={{ ...NOTE, dirty: true }} />);
+
+    expect(documentTab().disabled).toBe(true);
+    expect(documentTab().title).toContain("先保存");
+  });
+
+  it("选中之后变成未保存：卡片立刻收起，并给出同一句提示", async () => {
+    // The case the rule exists for. Reviewing stops the moment the document has
+    // unsaved changes, rather than continuing and losing the progress at the next
+    // save — which is a thing the reader would only find out afterwards.
+    const { rerender } = render(
+      <DailyReviewPanel notes={[]} currentDocument={{ ...NOTE, dirty: false }} />
+    );
+    await act(async () => {
+      fireEvent.click(documentTab());
+    });
+    expect(screen.getByText("眼前的问题")).toBeDefined();
+
+    rerender(<DailyReviewPanel notes={[]} currentDocument={{ ...NOTE, dirty: true }} />);
+
+    expect(screen.queryByText("眼前的问题")).toBeNull();
+    expect(screen.getByText("这一篇有未保存的改动，先保存再复习")).toBeDefined();
+  });
+
+  it("这一篇没有卡片时，说的是这一篇", async () => {
+    render(
+      <DailyReviewPanel
+        notes={[]}
+        currentDocument={{ filePath: "C:/Vault/open.md", content: "只有正文。", dirty: false }}
+      />
+    );
+
+    await act(async () => {
+      fireEvent.click(documentTab());
+    });
+
+    expect(screen.getByText("这一篇里还没有闪卡")).toBeDefined();
+  });
+});
+
+/**
  * The third source: a folder of the reader's own.
  *
  * Not the same act as opening it as the workspace — that replaces the vault, the tabs

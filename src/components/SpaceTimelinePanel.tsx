@@ -15,12 +15,20 @@ type SpaceTimelinePanelProps = {
    * three surfaces fighting over the same space.
    */
   onReviewActiveChange?: (active: boolean) => void;
+  /**
+   * The document the workspace has open, passed through to the review.
+   *
+   * The panel's own sources are things it fetches; this one is state the workspace
+   * already holds, so it travels down as a prop rather than being read again.
+   */
+  currentDocument?: { filePath: string; content: string; dirty: boolean } | null;
 };
 
 export const SpaceTimelinePanel: React.FC<SpaceTimelinePanelProps> = ({
   onOpenNoteFile,
   onMergeIntoDocument,
   onReviewActiveChange,
+  currentDocument = null,
 }) => {
   const [notes, setNotes] = useState<FlashNoteSummaryItem[]>([]);
   const [spaceDir, setSpaceDir] = useState<string>("");
@@ -262,11 +270,12 @@ export const SpaceTimelinePanel: React.FC<SpaceTimelinePanelProps> = ({
     return (
       <DailyReviewPanel
         notes={notes}
+        currentDocument={currentDocument}
         loading={loading}
         onOpenNoteFile={onOpenNoteFile}
         onProgressSaved={loadSummary}
         tabsSlot={tabSwitcher}
-      />
+        />
     );
   }
 
