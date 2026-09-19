@@ -366,24 +366,34 @@ describe("DailyReviewPanel - 每日复盘视图", () => {
  */
 describe("DailyReviewPanel - 评分与保存的边角", () => {
   let saveMarkdownFile: ReturnType<typeof vi.fn>;
+  let readMarkdownFile: ReturnType<typeof vi.fn>;
 
   const savedContent = () => String(saveMarkdownFile.mock.calls.at(-1)?.[0]?.content ?? "");
 
   beforeEach(() => {
     saveMarkdownFile = vi.fn().mockResolvedValue({ success: true, absolutePath: "x" });
-    (window as unknown as Record<string, unknown>).knowSpaceDesktop = { saveMarkdownFile };
+    // By default the file on disk is whatever the panel was given, which is the
+    // ordinary case: nothing wrote to it between loading and rating.
+    readMarkdownFile = vi.fn();
+    (window as unknown as Record<string, unknown>).knowSpaceDesktop = {
+      saveMarkdownFile,
+      readMarkdownFile,
+    };
   });
 
   afterEach(() => {
     delete (window as unknown as Record<string, unknown>).knowSpaceDesktop;
   });
 
-  it("数字键 1（重来）写进的是重学态", () => {
+  it("数字键 1（重来）写进的是重学态", async () => {
     render(<DailyReviewPanel notes={THREE_CARDS} />);
     pressKey(" ");
 
     pressKey("1");
 
+    // Waiting for the write: it now happens one await further along, because the file
+    // is read again first so the merge goes into what is actually there.
+    await waitFor(() => expect(saveMarkdownFile).toHaveBeenCalledTimes(1));
     // The first rating of a new card, rated Again: relearning, and a lapse counted.
     expect(savedContent()).toContain("state=relearning");
     expect(savedContent()).toContain("lapses=1");
@@ -461,17 +471,71 @@ describe("DailyReviewPanel - 评分与保存的边角", () => {
     });
   });
 
-  it("评分请求带着 force —— 这是写明的取舍，不是顺手加的", () => {
+  it("评分请求带着 force，而它现在是安全的", async () => {
     render(<DailyReviewPanel notes={THREE_CARDS} />);
     pressKey(" ");
 
     fireEvent.click(screen.getByText("良好"));
 
-    // The review's own metadata is what changes, and a stale-version refusal would
-    // block reviewing entirely. The cost is the other side of that: edits made to the
-    // file elsewhere while a review is open are overwritten by the next rating.
-    // Pinned here so the trade-off is visible to whoever decides to change it.
+    // Still forced: the version check refuses a write whenever anyone else has touched
+    // the file, and a review must not be blocked by that. It is safe now because the
+    // content being written is the file's own current content plus one metadata block
+    // — see the "别处改过同一文件" case above, which is what makes this a contract
+    // rather than a hope.
+    await waitFor(() => expect(saveMarkdownFile).toHaveBeenCalledTimes(1));
     expect(saveMarkdownFile.mock.calls.at(-1)?.[0]).toMatchObject({ force: true });
+  });
+
+  it("复习期间别处改过同一文件：别人的改动与本次进度都在", async () => {
+    // The panel holds a copy of the note from when it loaded, and a review can be open
+    // for a while: another editor, a sync client or the capture flow writes to the same
+    // file in the meantime. Writing that copy back whole loses the other edit — and the
+    // only thing a rating means to change is its own metadata block, so it is merged
+    // into what is actually in the file now.
+    const note = makeNote({ filePath: "C:/Space/edited.md", content: "问题甲 :: 答案甲" });
+    readMarkdownFile.mockResolvedValue({
+      markdown: "问题甲 :: 答案甲\n\n别人刚写下的一段。",
+      baseUrl: "",
+    });
+    render(<DailyReviewPanel notes={[note]} />);
+
+    pressKey(" ");
+    fireEvent.click(screen.getByText("良好"));
+    await waitFor(() => expect(saveMarkdownFile).toHaveBeenCalledTimes(1));
+
+    expect(savedContent()).toContain("别人刚写下的一段。");
+    expect(savedContent()).toContain("fsrs-");
+  });
+
+  it("卡片在别处被删掉了：不再把它的进度写回去", async () => {
+    // The same re-read, seen from the other side: the reader deleted the card while the
+    // review was open, so re-adding its scheduling row would leave the file claiming
+    // progress for a card that is not there any more.
+    const note = makeNote({ filePath: "C:/Space/gone.md", content: "要删的 :: 答案" });
+    readMarkdownFile.mockResolvedValue({ markdown: "这篇现在只剩正文了。", baseUrl: "" });
+    render(<DailyReviewPanel notes={[note]} />);
+
+    pressKey(" ");
+    fireEvent.click(screen.getByText("良好"));
+    await waitFor(() => expect(saveMarkdownFile).toHaveBeenCalledTimes(1));
+
+    expect(savedContent()).toContain("这篇现在只剩正文了。");
+    expect(savedContent()).not.toContain("fsrs-");
+  });
+
+  it("重读失败时退回手里的副本，照样存得下去", async () => {
+    // The re-read is a courtesy to other writers, not a requirement: a file that cannot
+    // be read right now still has to take the rating, or a failing read would block
+    // reviewing altogether.
+    const note = makeNote({ filePath: "C:/Space/unreadable.md", content: "问题甲 :: 答案甲" });
+    readMarkdownFile.mockRejectedValue(new Error("读不了"));
+    render(<DailyReviewPanel notes={[note]} />);
+
+    pressKey(" ");
+    fireEvent.click(screen.getByText("良好"));
+    await waitFor(() => expect(saveMarkdownFile).toHaveBeenCalledTimes(1));
+
+    expect(savedContent()).toContain("fsrs-");
   });
 
   it("连点评分只写一次", async () => {

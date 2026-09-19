@@ -148,10 +148,12 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
     for (const note of activeNotes) {
       inputs.push({ path: note.filePath, content: note.content });
 
-      // Every card of one note shares a single mutable holder. Giving each card
-      // its own copy looked harmless, but rating card A then card B would merge
-      // B's progress into the *original* text and silently drop A's — the two
-      // ratings of one note have to accumulate.
+      // Every card of one note shares a single mutable holder, which is where the
+      // last thing written to that note is kept. A rating merges into a fresh read of
+      // the file rather than into this, so the holder is not what makes two ratings of
+      // one note accumulate any more — it is what the merge falls back on when the file
+      // cannot be read, and what the panel's own view of the note stays consistent
+      // with while a write is in flight.
       const holder = { path: note.filePath, content: note.content };
 
       for (const card of parseFlashcards(note.content)) {
@@ -215,21 +217,45 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
       }
 
       const result = review(current.card, current.progress, rating);
-      const updatedContent = upsertFsrsMetadata(
-        source.content,
-        new Map([[current.card.id, result.progress]])
-      );
 
       setSaving(true);
       try {
         if (!desktop?.saveMarkdownFile) throw new Error("当前环境不支持写回笔记");
 
+        // The note is read again before it is written to, and the new scheduling is
+        // merged into *that* rather than into the copy this panel loaded.
+        //
+        // A review can sit open for a while, and the file it is about is not private:
+        // another editor, a sync client or the capture flow may have written to it in
+        // the meantime. Writing the loaded copy back whole would throw those edits away
+        // — and the only thing a rating means to change is its own metadata block, so
+        // there is no need to. Merging into what is actually there also settles the
+        // other direction: a card the reader deleted while the review was open no longer
+        // parses, so its row is dropped instead of being written back for a card that
+        // is not there.
+        //
+        // A read that fails is not a reason to refuse the rating: the copy in hand is
+        // what there is, which is what the panel used to write unconditionally.
+        let baseContent = source.content;
+        try {
+          const fresh = await desktop.readMarkdownFile?.(source.path);
+          if (typeof fresh?.markdown === "string") baseContent = fresh.markdown;
+        } catch {
+          // Falls through to the copy in hand.
+        }
+
+        const updatedContent = upsertFsrsMetadata(
+          baseContent,
+          new Map([[current.card.id, result.progress]])
+        );
+
         const res = await desktop.saveMarkdownFile({
           absolutePath: source.path,
           content: updatedContent,
-          // The review deliberately bypasses conflict detection: the board's own
-          // metadata is what changes, and a stale-version refusal here would
-          // block reviewing entirely. The next load re-reads from disk anyway.
+          // Still forced, and now for a narrower reason: the version check would refuse
+          // this write whenever anyone else touched the file, and what is being written
+          // is their content plus one metadata block — the merge above is what makes
+          // that safe, so a refusal here would only block reviewing.
           force: true,
         });
 

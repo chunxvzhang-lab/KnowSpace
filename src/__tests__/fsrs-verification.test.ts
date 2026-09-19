@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   FSRS_DEFAULT_PARAMS,
   buildReviewQueue,
+  computeCardId,
   createNewProgress,
   parseFlashcards,
+  parseFsrsMetadata,
   review,
+  serializeFsrsMetadata,
   summarize,
   type FsrsProgress,
 } from "../services/fsrsService";
@@ -106,6 +109,43 @@ describe("闪卡验证 - 同一张卡出现在两篇笔记里", () => {
     // "0 / 1", and the progress bar can never reach the end.
     expect(stats.total).toBe(1);
     expect(stats.due).toBe(1);
+  });
+});
+
+describe("闪卡验证 - 已经不存在的卡片不再留记录", () => {
+  it("文档里一张卡都不剩时，进度块整个消失", () => {
+    // The filter in serializeFsrsMetadata was conditional on there being at least one
+    // live card ("liveIds.size > 0 && …"), so with none left it skipped the filter
+    // entirely and wrote *every* row back — a file claiming scheduling history for
+    // cards that are not in it. The panel's re-read-and-merge is what made it visible:
+    // a rating written into a note whose card had just been deleted kept the row alive.
+    const id = computeCardId("inline", "要删的");
+    const withMeta =
+      `要删的 :: 答案\n\n<!-- fsrs:begin\n` +
+      `${id} S=1.0000 D=5.0000 due=2026-01-01 reps=1 lapses=0 state=review\n` +
+      `fsrs:end -->\n`;
+    const deleted = "这篇现在只剩正文了。";
+
+    const written = serializeFsrsMetadata(deleted, parseFsrsMetadata(withMeta));
+
+    expect(written).toBe(deleted);
+    expect(written).not.toContain("fsrs-");
+  });
+
+  it("还剩别的卡时，只有被删掉那张的行消失", () => {
+    const gone = computeCardId("inline", "要删的");
+    const kept = computeCardId("inline", "留着的");
+    const withMeta =
+      `要删的 :: 答案\n\n留着的 :: 答案\n\n<!-- fsrs:begin\n` +
+      `${gone} S=1.0000 D=5.0000 due=2026-01-01 reps=1 lapses=0 state=review\n` +
+      `${kept} S=2.0000 D=5.0000 due=2026-02-01 reps=2 lapses=0 state=review\n` +
+      `fsrs:end -->\n`;
+    const edited = "留着的 :: 答案";
+
+    const written = serializeFsrsMetadata(edited, parseFsrsMetadata(withMeta));
+
+    expect(written).toContain(kept);
+    expect(written).not.toContain(gone);
   });
 });
 

@@ -754,12 +754,19 @@ export function serializeFsrsMetadata(
 ): string {
   if (progress.size === 0) return markdown;
 
-  // Only keep entries that still correspond to a card in the note, so deleted
-  // cards do not accumulate forever.
+  // Only keep entries that still correspond to a card in the note, so deleted cards
+  // do not accumulate forever.
+  //
+  // The check is unconditional, and the first version of it was not: it read
+  // `liveIds.size > 0 && !liveIds.has(id)`, which skipped the filter entirely once a
+  // note had no cards left — so deleting the last card and then rating anything wrote
+  // every row back, leaving a file that claims scheduling history for cards that are
+  // not in it. With no cards the block is empty, and an empty block is removed below,
+  // which is what that guard was reaching for in the first place.
   const liveIds = new Set(parseFlashcards(markdown).map((c) => c.id));
   const lines: string[] = [];
   for (const [id, value] of progress) {
-    if (liveIds.size > 0 && !liveIds.has(id)) continue;
+    if (!liveIds.has(id)) continue;
     lines.push(formatLine(id, value));
   }
   if (lines.length === 0) return stripFsrsMetadata(markdown);
