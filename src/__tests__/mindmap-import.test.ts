@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  annotationsForDocument,
   annotationsFromOutline,
   bytesFromBase64,
+  planOutlineImport,
   importFileName,
   outlineToMarkdown,
   parseFreemindOutline,
@@ -640,6 +642,142 @@ describe("按内容决定是哪种格式", () => {
     const base64 = Buffer.from(zip).toString("base64");
 
     expect(Array.from(bytesFromBase64(base64))).toEqual(Array.from(zip));
+  });
+});
+
+describe("导入的判断（不经过任何界面）", () => {
+  const encoder = new TextEncoder();
+
+  it("能读的大纲：说清楚写什么、叫什么", () => {
+    const opmlBytes = encoder.encode(
+      '<?xml version="1.0"?><opml version="2.0"><head><title>我的大纲</title></head><body><outline text="甲"><outline text="乙"/></outline></body></opml>'
+    );
+
+    const plan = planOutlineImport(opmlBytes, "导出.opml");
+
+    expect(plan.kind).toBe("create");
+    if (plan.kind !== "create") return;
+    expect(plan.markdown).toBe("- 甲\n  - 乙\n");
+    // The outline's own title names the file; without one the source file does.
+    expect(plan.defaultName).toBe("我的大纲.md");
+    expect(plan.warning).toBeUndefined();
+  });
+
+  it("多张画布的 XMind：建是要建，但把没导入的说出来", () => {
+    const sheet = (title: string, topic: string) => ({
+      title,
+      rootTopic: { title: "根", children: { attached: [{ title: topic }] } },
+    });
+    const bytes = buildXmind([sheet("第一张", "甲"), sheet("第二张", "乙")]);
+
+    const plan = planOutlineImport(bytes, "我的思维导图.xmind");
+
+    expect(plan.kind).toBe("create");
+    if (plan.kind !== "create") return;
+    expect(plan.markdown).toBe("- 甲\n");
+    // The number counts what was *not* imported, and the reason is part of the
+    // sentence: "imported" without one would be a half-truth.
+    expect(plan.warning).toContain("还有 1 张");
+    expect(plan.warning).toContain("一篇文档是一棵树");
+    expect(plan.defaultName).toBe("第一张.md");
+  });
+
+  it("读不了的文件：拒绝，并且带着解析器说的那句话", () => {
+    const plan = planOutlineImport(encoder.encode("这只是一段文字"), "笔记.txt");
+
+    expect(plan.kind).toBe("refuse");
+    if (plan.kind !== "refuse") return;
+    // The message is finished here rather than assembled by the caller: one place
+    // decides what to say, so nothing can say "失败" twice or say nothing at all.
+    expect(plan.message).toContain("导入失败");
+    expect(plan.message).toContain("XML");
+  });
+
+  it("合法但空的大纲：拒绝，而且理由与读不了不同", () => {
+    // A file that is a perfectly good outline with nothing in it is not a parse
+    // failure, and telling the reader it was one would send them looking for the
+    // wrong problem.
+    const plan = planOutlineImport(
+      encoder.encode('<?xml version="1.0"?><opml version="2.0"><body></body></opml>'),
+      "空的.opml"
+    );
+
+    expect(plan.kind).toBe("refuse");
+    if (plan.kind !== "refuse") return;
+    expect(plan.message).toContain("空的");
+  });
+
+  it("空文件、以及只有名字没有内容的大纲，都算空", () => {
+    // The second is the one worth pinning: a .xmind holding a single root topic and
+    // nothing under it is a file that parses perfectly and has no outline in it, so
+    // it lands in the same place as a file with no bytes at all — and not in the
+    // place a parse failure lands, which sends the reader looking for the wrong
+    // problem.
+    const emptyFile = planOutlineImport(new Uint8Array(), "空.opml");
+    const emptyOutline = planOutlineImport(
+      buildXmind([{ title: "空的画布", rootTopic: { title: "只有根" } }]),
+      "空的.xmind"
+    );
+
+    for (const plan of [emptyFile, emptyOutline]) {
+      expect(plan.kind).toBe("refuse");
+      if (plan.kind === "refuse") expect(plan.message).toContain("空的");
+    }
+  });
+});
+
+describe("标注键到哪几个节点上", () => {
+  it("根主题的备注落在文档根上 —— 键是常量，两边都同意", () => {
+    // The case that would break first if the two trees disagreed: the annotations
+    // are read against a tree built from the document's own Markdown, and the map
+    // builds its own when it opens the file. The root's id is a constant, so they
+    // agree; the children's come from their text, so they agree too.
+    const outline: ImportedOutline = {
+      title: "",
+      topics: [],
+      root: {
+        text: "中心主题",
+        note: "根上的一句话",
+        children: [{ text: "甲", note: "甲的一句话", children: [] }],
+      },
+    };
+
+    const markdown = outlineToMarkdown(outline);
+    const annotations = annotationsForDocument(outline, markdown, "我的导图");
+
+    expect(annotations.notes["root-mindmap-node"]).toBe("根上的一句话");
+    // And the child's note is on the child: resolved back through the same tree the
+    // map would build, rather than trusted to look right.
+    const tree = parseMarkdownToMindmapTree(markdown, "我的导图");
+    expect(annotations.notes[tree.children[0].id]).toBe("甲的一句话");
+    expect(tree.children[0].text).toBe("甲");
+  });
+
+  it("线、概要、边界也跟着一起键过去", () => {
+    const outline: ImportedOutline = {
+      title: "",
+      topics: [],
+      root: { text: "根", children: [{ text: "甲", children: [] }, { text: "乙", children: [] }] },
+      references: {
+        relations: [{ fromId: "a", toId: "b" }],
+        summaries: [{ nodeIds: ["a", "b"], text: "两种" }],
+        boundaries: [{ nodeIds: ["b", "b"], text: "一组" }],
+      },
+    };
+    // The ids the file used, put on the topics the way a reader of the file would
+    // find them — this is what the cross-references are translated against.
+    outline.root!.children[0].sourceId = "a";
+    outline.root!.children[1].sourceId = "b";
+
+    const markdown = outlineToMarkdown(outline);
+    const annotations = annotationsForDocument(outline, markdown, "根");
+    const tree = parseMarkdownToMindmapTree(markdown, "根");
+
+    expect(annotations.relations).toEqual([
+      { fromId: tree.children[0].id, toId: tree.children[1].id },
+    ]);
+    expect(annotations.summaries[0].nodeIds).toEqual([tree.children[0].id, tree.children[1].id]);
+    expect(annotations.boundaries[0].nodeIds).toEqual([tree.children[1].id]);
   });
 });
 

@@ -101,6 +101,7 @@ import { MindmapFloatingTopics, type FloatingBox } from "./MindmapFloatingTopics
 import { MindmapSummaries, type SummaryBox } from "./MindmapSummaries";
 import { MindmapBoundaries, type BoundaryBox } from "./MindmapBoundaries";
 import { MindmapFloatingAnnotationMenu } from "./MindmapFloatingAnnotationMenu";
+import { downloadFile } from "../services/fileDownload";
 import { findMindmapIcon } from "../core/mindmapIcons";
 import { numberingFor } from "../core/mindmapNumbering";
 import { parseMindmapLink } from "../core/mindmapLinks";
@@ -1819,14 +1820,13 @@ export const MindmapView = memo(function MindmapView({
 
       canvas.toBlob((pngBlob) => {
         if (!pngBlob) return;
-        const pngUrl = URL.createObjectURL(pngBlob);
-        const a = document.createElement("a");
-        a.href = pngUrl;
-        a.download = `${title || "mindmap"}-思维导图.png`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(pngUrl);
+        downloadFile({
+          fileName: `${title || "mindmap"}-思维导图.png`,
+          data: pngBlob,
+          mime: "image/png",
+        });
+        // The URL the image was loaded from, not a download's: it is ours to give
+        // back now that the canvas has the pixels.
         URL.revokeObjectURL(url);
       }, "image/png");
     };
@@ -1848,15 +1848,11 @@ export const MindmapView = memo(function MindmapView({
     });
     if (!built) return;
 
-    const blob = new Blob([built.svg], { type: "image/svg+xml;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${title || "mindmap"}-思维导图.svg`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    downloadFile({
+      fileName: `${title || "mindmap"}-思维导图.svg`,
+      data: built.svg,
+      mime: "image/svg+xml;charset=utf-8",
+    });
   }, [layout, title, theme]);
 
   /**
@@ -1884,31 +1880,21 @@ export const MindmapView = memo(function MindmapView({
   }, [title]);
 
   const handleExportOpml = useCallback(() => {
-    const xml = exportMindmapToOpml(tree, title, sidecar);
-    const blob = new Blob([xml], { type: "text/x-opml+xml;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${title || "mindmap"}.opml`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    downloadFile({
+      fileName: `${title || "mindmap"}.opml`,
+      data: exportMindmapToOpml(tree, title, sidecar),
+      mime: "text/x-opml+xml;charset=utf-8",
+    });
   }, [tree, title, sidecar]);
 
   const handleExportFreeMind = useCallback(() => {
     // Collapsed state lives here, not on the tree, so the exporter has to be
     // told about it — without this the FOLDED attribute was never written.
-    const xml = exportMindmapToFreeMind(tree, collapsedIds, sidecar);
-    const blob = new Blob([xml], { type: "application/x-freemind;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${title || "mindmap"}.mm`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    downloadFile({
+      fileName: `${title || "mindmap"}.mm`,
+      data: exportMindmapToFreeMind(tree, collapsedIds, sidecar),
+      mime: "application/x-freemind;charset=utf-8",
+    });
   }, [tree, title, collapsedIds, sidecar]);
 
   /**
@@ -1920,36 +1906,19 @@ export const MindmapView = memo(function MindmapView({
    * be the smaller half of the map.
    */
   const handleExportXmind = useCallback(() => {
-    const bytes = exportMindmapToXmind(tree, { sidecar, sheetTitle: tree.text || title });
-    // A view is not a buffer, so the blob is built from a copy of exactly these
-    // bytes — the array this came from may be a window onto a larger one, and the
-    // file would then carry whatever else was in it.
-    const buffer = bytes.buffer.slice(
-      bytes.byteOffset,
-      bytes.byteOffset + bytes.byteLength
-    ) as ArrayBuffer;
-    const blob = new Blob([buffer], { type: "application/zip" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${title || "mindmap"}.xmind`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    downloadFile({
+      fileName: `${title || "mindmap"}.xmind`,
+      data: exportMindmapToXmind(tree, { sidecar, sheetTitle: tree.text || title }),
+      mime: "application/zip",
+    });
   }, [tree, sidecar, title]);
 
   const handleExportMarkdownOutline = useCallback(() => {
-    const md = exportMindmapToMarkdownOutline(tree);
-    const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${title || "mindmap"}-outline.md`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    downloadFile({
+      fileName: `${title || "mindmap"}-outline.md`,
+      data: exportMindmapToMarkdownOutline(tree),
+      mime: "text/markdown;charset=utf-8",
+    });
   }, [tree, title]);
 
   const editingNode = useMemo(() => {

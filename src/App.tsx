@@ -40,13 +40,10 @@ import { loadChapterMarkdown } from "./services/bookSource";
 import { type MermaidTheme } from "./services/mermaid";
 import { extractHeadingsFromSource, renderMarkdown } from "./services/markdown";
 import {
-  annotationsFromOutline,
+  annotationsForDocument,
   bytesFromBase64,
-  importFileName,
-  outlineToMarkdown,
-  parseOutlineBytes,
+  planOutlineImport,
 } from "./services/mindmapImport";
-import { parseMarkdownToMindmapTree } from "./services/mindmapService";
 import {
   applyImportedAnnotations,
   emptySidecar,
@@ -807,24 +804,19 @@ export function App() {
       return;
     }
 
-    // Which format it is comes out of the file rather than out of its name: one of
-    // them is a ZIP, another writes .xml under two different formats, and the
-    // content is the only thing that cannot be wrong.
-    const parsed = parseOutlineBytes(bytesFromBase64(picked.contentBase64));
-    if (!parsed.ok) {
-      setNotice(`导入失败：${parsed.message}`);
-      return;
-    }
-
-    const markdown = outlineToMarkdown(parsed.outline);
-    if (!markdown) {
-      setNotice("这个大纲是空的，没有可导入的主题。");
+    // What the bytes mean is decided in one place with no screen around it — see
+    // planOutlineImport, which is where an import's three judgements live. What is
+    // left here is what only this component can do: ask for a file, report a
+    // sentence, and open what was created.
+    const plan = planOutlineImport(bytesFromBase64(picked.contentBase64), picked.fileName ?? "");
+    if (plan.kind === "refuse") {
+      setNotice(plan.message);
       return;
     }
 
     const created = await createDocumentFromContent({
-      content: markdown,
-      defaultName: importFileName(parsed.outline, picked.fileName ?? ""),
+      content: plan.markdown,
+      defaultName: plan.defaultName,
       notice: "已导入为新文档：{title}",
       failureNotice: "导入大纲失败：{message}",
     });
@@ -832,8 +824,8 @@ export function App() {
 
     // What was not imported, said out loud: a file can hold several sheets and a
     // document is one tree, so "imported" without that would be a half-truth.
-    if (parsed.outline.warning) {
-      setNotice(`已导入为新文档：${created.title} —— ${parsed.outline.warning}`);
+    if (plan.warning) {
+      setNotice(`已导入为新文档：${created.title} —— ${plan.warning}`);
     }
 
     // What the file carried besides its shape — notes, links, tags, markers, the
@@ -841,11 +833,13 @@ export function App() {
     // keyed by the ids the document just produced. Written after the document
     // exists and not before: a sidecar with no document beside it is a file nothing
     // would ever read.
-    const annotations = annotationsFromOutline(
-      parsed.outline,
-      parseMarkdownToMindmapTree(created.markdown, created.absolutePath)
+    //
+    // Read against a tree built from the document's own Markdown and title, so the
+    // ids are the ones the map will use when it opens the file.
+    const sidecar = applyImportedAnnotations(
+      emptySidecar(),
+      annotationsForDocument(plan.outline, created.markdown, created.title)
     );
-    const sidecar = applyImportedAnnotations(emptySidecar(), annotations);
     if (sidecarIsEmpty(sidecar)) return;
 
     if (!(await saveSidecar(created.absolutePath, sidecar))) {

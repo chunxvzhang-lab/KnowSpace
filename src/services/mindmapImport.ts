@@ -1,6 +1,7 @@
 import type { MindmapNode } from "../core/types";
 import { readZipEntry } from "../core/zip";
 import type { ImportedAnnotations } from "./mindmapSidecar";
+import { parseMarkdownToMindmapTree } from "./mindmapService";
 
 /**
  * Reading an outline somebody else's app wrote.
@@ -383,6 +384,79 @@ function xmindNoteText(topic: Record<string, unknown>): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * What an imported file's bytes mean for the app: nothing, or a document to write.
+ *
+ * The decisions an import makes, in one place that has no screen, no bridge and no
+ * session — because that is where they were, and the branches are the whole of the
+ * feature's judgement: a file that will not parse, an outline with no topics in it,
+ * and the ordinary case. Everything else the app does around it is plumbing: ask
+ * for a file, report a message, open what was created.
+ *
+ * `refuse` carries a finished sentence rather than a code: there are three of these
+ * in total and each has exactly one useful thing to say, so a table of codes and a
+ * second table of translations would be two places to keep the same three strings.
+ */
+export type ImportPlan =
+  | { kind: "refuse"; message: string }
+  | {
+      kind: "create";
+      /** The document to write. Never empty. */
+      markdown: string;
+      /** What to call it. */
+      defaultName: string;
+      /**
+       * The outline as it was read, which the caller does not need for the document
+       * but does for everything the document will carry beside it.
+       *
+       * Alongside the Markdown rather than reconstructed from it: the Markdown
+       * cannot hold notes or spans, so throwing the outline away here would mean
+       * parsing the reader's file twice to get back what was just in hand.
+       */
+      outline: ImportedOutline;
+      /** What was not imported, when there was something. */
+      warning?: string;
+    };
+
+export function planOutlineImport(bytes: Uint8Array, sourceName: string): ImportPlan {
+  // Which format it is comes out of the file rather than out of its name: one of
+  // them is a ZIP, another writes .xml under two different formats, and the content
+  // is the only thing that cannot be wrong.
+  const parsed = parseOutlineBytes(bytes);
+  if (!parsed.ok) return { kind: "refuse", message: `导入失败：${parsed.message}` };
+
+  const markdown = outlineToMarkdown(parsed.outline);
+  // Possible for a file that is a valid outline and has nothing in it, which is a
+  // different thing from one that could not be read: the reader's file is fine, it
+  // simply says nothing.
+  if (!markdown) return { kind: "refuse", message: "这个大纲是空的，没有可导入的主题。" };
+
+  return {
+    kind: "create",
+    markdown,
+    defaultName: importFileName(parsed.outline, sourceName),
+    outline: parsed.outline,
+    ...(parsed.outline.warning ? { warning: parsed.outline.warning } : {}),
+  };
+}
+
+/**
+ * What the file carried, keyed by the ids of the document that was written from it.
+ *
+ * Two calls composed, and worth a name because of which two: the tree has to be the
+ * one the *document* produces, read the way the map will read it — same Markdown,
+ * same title — or the annotations would be keyed to ids nothing else agrees with.
+ * The root's id happens to be a constant today, which would hide a mismatch here
+ * rather than prevent it.
+ */
+export function annotationsForDocument(
+  outline: ImportedOutline,
+  documentMarkdown: string,
+  documentTitle: string
+): ImportedAnnotations {
+  return annotationsFromOutline(outline, parseMarkdownToMindmapTree(documentMarkdown, documentTitle));
 }
 
 /**
