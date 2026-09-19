@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { RefObject } from "react";
 import {
   CornerDownRight,
@@ -28,7 +29,7 @@ import {
   PROGRESS_MAX,
 } from "../core/mindmapMarkers";
 import { ProgressGlyph } from "./MindmapMarks";
-import type { NodeMarkers } from "../services/mindmapSidecar";
+import { parseTagInput, type NodeMarkers } from "../services/mindmapSidecar";
 
 /**
  * The node style panel: what a right click on a node opens.
@@ -79,12 +80,18 @@ export type MindmapNodeStyleMenuProps = {
    */
   icon: string;
   note: string;
+  /** The node's tags, as written. */
+  tags: string[];
+  /** Every tag already used in this document, most used first. */
+  knownTags: { tag: string; count: number }[];
   /** The node's priority and progress, if either is set. */
   markers: NodeMarkers;
   /** True when the last write to the companion file did not land. */
   saveFailed: boolean;
   onIconChange: (nodeId: string, iconId: string) => void;
   onNoteChange: (nodeId: string, text: string) => void;
+  /** The whole list at once: a tag list is edited as a list, not tag by tag. */
+  onTagsChange: (nodeId: string, tags: string[]) => void;
   /** `null` clears the mark; the panel only ever passes a value from a table or null. */
   onMarkChange: (nodeId: string, field: "priority" | "progress", value: number | null) => void;
   onClose: () => void;
@@ -220,13 +227,39 @@ export function MindmapNodeStyleMenu({
   onFreezeTheme,
   icon,
   note,
+  tags,
+  knownTags,
   markers,
   saveFailed,
   onIconChange,
   onNoteChange,
+  onTagsChange,
   onMarkChange,
   onClose,
 }: MindmapNodeStyleMenuProps) {
+  /**
+   * The tag field's text while it is being typed, and the node it belongs to.
+   *
+   * The one piece of state this panel keeps, and it keeps it because the field's
+   * value is not what is stored — it is a *parse* of it. A field controlled from
+   * the parse would eat the separator the moment it was typed: "api " would come
+   * back as "api" and the next word would join it. So the text lives here until
+   * it is committed, and the node id is remembered alongside it, so switching
+   * nodes cannot carry one node's half-typed tags onto another.
+   */
+  const [tagDraft, setTagDraft] = useState<{ nodeId: string; text: string } | null>(null);
+
+  const editingTags = tagDraft?.nodeId === nodeId;
+  const tagText = editingTags && tagDraft ? tagDraft.text : tags.join(" ");
+
+  const commitTags = () => {
+    if (!editingTags || !tagDraft) return;
+    // Dropped first so the field falls back to what was actually stored,
+    // including a tag the rules turned down.
+    setTagDraft(null);
+    onTagsChange(nodeId, parseTagInput(tagDraft.text));
+  };
+
   if (!open) return null;
 
   return (
@@ -367,6 +400,56 @@ export function MindmapNodeStyleMenu({
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Tags — free text, several per node, and the only annotation whose
+          spelling the reader owns. What the document already uses is offered as
+          chips, which is what keeps two names for one thing from growing up side
+          by side across a long map. */}
+      <div className="mindmap-ctx-section">
+        <div className="mindmap-ctx-label-row">
+          <span className="mindmap-ctx-label">标签</span>
+          <span className="mindmap-ctx-hint">{tags.length > 0 ? `${tags.length} 枚` : "未加"}</span>
+        </div>
+        <input
+          className="mindmap-tag-input"
+          value={tagText}
+          placeholder="空格或逗号分隔，# 可省"
+          onChange={(e) => setTagDraft({ nodeId, text: e.target.value })}
+          onBlur={commitTags}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              commitTags();
+            }
+          }}
+        />
+        {knownTags.length > 0 ? (
+          <div className="mindmap-tag-suggestions">
+            {knownTags.map(({ tag, count }) => {
+              const active = tags.some((own) => own.toLowerCase() === tag.toLowerCase());
+              return (
+                <button
+                  key={tag}
+                  type="button"
+                  className={`mindmap-tag-suggestion ${active ? "is-active" : ""}`}
+                  onClick={() =>
+                    onTagsChange(
+                      nodeId,
+                      active
+                        ? tags.filter((own) => own.toLowerCase() !== tag.toLowerCase())
+                        : [...tags, tag]
+                    )
+                  }
+                  title={active ? `从本节点去掉 ${tag}` : `加到本节点：${tag}`}
+                >
+                  #{tag}
+                  <span className="mindmap-tag-count">{count}</span>
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
       </div>
 
       {/* Node Note — the other thing on this panel that is not in the document.

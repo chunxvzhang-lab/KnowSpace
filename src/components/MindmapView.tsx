@@ -53,6 +53,7 @@ import {
   type MindmapLayoutNode,
 } from "../services/mindmapLayout";
 import {
+  allTags,
   emptySidecar,
   iconFor,
   loadSidecar,
@@ -63,10 +64,12 @@ import {
   setNodeNote,
   setNodePriority,
   setNodeProgress,
+  setNodeTags,
+  tagsFor,
   type MindmapSidecar,
 } from "../services/mindmapSidecar";
 import { findMindmapIcon } from "../core/mindmapIcons";
-import { NodeMarks } from "./MindmapMarks";
+import { NodeMarks, NodeTags } from "./MindmapMarks";
 
 /**
  * How long a note waits before it is written.
@@ -343,6 +346,21 @@ export const MindmapView = memo(function MindmapView({
     (nodeId: string, iconId: string) => applySidecarEdit((current) => setNodeIcon(current, nodeId, iconId)),
     [applySidecarEdit]
   );
+
+  /** A node's tags, replaced wholesale — the list is what the panel edits. */
+  const handleTagsChange = useCallback(
+    (nodeId: string, tags: string[]) => applySidecarEdit((current) => setNodeTags(current, nodeId, tags)),
+    [applySidecarEdit]
+  );
+
+  /**
+   * Every tag the document uses, most used first.
+   *
+   * Derived from the sidecar rather than stored, so it cannot fall out of step
+   * with the tags it describes, and computed once per change rather than once
+   * per keystroke in the note field.
+   */
+  const documentTags = useMemo(() => allTags(sidecar), [sidecar]);
 
   /**
    * A priority or a progress edit. One handler for both, because they differ
@@ -1698,6 +1716,15 @@ export const MindmapView = memo(function MindmapView({
     return () => observer.disconnect();
   }, []);
 
+  /**
+   * The node the style panel describes and every annotation control writes to:
+   * the node the menu was opened on, or the root when nothing is selected — the
+   * same target the node context menu uses. Declared here rather than with the
+   * other derived values because both of the things it is derived from are
+   * declared later than them.
+   */
+  const panelNodeId = contextMenu?.nodeId ?? tree.id;
+
   return (
     <div
       ref={containerRef}
@@ -2155,6 +2182,7 @@ export const MindmapView = memo(function MindmapView({
                       on its leading edge, a note badge and the marks on its corners. */}
                   <NodeIcon iconId={iconFor(sidecar, node.id)} height={node.height} />
                   <NodeMarks width={node.width} markers={markersFor(sidecar, node.id)} />
+                  <NodeTags height={node.height} tags={tagsFor(sidecar, node.id)} />
 
                   {/* A note is the one thing about a node the document cannot
                       show, so the map says where one is: a badge on the node's
@@ -2347,12 +2375,15 @@ export const MindmapView = memo(function MindmapView({
         target={contextTargetNode}
         isBatchMode={isBatchMode}
         selectedCount={selectedNodeIds.size}
-        icon={iconFor(sidecar, contextMenu?.nodeId ?? tree.id)}
-        note={noteFor(sidecar, contextMenu?.nodeId ?? tree.id)}
-        markers={markersFor(sidecar, contextMenu?.nodeId ?? tree.id)}
+        icon={iconFor(sidecar, panelNodeId)}
+        note={noteFor(sidecar, panelNodeId)}
+        tags={tagsFor(sidecar, panelNodeId)}
+        knownTags={documentTags}
+        markers={markersFor(sidecar, panelNodeId)}
         saveFailed={sidecarSaveFailed}
         onIconChange={handleIconChange}
         onNoteChange={handleNoteChange}
+        onTagsChange={handleTagsChange}
         onMarkChange={handleMarkChange}
         onUpdateStyle={handleUpdateStyle}
         onDelete={handleDeleteNode}

@@ -1,18 +1,22 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  allTags,
   emptySidecar,
   iconFor,
   loadSidecar,
   markersFor,
   noteFor,
   parseSidecar,
+  parseTagInput,
   saveSidecar,
   serializeSidecar,
   setNodeIcon,
   setNodeNote,
   setNodePriority,
   setNodeProgress,
+  setNodeTags,
   sidecarIsEmpty,
+  tagsFor,
   type MindmapSidecar,
 } from "../services/mindmapSidecar";
 
@@ -211,10 +215,7 @@ describe("导图伴生文件", () => {
       expect(iconFor(back, "node-a")).toBe("未来的图标");
     });
 
-    it("空文件判断把三个段落都算上", () => {
-      // The shape of an empty companion, pinned: a section added to the service
-      // and forgotten in `emptySidecar` would otherwise read as "nothing here".
-      expect(Object.keys(emptySidecar()).sort()).toEqual(["icons", "markers", "notes", "version"]);
+    it("空文件判断把这一段也算上", () => {
       expect(sidecarIsEmpty(setNodeIcon(emptySidecar(), "node-a", "star"))).toBe(false);
       expect(sidecarIsEmpty(setNodeNote(emptySidecar(), "node-a", "备注"))).toBe(false);
       expect(sidecarIsEmpty(setNodePriority(emptySidecar(), "node-a", 1))).toBe(false);
@@ -300,6 +301,106 @@ describe("导图伴生文件", () => {
       expect(back.notes).toEqual({ "node-a": "备注" });
       expect(back.icons).toEqual({ "node-b": "star" });
       expect(back.markers).toEqual({ "node-c": { progress: 3 } });
+    });
+  });
+
+  describe("标签", () => {
+    it("输入按人真正会写的样子切开", () => {
+      // A tag whose rules only accepted one separator would turn the rest of the
+      // line into a single tag, which is the kind of quiet wrong that ends up in
+      // a file and stays there.
+      expect(parseTagInput("#api, #urgent")).toEqual(["api", "urgent"]);
+      expect(parseTagInput("api urgent")).toEqual(["api", "urgent"]);
+      expect(parseTagInput("接口、紧急")).toEqual(["接口", "紧急"]);
+      expect(parseTagInput("  ##api  ")).toEqual(["api"]);
+      expect(parseTagInput(", ,、 ")).toEqual([]);
+      expect(parseTagInput("")).toEqual([]);
+    });
+
+    it("大小写不同算同一个标签，留下先写下的那个拼法", () => {
+      // Compared without case so #API and #api are one tag; kept as written so
+      // #KnowSpace does not become #knowspace.
+      expect(parseTagInput("API api Api")).toEqual(["API"]);
+      expect(parseTagInput("#KnowSpace #knowspace")).toEqual(["KnowSpace"]);
+    });
+
+    it("设、替、清，且不动传进来的那个", () => {
+      const before = emptySidecar();
+      const tagged = setNodeTags(before, "node-a", ["api", "紧急"]);
+
+      expect(tagsFor(tagged, "node-a")).toEqual(["api", "紧急"]);
+      expect(before.tags).toEqual({});
+      expect(tagsFor(null, "node-a")).toEqual([]);
+      expect(tagsFor(emptySidecar(), "node-没有")).toEqual([]);
+
+      // A new list replaces the old one rather than adding to it: the panel
+      // edits the list, not the individual tags.
+      expect(tagsFor(setNodeTags(tagged, "node-a", ["别的"]), "node-a")).toEqual(["别的"]);
+      expect(setNodeTags(tagged, "node-a", []).tags).toEqual({});
+      expect(setNodeTags(tagged, "node-a", ["  "]).tags).toEqual({});
+    });
+
+    it("写进去的标签一定过得了同一套规则", () => {
+      // Otherwise the file could hold something the panel's own rules would turn
+      // down on the way back in.
+      const tagged = setNodeTags(emptySidecar(), "node-a", ["#api api", " ", "#紧急"]);
+
+      expect(tagsFor(tagged, "node-a")).toEqual(["api", "紧急"]);
+    });
+
+    it("汇总全文档的标签，按用得多排", () => {
+      let sidecar = setNodeTags(emptySidecar(), "node-a", ["api", "紧急"]);
+      sidecar = setNodeTags(sidecar, "node-b", ["API"]);
+      sidecar = setNodeTags(sidecar, "node-c", ["文档"]);
+
+      expect(allTags(sidecar)).toEqual([
+        { tag: "api", count: 2 },
+        // Ties in the order they were first seen, not by name: see `allTags`.
+        { tag: "紧急", count: 1 },
+        { tag: "文档", count: 1 },
+      ]);
+      expect(allTags(null)).toEqual([]);
+    });
+
+    it("读文件时同样过滤：非数组、非文本、空白、重复", () => {
+      const parsed = parseSidecar(
+        JSON.stringify({
+          version: 1,
+          tags: {
+            "node-a": ["api", " ", 42, "#api", "紧急"],
+            "node-b": "不是一个列表",
+            "node-c": [],
+          },
+        })
+      );
+
+      expect(tagsFor(parsed, "node-a")).toEqual(["api", "紧急"]);
+      expect(tagsFor(parsed, "node-b")).toEqual([]);
+      expect(tagsFor(parsed, "node-c")).toEqual([]);
+    });
+
+    it("四段一起往返，谁也不丢", () => {
+      let sidecar = setNodeTags(setNodeNote(emptySidecar(), "node-a", "备注"), "node-a", ["api"]);
+      sidecar = setNodeIcon(sidecar, "node-b", "star");
+      sidecar = setNodePriority(sidecar, "node-c", 4);
+
+      const back = parseSidecar(serializeSidecar(sidecar)) as MindmapSidecar;
+
+      expect(back.notes).toEqual({ "node-a": "备注" });
+      expect(back.tags).toEqual({ "node-a": ["api"] });
+      expect(back.icons).toEqual({ "node-b": "star" });
+      expect(back.markers).toEqual({ "node-c": { priority: 4 } });
+    });
+
+    it("空文件判断把四段都算上", () => {
+      expect(Object.keys(emptySidecar()).sort()).toEqual([
+        "icons",
+        "markers",
+        "notes",
+        "tags",
+        "version",
+      ]);
+      expect(sidecarIsEmpty(setNodeTags(emptySidecar(), "node-a", ["api"]))).toBe(false);
     });
   });
 

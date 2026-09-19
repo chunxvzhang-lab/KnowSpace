@@ -11798,6 +11798,99 @@ body:has(.flash-capsule-overlay) {
   color: #f43f5e;
 }
 
+/* ── Mind map node tags ─────────────────────────────────────────────────
+   Chips under a node, and the field that writes them. The chips are part of the
+   drawing: they read at a glance and never take a click meant for the node.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+.mindmap-node-tags {
+  pointer-events: none;
+}
+
+.mindmap-tag-chip {
+  fill: color-mix(in srgb, #38bdf8 14%, var(--surface-1, #1e293b));
+  stroke: color-mix(in srgb, #38bdf8 45%, transparent);
+  stroke-width: 0.8;
+}
+
+.mindmap-tag-chip.is-more {
+  fill: color-mix(in srgb, var(--text-tertiary, #64748b) 18%, var(--surface-1, #1e293b));
+  stroke: color-mix(in srgb, var(--text-tertiary, #64748b) 45%, transparent);
+}
+
+.mindmap-tag-chip-text {
+  fill: #7dd3fc;
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.mindmap-tag-chip.is-more + .mindmap-tag-chip-text {
+  fill: var(--text-tertiary, #64748b);
+}
+
+.mindmap-tag-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 5px 8px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--text-primary, #e2e8f0);
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.mindmap-tag-input::placeholder {
+  color: var(--text-tertiary, #64748b);
+}
+
+.mindmap-tag-input:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 1px;
+}
+
+/* The tags this document already uses, offered as one click each. */
+.mindmap-tag-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.mindmap-tag-suggestion {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 2px 7px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-secondary, #cbd5e1);
+  font-size: 11px;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mindmap-tag-suggestion:hover {
+  border-color: #38bdf8;
+  color: #38bdf8;
+}
+
+.mindmap-tag-suggestion.is-active {
+  background: color-mix(in srgb, #38bdf8 18%, transparent);
+  border-color: #38bdf8;
+  color: #38bdf8;
+}
+
+.mindmap-tag-count {
+  font-size: 9.5px;
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ── Mind map node markers: priority and progress ───────────────────────
    Nine numbers and eight dials, in the panel and on the node. The dial is one
    drawing at two sizes, so what the picker shows is what the map will show.

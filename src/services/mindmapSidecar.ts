@@ -45,6 +45,8 @@ export interface MindmapSidecar {
   notes: Record<string, string>;
   /** Icon id by node id, from the mind map's own icon table. */
   icons: Record<string, string>;
+  /** Tag names by node id, as written, in the order they were added. */
+  tags: Record<string, string[]>;
   /** Priority and progress by node id. */
   markers: Record<string, NodeMarkers>;
   /** Sections this build does not know about, kept exactly as they were read. */
@@ -54,20 +56,25 @@ export interface MindmapSidecar {
 /**
  * The sections this build understands.
  *
- * Two shapes so far: a map from node id to a string (notes, icons) and a map
- * from node id to a small object (markers, which can say a priority and a
- * progress at once). Reading handles each shape in its own function, because
- * that is where the shapes differ; this list is only what writing and "is this
- * file empty" need, and both ask the same shape-agnostic question — does this
- * section hold anything at all.
+ * Three shapes now: node id to a string (notes, icons), to a list (tags), to a
+ * small object (markers, which can say a priority and a progress at once).
  *
- * A third shape is the point to look at this again rather than to add a name.
+ * Looked at again when the third arrived, as promised, and deliberately left as
+ * a list of names. Reading is the only part that differs by shape, and there each
+ * reader has its own type and its own rules — turning them into a table of
+ * descriptors would move four different functions behind one signature and buy
+ * nothing. Writing and "is this file empty" ask a question no shape can answer
+ * differently: does this section hold anything at all.
+ *
+ * A *fourth* shape is where that reasoning runs out: dates, links with labels or
+ * nested lists would each need more than a name here, and this list would have
+ * become the thing to replace rather than to extend.
  */
-const KNOWN_SECTIONS = ["notes", "icons", "markers"] as const;
+const KNOWN_SECTIONS = ["notes", "icons", "tags", "markers"] as const;
 
 /** A companion with nothing in it. */
 export function emptySidecar(): MindmapSidecar {
-  return { version: SIDECAR_VERSION, notes: {}, icons: {}, markers: {} };
+  return { version: SIDECAR_VERSION, notes: {}, icons: {}, tags: {}, markers: {} };
 }
 
 /** One section as read from a file: an empty map if the file's copy is unusable. */
@@ -79,6 +86,52 @@ function readStringSection(value: unknown): Record<string, string> {
       if (typeof entry === "string" && entry.trim()) section[nodeId] = entry;
     }
   }
+  return section;
+}
+
+/**
+ * A tag as the reader typed it, with the parts that mean nothing taken off.
+ *
+ * The hash is decoration: it is how tags are written in the document, and a tag
+ * whose name contained one would be a tag called `#api` sitting next to an `api`.
+ * Splitting accepts what people actually type — `#api, #urgent`, `api urgent`,
+ * `、` between Chinese words — rather than insisting on one separator and
+ * silently making a single tag out of the rest.
+ *
+ * Case is kept and compared without it, so `#API` and `#api` are one tag and the
+ * spelling that survives is the one written first. Lowercasing everything would
+ * be tidier in the file and would lose `#KnowSpace`.
+ */
+export function parseTagInput(input: string): string[] {
+  const tags: string[] = [];
+  const seen = new Set<string>();
+
+  for (const raw of String(input ?? "").split(/[,，、\s]+/)) {
+    const tag = raw.trim().replace(/^#+/, "").trim();
+    if (!tag) continue;
+    const key = tag.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    tags.push(tag);
+  }
+
+  return tags;
+}
+
+/** The tags section: a list per node, with unusable entries dropped. */
+function readTagSection(value: unknown): Record<string, string[]> {
+  const section: Record<string, string[]> = {};
+  const sections = value;
+  if (!isPlainObject(sections)) return section;
+
+  for (const [nodeId, entry] of Object.entries(sections)) {
+    if (!Array.isArray(entry)) continue;
+    // Through the same rules the panel's input goes through, so a hand-edited
+    // file cannot put a blank tag or a duplicate on a node.
+    const tags = parseTagInput(entry.filter((item) => typeof item === "string").join(" "));
+    if (tags.length > 0) section[nodeId] = tags;
+  }
+
   return section;
 }
 
@@ -146,13 +199,14 @@ export function parseSidecar(text: string | null | undefined): MindmapSidecar | 
 
   const notes = readStringSection(parsed.notes);
   const icons = readStringSection(parsed.icons);
+  const tags = readTagSection(parsed.tags);
   const markers = readMarkerSection(parsed.markers);
 
   const version = typeof parsed.version === "number" ? parsed.version : SIDECAR_VERSION;
 
   // The spread comes first so the sections this build does not know about are
   // carried through, and the normalised fields overwrite whatever was there.
-  return { ...parsed, version, notes, icons, markers };
+  return { ...parsed, version, notes, icons, tags, markers };
 }
 
 /**
@@ -222,6 +276,55 @@ export function setNodeIcon(sidecar: MindmapSidecar, nodeId: string, iconId: str
     delete icons[nodeId];
   }
   return { ...sidecar, icons };
+}
+
+/** A node's tags, as written. */
+export function tagsFor(sidecar: MindmapSidecar | null, nodeId: string): string[] {
+  return sidecar?.tags[nodeId] ?? [];
+}
+
+/**
+ * Sets a node's tags.
+ *
+ * The list goes through the same rules the input goes through, so no caller can
+ * store a tag the file could not have produced. An empty result removes the
+ * entry rather than storing a list with nothing in it.
+ */
+export function setNodeTags(sidecar: MindmapSidecar, nodeId: string, tags: string[]): MindmapSidecar {
+  const next: Record<string, string[]> = { ...sidecar.tags };
+  const cleaned = parseTagInput(Array.isArray(tags) ? tags.join(" ") : "");
+
+  if (cleaned.length > 0) next[nodeId] = cleaned;
+  else delete next[nodeId];
+
+  return { ...sidecar, tags: next };
+}
+
+/**
+ * Every tag in the document, most used first, ties in reading order.
+ *
+ * What the panel offers as one-click chips. The tags already on the map are the
+ * ones a reader is most likely to want next, and offering them is what keeps
+ * `#api` and `#接口` from growing up side by side as two names for one thing.
+ */
+export function allTags(sidecar: MindmapSidecar | null): { tag: string; count: number }[] {
+  if (!sidecar) return [];
+
+  const counts = new Map<string, { tag: string; count: number }>();
+  for (const tags of Object.values(sidecar.tags)) {
+    for (const tag of tags) {
+      const key = tag.toLowerCase();
+      const found = counts.get(key);
+      if (found) found.count += 1;
+      else counts.set(key, { tag, count: 1 });
+    }
+  }
+
+  // Most used first, and ties in the order they were first seen — a stable sort
+  // over the insertion order. Sorting ties by name would put the answer in the
+  // hands of a locale, and two machines would offer the same tags in a different
+  // order for no reason a reader could see.
+  return [...counts.values()].sort((a, b) => b.count - a.count);
 }
 
 /** Every marker on a node, or nothing set. */
