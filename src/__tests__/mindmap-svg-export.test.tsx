@@ -1,10 +1,20 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { buildStandaloneMindmapSvg } from "../services/mindmapSvgExport";
 import { layoutMindmap } from "../services/mindmapLayout";
 import { parseMarkdownToMindmapTree } from "../services/mindmapService";
 import { installDesktopMock, removeDesktopMock } from "./helpers/desktopMock";
 import { MindmapView } from "../components/MindmapView";
+import {
+  emptySidecar,
+  serializeSidecar,
+  setNodeIcon,
+  setNodeLink,
+  setNodeNote,
+  setNodePriority,
+  setNodeTags,
+} from "../services/mindmapSidecar";
+import { saveMindmapNumbering } from "../services/storage";
 
 const SOURCE = ["- 父节点", "  - 子节点甲", "  - 子节点乙", "- 第二个分支"].join("\n");
 
@@ -46,6 +56,36 @@ function canvasFixture(): SVGSVGElement {
     el("rect", { class: "mindmap-node-selection-ring", width: "86", height: "42" }),
     el("rect", { class: "mindmap-node-add-btn", width: "14", height: "14" }),
     el("g", { class: "mindmap-node-resize-handle" }),
+    // Everything the reader can attach to a node, drawn with no colour of its
+    // own: on screen a stylesheet paints all of it, and a stylesheet does not
+    // travel with a file.
+    el("g", { class: "mindmap-note-marker" }, [
+      el("circle", { r: "4.6" }),
+      el("path", { d: "M -2 -0.8 H 2" }),
+    ]),
+    el("g", { class: "mindmap-link-marker" }, [
+      el("circle", { r: "4.6" }),
+      el("path", { d: "M -1.7 1.7 L 1.5 -1.5" }),
+    ]),
+    el("svg", { class: "mindmap-node-icon", viewBox: "0 0 24 24", stroke: "currentColor" }, [
+      el("path", { d: "M 0 0" }),
+    ]),
+    el("text", { class: "mindmap-node-number" }, []),
+    el("g", { class: "mindmap-node-marks" }, [
+      el("path", { class: "mindmap-progress-fill", d: "M 0 0" }),
+      el("circle", { class: "mindmap-progress-track", r: "5.5" }),
+      el("text", { class: "mindmap-priority-text" }, []),
+    ]),
+    el("g", { class: "mindmap-node-tags" }, [
+      el("g", {}, [
+        el("rect", { class: "mindmap-tag-chip", width: "40", height: "13" }),
+        el("text", { class: "mindmap-tag-chip-text" }, []),
+      ]),
+      // The overflow chip and its label are siblings on purpose: that adjacency
+      // is what the stylesheet's rule for it matches on.
+      el("rect", { class: "mindmap-tag-chip is-more", width: "20", height: "13" }),
+      el("text", { class: "mindmap-tag-chip-text" }, []),
+    ]),
   ]);
 
   return el("svg", { width: "100%", height: "100%" }, [viewport]) as SVGSVGElement;
@@ -87,6 +127,45 @@ describe("导出的独立 SVG", () => {
     // ...while the parts that are the drawing stay.
     expect(result.svg).toContain("mindmap-node-rect");
     expect(result.svg).toContain("mindmap-collapse-circle");
+  });
+
+  it("标注带着颜色出门，而不是一身黑", () => {
+    // The correction that matters: the canvas is what gets copied, so every
+    // annotation is in the file already — but nothing painted them but the
+    // stylesheet, and without these literals a tag chip arrived as black text on
+    // a black rectangle, and an icon vanished into a dark node.
+    const parse = (svg: string) => new DOMParser().parseFromString(svg, "image/svg+xml");
+
+    const dark = parse(
+      buildStandaloneMindmapSvg(canvasFixture(), { bounds: BOUNDS, dark: true })!.svg
+    );
+    expect(dark.querySelector(".mindmap-note-marker circle")?.getAttribute("fill")).toBe("#16405a");
+    expect(dark.querySelector(".mindmap-link-marker path")?.getAttribute("stroke")).toBe("#c084fc");
+    expect(dark.querySelector(".mindmap-node-icon")?.getAttribute("stroke")).toBe("#a5d8f0");
+    expect(dark.querySelector(".mindmap-node-number")?.getAttribute("fill")).toBe("#9fd8f5");
+    expect(dark.querySelector(".mindmap-priority-text")?.getAttribute("fill")).toBe("#ffffff");
+    expect(dark.querySelector(".mindmap-progress-fill")?.getAttribute("fill")).toBe("#7dd3fc");
+    expect(dark.querySelector(".mindmap-tag-chip")?.getAttribute("fill")).toBe("#14384a");
+    expect(dark.querySelector(".mindmap-tag-chip.is-more")?.getAttribute("stroke")).toBe("#64748b");
+
+    // Text needs what the stylesheet was giving it too: a chip's size and a
+    // numeral's weight are not carried by the file any other way.
+    expect(dark.querySelector(".mindmap-node-number")?.getAttribute("font-size")).toBe("10px");
+    expect(dark.querySelector(".mindmap-tag-chip-text")?.getAttribute("font-size")).toBe("9px");
+    expect(dark.querySelector(".mindmap-tag-chip-text")?.getAttribute("font-family")).toBeTruthy();
+
+    const light = parse(
+      buildStandaloneMindmapSvg(canvasFixture(), { bounds: BOUNDS, dark: false })!.svg
+    );
+    expect(light.querySelector(".mindmap-note-marker circle")?.getAttribute("fill")).toBe("#dcecf8");
+    expect(light.querySelector(".mindmap-node-number")?.getAttribute("fill")).toBe("#0369a1");
+
+    // Nothing is left depending on a class name having been painted for it.
+    for (const element of light.querySelectorAll(
+      ".mindmap-note-marker circle, .mindmap-link-marker circle, .mindmap-tag-chip"
+    )) {
+      expect(element.getAttribute("fill")).toBeTruthy();
+    }
   });
 
   it("节点自己设的颜色保留，没设的落成字面色值", () => {
@@ -248,5 +327,65 @@ describe("导出菜单里的 SVG", () => {
     expect(produced).toHaveLength(1);
     expect(produced[0].type).toBe("image/svg+xml;charset=utf-8");
     expect(produced[0].size).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * The plainest question of all: does what the reader attached to a node reach the
+ * file?
+ *
+ * Worth its own test because the answer is easy to get wrong in a way no colour
+ * assertion would notice — by building the file from the layout data instead of
+ * from the canvas. The canvas is what is copied, so the annotations come along;
+ * this is what says so, and keeps saying so if that ever changes.
+ */
+describe("标注与导出", () => {
+  const DOC = "/vault/notes/a.md";
+
+  afterEach(() => {
+    cleanup();
+    removeDesktopMock();
+    vi.restoreAllMocks();
+    localStorage.clear();
+    delete (window as unknown as Record<string, unknown>).knowSpaceDesktop;
+    delete (window as unknown as Record<string, unknown>).bookMDDesktop;
+  });
+
+  it("备注、图标、标记、标签、链接与编号都在文件里", async () => {
+    const nodeId = parseMarkdownToMindmapTree(SOURCE, "测试").children[0].id;
+    let sidecar = setNodeNote(emptySidecar(), nodeId, "备注");
+    sidecar = setNodeIcon(sidecar, nodeId, "star");
+    sidecar = setNodePriority(sidecar, nodeId, 3);
+    sidecar = setNodeTags(sidecar, nodeId, ["api"]);
+    sidecar = setNodeLink(sidecar, nodeId, "https://example.com");
+
+    const api = {
+      readMindmapSidecar: vi.fn().mockResolvedValue({
+        success: true,
+        exists: true,
+        content: serializeSidecar(sidecar),
+      }),
+      saveMindmapSidecar: vi.fn().mockResolvedValue({ success: true }),
+    };
+    (window as unknown as Record<string, unknown>).knowSpaceDesktop = api;
+    saveMindmapNumbering(DOC, true);
+
+    render(<MindmapView title="测试" source={SOURCE} documentKey={DOC} />);
+    await waitFor(() => expect(document.querySelector(".mindmap-note-marker")).toBeTruthy());
+
+    const built = buildStandaloneMindmapSvg(
+      document.querySelector(".mindmap-svg-canvas") as SVGSVGElement,
+      { bounds: layoutMindmap(parseMarkdownToMindmapTree(SOURCE, "测试")).bounds, dark: true }
+    )!;
+    const doc = new DOMParser().parseFromString(built.svg, "image/svg+xml");
+
+    expect(doc.querySelector(".mindmap-note-marker")).toBeTruthy();
+    expect(doc.querySelector(".mindmap-node-icon")).toBeTruthy();
+    expect(doc.querySelector(".mindmap-priority-text")?.textContent).toBe("3");
+    expect(doc.querySelector(".mindmap-tag-chip-text")?.textContent).toBe("#api");
+    expect(doc.querySelector(".mindmap-link-marker")).toBeTruthy();
+    // The number is drawn beside the node and travels with it, because it is a
+    // shape in the canvas rather than a decoration added at export time.
+    expect(doc.querySelector(".mindmap-node-number")?.textContent).toBe("1");
   });
 });
