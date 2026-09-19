@@ -48,10 +48,10 @@ import {
 } from "./services/mindmapImport";
 import { parseMarkdownToMindmapTree } from "./services/mindmapService";
 import {
+  applyImportedAnnotations,
   emptySidecar,
   saveSidecar,
-  setNodeLink,
-  setNodeNote,
+  sidecarIsEmpty,
 } from "./services/mindmapSidecar";
 
 import {
@@ -836,25 +836,18 @@ export function App() {
       setNotice(`已导入为新文档：${created.title} —— ${parsed.outline.warning}`);
     }
 
-    // What the outline carried besides its shape — notes, links — belongs in the
-    // document's companion file, keyed by the ids the document just produced.
-    // Written after the document exists and not before: a sidecar with no document
-    // beside it is a file nothing would ever read.
+    // What the file carried besides its shape — notes, links, tags, markers, the
+    // lines and spans between topics — belongs in the document's companion file,
+    // keyed by the ids the document just produced. Written after the document
+    // exists and not before: a sidecar with no document beside it is a file nothing
+    // would ever read.
     const annotations = annotationsFromOutline(
       parsed.outline,
       parseMarkdownToMindmapTree(created.markdown, created.absolutePath)
     );
-    if (Object.keys(annotations.notes).length === 0 && Object.keys(annotations.links).length === 0) {
-      return;
-    }
+    const sidecar = applyImportedAnnotations(emptySidecar(), annotations);
+    if (sidecarIsEmpty(sidecar)) return;
 
-    let sidecar = emptySidecar();
-    for (const [nodeId, text] of Object.entries(annotations.notes)) {
-      sidecar = setNodeNote(sidecar, nodeId, text);
-    }
-    for (const [nodeId, text] of Object.entries(annotations.links)) {
-      sidecar = setNodeLink(sidecar, nodeId, text);
-    }
     if (!(await saveSidecar(created.absolutePath, sidecar))) {
       // The document was created; what it carried was not. Saying so is the point:
       // a reader who is told can write the notes again, and a reader who is not

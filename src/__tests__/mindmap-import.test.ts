@@ -12,6 +12,7 @@ import {
   type ImportedOutline,
 } from "../services/mindmapImport";
 import { buildXmind, buildZip } from "./helpers/zipBuilder";
+import { applyImportedAnnotations, emptySidecar, sidecarIsEmpty } from "../services/mindmapSidecar";
 import { parseMarkdownToMindmapTree } from "../services/mindmapService";
 import type { MindmapNode } from "../core/types";
 
@@ -207,7 +208,14 @@ describe("备注与链接落到哪几个节点上", () => {
     const outline = outlineOf(opml('<outline text="甲"><outline text="乙"/></outline>'));
     const tree = parseMarkdownToMindmapTree(outlineToMarkdown(outline), "标题");
 
-    expect(annotationsFromOutline(outline, tree)).toEqual({ notes: {}, links: {} });
+    const annotations = annotationsFromOutline(outline, tree);
+
+    // Asserted the way the caller asks it: not "is this object empty" but "would
+    // writing it produce a file with anything in it".
+    expect(sidecarIsEmpty(applyImportedAnnotations(emptySidecar(), annotations))).toBe(true);
+    expect(annotations.relations).toEqual([]);
+    expect(annotations.summaries).toEqual([]);
+    expect(annotations.boundaries).toEqual([]);
   });
 });
 
@@ -432,6 +440,130 @@ describe("读 XMind", () => {
     const noTopic = parseXmindOutline(buildXmind([{ title: "空的画布" }]));
     expect(noTopic.ok).toBe(false);
     if (!noTopic.ok) expect(noTopic.message).toContain("没有可读的画布");
+  });
+
+  it("主题之间的关系线读进来，标签一起", () => {
+    // The line lives on the sheet and names its two ends by the file's own ids, so
+    // the only way to read it is against the tree that was just walked.
+    const outline = xmindOf([
+      {
+        title: "画布",
+        rootTopic: xmindTopic("根", {}, [xmindTopic("甲"), xmindTopic("乙")]),
+        relationships: [
+          { id: "rel-1", class: "relationship", end1Id: "xmind-甲", end2Id: "xmind-乙", title: "取决于" },
+          // One end names a topic this sheet does not have: a line to nowhere.
+          { id: "rel-2", class: "relationship", end1Id: "xmind-甲", end2Id: "xmind-不存在" },
+        ],
+      },
+    ]);
+    const tree = parseMarkdownToMindmapTree(outlineToMarkdown(outline), "画布");
+
+    const { relations } = annotationsFromOutline(outline, tree);
+
+    expect(relations).toEqual([
+      { fromId: tree.children[0].id, toId: tree.children[1].id, label: "取决于" },
+    ]);
+  });
+
+  it("概要的跨度展开成中间那一串，不只是两个端点", () => {
+    // A span names where it begins and ends and covers everything between — which
+    // is what it draws as, and what this app's bracket has to span too.
+    const outline = xmindOf([
+      {
+        title: "画布",
+        rootTopic: {
+          title: "根",
+          children: {
+            attached: [xmindTopic("甲"), xmindTopic("乙"), xmindTopic("丙"), xmindTopic("丁")],
+            summary: [{ id: "s1", class: "summary", title: "总述", range: "(xmind-乙,xmind-丙)" }],
+            // Written the other way round, which also turns up, and past the end of
+            // the run it names: not a pair of siblings, so nothing to draw.
+            boundary: [
+              { id: "b1", class: "boundary", title: "一组", range: "(xmind-丙,xmind-乙)" },
+              { id: "b2", class: "boundary", title: "错的", range: "(xmind-乙,xmind-不存在)" },
+            ],
+          },
+        },
+      },
+    ]);
+    const tree = parseMarkdownToMindmapTree(outlineToMarkdown(outline), "画布");
+    const [a, b, c] = tree.children;
+
+    const { summaries, boundaries } = annotationsFromOutline(outline, tree);
+
+    expect(summaries).toEqual([{ nodeIds: [b.id, c.id], text: "总述" }]);
+    expect(boundaries).toEqual([{ nodeIds: [b.id, c.id], text: "一组" }]);
+    expect(boundaries[0].nodeIds).not.toContain(a.id);
+  });
+
+  it("标签与优先级、进度：认识的那几个读进来", () => {
+    // XMind's marker set is large and most of it is what this app expresses as an
+    // icon, which the two tables do not share ids for. Priorities and progress are
+    // the two they do, so those are read and the rest are left.
+    const outline = xmindOf([
+      {
+        title: "画布",
+        rootTopic: xmindTopic("根", {}, [
+          xmindTopic("甲", {
+            labels: ["api", "待办"],
+            markers: [{ markerId: "priority-3" }, { markerId: "task-half" }],
+          }),
+          xmindTopic("乙", { markers: [{ markerId: "star-red" }, { markerId: "flag-green" }] }),
+        ]),
+      },
+    ]);
+    const tree = parseMarkdownToMindmapTree(outlineToMarkdown(outline), "画布");
+
+    const { tags, markers } = annotationsFromOutline(outline, tree);
+
+    expect(tags[tree.children[0].id]).toEqual(["api", "待办"]);
+    expect(markers[tree.children[0].id]).toEqual({ priority: 3, progress: 4 });
+    // Nothing this build knows: not imported, and not invented either.
+    expect(markers[tree.children[1].id]).toBeUndefined();
+    expect(tags[tree.children[1].id]).toBeUndefined();
+  });
+
+  it("整条路：一份 .xmind → 新文档 + 它的伴生文件", () => {
+    // Everything the import does, end to end: bytes in, a document and the
+    // annotations it will read back out.
+    const xml = buildXmind([
+      {
+        title: "我的画布",
+        rootTopic: {
+          title: "中心主题",
+          children: {
+            attached: [
+              xmindTopic("甲", { labels: ["api"] }),
+              xmindTopic("乙", {}, [xmindTopic("乙一")]),
+            ],
+            summary: [{ title: "两种走法", range: "(xmind-甲,xmind-乙)" }],
+            boundary: [{ title: "一组", range: "(xmind-乙,xmind-乙)" }],
+          },
+        },
+        relationships: [{ end1Id: "xmind-甲", end2Id: "xmind-乙一" }],
+      },
+    ]);
+
+    const parsed = parseOutlineBytes(xml);
+    if (!parsed.ok) throw new Error(parsed.message);
+
+    const markdown = outlineToMarkdown(parsed.outline);
+    const tree = parseMarkdownToMindmapTree(markdown, "我的画布");
+    const sidecar = applyImportedAnnotations(
+      emptySidecar(),
+      annotationsFromOutline(parsed.outline, tree)
+    );
+
+    expect(shape(tree)).toEqual(["我的画布", "  甲", "  乙", "    乙一"]);
+    expect(sidecar.tags[tree.children[0].id]).toEqual(["api"]);
+    // The span covers 甲 through 乙, and the line joins 甲 to 乙一 — a nested topic,
+    // which is exactly the kind of line a tree cannot draw and this app can.
+    expect(sidecar.summaries["summary-1"].nodeIds).toEqual([
+      tree.children[0].id,
+      tree.children[1].id,
+    ]);
+    expect(sidecar.boundaries["boundary-1"].nodeIds).toEqual([tree.children[1].id]);
+    expect(sidecar.relations[0].toId).toBe(tree.children[1].children[0].id);
   });
 
   it("从字节到一棵树：整条路走通", () => {

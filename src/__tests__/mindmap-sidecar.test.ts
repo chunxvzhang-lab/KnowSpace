@@ -10,6 +10,7 @@ import {
   floatingTopics,
   moveFloatingTopic,
   nextBoundaryId,
+  applyImportedAnnotations,
   relationBetween,
   removeBoundary,
   setBoundaryColor,
@@ -767,6 +768,84 @@ describe("导图伴生文件", () => {
       const after = removeFloatingTopic(sidecar, "floating-1");
 
       expect(after.relations).toHaveLength(1);
+    });
+  });
+
+  describe("把导入的东西写进伴生文件", () => {
+    it("七段一次写完，走的都是面板用的那几个 setter", () => {
+      const sidecar = applyImportedAnnotations(emptySidecar(), {
+        notes: { "node-a": "一段备注" },
+        links: { "node-b": "https://example.com" },
+        tags: { "node-c": ["api", "待办"] },
+        markers: { "node-d": { priority: 3, progress: 4 } },
+        relations: [{ fromId: "node-e", toId: "node-f", label: "取决于" }],
+        summaries: [{ nodeIds: ["node-g", "node-h"], text: "总述" }],
+        boundaries: [{ nodeIds: ["node-i"], text: "一组" }],
+      });
+
+      expect(sidecar.notes).toEqual({ "node-a": "一段备注" });
+      expect(sidecar.links).toEqual({ "node-b": "https://example.com" });
+      expect(sidecar.tags).toEqual({ "node-c": ["api", "待办"] });
+      expect(sidecar.markers).toEqual({ "node-d": { priority: 3, progress: 4 } });
+      expect(sidecar.relations).toEqual([
+        { fromId: "node-e", toId: "node-f", label: "取决于" },
+      ]);
+      expect(sidecar.summaries["summary-1"]).toEqual({
+        nodeIds: ["node-g", "node-h"],
+        text: "总述",
+      });
+      expect(sidecar.boundaries["boundary-1"]).toEqual({ nodeIds: ["node-i"], text: "一组" });
+      expect(sidecarIsEmpty(sidecar)).toBe(false);
+    });
+
+    it("空的导入什么都不做", () => {
+      const before = emptySidecar();
+      const after = applyImportedAnnotations(before, {
+        notes: {},
+        links: {},
+        tags: {},
+        markers: {},
+        relations: [],
+        summaries: [],
+        boundaries: [],
+      });
+
+      expect(sidecarIsEmpty(after)).toBe(true);
+      // Written through the setters rather than assembled by hand, so an import
+      // cannot produce a file the app would not have produced itself.
+      expect(Object.keys(after).sort()).toEqual(Object.keys(emptySidecar()).sort());
+    });
+
+    it("已经有的一条线不会被当成开关关掉", () => {
+      // `toggleRelation` is a toggle: using it alone would *remove* a line that is
+      // already there, and an import adds what the file had.
+      const existing = toggleRelation(emptySidecar(), "node-a", "node-b");
+      const after = applyImportedAnnotations(existing, {
+        notes: {},
+        links: {},
+        tags: {},
+        markers: {},
+        relations: [{ fromId: "node-a", toId: "node-b" }],
+        summaries: [],
+        boundaries: [],
+      });
+
+      expect(after.relations).toHaveLength(1);
+      expect(after.relations[0]).toEqual({ fromId: "node-a", toId: "node-b" });
+    });
+
+    it("只给了优先级就只写优先级", () => {
+      const sidecar = applyImportedAnnotations(emptySidecar(), {
+        notes: {},
+        links: {},
+        tags: {},
+        markers: { "node-a": { progress: 4 }, "node-b": { priority: 2 } },
+        relations: [],
+        summaries: [],
+        boundaries: [],
+      });
+
+      expect(sidecar.markers).toEqual({ "node-a": { progress: 4 }, "node-b": { priority: 2 } });
     });
   });
 

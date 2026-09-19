@@ -958,6 +958,81 @@ export function relationBetween(
   return sidecar?.relations.find((relation) => isSameRelation(relation, a, b)) ?? null;
 }
 
+/**
+ * What an imported file carried besides its tree.
+ *
+ * Keyed by the ids the *document* produced rather than by the ids the file used:
+ * translating them is the importer's job, and by the time anything here runs the
+ * file's own ids are gone. Nothing distinguishes an annotation that came from an
+ * import from one the reader wrote — which is the point of importing into the
+ * app's own format rather than alongside it.
+ */
+export interface ImportedAnnotations {
+  notes: Record<string, string>;
+  links: Record<string, string>;
+  tags: Record<string, string[]>;
+  markers: Record<string, NodeMarkers>;
+  /** Lines between two topics, with what each says. */
+  relations: { fromId: string; toId: string; label?: string }[];
+  /** Brackets over a run of sibling topics. */
+  summaries: { nodeIds: string[]; text: string }[];
+  /** Boxes around a run of sibling topics. */
+  boundaries: { nodeIds: string[]; text: string }[];
+}
+
+/**
+ * Puts everything an imported file carried into the companion file.
+ *
+ * One function rather than a dozen calls at the call site, and here rather than
+ * there, for the reason a round of verification turned up: the call site is a
+ * screen, and the part that can be wrong about the file's shape is this one — which
+ * is now testable without rendering anything.
+ *
+ * Every section goes in through the same setters the panels use, so an import
+ * cannot produce a file the app would not have written itself: a note is a note,
+ * an empty list is no list, and a line that is already there is not toggled off.
+ */
+export function applyImportedAnnotations(
+  sidecar: MindmapSidecar,
+  annotations: ImportedAnnotations
+): MindmapSidecar {
+  let next = sidecar;
+
+  for (const [nodeId, text] of Object.entries(annotations.notes)) {
+    next = setNodeNote(next, nodeId, text);
+  }
+  for (const [nodeId, text] of Object.entries(annotations.links)) {
+    next = setNodeLink(next, nodeId, text);
+  }
+  for (const [nodeId, tags] of Object.entries(annotations.tags)) {
+    next = setNodeTags(next, nodeId, tags);
+  }
+  for (const [nodeId, markers] of Object.entries(annotations.markers)) {
+    if (markers.priority !== undefined) next = setNodePriority(next, nodeId, markers.priority);
+    if (markers.progress !== undefined) next = setNodeProgress(next, nodeId, markers.progress);
+  }
+
+  for (const relation of annotations.relations) {
+    // Not `toggleRelation` on its own: that would remove a line that is already
+    // there, and an import adds what the file had rather than flipping it.
+    if (!areRelated(next, relation.fromId, relation.toId)) {
+      next = toggleRelation(next, relation.fromId, relation.toId);
+    }
+    if (relation.label) {
+      next = setRelationFields(next, relation.fromId, relation.toId, { label: relation.label });
+    }
+  }
+
+  for (const summary of annotations.summaries) {
+    next = addSummary(next, summary.nodeIds, summary.text).sidecar;
+  }
+  for (const boundary of annotations.boundaries) {
+    next = addBoundary(next, boundary.nodeIds, boundary.text).sidecar;
+  }
+
+  return next;
+}
+
 /** Whether these two topics are already connected. */
 export function areRelated(sidecar: MindmapSidecar | null, a: string, b: string): boolean {
   if (!sidecar) return false;

@@ -1,5 +1,6 @@
 import type { MindmapNode } from "../core/types";
 import { readZipEntry } from "../core/zip";
+import type { ImportedAnnotations } from "./mindmapSidecar";
 
 /**
  * Reading an outline somebody else's app wrote.
@@ -18,11 +19,37 @@ import { readZipEntry } from "../core/zip";
 /** One topic as read from a foreign outline file. */
 export interface ImportedTopic {
   text: string;
+  /**
+   * The id the file gave this topic.
+   *
+   * Kept only so that cross-references — a line between two topics, a bracket over
+   * a run of them — can be followed to the topics they name. It is not carried any
+   * further: the document that gets written has its own ids, and the translation
+   * between the two is this module's business rather than anyone else's.
+   */
+  sourceId?: string;
   /** The note the file carried, if it carried one. */
   note?: string;
   /** A link the file carried, if it carried one this build can follow. */
   link?: string;
+  /** The file's labels for this topic, which this app calls tags. */
+  tags?: string[];
+  /** The file's priority and progress markers, where this app has a counterpart. */
+  markers?: { priority?: number; progress?: number };
   children: ImportedTopic[];
+}
+
+/**
+ * What the file said about topics in relation to each other.
+ *
+ * In the file's own ids, which is why it is kept apart from the tree: the tree is
+ * what becomes the document, and these are translated against it afterwards.
+ */
+export interface ImportedReferences {
+  relations: { fromId: string; toId: string; label?: string }[];
+  /** Each entry names the two topics its run begins and ends at. */
+  summaries: { nodeIds: string[]; text: string }[];
+  boundaries: { nodeIds: string[]; text: string }[];
 }
 
 export interface ImportedOutline {
@@ -47,6 +74,13 @@ export interface ImportedOutline {
    * standing in for the document would have them attached to nothing.
    */
   root?: ImportedTopic;
+  /**
+   * What the file said about topics in relation to each other.
+   *
+   * Only the formats that have such a thing fill this in, and only the parts of it
+   * this app can express are read.
+   */
+  references?: ImportedReferences;
   /**
    * Something the reader should know about what was *not* imported.
    *
@@ -182,8 +216,22 @@ export function parseXmindOutline(bytes: Uint8Array): ImportResult {
     return { ok: false, message: "这个 .xmind 里没有可读的画布。" };
   }
 
+  // Collected while the tree is walked: XMind keeps a summary and a boundary as
+  // pseudo-children of the topic they hang off, and both name the run of topics
+  // they cover, which is a cross-reference rather than a topic.
+  const references: ImportedReferences = { relations: [], summaries: [], boundaries: [] };
   const rootTopic = sheet.rootTopic as Record<string, unknown>;
-  const root = readXmindTopic(rootTopic);
+  const root = readXmindTopic(rootTopic, references);
+
+  // Lines between topics live on the sheet, not in the tree.
+  referenceList(sheet.relationships).forEach((relationship) => {
+    const fromId = text(relationship.end1Id);
+    const toId = text(relationship.end2Id);
+    if (!fromId || !toId) return;
+    const label = text(relationship.title);
+    references.relations.push({ fromId, toId, ...(label ? { label } : {}) });
+  });
+
   const warning =
     sheets.length > 1
       ? `只导入了第 1 张画布，这个文件里还有 ${sheets.length - 1} 张（一篇文档是一棵树）。`
@@ -195,22 +243,125 @@ export function parseXmindOutline(bytes: Uint8Array): ImportResult {
       title: typeof sheet.title === "string" ? oneLine(sheet.title) : "",
       topics: [],
       root,
+      references,
       ...(warning ? { warning } : {}),
     },
   };
 }
 
-/** Reads one XMind topic and everything attached under it. */
-function readXmindTopic(topic: Record<string, unknown>): ImportedTopic {
-  const children = isRecord(topic.children) ? topic.children : {};
-  const attached = Array.isArray(children.attached) ? children.attached : [];
+/** A string field, or an empty one — every value here comes from somebody's file. */
+function text(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
 
-  return topicFrom(
-    typeof topic.title === "string" ? topic.title : "",
-    xmindNoteText(topic),
-    typeof topic.href === "string" ? topic.href : "",
-    attached.filter(isRecord).map(readXmindTopic)
+function referenceList(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value) ? value.filter(isRecord) : [];
+}
+
+/**
+ * Reads one XMind topic and everything attached under it.
+ *
+ * `references` is filled in as a side effect rather than returned: a summary or a
+ * boundary is not a topic — it names a run of them — so it has no place in the
+ * tree that is being built here.
+ */
+function readXmindTopic(
+  topic: Record<string, unknown>,
+  references: ImportedReferences
+): ImportedTopic {
+  const children = isRecord(topic.children) ? topic.children : {};
+  const attached = referenceList(children.attached).map((child) =>
+    readXmindTopic(child, references)
   );
+
+  // A span is written as the pair of topics it runs between, in the file's own
+  // ids. The two forms differ only in which list they were in.
+  const span = (entry: Record<string, unknown>) => {
+    const nodeIds = parseXmindRange(text(entry.range));
+    if (nodeIds.length !== 2) return null;
+    return { nodeIds, text: oneLine(text(entry.title)) };
+  };
+
+  for (const entry of referenceList(children.summary)) {
+    const parsed = span(entry);
+    if (parsed) references.summaries.push(parsed);
+  }
+  for (const entry of referenceList(children.boundary)) {
+    const parsed = span(entry);
+    if (parsed) references.boundaries.push(parsed);
+  }
+
+  const markers = xmindMarkers(topic);
+  const note = xmindNoteText(topic).trim();
+  const labels = Array.isArray(topic.labels)
+    ? topic.labels.filter((label): label is string => typeof label === "string" && !!label.trim())
+    : [];
+
+  return {
+    sourceId: text(topic.id),
+    text: oneLine(text(topic.title)) || UNNAMED,
+    ...(note ? { note } : {}),
+    ...(text(topic.href) ? { link: oneLine(text(topic.href)) } : {}),
+    ...(labels.length > 0 ? { tags: labels } : {}),
+    ...(markers ? { markers } : {}),
+    children: attached,
+  };
+}
+
+/**
+ * A span, written as the pair of topics it runs between: `(id,id)`.
+ *
+ * The parentheses and the comma are the format's own spelling, and both orders
+ * turn up in files, so the pair is returned as written and sorted out later
+ * against the tree — where the two topics' siblings, and so the run between them,
+ * are known.
+ */
+function parseXmindRange(range: string): string[] {
+  const match = /^\((?<from>[^,()]+),(?<to>[^,()]+)\)$/.exec(range.trim());
+  if (!match?.groups) return [];
+  return [match.groups.from.trim(), match.groups.to.trim()];
+}
+
+/**
+ * The two marks a topic can carry, from XMind's marker ids.
+ *
+ * A faithful subset rather than everything: XMind's marker set is large and most
+ * of it — smileys, stars, flags, arrows — is what this app expresses as an *icon*,
+ * which the icon table does not share ids with. Priorities and progress are the
+ * two it does share, so the two are read and the rest are left, which is stated
+ * rather than guessed at.
+ */
+const XMIND_MARKER_TABLE: Record<string, { priority?: number; progress?: number }> = {
+  "priority-1": { priority: 1 },
+  "priority-2": { priority: 2 },
+  "priority-3": { priority: 3 },
+  "priority-4": { priority: 4 },
+  "priority-5": { priority: 5 },
+  "priority-6": { priority: 6 },
+  "priority-7": { priority: 7 },
+  // XMind's progress markers are five steps of an eighth scale; this app's are
+  // nine, so each one lands on the eighth it names.
+  "task-start": { progress: 1 },
+  "task-quarter": { progress: 2 },
+  "task-half": { progress: 4 },
+  "task-3quar": { progress: 6 },
+  "task-done": { progress: 8 },
+};
+
+function xmindMarkers(topic: Record<string, unknown>): { priority?: number; progress?: number } | null {
+  const ids = referenceList(topic.markers)
+    .map((marker) => text(marker.markerId))
+    .filter(Boolean);
+
+  let priority: number | undefined;
+  let progress: number | undefined;
+  for (const id of ids) {
+    const mark = XMIND_MARKER_TABLE[id];
+    if (mark?.priority !== undefined) priority = mark.priority;
+    if (mark?.progress !== undefined) progress = mark.progress;
+  }
+
+  return priority === undefined && progress === undefined ? null : { priority, progress };
 }
 
 /** A topic's note, which XMind keeps both as plain text and as HTML. */
@@ -444,18 +595,31 @@ function topicsOf(outline: ImportedOutline): ImportedTopic[] {
 export function annotationsFromOutline(
   outline: ImportedOutline,
   root: MindmapNode
-): { notes: Record<string, string>; links: Record<string, string> } {
+): ImportedAnnotations {
   const notes: Record<string, string> = {};
   const links: Record<string, string> = {};
+  const tags: Record<string, string[]> = {};
+  const markers: Record<string, { priority?: number; progress?: number }> = {};
+  /** The file's ids against the document's, which is what cross-references need. */
+  const bySourceId = new Map<string, MindmapNode>();
+  const parentOf = new Map<string, MindmapNode>();
 
-  const walk = (tree: MindmapNode | undefined, topic: ImportedTopic | undefined) => {
+  const walk = (
+    tree: MindmapNode | undefined,
+    topic: ImportedTopic | undefined,
+    parent?: MindmapNode
+  ) => {
     if (!tree || !topic) return;
     if (topic.note) notes[tree.id] = topic.note;
     if (topic.link) links[tree.id] = topic.link;
+    if (topic.tags?.length) tags[tree.id] = topic.tags;
+    if (topic.markers) markers[tree.id] = topic.markers;
+    if (topic.sourceId) bySourceId.set(topic.sourceId, tree);
+    if (parent) parentOf.set(tree.id, parent);
 
     const count = Math.min(tree.children.length, topic.children.length);
     for (let index = 0; index < count; index += 1) {
-      walk(tree.children[index], topic.children[index]);
+      walk(tree.children[index], topic.children[index], tree);
     }
   };
 
@@ -465,15 +629,65 @@ export function annotationsFromOutline(
   // level down.
   if (outline.root) {
     walk(root, outline.root);
-    return { notes, links };
+  } else {
+    const count = Math.min(root.children.length, outline.topics.length);
+    for (let index = 0; index < count; index += 1) {
+      walk(root.children[index], outline.topics[index], root);
+    }
   }
 
-  const count = Math.min(root.children.length, outline.topics.length);
-  for (let index = 0; index < count; index += 1) {
-    walk(root.children[index], outline.topics[index]);
-  }
+  /**
+   * The run of sibling topics a span covers, in the document's ids.
+   *
+   * A span names the topics it begins and ends at, and covers everything between
+   * them — which is what it draws as. Both orders turn up, and a pair that is not
+   * two siblings of one parent is not a run this app can express, so it is left
+   * out rather than guessed into something else.
+   */
+  const spanNodeIds = (sources: string[]): string[] | null => {
+    const first = bySourceId.get(sources[0]);
+    const second = bySourceId.get(sources[1]);
+    if (!first || !second) return null;
 
-  return { notes, links };
+    const parent = parentOf.get(first.id);
+    if (!parent || parentOf.get(second.id)?.id !== parent.id) return null;
+
+    const from = parent.children.findIndex((child) => child.id === first.id);
+    const to = parent.children.findIndex((child) => child.id === second.id);
+    if (from < 0 || to < 0) return null;
+
+    const [start, end] = from <= to ? [from, to] : [to, from];
+    return parent.children.slice(start, end + 1).map((child) => child.id);
+  };
+
+  const references = outline.references;
+  const relations = (references?.relations ?? [])
+    .map((relation) => {
+      const fromId = bySourceId.get(relation.fromId)?.id;
+      const toId = bySourceId.get(relation.toId)?.id;
+      // A line needs both of its ends, and one that names a topic the tree does not
+      // have would be a line to nowhere.
+      if (!fromId || !toId) return null;
+      return { fromId, toId, ...(relation.label ? { label: relation.label } : {}) };
+    })
+    .filter(
+      (relation): relation is { fromId: string; toId: string; label?: string } => relation !== null
+    );
+
+  const spans = (list: { nodeIds: string[]; text: string }[] | undefined) =>
+    (list ?? [])
+      .map((span) => ({ nodeIds: spanNodeIds(span.nodeIds), text: span.text }))
+      .filter((span): span is { nodeIds: string[]; text: string } => span.nodeIds !== null);
+
+  return {
+    notes,
+    links,
+    tags,
+    markers,
+    relations,
+    summaries: spans(references?.summaries),
+    boundaries: spans(references?.boundaries),
+  };
 }
 
 /** A file name for the imported document, from the outline's title. */
