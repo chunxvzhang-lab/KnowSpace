@@ -1884,7 +1884,7 @@ export const MindmapView = memo(function MindmapView({
   }, [title]);
 
   const handleExportOpml = useCallback(() => {
-    const xml = exportMindmapToOpml(tree, title);
+    const xml = exportMindmapToOpml(tree, title, sidecar);
     const blob = new Blob([xml], { type: "text/x-opml+xml;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -1894,12 +1894,12 @@ export const MindmapView = memo(function MindmapView({
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }, [tree, title]);
+  }, [tree, title, sidecar]);
 
   const handleExportFreeMind = useCallback(() => {
     // Collapsed state lives here, not on the tree, so the exporter has to be
     // told about it — without this the FOLDED attribute was never written.
-    const xml = exportMindmapToFreeMind(tree, collapsedIds);
+    const xml = exportMindmapToFreeMind(tree, collapsedIds, sidecar);
     const blob = new Blob([xml], { type: "application/x-freemind;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -1909,7 +1909,7 @@ export const MindmapView = memo(function MindmapView({
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }, [tree, title, collapsedIds]);
+  }, [tree, title, collapsedIds, sidecar]);
 
   /**
    * The map as an `.xmind` file, which is also the one export the app can read.

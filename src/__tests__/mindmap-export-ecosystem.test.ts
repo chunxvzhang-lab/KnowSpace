@@ -6,6 +6,14 @@ import {
   exportMindmapToFreeMind,
   exportMindmapToMarkdownOutline,
 } from "../services/mindmapExport";
+import {
+  annotationsFromOutline,
+  outlineToMarkdown,
+  parseFreemindOutline,
+  parseOpmlOutline,
+} from "../services/mindmapImport";
+import { parseMarkdownToMindmapTree } from "../services/mindmapService";
+import { emptySidecar, setNodeLink, setNodeNote } from "../services/mindmapSidecar";
 
 describe("Mindmap Format Ecosystem Exporters", () => {
   const sampleTree: MindmapNode = {
@@ -48,6 +56,89 @@ describe("Mindmap Format Ecosystem Exporters", () => {
       },
     ],
   };
+
+  /**
+   * Notes and links, which used to fall out of these two formats on the way out.
+   *
+   * The asymmetry was the whole problem: both importers read exactly these two
+   * things, so "export to OPML and open it again" quietly lost the reader's notes
+   * while looking like it had worked. Checked by doing precisely that, with the
+   * importers this app already has.
+   */
+  describe("备注与链接：出去再回来还在", () => {
+    const withAnnotations = () => {
+      let sidecar = emptySidecar();
+      sidecar = setNodeNote(sidecar, "node-1", "第一行\n第二行");
+      sidecar = setNodeLink(sidecar, "node-1-1", "https://example.com/notes");
+      return sidecar;
+    };
+
+    /** Which node of a freshly parsed tree carries what, by the text of the topic. */
+    function annotationsByText(xml: string, format: "opml" | "freemind") {
+      const parsed =
+        format === "opml" ? parseOpmlOutline(xml) : parseFreemindOutline(xml);
+      if (!parsed.ok) throw new Error(parsed.message);
+
+      const tree = parseMarkdownToMindmapTree(outlineToMarkdown(parsed.outline), "root");
+      const annotations = annotationsFromOutline(parsed.outline, tree);
+      const byText = new Map<string, { note?: string; link?: string }>();
+
+      const walk = (node: MindmapNode) => {
+        byText.set(node.text, { note: annotations.notes[node.id], link: annotations.links[node.id] });
+        node.children.forEach(walk);
+      };
+      walk(tree);
+
+      return byText;
+    }
+
+    it("OPML：_note 与 url 写出来，读回去还是那两条", () => {
+      const xml = exportMindmapToOpml(sampleTree, "测试", withAnnotations());
+
+      expect(xml).toContain('_note="第一行&#10;第二行"');
+      expect(xml).toContain('url="https://example.com/notes"');
+
+      const byText = annotationsByText(xml, "opml");
+      // The newline survives because it is written as a character reference: a
+      // literal one would be whitespace to an XML parser and come back as a space.
+      expect(byText.get("前端架构 <Web>")?.note).toBe("第一行\n第二行");
+      expect(byText.get("React 19 & TypeScript")?.link).toBe("https://example.com/notes");
+    });
+
+    it("FreeMind：richcontent 与 LINK 写出来，读回去还是那两条", () => {
+      const xml = exportMindmapToFreeMind(sampleTree, undefined, withAnnotations());
+
+      expect(xml).toContain('<richcontent TYPE="NOTE">');
+      expect(xml).toContain('LINK="https://example.com/notes"');
+
+      const byText = annotationsByText(xml, "freemind");
+      expect(byText.get("前端架构 <Web>")?.note).toBe("第一行\n第二行");
+      expect(byText.get("React 19 & TypeScript")?.link).toBe("https://example.com/notes");
+    });
+
+    it("没有标注时，文件里不多出这两个属性", () => {
+      // The shape a reader without notes has always seen, unchanged — the two
+      // attributes appear because there is something to put in them.
+      const opml = exportMindmapToOpml(sampleTree, "测试");
+      const freemind = exportMindmapToFreeMind(sampleTree);
+
+      expect(opml).not.toContain("_note=");
+      expect(opml).not.toContain("url=");
+      expect(freemind).not.toContain("richcontent");
+      expect(freemind).not.toContain("LINK=");
+    });
+
+    it("备注里的特殊字符仍然被转义", () => {
+      const sidecar = setNodeNote(emptySidecar(), "node-2", '小于号 < 与 & 和 "引号"');
+      const xml = exportMindmapToFreeMind(sampleTree, undefined, sidecar);
+
+      expect(xml).toContain("&lt;");
+      expect(xml).toContain("&amp;");
+      expect(annotationsByText(xml, "freemind").get("存储引擎")?.note).toBe(
+        '小于号 < 与 & 和 "引号"'
+      );
+    });
+  });
 
   it("escapes XML special characters correctly", () => {
     expect(escapeXml("Hello & <World> \"Quotes\" 'Single'")).toBe(
