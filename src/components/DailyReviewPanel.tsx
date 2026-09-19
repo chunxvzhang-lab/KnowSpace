@@ -8,14 +8,18 @@ import {
   Keyboard,
   AlertCircle,
   FolderOpen,
+  Undo2,
 } from "lucide-react";
 import {
   buildReviewQueue,
   parseFlashcards,
+  parseFsrsMetadata,
   review,
+  serializeFsrsMetadata,
   summarize,
   upsertFsrsMetadata,
   type FsrsCardKind,
+  type FsrsProgress,
   type FsrsRating,
   type FsrsStats,
 } from "../services/fsrsService";
@@ -67,11 +71,21 @@ const KIND_LABEL: Record<FsrsCardKind, string> = {
   cloze: "挖空",
 };
 
-/** One rated card, kept for the end-of-session summary. */
+/**
+ * One rated card, kept for the end-of-session summary — and for the one step of undo.
+ *
+ * `previous` is the scheduling the card had before this rating, and `filePath` is the
+ * document it lives in. Both are kept here rather than looked up at undo time: the
+ * sources are re-read after every rating, so the queue's own view of the card is
+ * already the new one by then, and a source the reader has since switched away from
+ * has no view of it at all.
+ */
 type ReviewLogEntry = {
   cardId: string;
   rating: FsrsRating;
   intervalDays: number;
+  filePath: string;
+  previous: FsrsProgress;
 };
 
 export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
@@ -304,7 +318,13 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
         source.content = updatedContent;
         setLog((prev) => [
           ...prev,
-          { cardId: current.card.id, rating, intervalDays: result.intervalDays },
+          {
+            cardId: current.card.id,
+            rating,
+            intervalDays: result.intervalDays,
+            filePath: source.path,
+            previous: current.progress,
+          },
         ]);
         // Mark rather than advance: the parent reload below rebuilds the queue,
         // and this is what keeps the next card in front of the reader.
@@ -341,6 +361,86 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
     ]
   );
 
+  /**
+   * Takes back the last rating of this session.
+   *
+   * A rating is one keypress, and "重来" sits one key away from "良好" on the same row:
+   * the wrong one moves the card's schedule — a lapse it did not have, an interval it
+   * did not earn — and afterwards nothing on screen says so. One step of undo is the
+   * step that mis-click needs, and it is the step the reader just took.
+   *
+   * The card returns to the round as well: what is being restored is the schedule it
+   * had, and a card whose schedule was taken back has not been reviewed.
+   */
+  const handleUndo = useCallback(async () => {
+    if (saving) return;
+    const last = log.at(-1);
+    if (!last) return;
+
+    // A card that had never been reviewed has no row of its own in the file, so taking
+    // the rating back means taking the row away again. (Writing the "new" progress back
+    // instead would say the same thing in a row that was not there before — and a note
+    // whose only card is undone this way should end up with no block at all, which is
+    // what removing it gives.)
+    const restoreIsRemoval = last.previous.state === "new" && last.previous.reps === 0;
+
+    setSaving(true);
+    try {
+      if (!desktop?.saveMarkdownFile) throw new Error("当前环境不支持写回笔记");
+
+      // Read first, like a rating does: the file may have been written to since, and
+      // what is being written back is one card's scheduling, not a whole document.
+      let baseContent = "";
+      try {
+        const fresh = await desktop.readMarkdownFile?.(last.filePath);
+        if (typeof fresh?.markdown === "string") baseContent = fresh.markdown;
+      } catch {
+        // Falls through to the refusal below: without the file's own text there is
+        // nothing to put one row back into, and guessing at it would be worse.
+      }
+      if (!baseContent) throw new Error("读不到这篇笔记");
+
+      const progress = parseFsrsMetadata(baseContent);
+      if (restoreIsRemoval) progress.delete(last.cardId);
+      else progress.set(last.cardId, last.previous);
+
+      const res = await desktop.saveMarkdownFile({
+        absolutePath: last.filePath,
+        content: serializeFsrsMetadata(baseContent, progress),
+        force: true,
+      });
+      if (!res?.success) throw new Error(res?.message || "保存失败");
+
+      setLog((prev) => prev.slice(0, -1));
+      setReviewedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(last.cardId);
+        return next;
+      });
+      setRevealed(false);
+      // The sources hold their own copies, so they are told the same way a rating
+      // tells them.
+      onProgressSaved?.();
+      if (isVaultSource) vault.reloadIfLoaded();
+      if (isFolderSource) folder.reloadIfLoaded();
+      showToast("已撤销上一次评分");
+    } catch (err) {
+      showToast(`撤销失败：${err instanceof Error ? err.message : "未知错误"}`);
+    } finally {
+      setSaving(false);
+    }
+  }, [
+    desktop,
+    folder.reloadIfLoaded,
+    isFolderSource,
+    isVaultSource,
+    log,
+    onProgressSaved,
+    saving,
+    showToast,
+    vault.reloadIfLoaded,
+  ]);
+
   // Keyboard review flow: Space reveals, 1-4 grade. Guarded against firing while
   // the user is typing in the search box above.
   useEffect(() => {
@@ -356,6 +456,14 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
         target?.isContentEditable === true ||
         target?.closest(".cm-editor") != null;
       if (isEditing) return;
+
+      // Ctrl/Cmd+Z only reaches here from outside a text field — the guard above has
+      // already let the editor keep its own undo.
+      if ((event.ctrlKey || event.metaKey) && (event.key === "z" || event.key === "Z")) {
+        event.preventDefault();
+        void handleUndo();
+        return;
+      }
 
       if (event.code === "Space" || event.key === " ") {
         // Stop the page from scrolling, and don't re-fire the button's own
@@ -394,6 +502,20 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
             <span className="space-count-badge">{stats.due} 张待复习</span>
           </div>
           <div className="space-header-actions">
+            {/* Only reachable while there is a rating to take back, which is also what
+                makes it a one-step undo rather than a history: the step the reader has
+                just taken is the step a mis-key needs. */}
+            {log.length > 0 ? (
+              <button
+                type="button"
+                className="space-icon-btn"
+                onClick={() => void handleUndo()}
+                disabled={saving}
+                title="撤销上一次评分（Ctrl+Z）"
+              >
+                <Undo2 size={13} />
+              </button>
+            ) : null}
             <button
               type="button"
               className="space-icon-btn"

@@ -11,9 +11,9 @@ import type { FlashNoteSummaryItem } from "../types/desktop";
  * `window.addEventListener("keydown")` listener under jsdom, so the panel's
  * keyboard flow is exercised with a genuine event instead.
  */
-function pressKey(key: string, code?: string) {
+function pressKey(key: string, code?: string, modifiers: KeyboardEventInit = {}) {
   act(() => {
-    window.dispatchEvent(new KeyboardEvent("keydown", { key, code, bubbles: true }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key, code, bubbles: true, ...modifiers }));
   });
 }
 
@@ -356,6 +356,146 @@ describe("DailyReviewPanel - 每日复盘视图", () => {
 
     expect(screen.getByText("待复习卡")).toBeDefined();
     expect(screen.getByText("1 张待复习")).toBeDefined();
+  });
+});
+
+/**
+ * One step of undo.
+ *
+ * "重来" sits one key away from "良好", and the wrong one silently moves a card's
+ * schedule — a lapse it did not have, an interval it did not earn. Nothing on screen
+ * says so afterwards, and the reader's only other recourse was editing the metadata
+ * block by hand.
+ */
+describe("DailyReviewPanel - 撤销上一次评分", () => {
+  let saveMarkdownFile: ReturnType<typeof vi.fn>;
+  let readMarkdownFile: ReturnType<typeof vi.fn>;
+
+  /** What the file on disk holds, which is the last thing written to it. */
+  const onDisk = () => String(saveMarkdownFile.mock.calls.at(-1)?.[0]?.content ?? "");
+  const savedContent = () => onDisk();
+
+  beforeEach(() => {
+    saveMarkdownFile = vi.fn().mockResolvedValue({ success: true });
+    // A real file, modelled honestly: reading gives back what was last written, or the
+    // note as it started. Anything else would make the merge look better than it is.
+    readMarkdownFile = vi.fn();
+    (window as unknown as Record<string, unknown>).knowSpaceDesktop = {
+      saveMarkdownFile,
+      readMarkdownFile,
+    };
+  });
+
+  afterEach(() => {
+    delete (window as unknown as Record<string, unknown>).knowSpaceDesktop;
+  });
+
+  const installDisk = (note: FlashNoteSummaryItem) => {
+    readMarkdownFile.mockImplementation(() =>
+      Promise.resolve({ markdown: onDisk() || note.content, baseUrl: "" })
+    );
+  };
+
+  it("还没评分时没有撤销按钮", () => {
+    render(<DailyReviewPanel notes={THREE_CARDS} />);
+
+    expect(screen.queryByTitle(/撤销上一次评分/)).toBeNull();
+  });
+
+  it("给从没复习过的卡片撤销：连那一行也收回去", async () => {
+    const note = makeNote({ filePath: "C:/Space/fresh.md", content: "问题甲 :: 答案甲" });
+    installDisk(note);
+    render(<DailyReviewPanel notes={[note]} />);
+
+    pressKey(" ");
+    fireEvent.click(screen.getByText("良好"));
+    await waitFor(() => expect(saveMarkdownFile).toHaveBeenCalledTimes(1));
+    expect(savedContent()).toContain("fsrs-");
+
+    fireEvent.click(screen.getByTitle(/撤销上一次评分/));
+
+    // A card that had no row of its own gets no row back: the note is left exactly as
+    // it was, byte for byte — block gone, and the blank line it was appended after
+    // gone with it, because that blank line is a mark of the block too.
+    await waitFor(() => expect(saveMarkdownFile).toHaveBeenCalledTimes(2));
+    expect(savedContent()).not.toContain("fsrs-");
+    expect(savedContent()).toBe("问题甲 :: 答案甲");
+  });
+
+  it("给复习过的卡片撤销：写回的是它原来的调度", async () => {
+    const cardId = computeCardId("inline", "复习过的卡");
+    const note = makeNote({
+      filePath: "C:/Space/tracked.md",
+      content:
+        `复习过的卡 :: 答案\n\n<!-- fsrs:begin\n` +
+        `${cardId} S=1.0000 D=5.0000 due=2026-01-01 reps=2 lapses=0 state=review last=2025-12-31\n` +
+        `fsrs:end -->`,
+    });
+    installDisk(note);
+    render(<DailyReviewPanel notes={[note]} />);
+
+    pressKey(" ");
+    fireEvent.click(screen.getByText("良好"));
+    await waitFor(() => expect(saveMarkdownFile).toHaveBeenCalledTimes(1));
+    expect(savedContent()).toContain("reps=3");
+
+    fireEvent.click(screen.getByTitle(/撤销上一次评分/));
+
+    await waitFor(() => expect(saveMarkdownFile).toHaveBeenCalledTimes(2));
+    const restored = /S=([\d.]+) D=([\d.]+) due=(\S+) reps=(\d+)/.exec(savedContent());
+    expect(restored?.slice(1)).toEqual(["1.0000", "5.0000", "2026-01-01", "2"]);
+  });
+
+  it("撤销之后，那张卡回到眼前", async () => {
+    const note = makeNote({ filePath: "C:/Space/back.md", content: "问题甲 :: 答案甲" });
+    installDisk(note);
+    render(<DailyReviewPanel notes={[note]} />);
+
+    pressKey(" ");
+    fireEvent.click(screen.getByText("良好"));
+    await waitFor(() => expect(saveMarkdownFile).toHaveBeenCalledTimes(1));
+    // The queue is empty, so the panel is on the completion screen.
+    await waitFor(() => expect(screen.getByText(/今日复习完成/)).toBeDefined());
+
+    fireEvent.click(screen.getByTitle(/撤销上一次评分/));
+
+    // Taking the rating back hands the card back: it has not been reviewed, so it is
+    // the card being asked about again.
+    await waitFor(() => expect(screen.getByText("问题甲")).toBeDefined());
+  });
+
+  it("Ctrl+Z 与按钮等效", async () => {
+    const note = makeNote({ filePath: "C:/Space/keys.md", content: "问题甲 :: 答案甲" });
+    installDisk(note);
+    render(<DailyReviewPanel notes={[note]} />);
+
+    pressKey(" ");
+    fireEvent.click(screen.getByText("良好"));
+    await waitFor(() => expect(saveMarkdownFile).toHaveBeenCalledTimes(1));
+
+    pressKey("z", undefined, { ctrlKey: true });
+
+    await waitFor(() => expect(saveMarkdownFile).toHaveBeenCalledTimes(2));
+    expect(savedContent()).not.toContain("fsrs-");
+  });
+
+  it("读不到文件就不撤销，并留着那一步等重试", async () => {
+    const note = makeNote({ filePath: "C:/Space/unreadable.md", content: "问题甲 :: 答案甲" });
+    readMarkdownFile.mockRejectedValue(new Error("读不了"));
+    render(<DailyReviewPanel notes={[note]} />);
+
+    pressKey(" ");
+    fireEvent.click(screen.getByText("良好"));
+    await waitFor(() => expect(saveMarkdownFile).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByTitle(/撤销上一次评分/));
+
+    // Refusing is the honest answer: without the file's own text there is nothing to
+    // put a row back into. The step is still there to try again, and the card has not
+    // been handed back — nothing happened at all.
+    await waitFor(() => expect(screen.getByText(/撤销失败/)).toBeDefined());
+    expect(saveMarkdownFile).toHaveBeenCalledTimes(1);
+    expect(screen.getByTitle(/撤销上一次评分/)).toBeDefined();
   });
 });
 

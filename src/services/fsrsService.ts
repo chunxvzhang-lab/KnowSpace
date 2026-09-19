@@ -752,7 +752,12 @@ export function serializeFsrsMetadata(
   markdown: string,
   progress: Map<string, FsrsProgress>
 ): string {
-  if (progress.size === 0) return markdown;
+  // An empty map is not "nothing to say" — it is "nothing to keep", and what the
+  // document still holds belongs to cards that are no longer in the map, so it goes.
+  // The shortcut that used to be here (`if (progress.size === 0) return markdown`)
+  // read the other way round, and undoing a rating is what found it out: taking back
+  // the only rating a note had left the row behind, because the map that would have
+  // removed it was empty.
 
   // Only keep entries that still correspond to a card in the note, so deleted cards
   // do not accumulate forever.
@@ -797,7 +802,10 @@ export function stripFsrsMetadata(markdown: string): string {
     kept.push(line);
   }
 
-  return kept.join("\n").replace(/\n{3,}/g, "\n\n");
+  // Trailing blank lines go too, so a note that has had its last rating taken back
+  // reads exactly like a note that was never rated — the block was appended after a
+  // blank line, and leaving that blank line behind is a mark of its own.
+  return kept.join("\n").replace(/\n{3,}/g, "\n\n").replace(/\s+$/, "");
 }
 
 /** Merges updated progress into a note, replacing any previous metadata. */
