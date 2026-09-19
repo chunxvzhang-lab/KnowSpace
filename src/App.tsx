@@ -36,7 +36,7 @@ import { useBookmarks } from "./hooks/useBookmarks";
 import { useDocumentSession } from "./hooks/useDocumentSession";
 import { useReadingTracker } from "./hooks/useReadingTracker";
 import { resolveBookmark } from "./services/bookmarks";
-import { loadChapterMarkdown } from "./services/bookSource";
+import { loadPackagedChapterMarkdown } from "./services/bookSource";
 import { type MermaidTheme } from "./services/mermaid";
 import { extractHeadingsFromSource, renderMarkdown } from "./services/markdown";
 import {
@@ -996,7 +996,7 @@ export function App() {
       targetAbsPath && window.bookMDDesktop
         ? window.bookMDDesktop.readMarkdownFile(targetAbsPath)
         : manifest
-        ? loadChapterMarkdown(manifest, chapterId)
+        ? loadPackagedChapterMarkdown(manifest, chapterId)
         : Promise.reject(new Error("无法加载章节内容。"));
 
     loadPromise
@@ -1060,7 +1060,7 @@ export function App() {
       targetAbsPath && window.bookMDDesktop
         ? window.bookMDDesktop.readMarkdownFile(targetAbsPath)
         : manifest
-          ? loadChapterMarkdown(manifest, dualSplitTabId)
+          ? loadPackagedChapterMarkdown(manifest, dualSplitTabId)
           : null;
 
     if (!loadPromise) return;

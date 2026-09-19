@@ -13,13 +13,29 @@ const EMBEDDED_CHAPTERS: Record<string, string> = {
   "chapters/03-advanced-markdown.md": advancedMd,
 };
 
+/**
+ * The book that ships inside the app, for the web build and for first run.
+ *
+ * One book, hard-coded, and the chapter loader below is hard-coded to match: there is
+ * no folder to open without the desktop bridge, so the manifest this app can be showing
+ * is this one.
+ */
 export async function loadPackagedBook(): Promise<BookManifest> {
   const manifest = demoManifest as BookManifest;
   validateManifest(manifest);
   return manifest;
 }
 
-export async function loadChapterMarkdown(
+/**
+ * Loads a chapter **of the packaged book**.
+ *
+ * Named for that, because the name used to be `loadChapterMarkdown` and the URL below
+ * says `books/demo/` — which reads like a bug to anyone who takes the old name at its
+ * word. It is the fallback for when there is no desktop bridge: with one, App reads the
+ * chapter from disk through the bridge and this is never called. So the manifest that
+ * arrives here is the packaged one, and the hard-coded path is the book.
+ */
+export async function loadPackagedChapterMarkdown(
   manifest: BookManifest,
   chapterId: string,
 ): Promise<ChapterSource> {
@@ -35,7 +51,8 @@ export async function loadChapterMarkdown(
     };
   }
 
-  // 2. Fallback to network fetch if not embedded
+  // 2. Fallback to a fetch for anything the bundle does not carry. The path is the
+  // packaged book's, which is the only book reachable without the desktop bridge.
   const chapterUrl = `books/demo/${chapter.src}`;
   const response = await fetch(chapterUrl);
   if (!response.ok) {

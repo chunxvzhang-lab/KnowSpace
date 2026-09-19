@@ -11,9 +11,9 @@
 
 | 项目 | 数值 |
 | :--- | ---: |
-| 测试文件 | **92** |
-| 用例总数 | **1189** |
-| 通过 | 1189 |
+| 测试文件 | **94** |
+| 用例总数 | **1208** |
+| 通过 | 1208 |
 | 失败 | 0 |
 | 跳过 | 0 |
 | 通过率 | 100.0% |
@@ -46,6 +46,7 @@
 | `src/__tests__/markdown-files.test.ts` | 19 | ✅ |
 | `src/__tests__/vault-store.test.ts` | 19 | ✅ |
 | `src/__tests__/mindmap-svg-export.test.tsx` | 15 | ✅ |
+| `src/__tests__/table-generator.test.ts` | 14 | ✅ |
 | `src/__tests__/document-creation.test.ts` | 13 | ✅ |
 | `src/__tests__/mindmap-export-ecosystem.test.ts` | 13 | ✅ |
 | `src/__tests__/backlink-index-hook.test.ts` | 12 | ✅ |
@@ -86,6 +87,7 @@
 | `src/__tests__/space-timeline.test.ts` | 6 | ✅ |
 | `src/__tests__/sync-selection.test.ts` | 6 | ✅ |
 | `src/__tests__/blocklink.test.ts` | 5 | ✅ |
+| `src/__tests__/book-source.test.ts` | 5 | ✅ |
 | `src/__tests__/global-shortcuts-hook.test.ts` | 5 | ✅ |
 | `src/__tests__/media-lightbox.test.tsx` | 5 | ✅ |
 | `src/__tests__/mindmap-alignment.test.tsx` | 5 | ✅ |
@@ -144,7 +146,7 @@
 
 任何重构都必须满足：
 
-1. 用例总数 **不低于 1189**（删除测试需在 PR 说明中论证）
+1. 用例总数 **不低于 1208**（删除测试需在 PR 说明中论证）
 2. 通过率 **100%**
 3. 单文件用例数**不得下降**（防止测试被静默删除）
 
