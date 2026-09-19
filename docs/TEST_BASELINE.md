@@ -12,8 +12,8 @@
 | 项目 | 数值 |
 | :--- | ---: |
 | 测试文件 | **92** |
-| 用例总数 | **1184** |
-| 通过 | 1184 |
+| 用例总数 | **1189** |
+| 通过 | 1189 |
 | 失败 | 0 |
 | 跳过 | 0 |
 | 通过率 | 100.0% |
@@ -37,9 +37,9 @@
 | `src/__tests__/ui-store.test.ts` | 35 | ✅ |
 | `src/__tests__/tab-store.test.ts` | 34 | ✅ |
 | `src/__tests__/mindmap-reparent.test.ts` | 32 | ✅ |
+| `src/__tests__/review-sources.test.tsx` | 29 | ✅ |
 | `src/__tests__/mindmap-themes.test.ts` | 28 | ✅ |
 | `src/__tests__/mindmap-collapse-persistence.test.tsx` | 24 | ✅ |
-| `src/__tests__/review-sources.test.tsx` | 24 | ✅ |
 | `src/__tests__/mindmap.test.ts` | 23 | ✅ |
 | `src/__tests__/search-index-service.test.ts` | 20 | ✅ |
 | `src/__tests__/column-resize.test.tsx` | 19 | ✅ |
@@ -144,7 +144,7 @@
 
 任何重构都必须满足：
 
-1. 用例总数 **不低于 1184**（删除测试需在 PR 说明中论证）
+1. 用例总数 **不低于 1189**（删除测试需在 PR 说明中论证）
 2. 通过率 **100%**
 3. 单文件用例数**不得下降**（防止测试被静默删除）
 

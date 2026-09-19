@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { DailyReviewPanel } from "../components/DailyReviewPanel";
+import { MAX_REVIEW_FOLDERS } from "../hooks/useReviewFolders";
 import { useVaultStore } from "../store/useVaultStore";
 
 /**
@@ -496,8 +497,8 @@ describe("DailyReviewPanel - 自定义文件夹来源", () => {
     expect(readMarkdownBatch).toHaveBeenCalledWith(["C:/Notes/复习/a.md"]);
   });
 
-  it("点「取消」就不再记住它", async () => {
-    localStorage.setItem("knowspace.review-folder", JSON.stringify(folderRow));
+  it("点「移除」就不再记住它", async () => {
+    localStorage.setItem("knowspace.review-folders", JSON.stringify([folderRow]));
     listReviewFolder.mockResolvedValue({ paths: folderRow.paths });
     render(<DailyReviewPanel notes={[]} />);
 
@@ -506,9 +507,121 @@ describe("DailyReviewPanel - 自定义文件夹来源", () => {
     });
     await waitFor(() => expect(screen.getByText("复习")).toBeDefined());
 
-    fireEvent.click(screen.getByText("取消"));
+    fireEvent.click(screen.getByText("移除"));
 
-    expect(localStorage.getItem("knowspace.review-folder")).toBeNull();
+    expect(localStorage.getItem("knowspace.review-folders")).toBe(JSON.stringify([]));
     expect(screen.getByText("还没有选择文件夹")).toBeDefined();
+  });
+
+  it("两个文件夹：两边的卡在同一轮里", async () => {
+    // Revision is rarely one subject. A reader with 英语 and 专业课 was re-picking a
+    // folder every time they switched; now both are read, and the batch is asked for
+    // the union of their files.
+    pickReviewFolder
+      .mockResolvedValueOnce({ canceled: false, ...folderRow })
+      .mockResolvedValueOnce({
+        canceled: false,
+        rootPath: "C:/Notes/英语",
+        name: "英语",
+        paths: ["C:/Notes/英语/b.md"],
+      });
+    readMarkdownBatch.mockResolvedValue(
+      batch([
+        ["C:/Notes/复习/a.md", "复习里的卡 :: 答案"],
+        ["C:/Notes/英语/b.md", "英语里的卡 :: 答案"],
+      ])
+    );
+    render(<DailyReviewPanel notes={[]} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("自定义文件夹"));
+    });
+    await waitFor(() => expect(screen.getByText("复习里的卡")).toBeDefined());
+    // The second one is picked from the row that adds another.
+    await act(async () => {
+      fireEvent.click(screen.getByText("添加文件夹"));
+    });
+
+    await waitFor(() => expect(screen.getByText("英语")).toBeDefined());
+    expect(readMarkdownBatch).toHaveBeenLastCalledWith([
+      "C:/Notes/复习/a.md",
+      "C:/Notes/英语/b.md",
+    ]);
+  });
+
+  it("同一个文件夹加两次：只留一行", async () => {
+    pickReviewFolder.mockResolvedValue({ canceled: false, ...folderRow });
+    readMarkdownBatch.mockResolvedValue(batch([["C:/Notes/复习/a.md", "卡 :: 答案"]]));
+    render(<DailyReviewPanel notes={[]} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("自定义文件夹"));
+    });
+    await waitFor(() => expect(screen.getByText("复习")).toBeDefined());
+    await act(async () => {
+      fireEvent.click(screen.getByText("添加文件夹"));
+    });
+
+    // One row, and the file is read once: adding it again refreshes the listing rather
+    // than listing the same folder twice.
+    expect(screen.getAllByText("复习")).toHaveLength(1);
+    expect(readMarkdownBatch).toHaveBeenLastCalledWith(["C:/Notes/复习/a.md"]);
+  });
+
+  it("两个文件夹里有同一个文件时，那个文件只读一次", async () => {
+    localStorage.setItem(
+      "knowspace.review-folders",
+      JSON.stringify([
+        folderRow,
+        { rootPath: "C:/Notes/复习/子集", name: "子集", paths: ["C:/Notes/复习/a.md"] },
+      ])
+    );
+    listReviewFolder.mockResolvedValue({ paths: ["C:/Notes/复习/a.md"] });
+    readMarkdownBatch.mockResolvedValue(batch([["C:/Notes/复习/a.md", "卡 :: 答案"]]));
+    render(<DailyReviewPanel notes={[]} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("自定义文件夹"));
+    });
+
+    // One folder inside another is a normal thing to set up, and the same path read
+    // twice would put the same cards in the round twice.
+    await waitFor(() => expect(readMarkdownBatch).toHaveBeenCalled());
+    expect(readMarkdownBatch.mock.calls.at(-1)?.[0]).toEqual(["C:/Notes/复习/a.md"]);
+  });
+
+  it("上限到了就不再接受新的，并说清为什么", async () => {
+    const many = Array.from({ length: MAX_REVIEW_FOLDERS }, (_, index) => ({
+      rootPath: `C:/Notes/f${index}`,
+      name: `f${index}`,
+      paths: [`C:/Notes/f${index}/a.md`],
+    }));
+    localStorage.setItem("knowspace.review-folders", JSON.stringify(many));
+    listReviewFolder.mockResolvedValue({ paths: [] });
+    render(<DailyReviewPanel notes={[]} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("自定义文件夹"));
+    });
+
+    const add = await screen.findByText("添加文件夹");
+    expect((add as HTMLButtonElement).disabled).toBe(true);
+    expect((add as HTMLButtonElement).title).toContain("当前知识库");
+  });
+
+  it("旧版本记住的那一个文件夹会被带过来", async () => {
+    // The single-folder key this replaced. An upgrade renaming a storage key is not a
+    // reason for the folder someone chose to disappear.
+    localStorage.setItem("knowspace.review-folder", JSON.stringify(folderRow));
+    listReviewFolder.mockResolvedValue({ paths: folderRow.paths });
+    readMarkdownBatch.mockResolvedValue(batch([["C:/Notes/复习/a.md", "带过来的卡 :: 答案"]]));
+    render(<DailyReviewPanel notes={[]} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByText("自定义文件夹"));
+    });
+
+    await waitFor(() => expect(screen.getByText("带过来的卡")).toBeDefined());
+    expect(screen.getByText("复习")).toBeDefined();
   });
 });

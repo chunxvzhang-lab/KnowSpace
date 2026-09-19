@@ -6371,13 +6371,20 @@ body:has(.flash-capsule-overlay) {
   flex: 1 1 44%;
 }
 
-/* Which folder the review is reading, and what one may do about it. Shown only
-   while that source is in use: it belongs to the source, not to the header. */
+/* Which folders the review is reading, and what one may do about them. Shown only
+   while that source is in use: they belong to the source, not to the header. One
+   row per folder, and the last row is the way to add another. */
+.dr-folder-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 0 0 8px;
+}
+
 .dr-folder-row {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 0 0 8px;
   font-size: 10.5px;
   color: #94a3b8;
 }

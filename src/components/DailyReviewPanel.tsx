@@ -24,7 +24,7 @@ import {
   type FsrsStats,
 } from "../services/fsrsService";
 import { useVaultCards } from "../hooks/useVaultCards";
-import { useReviewFolder } from "../hooks/useReviewFolder";
+import { MAX_REVIEW_FOLDERS, useReviewFolders } from "../hooks/useReviewFolders";
 import type { ReviewSourceDocument } from "../services/reviewSources";
 
 type DailyReviewPanelProps = {
@@ -135,7 +135,7 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
    */
   const [reviewSource, setReviewSource] = useState<ReviewSourceKind>(() => readStoredSource());
   const vault = useVaultCards();
-  const folder = useReviewFolder();
+  const folder = useReviewFolders();
   const isVaultSource = reviewSource === "vault";
   const isFolderSource = reviewSource === "folder";
   const isDocumentSource = reviewSource === "document";
@@ -187,7 +187,7 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
       const remembered = reviewSource;
       const unavailable =
         (remembered === "vault" && vault.chapterCount === 0) ||
-        (remembered === "folder" && !folder.choice) ||
+        (remembered === "folder" && folder.choices.length === 0) ||
         (remembered === "document" && !canReviewDocument);
       if (unavailable) {
         setReviewSource("space");
@@ -196,13 +196,15 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
     }
 
     if (reviewSource === "vault" && vault.chapterCount > 0 && !vault.loaded) void vault.load();
-    if (reviewSource === "folder" && folder.choice && !folder.loaded) void folder.load();
+    if (reviewSource === "folder" && folder.choices.length > 0 && !folder.loaded) {
+      void folder.load();
+    }
   }, [
     reviewSource,
     vault.chapterCount,
     vault.loaded,
     vault.load,
-    folder.choice,
+    folder.choices,
     folder.loaded,
     folder.load,
     canReviewDocument,
@@ -640,13 +642,12 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
               setReviewSource("folder");
               // Nothing chosen yet means nothing to read, so the first click asks for a
               // folder rather than opening an empty review and leaving the reader to
-              // work out why. `choose` reads the folder it just picked; a picked folder
-              // needs no second read, and the effect above handles the rest.
-              if (!folder.choice) void folder.choose();
+              // work out why. `choose` adds one to the list; the effect above reads it.
+              if (folder.choices.length === 0) void folder.choose();
             }}
             title={
-              folder.choice
-                ? `复习「${folder.choice.name}」里的 ${folder.fileCount} 篇文档`
+              folder.choices.length > 0
+                ? `复习 ${folder.choices.length} 个文件夹里的 ${folder.fileCount} 篇文档`
                 : "选一个文件夹作为卡片来源"
             }
           >
@@ -667,22 +668,43 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
           </button>
         </div>
 
-        {/* Which folder, and the two things one might want to do about it. Only while
-            that source is in use: it is a row about the source, not a permanent part
-            of the header. */}
-        {isFolderSource && folder.choice ? (
-          <div className="dr-folder-row">
-            <FolderOpen size={12} />
-            <span className="dr-folder-name" title={folder.choice.rootPath}>
-              {folder.choice.name}
-            </span>
-            <span className="dr-folder-count">{folder.fileCount} 篇</span>
-            <button type="button" className="dr-folder-action" onClick={() => void folder.choose()}>
-              更换
-            </button>
-            <button type="button" className="dr-folder-action" onClick={folder.forget}>
-              取消
-            </button>
+        {/* Which folders, and what one might want to do about them. Only while that
+            source is in use: these are rows about the source, not a permanent part of
+            the header. */}
+        {isFolderSource && folder.choices.length > 0 ? (
+          <div className="dr-folder-list">
+            {folder.choices.map((choice) => (
+              <div className="dr-folder-row" key={choice.rootPath}>
+                <FolderOpen size={12} />
+                <span className="dr-folder-name" title={choice.rootPath}>
+                  {choice.name}
+                </span>
+                <span className="dr-folder-count">{choice.paths.length} 篇</span>
+                <button
+                  type="button"
+                  className="dr-folder-action"
+                  onClick={() => folder.remove(choice.rootPath)}
+                  title={`不再复习「${choice.name}」`}
+                >
+                  移除
+                </button>
+              </div>
+            ))}
+            <div className="dr-folder-row">
+              <button
+                type="button"
+                className="dr-folder-action"
+                onClick={() => void folder.choose()}
+                disabled={!folder.canAddMore}
+                title={
+                  folder.canAddMore
+                    ? "再加一个文件夹"
+                    : `一轮最多复习 ${MAX_REVIEW_FOLDERS} 个文件夹；再多就用「当前知识库」来源`
+                }
+              >
+                添加文件夹
+              </button>
+            </div>
           </div>
         ) : null}
 
@@ -740,12 +762,13 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
               <code>{"{{c1::答案}}"}</code>，保存后即可复习。
             </p>
           </div>
-        ) : isFolderSource && !folder.choice ? (
+        ) : isFolderSource && folder.choices.length === 0 ? (
           <div className="space-empty-state">
             <FolderOpen size={32} />
             <p>还没有选择文件夹</p>
             <p className="dr-empty-hint">
-              挑一个放着笔记的文件夹，它里面的卡片就会进入复习 —— 只是复习，不会把它打开成工作区。
+              挑一个放着笔记的文件夹（最多 {MAX_REVIEW_FOLDERS} 个），它里面的卡片就会进入复习
+              —— 只是复习，不会把它打开成工作区。
             </p>
             <button
               type="button"
@@ -761,7 +784,7 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
             <Inbox size={32} />
             <p>
               {isFolderSource
-                ? "这个文件夹里还没有闪卡"
+                ? "这些文件夹里还没有闪卡"
                 : isVaultSource
                   ? "知识库里还没有闪卡"
                   : "Space 里还没有闪卡"}
