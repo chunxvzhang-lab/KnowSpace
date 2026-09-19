@@ -56,11 +56,13 @@ import {
   allTags,
   emptySidecar,
   iconFor,
+  linkFor,
   loadSidecar,
   markersFor,
   noteFor,
   saveSidecar,
   setNodeIcon,
+  setNodeLink,
   setNodeNote,
   setNodePriority,
   setNodeProgress,
@@ -69,7 +71,8 @@ import {
   type MindmapSidecar,
 } from "../services/mindmapSidecar";
 import { findMindmapIcon } from "../core/mindmapIcons";
-import { NodeMarks, NodeTags } from "./MindmapMarks";
+import { parseMindmapLink } from "../core/mindmapLinks";
+import { NodeLinkMark, NodeMarks, NodeTags } from "./MindmapMarks";
 
 /**
  * How long a note waits before it is written.
@@ -102,6 +105,16 @@ export type MindmapViewProps = {
   onSourceChange?: (newSource: string) => void;
   editable?: boolean;
   onJumpToHeading?: (headingId: string, line?: number) => void;
+  /**
+   * Opens another document, for `[[wiki links]]` on a node.
+   *
+   * Supplied by the caller because only it knows how this app resolves a name to
+   * a file — the reader already asks the same question when a wiki link is
+   * clicked, so it hands over the same answer rather than a second resolver
+   * growing here. Without it, a wiki link is shown and described but not
+   * followable, and the panel says so instead of failing on click.
+   */
+  onWikiLinkClick?: (target: string) => void;
   onClose?: () => void;
   theme?: ThemeMode;
   /**
@@ -187,6 +200,7 @@ export const MindmapView = memo(function MindmapView({
   onSourceChange,
   editable = true,
   onJumpToHeading,
+  onWikiLinkClick,
   onClose,
   theme = "system",
   documentKey,
@@ -345,6 +359,73 @@ export const MindmapView = memo(function MindmapView({
   const handleIconChange = useCallback(
     (nodeId: string, iconId: string) => applySidecarEdit((current) => setNodeIcon(current, nodeId, iconId)),
     [applySidecarEdit]
+  );
+
+  /** A node's link, as typed. Stored verbatim; read when someone follows it. */
+  const handleLinkChange = useCallback(
+    (nodeId: string, text: string) => applySidecarEdit((current) => setNodeLink(current, nodeId, text)),
+    [applySidecarEdit]
+  );
+
+  /**
+   * Follows a link to a heading in this document.
+   *
+   * The document's headings become this map's nodes, so an anchor names a node
+   * — which is why following one is the same jump the reader's outline makes,
+   * and needs no resolution beyond finding that node. The text must match
+   * entirely (case aside): a link that lands somewhere approximate is worse than
+   * one that does nothing, because the reader would not know it missed.
+   */
+  const followAnchor = useCallback(
+    (root: MindmapNode, text: string) => {
+      const wanted = text.trim().toLowerCase();
+      if (!wanted) return;
+
+      const matches: MindmapNode[] = [];
+      const walk = (node: MindmapNode) => {
+        if (node.text.trim().toLowerCase() === wanted) matches.push(node);
+        node.children.forEach(walk);
+      };
+      walk(root);
+
+      const target = matches[0];
+      if (target && onJumpToHeading) onJumpToHeading(target.id, target.line);
+    },
+    [onJumpToHeading]
+  );
+
+  /**
+   * Follows a node's link, through whichever channel its form calls for.
+   *
+   * All three already exist in the app — the shell opens a URL, the reader's own
+   * resolver opens a wiki link, and a heading is a node here — so following a
+   * link on the map is a matter of picking one, not of building a fourth way to
+   * navigate.
+   */
+  const handleOpenLink = useCallback(
+    (root: MindmapNode, nodeId: string) => {
+      const link = parseMindmapLink(linkFor(sidecar, nodeId));
+      if (!link) return;
+
+      if (link.kind === "external") {
+        const bridge =
+          typeof window !== "undefined"
+            ? window.knowSpaceDesktop ?? window.bookMDDesktop
+            : undefined;
+        void bridge?.openExternal?.(link.target);
+        return;
+      }
+
+      if (link.kind === "wiki") {
+        // The anchor rides along: resolving `doc#heading` is the reader's
+        // business, and it already does exactly that for a wiki link in text.
+        onWikiLinkClick?.(link.anchor ? `${link.target}#${link.anchor}` : link.target);
+        return;
+      }
+
+      followAnchor(root, link.target);
+    },
+    [followAnchor, onWikiLinkClick, sidecar]
   );
 
   /** A node's tags, replaced wholesale — the list is what the panel edits. */
@@ -1725,6 +1806,22 @@ export const MindmapView = memo(function MindmapView({
    */
   const panelNodeId = contextMenu?.nodeId ?? tree.id;
 
+  const panelLink = linkFor(sidecar, panelNodeId);
+  const parsedPanelLink = parseMindmapLink(panelLink);
+
+  /**
+   * Whether this build can actually go where the panel's link points.
+   *
+   * Worked out here rather than in the panel, because it is a fact about what
+   * this app was handed: a wiki link needs a caller that can open documents, and
+   * an anchor needs a caller that can jump. The button is offered disabled with
+   * the reason, rather than hidden — a control that vanishes teaches nothing.
+   */
+  const canOpenPanelLink =
+    parsedPanelLink?.kind === "external" ||
+    (parsedPanelLink?.kind === "anchor" && !!onJumpToHeading) ||
+    (parsedPanelLink?.kind === "wiki" && !!onWikiLinkClick);
+
   return (
     <div
       ref={containerRef}
@@ -2183,6 +2280,13 @@ export const MindmapView = memo(function MindmapView({
                   <NodeIcon iconId={iconFor(sidecar, node.id)} height={node.height} />
                   <NodeMarks width={node.width} markers={markersFor(sidecar, node.id)} />
                   <NodeTags height={node.height} tags={tagsFor(sidecar, node.id)} />
+                  {/* Only for a link this build recognises: the badge says "this
+                      goes somewhere", and a mark that promised a trip for text
+                      that leads nowhere would be the one lie on the map. Text
+                      that is not a link still shows in the panel, with the hint. */}
+                  {parseMindmapLink(linkFor(sidecar, node.id)) ? (
+                    <NodeLinkMark height={node.height} />
+                  ) : null}
 
                   {/* A note is the one thing about a node the document cannot
                       show, so the map says where one is: a badge on the node's
@@ -2377,12 +2481,17 @@ export const MindmapView = memo(function MindmapView({
         selectedCount={selectedNodeIds.size}
         icon={iconFor(sidecar, panelNodeId)}
         note={noteFor(sidecar, panelNodeId)}
+        link={panelLink}
+        parsedLink={parsedPanelLink}
+        canOpenLink={canOpenPanelLink}
         tags={tagsFor(sidecar, panelNodeId)}
         knownTags={documentTags}
         markers={markersFor(sidecar, panelNodeId)}
         saveFailed={sidecarSaveFailed}
         onIconChange={handleIconChange}
         onNoteChange={handleNoteChange}
+        onLinkChange={handleLinkChange}
+        onOpenLink={(nodeId) => handleOpenLink(tree, nodeId)}
         onTagsChange={handleTagsChange}
         onMarkChange={handleMarkChange}
         onUpdateStyle={handleUpdateStyle}

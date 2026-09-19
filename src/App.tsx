@@ -1968,6 +1968,10 @@ export function App() {
                     jumpToHeading(headingId, "smooth", true);
                   }, 80);
                 }}
+                // The same resolver the reader uses when a `[[wiki link]]` in
+                // the text is clicked: one answer to "which file is this name",
+                // not a second one that could disagree with it.
+                onWikiLinkClick={handleWikiLinkClick}
                 onClose={() => setViewMode("split")}
               />
             ) : (viewMode === "canvas" || session?.fileName?.toLowerCase().endsWith(".canvas")) && session ? (

@@ -11798,6 +11798,95 @@ body:has(.flash-capsule-overlay) {
   color: #f43f5e;
 }
 
+/* ── Mind map node links ────────────────────────────────────────────────
+   A badge on the node that says "this goes somewhere", and the field that
+   writes it. The badge mirrors the note one across the box: both mean "there is
+   more here than the text", so neither may hide the other.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+.mindmap-link-marker {
+  pointer-events: none;
+}
+
+.mindmap-link-marker circle {
+  fill: color-mix(in srgb, #a855f7 22%, var(--surface-1, #1e293b));
+  stroke: color-mix(in srgb, #a855f7 70%, transparent);
+  stroke-width: 1;
+}
+
+.mindmap-link-marker path {
+  fill: none;
+  stroke: #c084fc;
+  stroke-width: 1.1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.mindmap-link-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 5px 8px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--text-primary, #e2e8f0);
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.mindmap-link-input::placeholder {
+  color: var(--text-tertiary, #64748b);
+}
+
+.mindmap-link-input:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 1px;
+}
+
+.mindmap-link-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 5px;
+}
+
+.mindmap-link-open {
+  flex-shrink: 0;
+  padding: 3px 10px;
+  border: 1px solid color-mix(in srgb, #38bdf8 45%, transparent);
+  border-radius: 5px;
+  background: color-mix(in srgb, #38bdf8 12%, transparent);
+  color: #38bdf8;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.mindmap-link-open:hover:not(:disabled) {
+  border-color: #38bdf8;
+  background: color-mix(in srgb, #38bdf8 20%, transparent);
+}
+
+.mindmap-link-open:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mindmap-link-clear {
+  padding: 2px 7px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-secondary, #cbd5e1);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.mindmap-link-clear:hover {
+  border-color: #f43f5e;
+  color: #f43f5e;
+}
+
 /* ── Mind map node tags ─────────────────────────────────────────────────
    Chips under a node, and the field that writes them. The chips are part of the
    drawing: they read at a glance and never take a click meant for the node.

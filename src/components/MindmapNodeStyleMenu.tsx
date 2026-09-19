@@ -30,6 +30,7 @@ import {
 } from "../core/mindmapMarkers";
 import { ProgressGlyph } from "./MindmapMarks";
 import { parseTagInput, type NodeMarkers } from "../services/mindmapSidecar";
+import { describeMindmapLink, type MindmapLink } from "../core/mindmapLinks";
 
 /**
  * The node style panel: what a right click on a node opens.
@@ -80,6 +81,12 @@ export type MindmapNodeStyleMenuProps = {
    */
   icon: string;
   note: string;
+  /** The node's link, exactly as the reader typed it. */
+  link: string;
+  /** That text read as a link, or null when this build cannot follow it. */
+  parsedLink: MindmapLink | null;
+  /** False when this build has no channel for where the link points. */
+  canOpenLink: boolean;
   /** The node's tags, as written. */
   tags: string[];
   /** Every tag already used in this document, most used first. */
@@ -90,6 +97,9 @@ export type MindmapNodeStyleMenuProps = {
   saveFailed: boolean;
   onIconChange: (nodeId: string, iconId: string) => void;
   onNoteChange: (nodeId: string, text: string) => void;
+  onLinkChange: (nodeId: string, text: string) => void;
+  /** Follows the node's link. Only offered when `canOpenLink`. */
+  onOpenLink: (nodeId: string) => void;
   /** The whole list at once: a tag list is edited as a list, not tag by tag. */
   onTagsChange: (nodeId: string, tags: string[]) => void;
   /** `null` clears the mark; the panel only ever passes a value from a table or null. */
@@ -227,12 +237,17 @@ export function MindmapNodeStyleMenu({
   onFreezeTheme,
   icon,
   note,
+  link,
+  parsedLink,
+  canOpenLink,
   tags,
   knownTags,
   markers,
   saveFailed,
   onIconChange,
   onNoteChange,
+  onLinkChange,
+  onOpenLink,
   onTagsChange,
   onMarkChange,
   onClose,
@@ -449,6 +464,51 @@ export function MindmapNodeStyleMenu({
               );
             })}
           </div>
+        ) : null}
+      </div>
+
+      {/* Link — one per node, kept as typed. The field says when what is typed
+          is not something this build can follow, rather than accepting it in
+          silence and then doing nothing when someone asks it to go there. */}
+      <div className="mindmap-ctx-section">
+        <div className="mindmap-ctx-label-row">
+          <span className="mindmap-ctx-label">链接</span>
+          {link ? (
+            <button
+              type="button"
+              className="mindmap-link-clear"
+              onClick={() => onLinkChange(nodeId, "")}
+            >
+              清除
+            </button>
+          ) : null}
+        </div>
+        <input
+          className="mindmap-link-input"
+          value={link}
+          placeholder="https://… 或 [[笔记]] 或 #标题"
+          onChange={(e) => onLinkChange(nodeId, e.target.value)}
+        />
+        {link ? (
+          parsedLink ? (
+            <div className="mindmap-link-actions">
+              <span className="mindmap-ctx-hint">{describeMindmapLink(parsedLink)}</span>
+              <button
+                type="button"
+                className="mindmap-link-open"
+                onClick={() => onOpenLink(nodeId)}
+                disabled={!canOpenLink}
+                title={canOpenLink ? "打开" : "这一侧没有能打开它的通道"}
+              >
+                打开
+              </button>
+            </div>
+          ) : (
+            <div className="mindmap-link-actions">
+              <span className="mindmap-note-error">不是可识别的链接</span>
+              <span className="mindmap-ctx-hint">用 https:// 、[[笔记]] 或 #标题</span>
+            </div>
+          )
         ) : null}
       </div>
 

@@ -4,6 +4,7 @@ import {
   emptySidecar,
   iconFor,
   loadSidecar,
+  linkFor,
   markersFor,
   noteFor,
   parseSidecar,
@@ -11,11 +12,13 @@ import {
   saveSidecar,
   serializeSidecar,
   setNodeIcon,
+  setNodeLink,
   setNodeNote,
   setNodePriority,
   setNodeProgress,
   setNodeTags,
   sidecarIsEmpty,
+  SIDECAR_SECTIONS,
   tagsFor,
   type MindmapSidecar,
 } from "../services/mindmapSidecar";
@@ -392,15 +395,65 @@ describe("导图伴生文件", () => {
       expect(back.markers).toEqual({ "node-c": { priority: 4 } });
     });
 
-    it("空文件判断把四段都算上", () => {
-      expect(Object.keys(emptySidecar()).sort()).toEqual([
-        "icons",
-        "markers",
-        "notes",
-        "tags",
-        "version",
-      ]);
+    it("空文件判断把每一段都算上", () => {
+      // Asserted as an agreement between the two places rather than as a literal
+      // list: a section added to the service and forgotten in `emptySidecar`
+      // would read as "nothing here", and a literal list would only ever tell me
+      // that it had gone stale.
+      expect(Object.keys(emptySidecar()).sort()).toEqual(
+        [...SIDECAR_SECTIONS, "version"].sort()
+      );
       expect(sidecarIsEmpty(setNodeTags(emptySidecar(), "node-a", ["api"]))).toBe(false);
+    });
+  });
+
+  describe("链接", () => {
+    it("按写下的样子存，去掉首尾空白", () => {
+      // Stored as typed rather than as a parsed record: a form this build cannot
+      // follow is still there, unchanged, for the build that can.
+      const linked = setNodeLink(emptySidecar(), "node-a", "  [[产品设计#验收]]  ");
+
+      expect(linkFor(linked, "node-a")).toBe("[[产品设计#验收]]");
+      expect(linkFor(null, "node-a")).toBe("");
+      expect(linkFor(emptySidecar(), "node-没有")).toBe("");
+    });
+
+    it("清空即删除条目", () => {
+      const linked = setNodeLink(emptySidecar(), "node-a", "https://example.com");
+
+      expect(setNodeLink(linked, "node-a", "").links).toEqual({});
+      expect(setNodeLink(linked, "node-a", "   ").links).toEqual({});
+    });
+
+    it("原样存下这一版读不懂的写法", () => {
+      // The reason the field is a string and not a parsed record. Whatever a
+      // newer version decides `obsidian://…` or `[[a|别名]]` means, this build
+      // must not have thrown it away before then.
+      const stored = setNodeLink(emptySidecar(), "node-a", "[[产品设计|别名]]");
+
+      expect(linkFor(stored, "node-a")).toBe("[[产品设计|别名]]");
+      expect(parseSidecar(serializeSidecar(stored))?.links["node-a"]).toBe("[[产品设计|别名]]");
+    });
+
+    it("五段一起往返，谁也不丢", () => {
+      let sidecar = setNodeLink(setNodeTags(emptySidecar(), "node-a", ["api"]), "node-a", "#验收");
+      sidecar = setNodeNote(sidecar, "node-b", "备注");
+      sidecar = setNodeIcon(sidecar, "node-c", "star");
+      sidecar = setNodePriority(sidecar, "node-d", 2);
+
+      const back = parseSidecar(serializeSidecar(sidecar)) as MindmapSidecar;
+
+      expect(back.links).toEqual({ "node-a": "#验收" });
+      expect(back.tags).toEqual({ "node-a": ["api"] });
+      expect(back.notes).toEqual({ "node-b": "备注" });
+      expect(back.icons).toEqual({ "node-c": "star" });
+      expect(back.markers).toEqual({ "node-d": { priority: 2 } });
+    });
+
+    it("链接也算作内容", () => {
+      // The agreement between `emptySidecar` and the section list is asserted
+      // once, in the tags block; this is the part that concerns links.
+      expect(sidecarIsEmpty(setNodeLink(emptySidecar(), "node-a", "#x"))).toBe(false);
     });
   });
 

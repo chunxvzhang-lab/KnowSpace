@@ -47,6 +47,12 @@ export interface MindmapSidecar {
   icons: Record<string, string>;
   /** Tag names by node id, as written, in the order they were added. */
   tags: Record<string, string[]>;
+  /**
+   * One link per node, **as the reader typed it** rather than as a parsed record,
+   * so a form this build does not understand is still there for the build that
+   * does. See `core/mindmapLinks.ts` for how it is read.
+   */
+  links: Record<string, string>;
   /** Priority and progress by node id. */
   markers: Record<string, NodeMarkers>;
   /** Sections this build does not know about, kept exactly as they were read. */
@@ -70,11 +76,18 @@ export interface MindmapSidecar {
  * nested lists would each need more than a name here, and this list would have
  * become the thing to replace rather than to extend.
  */
-const KNOWN_SECTIONS = ["notes", "icons", "tags", "markers"] as const;
+export const SIDECAR_SECTIONS = ["notes", "icons", "tags", "links", "markers"] as const;
 
 /** A companion with nothing in it. */
 export function emptySidecar(): MindmapSidecar {
-  return { version: SIDECAR_VERSION, notes: {}, icons: {}, tags: {}, markers: {} };
+  return {
+    version: SIDECAR_VERSION,
+    notes: {},
+    icons: {},
+    tags: {},
+    links: {},
+    markers: {},
+  };
 }
 
 /** One section as read from a file: an empty map if the file's copy is unusable. */
@@ -199,6 +212,7 @@ export function parseSidecar(text: string | null | undefined): MindmapSidecar | 
 
   const notes = readStringSection(parsed.notes);
   const icons = readStringSection(parsed.icons);
+  const links = readStringSection(parsed.links);
   const tags = readTagSection(parsed.tags);
   const markers = readMarkerSection(parsed.markers);
 
@@ -206,7 +220,7 @@ export function parseSidecar(text: string | null | undefined): MindmapSidecar | 
 
   // The spread comes first so the sections this build does not know about are
   // carried through, and the normalised fields overwrite whatever was there.
-  return { ...parsed, version, notes, icons, tags, markers };
+  return { ...parsed, version, notes, icons, tags, links, markers };
 }
 
 /**
@@ -223,7 +237,7 @@ export function parseSidecar(text: string | null | undefined): MindmapSidecar | 
 export function serializeSidecar(sidecar: MindmapSidecar): string {
   const payload: Record<string, unknown> = { ...sidecar };
 
-  for (const section of KNOWN_SECTIONS) {
+  for (const section of SIDECAR_SECTIONS) {
     const value = payload[section];
     if (isPlainObject(value) && Object.keys(value).length === 0) delete payload[section];
   }
@@ -276,6 +290,29 @@ export function setNodeIcon(sidecar: MindmapSidecar, nodeId: string, iconId: str
     delete icons[nodeId];
   }
   return { ...sidecar, icons };
+}
+
+/** A node's link, as the reader typed it, or an empty string. */
+export function linkFor(sidecar: MindmapSidecar | null, nodeId: string): string {
+  return sidecar?.links[nodeId] ?? "";
+}
+
+/**
+ * Sets or clears a node's link.
+ *
+ * Stored trimmed and otherwise untouched: this build does not decide whether the
+ * text is a link — `parseMindmapLink` does that when someone tries to follow it,
+ * and the panel says so when it cannot. Rejecting it here would mean a form a
+ * newer version understands could never be written by an older one.
+ */
+export function setNodeLink(sidecar: MindmapSidecar, nodeId: string, text: string): MindmapSidecar {
+  const links = { ...sidecar.links };
+  const trimmed = String(text ?? "").trim();
+
+  if (trimmed) links[nodeId] = trimmed;
+  else delete links[nodeId];
+
+  return { ...sidecar, links };
 }
 
 /** A node's tags, as written. */
@@ -392,7 +429,7 @@ export function setNodeProgress(
 export function sidecarIsEmpty(sidecar: MindmapSidecar | null): boolean {
   if (!sidecar) return true;
 
-  for (const section of KNOWN_SECTIONS) {
+  for (const section of SIDECAR_SECTIONS) {
     const value = sidecar[section];
     if (isPlainObject(value) && Object.keys(value).length > 0) return false;
   }
@@ -400,7 +437,7 @@ export function sidecarIsEmpty(sidecar: MindmapSidecar | null): boolean {
   // Only the version and the sections this build knows — and those sections'
   // own keys, which are present whether or not they hold anything. Anything else
   // is content a newer version wrote, even if this build cannot see it.
-  const known = new Set<string>(["version", ...KNOWN_SECTIONS]);
+  const known = new Set<string>(["version", ...SIDECAR_SECTIONS]);
   return Object.keys(sidecar).every((key) => known.has(key));
 }
 

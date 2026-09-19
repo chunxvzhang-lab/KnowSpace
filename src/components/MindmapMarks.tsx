@@ -82,6 +82,25 @@ export function NodeTags({ height, tags }: { height: number; tags: string[] }) {
   );
 }
 
+/**
+ * The badge for a node that carries a link.
+ *
+ * At the bottom-left corner, mirroring the note badge at the top-left: both are
+ * "there is more here than the text", and putting them on opposite corners means
+ * a node can wear both without either hiding the other. A mark rather than a
+ * control — following the link is done from the panel, which is where the reader
+ * can also see where it goes before going there.
+ */
+export function NodeLinkMark({ height }: { height: number }) {
+  return (
+    <g className="mindmap-link-marker" transform={`translate(-4, ${height + 4})`} aria-label="有链接">
+      <circle r="4.6" />
+      {/* An arrow pointing out: the one glyph that means "this goes elsewhere". */}
+      <path d="M -1.7 1.7 L 1.5 -1.5 M 1.5 -1.5 H -0.3 M 1.5 -1.5 V 0.3" />
+    </g>
+  );
+}
+
 /** A progress dial: a track, and the filled part of eighths. */
 export function ProgressGlyph({ value, size = 14 }: { value: number; size?: number }) {
   const radius = size / 2 - 1.5;
