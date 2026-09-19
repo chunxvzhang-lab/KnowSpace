@@ -2,7 +2,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MindmapView } from "../components/MindmapView";
 import { parseMarkdownToMindmapTree } from "../services/mindmapService";
-import { parseSidecar, serializeSidecar } from "../services/mindmapSidecar";
+import { emptySidecar, parseSidecar, serializeSidecar, setNodeIcon } from "../services/mindmapSidecar";
+
+/** A stored companion carrying one icon — built by the service, not by hand. */
+function sidecarWithIcon(nodeId: string, iconId: string): string {
+  return serializeSidecar(setNodeIcon(emptySidecar(), nodeId, iconId));
+}
 
 /**
  * Icons on nodes, through the view.
@@ -58,7 +63,7 @@ describe("节点图标", () => {
     api.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
-      content: serializeSidecar({ version: 1, notes: {}, icons: { [firstBranchId()]: "star" } }),
+      content: sidecarWithIcon(firstBranchId(), "star"),
     });
 
     render(<MindmapView title="测试" source={SOURCE} documentKey={DOC} />);
@@ -117,7 +122,7 @@ describe("节点图标", () => {
     api.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
-      content: serializeSidecar({ version: 1, notes: {}, icons: { [firstBranchId()]: "star" } }),
+      content: sidecarWithIcon(firstBranchId(), "star"),
     });
 
     render(<MindmapView title="测试" source={SOURCE} documentKey={DOC} />);
@@ -140,11 +145,7 @@ describe("节点图标", () => {
     api.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
-      content: serializeSidecar({
-        version: 1,
-        notes: {},
-        icons: { [firstBranchId()]: "未来的图标" },
-      }),
+      content: sidecarWithIcon(firstBranchId(), "未来的图标"),
     });
 
     render(<MindmapView title="测试" source={SOURCE} documentKey={DOC} />);

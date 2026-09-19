@@ -23,7 +23,19 @@
  */
 
 /** The shape this build writes. A file may carry a different one; see above. */
+import { isPriorityInRange, isProgressInRange } from "../core/mindmapMarkers";
+
 export const SIDECAR_VERSION = 1;
+
+/** How urgent a node is, and how far along — the two marks a number says best. */
+export interface NodeMarkers {
+  /** 1 is most urgent. Absent means no priority is set. */
+  priority?: number;
+  /** Eighths done. Absent means no progress is set. */
+  progress?: number;
+  /** Fields a newer version added to a node's markers, kept as they were read. */
+  [field: string]: unknown;
+}
 
 /** Everything the companion holds. */
 export interface MindmapSidecar {
@@ -33,25 +45,29 @@ export interface MindmapSidecar {
   notes: Record<string, string>;
   /** Icon id by node id, from the mind map's own icon table. */
   icons: Record<string, string>;
+  /** Priority and progress by node id. */
+  markers: Record<string, NodeMarkers>;
   /** Sections this build does not know about, kept exactly as they were read. */
   [section: string]: unknown;
 }
 
 /**
- * The sections this build understands: each a map from node id to a string.
+ * The sections this build understands.
  *
- * Listed once because three separate places walk all of them — reading
- * normalises each, writing omits each while it is empty, and "is this file
- * empty" asks about each. A section of a different shape (a list, a link with a
- * label) needs handling of its own rather than a place in this list, which is
- * the point at which this should become something more general than a list of
- * names.
+ * Two shapes so far: a map from node id to a string (notes, icons) and a map
+ * from node id to a small object (markers, which can say a priority and a
+ * progress at once). Reading handles each shape in its own function, because
+ * that is where the shapes differ; this list is only what writing and "is this
+ * file empty" need, and both ask the same shape-agnostic question — does this
+ * section hold anything at all.
+ *
+ * A third shape is the point to look at this again rather than to add a name.
  */
-const STRING_SECTIONS = ["notes", "icons"] as const;
+const KNOWN_SECTIONS = ["notes", "icons", "markers"] as const;
 
 /** A companion with nothing in it. */
 export function emptySidecar(): MindmapSidecar {
-  return { version: SIDECAR_VERSION, notes: {}, icons: {} };
+  return { version: SIDECAR_VERSION, notes: {}, icons: {}, markers: {} };
 }
 
 /** One section as read from a file: an empty map if the file's copy is unusable. */
@@ -63,6 +79,37 @@ function readStringSection(value: unknown): Record<string, string> {
       if (typeof entry === "string" && entry.trim()) section[nodeId] = entry;
     }
   }
+  return section;
+}
+
+/**
+ * The markers section, with each value checked against the range the map draws.
+ *
+ * A value out of range is dropped rather than clamped: the file may have been
+ * edited by hand or written by a version with a wider scale, and silently moving
+ * someone's "12" to a "9" invents a judgement they did not make.
+ *
+ * Unknown fields **inside** an entry are kept, the same rule as unknown sections
+ * one level up — a node's markers are only partly this build's business.
+ */
+function readMarkerSection(value: unknown): Record<string, NodeMarkers> {
+  const section: Record<string, NodeMarkers> = {};
+  if (!isPlainObject(value)) return section;
+
+  for (const [nodeId, entry] of Object.entries(value)) {
+    if (!isPlainObject(entry)) continue;
+
+    const markers: NodeMarkers = { ...entry };
+    if (isPriorityInRange(entry.priority)) markers.priority = entry.priority;
+    else delete markers.priority;
+    if (isProgressInRange(entry.progress)) markers.progress = entry.progress;
+    else delete markers.progress;
+
+    // An entry with nothing left in it is no entry: the file records what is
+    // set, and an object of dropped fields would say the opposite.
+    if (Object.keys(markers).length > 0) section[nodeId] = markers;
+  }
+
   return section;
 }
 
@@ -99,12 +146,13 @@ export function parseSidecar(text: string | null | undefined): MindmapSidecar | 
 
   const notes = readStringSection(parsed.notes);
   const icons = readStringSection(parsed.icons);
+  const markers = readMarkerSection(parsed.markers);
 
   const version = typeof parsed.version === "number" ? parsed.version : SIDECAR_VERSION;
 
   // The spread comes first so the sections this build does not know about are
   // carried through, and the normalised fields overwrite whatever was there.
-  return { ...parsed, version, notes, icons };
+  return { ...parsed, version, notes, icons, markers };
 }
 
 /**
@@ -121,7 +169,7 @@ export function parseSidecar(text: string | null | undefined): MindmapSidecar | 
 export function serializeSidecar(sidecar: MindmapSidecar): string {
   const payload: Record<string, unknown> = { ...sidecar };
 
-  for (const section of STRING_SECTIONS) {
+  for (const section of KNOWN_SECTIONS) {
     const value = payload[section];
     if (isPlainObject(value) && Object.keys(value).length === 0) delete payload[section];
   }
@@ -176,11 +224,72 @@ export function setNodeIcon(sidecar: MindmapSidecar, nodeId: string, iconId: str
   return { ...sidecar, icons };
 }
 
+/** Every marker on a node, or nothing set. */
+export function markersFor(sidecar: MindmapSidecar | null, nodeId: string): NodeMarkers {
+  return sidecar?.markers[nodeId] ?? {};
+}
+
+/**
+ * Sets or clears one of a node's two marks.
+ *
+ * One function for both rather than two, because they differ only in which field
+ * they touch and which range validates them: a node keeps a priority and a
+ * progress at once, so neither can be a section of its own without duplicating
+ * the node's key across two of them.
+ *
+ * A value out of range clears the mark rather than storing something the map
+ * cannot draw. The picker only ever passes a value from the table or null, so
+ * this is defence rather than a path anyone takes.
+ */
+function setMarker(
+  sidecar: MindmapSidecar,
+  nodeId: string,
+  field: "priority" | "progress",
+  value: number | null,
+  isValid: (candidate: unknown) => boolean
+): MindmapSidecar {
+  const markers: Record<string, NodeMarkers> = { ...sidecar.markers };
+  const current: NodeMarkers = { ...(markers[nodeId] ?? {}) };
+
+  if (value !== null && isValid(value)) {
+    current[field] = value;
+  } else {
+    delete current[field];
+  }
+
+  if (Object.keys(current).length > 0) {
+    markers[nodeId] = current;
+  } else {
+    // A node with nothing set has no entry, like every other section here.
+    delete markers[nodeId];
+  }
+
+  return { ...sidecar, markers };
+}
+
+/** Sets a node's priority, or clears it with null. */
+export function setNodePriority(
+  sidecar: MindmapSidecar,
+  nodeId: string,
+  priority: number | null
+): MindmapSidecar {
+  return setMarker(sidecar, nodeId, "priority", priority, isPriorityInRange);
+}
+
+/** Sets a node's progress, or clears it with null. */
+export function setNodeProgress(
+  sidecar: MindmapSidecar,
+  nodeId: string,
+  progress: number | null
+): MindmapSidecar {
+  return setMarker(sidecar, nodeId, "progress", progress, isProgressInRange);
+}
+
 /** Whether anything is stored at all. */
 export function sidecarIsEmpty(sidecar: MindmapSidecar | null): boolean {
   if (!sidecar) return true;
 
-  for (const section of STRING_SECTIONS) {
+  for (const section of KNOWN_SECTIONS) {
     const value = sidecar[section];
     if (isPlainObject(value) && Object.keys(value).length > 0) return false;
   }
@@ -188,7 +297,7 @@ export function sidecarIsEmpty(sidecar: MindmapSidecar | null): boolean {
   // Only the version and the sections this build knows — and those sections'
   // own keys, which are present whether or not they hold anything. Anything else
   // is content a newer version wrote, even if this build cannot see it.
-  const known = new Set<string>(["version", ...STRING_SECTIONS]);
+  const known = new Set<string>(["version", ...KNOWN_SECTIONS]);
   return Object.keys(sidecar).every((key) => known.has(key));
 }
 

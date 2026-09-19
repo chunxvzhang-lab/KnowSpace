@@ -22,6 +22,13 @@ import type {
   MindmapTextAlign,
 } from "../core/types";
 import { MINDMAP_ICON_GROUPS } from "../core/mindmapIcons";
+import {
+  MINDMAP_PRIORITIES,
+  MINDMAP_PROGRESS_STEPS,
+  PROGRESS_MAX,
+} from "../core/mindmapMarkers";
+import { ProgressGlyph } from "./MindmapMarks";
+import type { NodeMarkers } from "../services/mindmapSidecar";
 
 /**
  * The node style panel: what a right click on a node opens.
@@ -72,10 +79,14 @@ export type MindmapNodeStyleMenuProps = {
    */
   icon: string;
   note: string;
+  /** The node's priority and progress, if either is set. */
+  markers: NodeMarkers;
   /** True when the last write to the companion file did not land. */
   saveFailed: boolean;
   onIconChange: (nodeId: string, iconId: string) => void;
   onNoteChange: (nodeId: string, text: string) => void;
+  /** `null` clears the mark; the panel only ever passes a value from a table or null. */
+  onMarkChange: (nodeId: string, field: "priority" | "progress", value: number | null) => void;
   onClose: () => void;
 };
 
@@ -209,9 +220,11 @@ export function MindmapNodeStyleMenu({
   onFreezeTheme,
   icon,
   note,
+  markers,
   saveFailed,
   onIconChange,
   onNoteChange,
+  onMarkChange,
   onClose,
 }: MindmapNodeStyleMenuProps) {
   if (!open) return null;
@@ -294,6 +307,66 @@ export function MindmapNodeStyleMenu({
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Priority and progress — the two marks a number says better than any
+          picture, and the two the icon table deliberately leaves alone. Clicking
+          the mark a node already has takes it off, like the icons above. */}
+      <div className="mindmap-ctx-section">
+        <div className="mindmap-ctx-label-row">
+          <span className="mindmap-ctx-label">优先级</span>
+          <span className="mindmap-ctx-hint">
+            {markers.priority ? `P${markers.priority}` : "未设"}
+          </span>
+        </div>
+        <div className="mindmap-mark-row">
+          {MINDMAP_PRIORITIES.map((mark) => (
+            <button
+              key={mark.value}
+              type="button"
+              className={`mindmap-priority-btn ${markers.priority === mark.value ? "is-active" : ""}`}
+              style={{ background: mark.color }}
+              onClick={() =>
+                onMarkChange(
+                  nodeId,
+                  "priority",
+                  markers.priority === mark.value ? null : mark.value
+                )
+              }
+              title={`优先级 ${mark.label}`}
+              aria-label={`优先级 ${mark.label}`}
+            >
+              {mark.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="mindmap-ctx-label-row">
+          <span className="mindmap-ctx-label">进度</span>
+          <span className="mindmap-ctx-hint">
+            {markers.progress ? `${markers.progress}/${PROGRESS_MAX}` : "未设"}
+          </span>
+        </div>
+        <div className="mindmap-mark-row">
+          {MINDMAP_PROGRESS_STEPS.map((mark) => (
+            <button
+              key={mark.value}
+              type="button"
+              className={`mindmap-progress-btn ${markers.progress === mark.value ? "is-active" : ""}`}
+              onClick={() =>
+                onMarkChange(
+                  nodeId,
+                  "progress",
+                  markers.progress === mark.value ? null : mark.value
+                )
+              }
+              title={mark.label}
+              aria-label={`进度 ${mark.label}`}
+            >
+              <ProgressGlyph value={mark.value} size={16} />
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Node Note — the other thing on this panel that is not in the document.

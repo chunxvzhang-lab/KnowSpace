@@ -3,12 +3,15 @@ import {
   emptySidecar,
   iconFor,
   loadSidecar,
+  markersFor,
   noteFor,
   parseSidecar,
   saveSidecar,
   serializeSidecar,
   setNodeIcon,
   setNodeNote,
+  setNodePriority,
+  setNodeProgress,
   sidecarIsEmpty,
   type MindmapSidecar,
 } from "../services/mindmapSidecar";
@@ -160,7 +163,7 @@ describe("导图伴生文件", () => {
       expect(sidecarIsEmpty(emptySidecar())).toBe(true);
       // Anything a newer version wrote counts as content, even unseen, or the
       // next save could look like nothing worth writing.
-      expect(sidecarIsEmpty({ version: 7, notes: {}, icons: { a: "star" } })).toBe(false);
+      expect(sidecarIsEmpty({ ...emptySidecar(), version: 7, icons: { a: "star" } })).toBe(false);
       expect(sidecarIsEmpty(setNodeNote(emptySidecar(), "node-a", "备注"))).toBe(false);
     });
   });
@@ -208,12 +211,95 @@ describe("导图伴生文件", () => {
       expect(iconFor(back, "node-a")).toBe("未来的图标");
     });
 
-    it("空文件判断把两个段落都算上", () => {
+    it("空文件判断把三个段落都算上", () => {
       // The shape of an empty companion, pinned: a section added to the service
       // and forgotten in `emptySidecar` would otherwise read as "nothing here".
-      expect(Object.keys(emptySidecar()).sort()).toEqual(["icons", "notes", "version"]);
+      expect(Object.keys(emptySidecar()).sort()).toEqual(["icons", "markers", "notes", "version"]);
       expect(sidecarIsEmpty(setNodeIcon(emptySidecar(), "node-a", "star"))).toBe(false);
       expect(sidecarIsEmpty(setNodeNote(emptySidecar(), "node-a", "备注"))).toBe(false);
+      expect(sidecarIsEmpty(setNodePriority(emptySidecar(), "node-a", 1))).toBe(false);
+    });
+  });
+
+  describe("标记", () => {
+    it("优先级与进度可以同时挂在一个节点上", () => {
+      // The reason the section is one map to a small object rather than two maps
+      // of numbers: a node under a deadline is both urgent and half done, and two
+      // sections would mean two keys for the same node.
+      const marked = setNodeProgress(setNodePriority(emptySidecar(), "node-a", 2), "node-a", 5);
+
+      expect(markersFor(marked, "node-a")).toEqual({ priority: 2, progress: 5 });
+      expect(markersFor(null, "node-a")).toEqual({});
+      expect(markersFor(marked, "node-没有")).toEqual({});
+    });
+
+    it("清除一个不动另一个", () => {
+      const both = setNodeProgress(setNodePriority(emptySidecar(), "node-a", 2), "node-a", 5);
+
+      expect(markersFor(setNodePriority(both, "node-a", null), "node-a")).toEqual({ progress: 5 });
+      expect(markersFor(setNodeProgress(both, "node-a", null), "node-a")).toEqual({ priority: 2 });
+      // Both gone: no entry at all, like every other section here.
+      const cleared = setNodeProgress(setNodePriority(both, "node-a", null), "node-a", null);
+      expect(cleared.markers).toEqual({});
+    });
+
+    it("越界的值当清除，不存进去", () => {
+      const base = setNodePriority(emptySidecar(), "node-a", 3);
+
+      expect(markersFor(setNodePriority(base, "node-a", 0), "node-a")).toEqual({});
+      expect(markersFor(setNodePriority(base, "node-a", 10), "node-a")).toEqual({});
+
+      // Clearing reaches only its own mark: an out-of-range progress does not
+      // take the priority down with it.
+      const withProgress = setNodeProgress(base, "node-a", 4);
+      expect(markersFor(setNodeProgress(withProgress, "node-a", 9), "node-a")).toEqual({
+        priority: 3,
+      });
+    });
+
+    it("读文件时越界的值丢掉，但同一节点上另一个标记留着", () => {
+      // A value out of range is dropped rather than clamped: clamping someone's
+      // "12" into a "9" would invent a judgement they never made.
+      const parsed = parseSidecar(
+        JSON.stringify({
+          version: 1,
+          markers: {
+            "node-a": { priority: 3, progress: 99 },
+            "node-b": { priority: 2.5 },
+            "node-c": { priority: 4 },
+          },
+        })
+      );
+
+      expect(markersFor(parsed, "node-a")).toEqual({ priority: 3 });
+      // Nothing left of that entry, so the node has no entry — not an empty one.
+      expect(parsed?.markers["node-b"]).toBeUndefined();
+      expect(markersFor(parsed, "node-c")).toEqual({ priority: 4 });
+    });
+
+    it("条目里不认识的字段照样留着", () => {
+      // The same rule as unknown sections, one level down: a node's markers are
+      // only partly this build's business.
+      const parsed = parseSidecar(
+        JSON.stringify({ version: 1, markers: { "node-a": { priority: 1, review: "pending" } } })
+      );
+
+      expect(markersFor(parsed, "node-a")).toEqual({ priority: 1, review: "pending" });
+      expect(serializeSidecar(parsed as MindmapSidecar)).toContain('"review": "pending"');
+    });
+
+    it("三段一起往返，谁也不丢", () => {
+      const sidecar = setNodeProgress(
+        setNodeIcon(setNodeNote(emptySidecar(), "node-a", "备注"), "node-b", "star"),
+        "node-c",
+        3
+      );
+
+      const back = parseSidecar(serializeSidecar(sidecar)) as MindmapSidecar;
+
+      expect(back.notes).toEqual({ "node-a": "备注" });
+      expect(back.icons).toEqual({ "node-b": "star" });
+      expect(back.markers).toEqual({ "node-c": { progress: 3 } });
     });
   });
 

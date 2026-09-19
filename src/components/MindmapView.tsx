@@ -56,13 +56,17 @@ import {
   emptySidecar,
   iconFor,
   loadSidecar,
+  markersFor,
   noteFor,
   saveSidecar,
   setNodeIcon,
   setNodeNote,
+  setNodePriority,
+  setNodeProgress,
   type MindmapSidecar,
 } from "../services/mindmapSidecar";
 import { findMindmapIcon } from "../core/mindmapIcons";
+import { NodeMarks } from "./MindmapMarks";
 
 /**
  * How long a note waits before it is written.
@@ -337,6 +341,21 @@ export const MindmapView = memo(function MindmapView({
    */
   const handleIconChange = useCallback(
     (nodeId: string, iconId: string) => applySidecarEdit((current) => setNodeIcon(current, nodeId, iconId)),
+    [applySidecarEdit]
+  );
+
+  /**
+   * A priority or a progress edit. One handler for both, because they differ
+   * only in which setter they reach — a node carries one of each at the same
+   * time, so neither is a separate kind of thing to the panel.
+   */
+  const handleMarkChange = useCallback(
+    (nodeId: string, field: "priority" | "progress", value: number | null) =>
+      applySidecarEdit((current) =>
+        field === "priority"
+          ? setNodePriority(current, nodeId, value)
+          : setNodeProgress(current, nodeId, value)
+      ),
     [applySidecarEdit]
   );
 
@@ -2133,8 +2152,9 @@ export const MindmapView = memo(function MindmapView({
                   })()}
 
                   {/* What the node carries but the document cannot say: an icon
-                      on its leading edge, and a badge for a note on its corner. */}
+                      on its leading edge, a note badge and the marks on its corners. */}
                   <NodeIcon iconId={iconFor(sidecar, node.id)} height={node.height} />
+                  <NodeMarks width={node.width} markers={markersFor(sidecar, node.id)} />
 
                   {/* A note is the one thing about a node the document cannot
                       show, so the map says where one is: a badge on the node's
@@ -2329,9 +2349,11 @@ export const MindmapView = memo(function MindmapView({
         selectedCount={selectedNodeIds.size}
         icon={iconFor(sidecar, contextMenu?.nodeId ?? tree.id)}
         note={noteFor(sidecar, contextMenu?.nodeId ?? tree.id)}
+        markers={markersFor(sidecar, contextMenu?.nodeId ?? tree.id)}
         saveFailed={sidecarSaveFailed}
         onIconChange={handleIconChange}
         onNoteChange={handleNoteChange}
+        onMarkChange={handleMarkChange}
         onUpdateStyle={handleUpdateStyle}
         onDelete={handleDeleteNode}
         onAddChild={handleAddChild}
