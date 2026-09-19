@@ -855,7 +855,12 @@ export function App() {
     for (const [nodeId, text] of Object.entries(annotations.links)) {
       sidecar = setNodeLink(sidecar, nodeId, text);
     }
-    await saveSidecar(created.absolutePath, sidecar);
+    if (!(await saveSidecar(created.absolutePath, sidecar))) {
+      // The document was created; what it carried was not. Saying so is the point:
+      // a reader who is told can write the notes again, and a reader who is not
+      // will find the outline intact and the notes gone with no explanation.
+      setNotice(`已导入为新文档：${created.title}，但它的备注与链接没能写入。`);
+    }
   }, [createDocumentFromContent]);
 
   // ── Bookmarks (R1 batch B3b-7) ────────────────────────────────────────────

@@ -204,21 +204,44 @@ async function readMarkdownSource(absolutePath) {
  * a document already open, and a wrong pick should fail before the parser has to
  * make sense of it.
  */
+// An import file is read whole, so it is worth saying what is too big to read.
+// An .xmind carries its images inside it and can be large; an outline is not, and
+// this is a ceiling on memory rather than a rule about outlines.
+const MAX_OUTLINE_FILE_BYTES = 64 * 1024 * 1024;
+
 async function readOutlineFile(absolutePath) {
-  if (typeof absolutePath !== "string" || !/\.(opml|xml|mm|xmind)$/i.test(absolutePath)) {
-    return { success: false, message: "只能导入 .xmind、.mm、.opml 或 .xml 大纲文件。" };
+  if (typeof absolutePath !== "string" || !absolutePath.trim()) {
+    return { success: false, message: "没有选到文件。" };
   }
 
   try {
+    const resolvedPath = path.resolve(absolutePath);
+    const stats = await fs.stat(resolvedPath);
+    if (!stats.isFile()) {
+      return { success: false, message: "选中的不是一个文件。" };
+    }
+    // Checked before reading rather than after: the point is not to find out too
+    // late that this should not have been read.
+    if (stats.size > MAX_OUTLINE_FILE_BYTES) {
+      return {
+        success: false,
+        message: `这个文件太大了（${Math.round(stats.size / 1024 / 1024)}MB），导入的上限是 64MB。`,
+      };
+    }
+
     // Bytes, encoded for the trip. Not text: an .xmind is a ZIP, and which format
     // this is has to be decided by what is inside the file — so the main process
     // hands over the bytes and the renderer, which owns the parsers, decides.
     //
+    // The extension is deliberately not checked. It used to be, to fail early, but
+    // the parsers now read the content and say what they found — and a reader whose
+    // exporter wrote .txt should not be told their outline is not an outline.
+    //
     // Base64 rather than the bytes themselves: this crosses an IPC boundary, and
     // an unambiguous string cannot be mangled by however a given Electron version
     // chooses to serialize a typed array.
-    const bytes = await fs.readFile(path.resolve(absolutePath));
-    return { success: true, contentBase64: bytes.toString("base64"), fileName: path.basename(absolutePath) };
+    const bytes = await fs.readFile(resolvedPath);
+    return { success: true, contentBase64: bytes.toString("base64"), fileName: path.basename(resolvedPath) };
   } catch (error) {
     return { success: false, message: `无法读取文件：${error.message}` };
   }
@@ -473,6 +496,9 @@ module.exports = {
   readMindmapSidecar,
   saveMindmapSidecar,
   readOutlineFile,
+  // Exported so the test can assert on the boundary itself rather than on a copy
+  // of the number, which would drift the moment either changed.
+  MAX_OUTLINE_FILE_BYTES,
   generateStableChapterId,
   titleFromRelativePath,
   collectMarkdownFiles,

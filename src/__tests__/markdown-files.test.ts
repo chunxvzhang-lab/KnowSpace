@@ -79,6 +79,70 @@ describe("electron/markdown-files.cjs", () => {
     });
   });
 
+  /**
+   * Reading the file a reader picked to import.
+   *
+   * The parsers and everything after them are covered by mindmap-import.test.ts;
+   * what can only be checked here is this end of it — that the bytes arrive as
+   * they are, and that the one thing standing between the reader and a file that
+   * should not be read into memory says no.
+   */
+  describe("导入文件的读取", () => {
+    it("读成 base64，字节一模一样", async () => {
+      const filePath = path.join(tempDir, "导出.xmind");
+      // Written as bytes, not text: the point of this path is that it does not
+      // pretend to know what the file is.
+      const original = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x00, 0xff, 0xfe, 0x7f]);
+      await fs.writeFile(filePath, original);
+
+      const result = await markdownFiles.readOutlineFile(filePath);
+
+      expect(result.success).toBe(true);
+      expect(result.fileName).toBe("导出.xmind");
+      expect(Buffer.from(result.contentBase64, "base64").equals(original)).toBe(true);
+    });
+
+    it("扩展名不再拦人：解析器会说出这是什么", async () => {
+      // It used to check the extension to fail early. The parsers now read the
+      // content and say what they found, and a reader whose exporter wrote .txt
+      // should not be told their outline is not an outline.
+      const filePath = path.join(tempDir, "大纲.txt");
+      await fs.writeFile(filePath, '<opml version="2.0"><body><outline text="甲"/></body></opml>', "utf8");
+
+      expect((await markdownFiles.readOutlineFile(filePath)).success).toBe(true);
+    });
+
+    it("太大的文件在读之前就拒绝", async () => {
+      const filePath = path.join(tempDir, "巨大.xmind");
+      // Sparse: the size is what is being tested, not the contents, and writing
+      // 64MB of bytes to prove it would be a slow way to say the same thing. The
+      // file has to exist first — truncate resizes, it does not create — and an
+      // empty one stretched to the boundary is exactly the input this needs.
+      await fs.writeFile(filePath, "");
+      await fs.truncate(filePath, markdownFiles.MAX_OUTLINE_FILE_BYTES + 1);
+
+      const result = await markdownFiles.readOutlineFile(filePath);
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain("太大");
+    });
+
+    it("目录与空路径各有各的说法", async () => {
+      const asDirectory = await markdownFiles.readOutlineFile(tempDir);
+      expect(asDirectory.success).toBe(false);
+      expect(asDirectory.message).toContain("不是一个文件");
+
+      expect((await markdownFiles.readOutlineFile("")).success).toBe(false);
+    });
+
+    it("文件不存在时说读不了，而不是崩掉", async () => {
+      const result = await markdownFiles.readOutlineFile(path.join(tempDir, "没有这个文件.opml"));
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain("无法读取文件");
+    });
+  });
+
   it("generates stable chapter IDs based on relative path", () => {
     const id1 = markdownFiles.generateStableChapterId("docs/01-intro.md");
     const id2 = markdownFiles.generateStableChapterId("docs\\01-intro.md");

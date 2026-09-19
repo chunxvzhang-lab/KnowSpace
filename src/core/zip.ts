@@ -98,7 +98,7 @@ function crc32(bytes: Uint8Array): number {
  * writers predate UTF-8, and in practice a name that is not UTF-8 is a name that
  * cannot be matched against the one thing this app is looking for anyway.
  */
-function readDirectory(bytes: Uint8Array): { entries: ZipEntry[]; truncated: boolean } | null {
+function readDirectory(bytes: Uint8Array): ZipEntry[] | null {
   const location = readDirectoryLocation(bytes);
   if (!location) return null;
 
@@ -109,9 +109,10 @@ function readDirectory(bytes: Uint8Array): { entries: ZipEntry[]; truncated: boo
   for (let index = 0; index < location.count; index += 1) {
     if (offset + 46 > bytes.length || readUint32(bytes, offset) !== DIRECTORY_ENTRY) {
       // The count and the data disagree. What was read so far is still usable, so
-      // this is reported as a truncated listing rather than as a failure: a writer
-      // that miscounted its own entries should not cost the reader their file.
-      return { entries, truncated: true };
+      // the listing stops here rather than failing: a writer that miscounted its
+      // own entries should not cost the reader their file, and an entry that was
+      // not listed simply is not found.
+      break;
     }
 
     const method = readUint16(bytes, offset + 10);
@@ -128,7 +129,7 @@ function readDirectory(bytes: Uint8Array): { entries: ZipEntry[]; truncated: boo
     offset += 46 + nameLength + extraLength + commentLength;
   }
 
-  return { entries, truncated: false };
+  return entries;
 }
 
 /**
@@ -147,11 +148,11 @@ export function readZipEntry(
   label: string
 ): ZipResult {
   const directory = readDirectory(bytes);
-  if (!directory || directory.entries.length === 0) {
+  if (!directory || directory.length === 0) {
     return { ok: false, message: "这个文件不是一个 ZIP 包（没有找到中央目录）。" };
   }
 
-  const entry = directory.entries.find((candidate) => wanted(candidate.name));
+  const entry = directory.find((candidate) => wanted(candidate.name));
   if (!entry) {
     // Named rather than called "the entry": for a reader, "there is no content.json
     // in this archive" is news they can act on, and "the entry is missing" is not.
