@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-v2.6.2-1D9BF0?style=flat-square&logo=github" alt="Version 2.6.2" />
+  <img src="https://img.shields.io/badge/Version-v2.6.3-1D9BF0?style=flat-square&logo=github" alt="Version 2.6.3" />
   <img src="https://img.shields.io/badge/Presentation-Mode_2.3_Clockwise_Cycles-8B5CF6?style=flat-square" alt="Presentation Mode 2.3" />
   <img src="https://img.shields.io/badge/FSRS-5_Spaced_Repetition-F59E0B?style=flat-square" alt="FSRS-5 Spaced Repetition" />
   <img src="https://img.shields.io/badge/Mind_Map-Non--Destructive_Sync-00BA7C?style=flat-square" alt="Non-Destructive Mindmap Sync" />
@@ -60,6 +60,7 @@
 
 ## 🏛️ 核心能力体系
 
+- **🗺️ Mind Map 2.6.3（顶栏重排 · v2.6.3 更新）**：**双栏展开时两行对齐成一列** —— 顶栏从"会自己换行的横排"改成网格：设置控件（搜索 / 主题 / 布局 / 编号）整排换行，并与第一行第一个控件**同列**；缩放与导出固定在**第一行右上**，不再被挤到第二行末尾、上方也不再空半行 ✓。一行还是两行由**导图区自己的宽度**决定（容器查询，宽过 1800px 回到一行 ✓）。控件统一 30px 高、组间 6px / 组内 4px，各窄档位补回上下留白，主题与布局两个下拉做成真正的控件（此前无边框、偏矮、文字偏暗，看着像被禁用 ✓）。
 - **🗺️ Mind Map 2.6.2（细节打磨 · v2.6.2 更新）**：**顶栏两行对齐** —— 两行布局下第二行与第一行左对齐，右侧那排不再看起来错位 ✓；**链接徽章真正可点** —— 根因是父层的 `pointer-events: none` 被继承下来、徽章收不到点击，改为显式 `auto`，并支持**裸域名**（`example.com` ✓）；节点类型图标改画在**主题盒子之上**，不再被连线压住 ✓；**PNG 导出改为 3× 超采样**，放大后文字与图标不再发虚 ✓。
 - **🗺️ Mind Map 2.6.1（交互对象与可读性收口 · v2.6.1 更新）**：**顶栏在打开文件目录与大纲后不再丢右侧控件**（装不下就换行；缩放与导出归右侧同一组；滚轮落在顶栏上不再缩放画布 ✓）；**快捷键归属插入符所在的输入框** —— 在备注框里按 `Delete` 不再删掉整个主题、在标签或链接框里按 `Ctrl+V` 不再贴出一个分支，节点菜单里新增**复制/剪切整个主题、粘贴为子主题**三行，删除行明确写着"整个主题及其子主题" ✓；节点可标 **8 枚语义类型**（待办 / 进行中 / 已完成 / 疑问 / 想法 / 风险 / 重点 / 参考，一名一义，画布搜索里输入类型名即可找出同类主题 ✓）；节点上的**链接徽章可直接点击打开**（外链走系统浏览器 ✓）；点击顶栏即可收起右键菜单且不丢选择 ✓。
 - **🧠 Mind Map 2.3（思维导图双端非破坏性同步体系与响应式工具栏 · v2.3.0 升级）**：Markdown 架构一键转化为交互式思维脑图（`Ctrl+M`），**核心无损同步算法 `syncMindmapToDocument`** 彻底攻克导图编辑抹杀正文段落的历史顽疾，基于 AST 章节区块映射进行增量标题结构同步，**100% 完整保全所有正文文字、代码块、表格与数学公式**；顶栏增设「🔄 同步到文档」按键、脏状态感知与绿色呼吸脉冲徽标、支持 `Ctrl+S` / `Cmd+S` 快捷同步与反向自动联动；移除节点旁冗余悬浮加号，界面清爽无杂音；**顶栏按钮自适应换行排版（Responsive Wrapped Toolbar）**，小窗口或高系统缩放比例下功能按钮不溢出、不被截断；支持**分支拖拽改变层级/同级重排（防环闭环保护）**、**导图内搜索与运镜聚焦**、**标准 OPML 2.0 / FreeMind (.mm) / Markdown / 视网膜级 PNG 透明底高清导出**；**v2.6.0 补齐「导出 × 导入」闭环**：新增 **SVG / 打印即 PDF** 导出与 **`.xmind` 导出、导入**（DEFLATE 解压与 ZIP 读写自写实现，是**唯一一种本应用能读回来**的格式），导出共 **7 种**、导入 **3 种**（`.opml` / `.mm` / `.xmind`，导入为新文档并带回备注、链接、关系线、概要与边界）。
@@ -532,20 +533,20 @@
 
 ## 📦 安装程序与便携版下载 (Downloads & Release Assets)
 
-本项目为 Windows 64 位系统深度优化，提供图形化安装程序、标准 MSI 安装包与免安装便携版，最新 `v2.6.2` 资产已发布：
+本项目为 Windows 64 位系统深度优化，提供图形化安装程序、标准 MSI 安装包与免安装便携版，最新 `v2.6.3` 资产已发布：
 
-> 🌐 **GitHub 官方发布主页**：[GitHub Releases · v2.6.2](https://github.com/chunxvzhang-lab/KnowSpace/releases/tag/v2.6.2)
+> 🌐 **GitHub 官方发布主页**：[GitHub Releases · v2.6.3](https://github.com/chunxvzhang-lab/KnowSpace/releases/tag/v2.6.3)
 
 ### 1. Windows 图形化安装程序（推荐）
-- **安装文件**：[`KnowSpace-Setup-2.6.2.exe`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.6.2/KnowSpace-Setup-2.6.2.exe)
+- **安装文件**：[`KnowSpace-Setup-2.6.3.exe`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.6.3/KnowSpace-Setup-2.6.3.exe)
 - **特点**：双击即可向导式安装，支持自定义安装目录，自动创建桌面快捷方式与开始菜单官方品牌图标，深度集成系统级 `.md` 与 `.canvas` 文件关联，内置标准卸载程序。
 
 ### 2. Windows MSI 标准安装包
-- **安装文件**：[`KnowSpace-2.6.2.msi`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.6.2/KnowSpace-2.6.2.msi)
+- **安装文件**：[`KnowSpace-2.6.3.msi`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.6.3/KnowSpace-2.6.3.msi)
 - **特点**：Windows Installer 官方格式，适合企业批量部署、组策略分发与企业级静默安装，支持标准控制面板卸载。
 
 ### 3. Windows 绿色免安装便携版
-- **便携文件**：[`KnowSpace-win-x64-portable.zip`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.6.2/KnowSpace-win-x64-portable.zip)
+- **便携文件**：[`KnowSpace-win-x64-portable.zip`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.6.3/KnowSpace-win-x64-portable.zip)
 - **直接运行**：解压后双击 `KnowSpace.exe` 即可直接使用完整功能。
 - **特点**：解压即用、随身携带（支持装入 U 盘或移动硬盘）；完全自包含 Electron 运行时与全套本地依赖，无需配置任何外部开发环境；支持右键「打开方式」关联 Markdown 与白板文档。
 

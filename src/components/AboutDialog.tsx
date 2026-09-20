@@ -150,6 +150,21 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
               <span className="about-changelog-version-badge">v{__APP_VERSION__}</span>
             </div>
             <div className="about-changelog-list">
+              {/* v2.6.3 */}
+              <div className="about-changelog-group">
+                <div className="about-changelog-group-label">
+                  <Sparkles size={12} className="text-cyan" />
+                  <span>v2.6.3 导图顶栏重排：双栏展开时，两行对齐成一列</span>
+                </div>
+                <ul className="about-changelog-items">
+                  <li>📐 <strong>顶栏改成网格</strong>：此前它是一条会自己换行的横排，而中间控制区的基准宽度是它的<strong>最大内容宽度</strong> —— 等于先把整行占下；于是被挤到第二行的是右侧的缩放与导出（独自靠右、上方空着半行），标题又在两行之间垂直居中。现在：标题一列、控件区一列、缩放与导出一列。</li>
+                  <li>🧩 <strong>设置控件整排换行</strong>：搜索 / 主题 / 布局 / 编号装不下时整排落到第二行，并<strong>与第一行第一个控件同列</strong>、可伸展到右端 —— 前者让两行读成一列，后者让它不必再挤第三行；缩放与导出留在<strong>第一行右上</strong>，不参与重排。</li>
+                  <li>📏 <strong>一行还是两行，由导图区自己的宽度决定</strong>（容器查询，不是窗口宽度 —— 打开的侧栏改变的是前者）：宽过 1800px 时，设置那块回到第一行。</li>
+                  <li>🎚️ <strong>尺寸与间距统一</strong>：控件一律 30px 高（搜索框与缩放读数此前矮一截、看着是"漂"着）；组间 6px、组内 4px；窄档位补回上下留白；<strong>主题与布局下拉</strong>做成真正的控件 —— 边框、按钮同高、正文色（此前用 <code>--text-primary</code>，在未定义它的主题里看着像被禁用）。</li>
+                  <li>🧪 <strong>测试规模</strong>：<strong>99 个测试套件、1241 项</strong>单元与集成测试 100% 通过；布局另有实机截图与计算盒核对。</li>
+                </ul>
+              </div>
+
               {/* v2.6.2 */}
               <div className="about-changelog-group">
                 <div className="about-changelog-group-label">
