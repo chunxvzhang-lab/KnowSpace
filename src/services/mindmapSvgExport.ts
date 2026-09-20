@@ -137,10 +137,12 @@ const DECORATION_RULES: DecorationRule[] = [
     selector: ".mindmap-note-marker path",
     stroke: { dark: "#7dd3fc", light: "#0369a1" },
   },
-  // Link badge, at its bottom-left.
+  // Link badge, at its bottom-left. Its disc is transparent on screen — only the
+  // arrow and its ring — and the file has to say the same, or the exported map
+  // carries the purple blob the app no longer draws.
   {
     selector: ".mindmap-link-marker circle",
-    fill: { dark: "#35275c", light: "#ece7fd" },
+    fill: { dark: "transparent", light: "transparent" },
     stroke: { dark: "#8b6fd0", light: "#b39ae8" },
   },
   {

@@ -8732,10 +8732,10 @@ body:has(.flash-capsule-overlay) {
   user-select: none;
   background-color: var(--bg);
   cursor: grab;
-  /* 顶栏要按"这块地方有多宽"决定一行还是两行（见 .mindmap-toolbar 末尾的 @container）。
-     查询的是这个容器的宽度，也就是导图实际拿到的那块地方 —— 窗口宽度不是它：打开文件目录
-     与大纲之后，窗口一点没变，导图区却窄了一大截。 */
-  container-type: inline-size;
+  /* 顶栏按"这块地方有多宽"决定一行还是两行 —— 但量的不是这个容器的宽度查询，
+     而是 MindmapToolbar 里对顶栏自身的一次实测（见 .mindmap-toolbar 的注释）。
+     关心这块地方的宽度仍然是对的：窗口宽度不是它，打开文件目录与大纲之后，
+     窗口一点没变，导图区却窄了一大截。 */
 }
 
 .mindmap-view-container.is-dragging {
@@ -8753,13 +8753,17 @@ body:has(.flash-capsule-overlay) {
      决定，被推下去的恰好是右边的缩放与导出那一组 —— 它落成第二行、独自靠右，上面空着另外
      半行；而中间那块（flex: 1 1 auto）的基准宽度是它的最大内容宽度，等于先把整行占下，
      于是"空半行"几乎必然发生（打开文件目录与大纲后最明显）。
-     网格里三件东西各就各位：标题一列，控件区一列，看什么 / 带走什么（缩放与导出）一列。
-     控件区再分结构控件与设置控件两块 —— 装不下时设置那块整排落到第二行，并从控件列的左边缘
-     起排，两行因此对齐成一列；缩放与导出留在第一行右端，不参与重排。
-     够宽时（见下面 .mindmap-toolbar-settings 之后的 @container）设置那块回到第一行。 */
+     网格里四件东西各就各位：标题一列，控件区一列，设置控件一列，看什么 / 带走什么
+     （缩放与导出）一列。
+     一行还是两行、标签留不留，不由这里的阈值决定，由 MindmapToolbar 实测决定：
+     它把四种排法各量一遍（见 .is-measuring），第一种放得下的胜出。阈值回答不了这个问题 ——
+     同一扇窗户里，打开搜索框、多选一个节点、换个长标题，都会让"放得下"的宽度变上一截，
+     而窗户一点没动。实测的那套逻辑只管选排法，落位仍然靠这张网格：
+     .is-two-row 把设置控件与缩放导出整组挪到第二行，设置控件与第一行第一个控件对齐，
+     缩放导出落在第二行右端 —— 两行因此都是满的，不再有"下半行空着"的那道沟。 */
   min-height: 44px;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
   column-gap: 10px;
   row-gap: 8px;
@@ -8919,12 +8923,10 @@ body:has(.flash-capsule-overlay) {
   z-index: 2;
 }
 
-/* 设置控件（搜索 / 主题 / 布局 / 编号）：默认在第二行，从控件列的左边缘起排，并允许一直
-   伸展到右端。两件事都要紧 —— 对齐第一行的第一个控件，是"两行读成一列"的关键；能用满整幅
-   宽度，是"不会再挤成第三行"的关键。 */
+/* 设置控件（搜索 / 主题 / 布局 / 编号）：一行版的第三列，紧跟在结构控件那一列之后。 */
 .mindmap-toolbar-settings {
-  grid-column: 2 / -1;
-  grid-row: 2;
+  grid-column: 3;
+  grid-row: 1;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -8933,20 +8935,34 @@ body:has(.flash-capsule-overlay) {
   min-width: 0;
 }
 
+/* 两行版：设置控件整组落到第二行，从控件列的左边缘起排 —— 与第一行第一个控件对齐，
+   两行才读成一列；缩放与导出跟着搬到第二行右端，第二行因此是满的。
+   旧版把缩放导出留在第一行右端，第二行只剩设置控件，右半边空成一道沟 —— 那道沟就是
+   这次要收拾的东西。中间列因此要容得下"结构控件"与"设置控件"里较宽的那个，
+   这与 MindmapToolbar 里两行版需求宽度的算法是一回事。 */
+.mindmap-toolbar.is-two-row {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.mindmap-toolbar.is-two-row .mindmap-toolbar-settings {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.mindmap-toolbar.is-two-row .mindmap-toolbar-view {
+  grid-column: 3;
+  grid-row: 2;
+}
+
 /* 两行版里，结构控件那一行不以分隔线收尾：它后面不是另一个组，而是换行本身。 */
-.mindmap-view-container .mindmap-toolbar-center > .mindmap-toolbar-divider:last-child {
+.mindmap-toolbar.is-two-row .mindmap-toolbar-center > .mindmap-toolbar-divider:last-child {
   display: none;
 }
 
-/* 一行版的规则在下面 —— 它必须排在所有基础规则之后。
-   写在基础规则前面会被它们按"后来者优先"盖掉：优先级相同的情况下，谁在后面谁生效，
-   而 @container 里的规则并不因为"有查询"就自动赢。第一版写在这里，结果设置块与缩放块
-   同时落在第三列、叠在一起 —— 正是这一段注释要拦住的那种错误。 */
-
-/* 缩放与导出装在一个盒子里，那个盒子是网格的第三列 —— 两者一起待在右上角，
-   地图级控件怎么重排都不动它们。 */
+/* 缩放与导出装在一个盒子里：一行版里是网格的第四列，两者一起待在右上角；
+   两行版里搬到第二行右端（见上面 .is-two-row）。地图级控件怎么重排都不拆开它们。 */
 .mindmap-toolbar-view {
-  grid-column: 3;
+  grid-column: 4;
   grid-row: 1;
   display: flex;
   align-items: center;
@@ -8965,6 +8981,46 @@ body:has(.flash-capsule-overlay) {
 .mindmap-theme-select,
 .mindmap-layout-select {
   max-width: 132px;
+}
+
+/* ── 标签密度：放不下的时候，先收标签，再收行 ──────────────────────────────
+   两个档位由 MindmapToolbar 实测后加类，不是媒体查询：同一个窗口宽度下，搜索框开没开、
+   选中几个节点、标题多长，都会改变"放得下"的答案，而宽度查询看不见这些。
+   收起来的按钮仍有图标与 tooltip —— 少的是一个词，不是整个控件。
+   ─────────────────────────────────────────────────────────────────────── */
+
+/* 次级动作收成图标：外观样式、全选、折叠、展开。 */
+.mindmap-toolbar.is-density-secondary .mindmap-tool-btn.secondary-action span {
+  display: none;
+}
+
+.mindmap-toolbar.is-density-secondary .mindmap-toolbar-btn-group .mindmap-tool-btn.secondary-action {
+  padding: 0 8px;
+}
+
+/* 连主级动作也收成图标：同级主题、子主题、编号，以及搜索开关。
+   到这一步通常已经进了两行版，再下一步就是 ultra-narrow 的"更多"菜单。 */
+.mindmap-toolbar.is-density-compact .mindmap-tool-btn.secondary-action span,
+.mindmap-toolbar.is-density-compact .mindmap-tool-btn.highlight-btn span,
+.mindmap-toolbar.is-density-compact .mindmap-search-group .mindmap-tool-btn span {
+  display: none;
+}
+
+.mindmap-toolbar.is-density-compact .mindmap-tool-btn.highlight-btn,
+.mindmap-toolbar.is-density-compact .mindmap-search-group .mindmap-tool-btn {
+  padding: 0 8px;
+}
+
+/* 量宽度时的临时形态：绝对定位、不可见、按内容自然展开成一条横排。
+   网格在这里换成 flex，于是四块各报各的自然宽度，没有被轨道挤压过的痕迹。
+   MindmapToolbar 在同一个任务里加上又移除这一条，浏览器来不及画出中间态。 */
+.mindmap-toolbar.is-measuring {
+  display: flex;
+  position: absolute;
+  visibility: hidden;
+  width: max-content;
+  max-width: none;
+  pointer-events: none;
 }
 
 /* More Actions Dropdown in Mindmap Toolbar */
@@ -9021,10 +9077,11 @@ body:has(.flash-capsule-overlay) {
 
 /* ==========================================================================
    Responsive Modes for Mindmap Toolbar
-   1. Semi-Compact (width < 1220px): Collapse secondary actions into icon-only
-   2. Compact Mode (width < 1000px): Collapse primary actions into icon-only
+   1. Semi-Compact (width < 1220px): tighten margins, shorten the title
+   2. Compact Mode (width < 1000px): shorten the title further
    3. Narrow Mode (width < 820px): Collapse sync text, hide badges, slim margins
    4. Ultra-Narrow Mode (width < 650px): Fold secondary tools into More (···) menu
+   文字收成图标不再由宽度档位决定，归 .is-density-* 管 —— 那要实测（见上面"标签密度"）。
    ========================================================================== */
 
 /* 1. Semi-Compact Mode (w < 1220px) - When dual sidebars (folder + outline) are open */
@@ -9043,34 +9100,15 @@ body:has(.flash-capsule-overlay) {
   margin: 0 6px;
 }
 
-.mindmap-view-container.is-semi-compact .mindmap-tool-btn.secondary-action {
-  padding: 0 8px;
-}
-
-.mindmap-view-container.is-semi-compact .mindmap-tool-btn.secondary-action span {
-  display: none !important;
-}
+/* 次级动作收图标由 .is-density-secondary 决定（见上面"标签密度"一节）——
+   那要看实测，不是看宽度：搜索框开没开、多选没多选，都会改变放得下的答案。 */
 
 /* 2. Compact Mode (w < 1000px) - When user starts resizing the left sidebar */
 .mindmap-view-container.is-compact .mindmap-toolbar-title {
   max-width: 110px;
 }
 
-.mindmap-view-container.is-compact .mindmap-tool-btn.highlight-btn {
-  padding: 0 8px;
-}
-
-.mindmap-view-container.is-compact .mindmap-tool-btn.highlight-btn span {
-  display: none !important;
-}
-
-.mindmap-view-container.is-compact .mindmap-search-group .mindmap-tool-btn span {
-  display: none !important;
-}
-
-.mindmap-view-container.is-compact .mindmap-search-group .mindmap-tool-btn {
-  padding: 0 8px;
-}
+/* 主级动作收图标同样归 .is-density-compact 管，理由同上。 */
 
 /* 3. Narrow Mode (w < 820px) - Moderately squeezed workspace */
 .mindmap-view-container.is-narrow .mindmap-toolbar {
@@ -9154,32 +9192,11 @@ body:has(.flash-capsule-overlay) {
   padding-block: 6px;
 }
 
-/* 够宽就回到一行：标题 | 结构控件 | 设置控件 | 缩放与导出。
-   1800px 是这几块的实测宽度之和（最长的标题 + 各按钮带着文字 + 两个下拉按上限 132px 算），
-   不是随手取的数。阈值宁可略高：高一点只是白留一行，低一点会让结构控件自己挤成两行 —— 那
-   正是这次要收拾的样子。
-   这一段必须排在所有基础规则之后：优先级相同时后来者生效，而 @container 里的规则并不会因为
-   "有查询"就自动赢。第一版把它写在基础规则之前，结果设置块与缩放块同时落在第三列、叠在一起。 */
-@container (min-width: 1800px) {
-  .mindmap-toolbar {
-    grid-template-columns: auto minmax(0, 1fr) auto auto;
-  }
-
-  .mindmap-toolbar-settings {
-    grid-column: 3;
-    grid-row: 1;
-  }
-
-  .mindmap-toolbar-view {
-    grid-column: 4;
-    grid-row: 1;
-  }
-
-  /* 一行的时候分隔线又要回来：这时它隔开的是"结构"与"设置"两块。 */
-  .mindmap-view-container .mindmap-toolbar-center > .mindmap-toolbar-divider:last-child {
-    display: block;
-  }
-}
+/* 一行还是两行，从前在这里按一个写死的容器宽度切（1800px）。那个数有两个问题：
+   它是"全都带着文字、搜索框还开着"时量出来的，于是搜索框没开、标题不长的绝大多数
+   窗口明明放得下一行，却照样落进两行；而它又管不了另一头 —— 打开搜索框、多选几个
+   节点，一行又会从 1800px 里溢出去。现在这件事由 MindmapToolbar 实测决定，
+   这里不再需要阈值。 */
 
 /* SVG Canvas & Node Elements */
 .mindmap-svg-canvas {
@@ -12327,7 +12344,11 @@ body:has(.flash-capsule-overlay) {
 }
 
 .mindmap-link-marker circle {
-  fill: color-mix(in srgb, #a855f7 22%, var(--surface-1, #1e293b));
+  /* 透明底：此前是一坨 22% 的紫压在节点上，链接一多，节点角上就挂着一串色块。
+     现在底是透明的，只剩箭头和一圈细边 —— 徽章因此读作"这儿有条链"，而不是
+     "这儿有个紫点"。备注徽章仍带底色：它俩分居两角，一个有底一个没底，
+     正好互相认得出。 */
+  fill: transparent;
   stroke: color-mix(in srgb, #a855f7 70%, transparent);
   stroke-width: 1;
 }
