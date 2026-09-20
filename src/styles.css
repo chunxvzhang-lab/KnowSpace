@@ -8732,6 +8732,10 @@ body:has(.flash-capsule-overlay) {
   user-select: none;
   background-color: var(--bg);
   cursor: grab;
+  /* 顶栏要按"这块地方有多宽"决定一行还是两行（见 .mindmap-toolbar 末尾的 @container）。
+     查询的是这个容器的宽度，也就是导图实际拿到的那块地方 —— 窗口宽度不是它：打开文件目录
+     与大纲之后，窗口一点没变，导图区却窄了一大截。 */
+  container-type: inline-size;
 }
 
 .mindmap-view-container.is-dragging {
@@ -8744,18 +8748,22 @@ body:has(.flash-capsule-overlay) {
   top: 12px;
   left: 12px;
   right: 12px;
-  /* 高度是下限，不是定值 —— 这一条和下面中间区的换行一起，修的是"打开文件目录与大纲后，
-     顶栏右侧那一半不见了"：面板一开，导图区变窄，旧的写法（定高 + 不换行 + 中间区横向
-     滚动且藏掉滚动条）会把右侧的控件推到可视区之外，滚轮又归画布缩放，于是既看不见也
-     够不着。现在装不下就换行，顶栏自己长高，什么都不会被推出框外。 */
+  /* 顶栏是一张网格，不是一条会自己换行的横排。
+     差别在"换行发生在哪里"能不能由我们决定。横排里换行由浏览器在"这行放不下"的那一刻临时
+     决定，被推下去的恰好是右边的缩放与导出那一组 —— 它落成第二行、独自靠右，上面空着另外
+     半行；而中间那块（flex: 1 1 auto）的基准宽度是它的最大内容宽度，等于先把整行占下，
+     于是"空半行"几乎必然发生（打开文件目录与大纲后最明显）。
+     网格里三件东西各就各位：标题一列，控件区一列，看什么 / 带走什么（缩放与导出）一列。
+     控件区再分结构控件与设置控件两块 —— 装不下时设置那块整排落到第二行，并从控件列的左边缘
+     起排，两行因此对齐成一列；缩放与导出留在第一行右端，不参与重排。
+     够宽时（见下面 .mindmap-toolbar-settings 之后的 @container）设置那块回到第一行。 */
   min-height: 44px;
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  align-content: center;
-  row-gap: 6px;
-  padding: 6px 10px;
+  column-gap: 10px;
+  row-gap: 8px;
+  padding: 7px 12px;
   background: color-mix(in srgb, var(--surface) 92%, transparent);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
@@ -8806,16 +8814,16 @@ body:has(.flash-capsule-overlay) {
 }
 
 .mindmap-toolbar-center {
+  grid-column: 2;
+  grid-row: 1;
   display: flex;
   align-items: center;
-  gap: 5px;
-  flex: 1 1 auto;
-  min-width: 0;
-  margin: 0 8px;
-  /* 换行，而不是横向滚动：藏起来的那一截既没有滚动条可拖，滚轮又属于画布的缩放，
-     于是"看不见"实际就等于"没有"。装不下就换到下一行，代价是顶栏高一行。 */
   flex-wrap: wrap;
+  /* 两组之间 6px、组内 4px（见 .mindmap-toolbar-btn-group）：间距的分级就是层级的分级，
+     全是同一个数的时候，读者看不出哪些控件是一家的。 */
+  column-gap: 6px;
   row-gap: 6px;
+  min-width: 0;
 }
 
 .mindmap-toolbar-btn-group {
@@ -8911,33 +8919,46 @@ body:has(.flash-capsule-overlay) {
   z-index: 2;
 }
 
-/* 顶栏的显式换行点：默认不占位，在窄档位把这一行断开。
-   不这么做的话，换行发生在"当前这行放不下"的那一刻 —— 被推下去的是右边的缩放与导出
-   那一组，于是第二行只有它自己、靠右、左边一大片空白，两行也不对齐。断开点固定放在结构性
-   控件之后、设置类控件之前：第二行从左边起排，右侧再由缩放与导出收尾。 */
-.mindmap-toolbar-break {
+/* 设置控件（搜索 / 主题 / 布局 / 编号）：默认在第二行，从控件列的左边缘起排，并允许一直
+   伸展到右端。两件事都要紧 —— 对齐第一行的第一个控件，是"两行读成一列"的关键；能用满整幅
+   宽度，是"不会再挤成第三行"的关键。 */
+.mindmap-toolbar-settings {
+  grid-column: 2 / -1;
+  grid-row: 2;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  column-gap: 6px;
+  row-gap: 6px;
+  min-width: 0;
+}
+
+/* 两行版里，结构控件那一行不以分隔线收尾：它后面不是另一个组，而是换行本身。 */
+.mindmap-view-container .mindmap-toolbar-center > .mindmap-toolbar-divider:last-child {
   display: none;
 }
 
-.mindmap-view-container.is-semi-compact .mindmap-toolbar-break,
-.mindmap-view-container.is-compact .mindmap-toolbar-break,
-.mindmap-view-container.is-narrow .mindmap-toolbar-break,
-.mindmap-view-container.is-ultra-narrow .mindmap-toolbar-break {
-  display: block;
-  flex-basis: 100%;
-  width: 100%;
-  height: 0;
+/* 一行版的规则在下面 —— 它必须排在所有基础规则之后。
+   写在基础规则前面会被它们按"后来者优先"盖掉：优先级相同的情况下，谁在后面谁生效，
+   而 @container 里的规则并不因为"有查询"就自动赢。第一版写在这里，结果设置块与缩放块
+   同时落在第三列、叠在一起 —— 正是这一段注释要拦住的那种错误。 */
+
+/* 缩放与导出装在一个盒子里，那个盒子是网格的第三列 —— 两者一起待在右上角，
+   地图级控件怎么重排都不动它们。 */
+.mindmap-toolbar-view {
+  grid-column: 3;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
-/* 缩放与导出：一起靠右，作为一组换行 —— 读者在看什么、要带走什么，不该跟着中间那排
-   地图级控件一起挪。 */
 .mindmap-toolbar-zoom {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   flex-shrink: 0;
-  margin-left: auto;
-  margin-right: 6px;
 }
 
 /* 主题与布局两个下拉别把顶栏撑宽：它们是选了就走的控件，不是要读的内容。 */
@@ -9122,6 +9143,42 @@ body:has(.flash-capsule-overlay) {
 
 .mindmap-view-container.is-ultra-narrow .mindmap-tool-btn.export-btn span {
   font-size: 11px;
+}
+
+/* 各窄档位此前只调左右内边距，上下写成 0 —— 一行的时候够用，两行就贴边了。
+   这里统一补回上下留白：这几条在那些规则之后，所以是覆盖，不是并列。 */
+.mindmap-view-container.is-semi-compact .mindmap-toolbar,
+.mindmap-view-container.is-compact .mindmap-toolbar,
+.mindmap-view-container.is-narrow .mindmap-toolbar,
+.mindmap-view-container.is-ultra-narrow .mindmap-toolbar {
+  padding-block: 6px;
+}
+
+/* 够宽就回到一行：标题 | 结构控件 | 设置控件 | 缩放与导出。
+   1800px 是这几块的实测宽度之和（最长的标题 + 各按钮带着文字 + 两个下拉按上限 132px 算），
+   不是随手取的数。阈值宁可略高：高一点只是白留一行，低一点会让结构控件自己挤成两行 —— 那
+   正是这次要收拾的样子。
+   这一段必须排在所有基础规则之后：优先级相同时后来者生效，而 @container 里的规则并不会因为
+   "有查询"就自动赢。第一版把它写在基础规则之前，结果设置块与缩放块同时落在第三列、叠在一起。 */
+@container (min-width: 1800px) {
+  .mindmap-toolbar {
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+  }
+
+  .mindmap-toolbar-settings {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .mindmap-toolbar-view {
+    grid-column: 4;
+    grid-row: 1;
+  }
+
+  /* 一行的时候分隔线又要回来：这时它隔开的是"结构"与"设置"两块。 */
+  .mindmap-view-container .mindmap-toolbar-center > .mindmap-toolbar-divider:last-child {
+    display: block;
+  }
 }
 
 /* SVG Canvas & Node Elements */
@@ -10450,10 +10507,12 @@ body:has(.flash-capsule-overlay) {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 6px;
+  /* 与旁边的按钮同高：此前它只有 2px 内边距，在一排 30px 的控件里矮一截。 */
+  min-height: 30px;
+  padding: 0 8px;
   background: rgba(24, 28, 36, 0.85);
   border: 1px solid rgba(56, 189, 248, 0.35);
-  border-radius: 6px;
+  border-radius: 7px;
   margin-left: 6px;
   backdrop-filter: blur(12px);
   animation: contextMenuFadeIn 0.15s ease-out;
@@ -11808,7 +11867,12 @@ body:has(.flash-capsule-overlay) {
 
 .mindmap-zoom-value {
   min-width: 44px;
-  padding: 2px 6px;
+  /* 与同一排的按钮同高，读数才不会像"漂"在两组图标中间。 */
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
   border: none;
   border-radius: 6px;
   background: transparent;
@@ -12676,7 +12740,9 @@ body:has(.flash-capsule-overlay) {
   background-position: right 11px center, right 7px center;
   background-size: 4px 4px, 4px 4px;
   background-repeat: no-repeat;
-  color: var(--text-primary, #e2e8f0);
+  /* 正文色，与旁边的按钮一致 —— 这套下拉此前用 --text-primary，在没有定义它的主题里
+     会落回一个偏暗的值，在深色底上看着像被禁用。 */
+  color: var(--text);
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;

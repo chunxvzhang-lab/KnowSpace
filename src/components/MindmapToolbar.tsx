@@ -342,15 +342,20 @@ export function MindmapToolbar({
           </>
         )}
 
-        {/* Where the bar breaks when there is not enough room for one line.
-            Without a deliberate break the browser wraps wherever the line runs out, and
-            the zoom and export cluster is what gets pushed to the second row — alone,
-            right-aligned, above a hole. The break is a real element so it can be
-            switched on at the widths where the bar is known to be two rows: the line
-            then ends after the structural controls, and the second row starts at the
-            left edge with the settings, filled out to the right by the view cluster. */}
-        <div className="mindmap-toolbar-break" aria-hidden="true" />
+      </div>
 
+      {/* The settings row: search, theme, layout, numbering.
+          It is its own grid item rather than the tail of the row above, because where it
+          lands is the whole point. When the bar cannot hold one line, this row starts at
+          the left edge of the *controls* — the column the structural buttons begin in —
+          and is free to run to the right edge. Both matter: lining up with the first
+          button of the row above is what makes two rows read as one column, and spanning
+          the full width is what lets the row hold everything without a third line.
+          Previously these sat in the same wrapping box as the controls above, so the
+          browser broke the line wherever it ran out — and since that box's flex basis was
+          its max-content width, it claimed the whole row first, which is why the zoom and
+          export cluster was what got pushed down, alone and right-aligned, over a hole. */}
+      <div className="mindmap-toolbar-settings">
         {/* In-Canvas Search Toolbar Group */}
         <MindmapSearchGroup {...search} />
 
@@ -410,46 +415,49 @@ export function MindmapToolbar({
 
       </div>
 
-      {/* View and export sit together on the right, outside the middle row's wrapping.
-          What a reader is looking at and what they take away from it are the two things
-          that should stay where they were while the map-level controls reflow. */}
-      <div className="mindmap-toolbar-zoom">
-        <MindmapZoomGroup scale={scale} onStep={onZoomStep} onFitToScreen={onFitToScreen} />
+      {/* What the reader is looking at, and what they take away from it: zoom and export,
+          one group, always the right end of the first row. They take no part in the
+          reflow above — the map-level controls can wrap under themselves as much as they
+          like without moving these two. */}
+      <div className="mindmap-toolbar-view">
+        <div className="mindmap-toolbar-zoom">
+          <MindmapZoomGroup scale={scale} onStep={onZoomStep} onFitToScreen={onFitToScreen} />
+        </div>
+        <div className="mindmap-toolbar-divider" />
+        <MindmapExportMenu
+          menuRef={exportMenuRef}
+          isOpen={isExportMenuOpen}
+          onToggle={() => setIsExportMenuOpen((prev) => !prev)}
+          onExportPng={() => {
+            setIsExportMenuOpen(false);
+            onExportPng();
+          }}
+          onExportSvg={() => {
+            setIsExportMenuOpen(false);
+            onExportSvg();
+          }}
+          onPrintPdf={() => {
+            setIsExportMenuOpen(false);
+            onPrintPdf();
+          }}
+          onExportXmind={() => {
+            setIsExportMenuOpen(false);
+            onExportXmind();
+          }}
+          onExportOpml={() => {
+            setIsExportMenuOpen(false);
+            onExportOpml();
+          }}
+          onExportFreeMind={() => {
+            setIsExportMenuOpen(false);
+            onExportFreeMind();
+          }}
+          onExportMarkdownOutline={() => {
+            setIsExportMenuOpen(false);
+            onExportMarkdownOutline();
+          }}
+        />
       </div>
-
-      <MindmapExportMenu
-        menuRef={exportMenuRef}
-        isOpen={isExportMenuOpen}
-        onToggle={() => setIsExportMenuOpen((prev) => !prev)}
-        onExportPng={() => {
-          setIsExportMenuOpen(false);
-          onExportPng();
-        }}
-        onExportSvg={() => {
-          setIsExportMenuOpen(false);
-          onExportSvg();
-        }}
-        onPrintPdf={() => {
-          setIsExportMenuOpen(false);
-          onPrintPdf();
-        }}
-        onExportXmind={() => {
-          setIsExportMenuOpen(false);
-          onExportXmind();
-        }}
-        onExportOpml={() => {
-          setIsExportMenuOpen(false);
-          onExportOpml();
-        }}
-        onExportFreeMind={() => {
-          setIsExportMenuOpen(false);
-          onExportFreeMind();
-        }}
-        onExportMarkdownOutline={() => {
-          setIsExportMenuOpen(false);
-          onExportMarkdownOutline();
-        }}
-      />
     </header>
   );
 }
