@@ -39,6 +39,7 @@ import {
   saveMindmapNumbering,
 } from "../services/storage";
 import { buildStandaloneMindmapSvg } from "../services/mindmapSvgExport";
+import { describeMindmapIcon } from "../core/mindmapIcons";
 import { MindmapCanvasMenu } from "./MindmapCanvasMenu";
 import { MindmapNodeStyleMenu } from "./MindmapNodeStyleMenu";
 import { MindmapInlineEditor } from "./MindmapInlineEditor";
@@ -951,13 +952,19 @@ export const MindmapView = memo(function MindmapView({
       setCurrentSearchIndex(0);
       return;
     }
-    const matches = searchMindmapNodes(tree, q);
+    // Two things are searchable: the words in the topics, and the type a topic wears.
+    // The types live in the companion file, so only this side can name them — and being
+    // findable by name is half of what makes the row of icons a way to ask "what is
+    // still open in this map" instead of a row of pictures.
+    const matches = searchMindmapNodes(tree, q, (nodeId) =>
+      describeMindmapIcon(iconFor(sidecar, nodeId))
+    );
     setSearchMatchIds(matches);
     setCurrentSearchIndex(0);
     if (matches.length > 0) {
       focusOnNode(matches[0]);
     }
-  }, [focusOnNode, tree]);
+  }, [focusOnNode, sidecar, tree]);
 
   const handleNextSearch = useCallback(() => {
     if (searchMatchIds.length === 0) return;
@@ -1090,21 +1097,35 @@ export const MindmapView = memo(function MindmapView({
    */
   const clipboardRef = useRef<MindmapNode | null>(null);
 
-  const handleCopyNode = useCallback(() => {
-    const nodeId = [...selectedNodeIds][0];
+  /**
+   * Whether anything has been copied, in a form React can render from.
+   *
+   * The tree itself stays in the ref — nothing draws it — but the node menu shows
+   * "粘贴为子主题" greyed out until there is something to paste, and a ref cannot tell it
+   * when that changes: copying from the menu left the row disabled until some unrelated
+   * interaction re-rendered the panel, which reads as the copy having failed.
+   */
+  const [clipboardReady, setClipboardReady] = useState(false);
+
+  const handleCopyNode = useCallback((explicitNodeId?: string) => {
+    const nodeId = explicitNodeId ?? [...selectedNodeIds][0];
     if (!nodeId) return;
     const copied = copySubtree(tree, nodeId);
-    if (copied) clipboardRef.current = copied;
+    if (copied) {
+      clipboardRef.current = copied;
+      setClipboardReady(true);
+    }
   }, [selectedNodeIds, tree]);
 
-  const handleCutNode = useCallback(() => {
-    const nodeId = [...selectedNodeIds][0];
+  const handleCutNode = useCallback((explicitNodeId?: string) => {
+    const nodeId = explicitNodeId ?? [...selectedNodeIds][0];
     // The root is refused: cutting it would leave no tree to paste into.
     if (!nodeId || nodeId === tree.id) return;
 
     const copied = copySubtree(tree, nodeId);
     if (!copied) return;
     clipboardRef.current = copied;
+    setClipboardReady(true);
 
     // deleteNode returns the tree *and* what to select afterwards, so a cut
     // leaves a sensible selection rather than nothing selected.
@@ -1113,13 +1134,14 @@ export const MindmapView = memo(function MindmapView({
     setSelectedNodeIds(new Set([fallbackSelectedId]));
   }, [applyTreeChange, selectedNodeIds, tree]);
 
-  const handlePasteNode = useCallback(() => {
+  const handlePasteNode = useCallback((explicitParentId?: string) => {
     const copied = clipboardRef.current;
     if (!copied) return;
 
     // Pasted under the selection, so a paste into empty space lands on the root
-    // rather than doing nothing.
-    const result = pasteSubtree(tree, [...selectedNodeIds][0], copied);
+    // rather than doing nothing. The node menu passes the topic it was opened on, so
+    // its row can name where the branch will land instead of leaving it to the selection.
+    const result = pasteSubtree(tree, explicitParentId ?? [...selectedNodeIds][0], copied);
     if (!result) return;
 
     applyTreeChange(result.nextTree);
@@ -1506,6 +1528,28 @@ export const MindmapView = memo(function MindmapView({
         return;
       }
 
+      // Keys belong to the field the reader is typing in, not to the map.
+      //
+      // The same rule as the block above, and it has to be written twice because these
+      // shortcuts are bound to the window: they fired while the caret was in the panel's
+      // own fields. Delete inside the note field deleted the topic the note was on;
+      // Ctrl+V inside the tag or link field pasted a branch — reading a menu of text
+      // fields and getting the map rearranged behind it. Anything with a caret is left
+      // alone now: the annotation fields, the search box, the colour inputs. Escape is
+      // the exception, because it changes nothing — it drops the focus and then closes
+      // whatever is open, which is what it already did everywhere else.
+      const focused = e.target as HTMLElement | null;
+      const focusedTag = focused?.tagName;
+      const isTextEntry =
+        focusedTag === "INPUT" ||
+        focusedTag === "TEXTAREA" ||
+        focusedTag === "SELECT" ||
+        Boolean(focused?.isContentEditable);
+      if (isTextEntry) {
+        if (e.key !== "Escape") return;
+        focused?.blur();
+      }
+
       // Ctrl+F In-Canvas Search
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") {
         e.preventDefault();
@@ -1698,10 +1742,20 @@ export const MindmapView = memo(function MindmapView({
     const target = e.target as HTMLElement | SVGElement;
     if (
       target.closest(".mindmap-node-interactive") ||
-      target.closest(".mindmap-toolbar") ||
       target.closest(".mindmap-inline-edit-input") ||
       target.closest(".mindmap-context-menu")
     ) {
+      return;
+    }
+    // A click on the control bar: the menus close, and nothing else happens.
+    //
+    // The bar used to sit in the list above, which made a click on it not a click
+    // anywhere — a panel stayed open over a map the reader had started using again, and
+    // the only way to be rid of it was to click the canvas, which threw the selection
+    // away too. Dismissing on the way in is what every other surface here already does.
+    if (target.closest(".mindmap-toolbar")) {
+      if (contextMenu) setContextMenu(null);
+      if (sideChooser) setSideChooser(null);
       return;
     }
     // Clicking blank canvas background commits edit, closes menu, and cancels selection!
@@ -1720,7 +1774,7 @@ export const MindmapView = memo(function MindmapView({
       startTransformX: transform.x,
       startTransformY: transform.y,
     };
-  }, [transform.x, transform.y, editingNodeId, contextMenu, handleCommitEdit]);
+  }, [transform.x, transform.y, editingNodeId, contextMenu, sideChooser, handleCommitEdit]);
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
@@ -1831,6 +1885,11 @@ export const MindmapView = memo(function MindmapView({
     // one effect.
     const target = e.target as Element | null;
     if (target?.closest?.(".mindmap-context-menu")) return;
+    // The control bar is chrome, not canvas: a wheel over it is someone trying to get
+    // through the bar, and it used to zoom the map underneath instead. Nothing happens
+    // now — which is also the second half of the fix that lets the bar wrap: the
+    // right-hand controls are on screen rather than somewhere a wheel cannot reach.
+    if (target?.closest?.(".mindmap-toolbar")) return;
     if (contextMenu) {
       setContextMenu(null);
       return;
@@ -3079,7 +3138,14 @@ export const MindmapView = memo(function MindmapView({
                       that leads nowhere would be the one lie on the map. Text
                       that is not a link still shows in the panel, with the hint. */}
                   {parseMindmapLink(linkFor(sidecar, node.id)) ? (
-                    <NodeLinkMark height={node.height} />
+                    // Clickable: the badge is where a reader sees "this goes somewhere",
+                    // so it should be where they can go. The panel keeps its own 打开
+                    // button for the same journey with the destination written out first.
+                    <NodeLinkMark
+                      height={node.height}
+                      onOpen={() => handleOpenLink(tree, node.id)}
+                      label={linkFor(sidecar, node.id)}
+                    />
                   ) : null}
 
                   {/* Outline numbering, drawn above the node's left corner.
@@ -3225,6 +3291,7 @@ export const MindmapView = memo(function MindmapView({
             onStartEdit={handleStartFloatingEdit}
             onStartDrag={handleFloatingDragStart}
             onOpenMenu={handleFloatingContextMenu}
+            onOpenLink={(id) => handleOpenLink(tree, id)}
             />
         </g>
       </svg>
@@ -3400,6 +3467,10 @@ export const MindmapView = memo(function MindmapView({
         target={contextTargetNode}
         isBatchMode={isBatchMode}
         selectedCount={selectedNodeIds.size}
+        canPasteBranch={clipboardReady}
+        onCopyBranch={() => handleCopyNode(contextMenu?.nodeId)}
+        onCutBranch={() => handleCutNode(contextMenu?.nodeId)}
+        onPasteBranch={() => handlePasteNode(contextMenu?.nodeId)}
         icon={iconFor(sidecar, panelNodeId)}
         note={noteFor(sidecar, panelNodeId)}
         link={panelLink}

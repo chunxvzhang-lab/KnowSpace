@@ -1,8 +1,11 @@
 import type { RefObject } from "react";
 import {
+  Clipboard,
   CornerDownRight,
+  Copy,
   Edit3,
   PlusCircle,
+  Scissors,
   Trash2,
   Palette,
   Check,
@@ -56,6 +59,19 @@ export type MindmapNodeStyleMenuProps = {
   onAddChild: (parentId?: string) => void;
   onAddSibling: (targetId?: string) => void;
   onStartRename: (nodeId: string) => void;
+  /**
+   * The branch clipboard: the three operations that act on the whole topic.
+   *
+   * They are rows here rather than only shortcuts because the shortcuts were the entire
+   * feature, and a menu whose rows do not say what they act on is how a reader ends up
+   * expecting "粘贴" to paste their text and getting a second copy of a branch. The
+   * paste row is disabled with a reason when nothing has been copied, like the paste row
+   * on the canvas menu.
+   */
+  canPasteBranch: boolean;
+  onCopyBranch: () => void;
+  onCutBranch: () => void;
+  onPasteBranch: () => void;
   /**
    * Moves this branch to the other side of the root.
    *
@@ -236,6 +252,10 @@ export function MindmapNodeStyleMenu({
   onAddChild,
   onAddSibling,
   onStartRename,
+  canPasteBranch,
+  onCopyBranch,
+  onCutBranch,
+  onPasteBranch,
   onMoveToSide,
   onFreezeTheme,
   icon,
@@ -557,6 +577,50 @@ export function MindmapNodeStyleMenu({
       <div className="mindmap-ctx-actions">
         {!isBatchMode && (
           <>
+            {/* The branch operations, next to the other decisions about the topic and
+                named after their object. They were keyboard-only until now, which left
+                "复制" and "粘贴" with no row anywhere in the map — so the only thing a
+                reader could conclude from this menu was that the words belonged to the
+                text. Copy keeps the menu open, because it changes nothing; cut and paste
+                close it, because they do. */}
+            <button
+              type="button"
+              className="mindmap-ctx-action-item"
+              onClick={onCopyBranch}
+              title="复制整个主题与它的子主题，不改变文档 (Ctrl+C)"
+            >
+              <Copy size={13} />
+              <span>复制整个主题 (Ctrl+C)</span>
+            </button>
+            <button
+              type="button"
+              className="mindmap-ctx-action-item"
+              onClick={() => {
+                onClose();
+                onCutBranch();
+              }}
+              title="剪切整个主题与它的子主题 (Ctrl+X)"
+            >
+              <Scissors size={13} />
+              <span>剪切整个主题 (Ctrl+X)</span>
+            </button>
+            <button
+              type="button"
+              className="mindmap-ctx-action-item"
+              onClick={() => {
+                onClose();
+                onPasteBranch();
+              }}
+              disabled={!canPasteBranch}
+              title={
+                canPasteBranch
+                  ? `粘贴为「${target?.text || "当前主题"}」的子主题 (Ctrl+V)`
+                  : "先复制一个主题 (Ctrl+C)"
+              }
+            >
+              <Clipboard size={13} />
+              <span>粘贴为子主题 (Ctrl+V)</span>
+            </button>
             <button
               type="button"
               className="mindmap-ctx-action-item"
@@ -645,7 +709,12 @@ export function MindmapNodeStyleMenu({
           }}
         >
           <Trash2 size={13} />
-          <span>{isBatchMode ? `删除选中的 ${selectedCount} 个主题 (Del)` : "删除主题 (Del)"}</span>
+          {/* 名字里写明连子主题一起删：这一行删的是主题，不是主题里的字。 */}
+          <span>
+            {isBatchMode
+              ? `删除选中的 ${selectedCount} 个主题及其子主题 (Del)`
+              : "删除整个主题及其子主题 (Del)"}
+          </span>
         </button>
       </div>
     </div>

@@ -4,6 +4,7 @@ import {
   Bookmark,
   Calendar,
   CircleAlert,
+  CircleCheck,
   CircleHelp,
   Clock,
   Code,
@@ -21,6 +22,8 @@ import {
   Lightbulb,
   Link,
   ListChecks,
+  ListTodo,
+  LoaderCircle,
   MapPin,
   MessageSquare,
   Pin,
@@ -55,6 +58,15 @@ import type { LucideIcon } from "lucide-react";
 export interface MindmapIcon {
   id: string;
   label: string;
+  /**
+   * One line saying when to wear it.
+   *
+   * Here because the type icons below are only worth having if two readers would
+   * reach for the same one for the same situation. A name like "风险" is not enough
+   * on its own — the sentence is what makes the row a set of decisions rather than a
+   * set of pictures.
+   */
+  meaning?: string;
   Icon: LucideIcon;
 }
 
@@ -64,6 +76,63 @@ export interface MindmapIconGroup {
   icons: MindmapIcon[];
 }
 
+/**
+ * The node types: eight icons, one row, one meaning each.
+ *
+ * This table is what the picker offers, and it replaced a grid of thirty-four
+ * pictures grouped by nothing in particular — stars beside hearts beside flags,
+ * where two reasonable readers would never choose the same one for the same
+ * situation, which is the whole test a marker has to pass.
+ *
+ * What each one is for, so the row is a decision rather than decoration:
+ *
+ *   - 待办 / 进行中 / 已完成 — where a piece of work stands. One node, one answer.
+ *   - 疑问 / 想法 — what a node is *for* in a map that is still being thought in.
+ *   - 风险 — the branch that needs watching. The one marker worth seeing from far away.
+ *   - 重点 — the link in a long branch that matters most.
+ *   - 参考 — this is not my own conclusion, it came from somewhere else.
+ *
+ * The interaction is deliberately the smallest one that can work: clicking a type
+ * sets it, clicking the same type again takes it off, and a node wears at most one.
+ * It is stored in the companion file like the note and the link, so the type
+ * survives closing the document and never lands in the Markdown; and the in-canvas
+ * search matches on the name — type 「待办」 and every node marked that way is
+ * found, which is the use the feature did not have before.
+ */
+export const MINDMAP_NODE_TYPES: MindmapIcon[] = [
+  { id: "todo", label: "待办", meaning: "这件事还没做", Icon: ListTodo },
+  { id: "doing", label: "进行中", meaning: "正在做，别人不用再安排", Icon: LoaderCircle },
+  { id: "done", label: "已完成", meaning: "做完了，留着做记录", Icon: CircleCheck },
+  { id: "question", label: "疑问", meaning: "还没想清楚，等一个答案", Icon: CircleHelp },
+  { id: "idea", label: "想法", meaning: "值得记下来，但还没定", Icon: Lightbulb },
+  { id: "risk", label: "风险", meaning: "可能出问题，先盯住", Icon: TriangleAlert },
+  { id: "important", label: "重点", meaning: "这一支里最要紧的一环", Icon: Star },
+  { id: "reference", label: "参考", meaning: "外部资料、依据或出处", Icon: Link },
+];
+
+/**
+ * What a node is wearing, in words, or an empty string.
+ *
+ * The one answer to "what does this id mean" — used as a node's own search term, and by
+ * the panel to name the type in the row header. It resolves through the whole table
+ * rather than the eight types alone: a node marked before the redesign still wears a
+ * real icon, and a search that cannot find it by name would be the same forgetting the
+ * old ids are kept to avoid.
+ */
+export function describeMindmapIcon(id: string | null | undefined): string {
+  if (!id) return "";
+  return ICON_BY_ID.get(id)?.label ?? "";
+}
+
+/**
+ * The old picker's icons.
+ *
+ * Kept, and kept out of the picker, for exactly one reason: companion files in the
+ * wild name these ids, and `findMindmapIcon` has to keep drawing them or a map
+ * written last week opens with its icons silently gone. A node that already wears
+ * one still shows it, and the panel offers to take it off; what it does not offer
+ * is a second set of thirty-four pictures to choose from.
+ */
 export const MINDMAP_ICON_GROUPS: MindmapIconGroup[] = [
   {
     group: "重点",
@@ -126,10 +195,16 @@ export const MINDMAP_ICON_GROUPS: MindmapIconGroup[] = [
   },
 ];
 
-/** Every icon, in the order the groups are shown. */
-export const MINDMAP_ICONS: MindmapIcon[] = MINDMAP_ICON_GROUPS.flatMap((group) => group.icons);
+/** Every icon the picker offers, in the order the row shows them. */
+export const MINDMAP_ICONS: MindmapIcon[] = MINDMAP_NODE_TYPES;
 
-const ICON_BY_ID = new Map(MINDMAP_ICONS.map((icon) => [icon.id, icon]));
+/** Every icon this build can draw, the node types and the old table both. */
+const ICON_BY_ID = new Map(
+  [...MINDMAP_NODE_TYPES, ...MINDMAP_ICON_GROUPS.flatMap((group) => group.icons)].map((icon) => [
+    icon.id,
+    icon,
+  ])
+);
 
 /**
  * The icon with this id, or null.

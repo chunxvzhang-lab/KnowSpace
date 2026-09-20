@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MINDMAP_ICON_GROUPS } from "../core/mindmapIcons";
+import { MINDMAP_NODE_TYPES, findMindmapIcon } from "../core/mindmapIcons";
 import { MINDMAP_PRIORITIES, MINDMAP_PROGRESS_STEPS, PROGRESS_MAX } from "../core/mindmapMarkers";
 import { describeMindmapLink, type MindmapLink } from "../core/mindmapLinks";
 import { parseTagInput, type NodeMarkers } from "../services/mindmapSidecar";
@@ -87,6 +87,13 @@ export function MindmapAnnotationSections({
   const editingTags = tagDraft?.nodeId === nodeId;
   const tagText = editingTags && tagDraft ? tagDraft.text : tags.join(" ");
 
+  // What the topic wears now, looked up once for the two places that say it: the row's
+  // right-hand hint and the sentence under the row. An id from the old table resolves
+  // through `findMindmapIcon`, so a document written before the redesign keeps its icon
+  // instead of opening one morning with the marks silently gone.
+  const currentType = MINDMAP_NODE_TYPES.find((entry) => entry.id === icon) ?? null;
+  const legacyIcon = currentType ? null : findMindmapIcon(icon);
+
   const commitTags = () => {
     if (!editingTags || !tagDraft) return;
     // Dropped first so the field falls back to what was actually stored,
@@ -106,13 +113,47 @@ export function MindmapAnnotationSections({
         </div>
       ) : null}
 
-      {/* Node Icon — a marker the document has no syntax for, so like the note
-          below it lives in the mind map's companion file. Clicking the active
-          one takes it off again, which is where the clear button would be. */}
+      {/* Node type — what this topic *is*, which is the one thing none of the
+          controls around it says: the priority says how urgent, the progress says how
+          far along, the tags say what it belongs to, and none of them answers "is this
+          a task, a question, or a conclusion". Eight marks, one row, one meaning each,
+          and the sentence under the row is the one that matters: it names what the
+          mark does, because a picker of pictures with no stated job is decoration.
+          Clicking the active one takes it off, which is where the clear button would
+          be; a topic wears at most one, so this is a choice rather than a tally. */}
       <div className="mindmap-ctx-section">
         <div className="mindmap-ctx-label-row">
-          <span className="mindmap-ctx-label">节点图标</span>
-          {icon ? (
+          <span className="mindmap-ctx-label">节点类型</span>
+          <span className="mindmap-ctx-hint">
+            {currentType ? currentType.label : legacyIcon ? `旧版：${legacyIcon.label}` : "未标"}
+          </span>
+        </div>
+        <div className="mindmap-type-row">
+          {MINDMAP_NODE_TYPES.map((entry) => (
+            <button
+              key={entry.id}
+              type="button"
+              className={`mindmap-icon-btn ${icon === entry.id ? "is-active" : ""}`}
+              onClick={() => onIconChange(nodeId, icon === entry.id ? "" : entry.id)}
+              title={entry.meaning ? `${entry.label} —— ${entry.meaning}` : entry.label}
+              aria-label={`标记为${entry.label}`}
+              aria-pressed={icon === entry.id}
+            >
+              <entry.Icon size={14} />
+            </button>
+          ))}
+        </div>
+        <div className="mindmap-ctx-hint-line">
+          {currentType
+            ? `${currentType.label}：${currentType.meaning ?? ""}。再点一次取消；一个主题只戴一枚。`
+            : "给主题标一枚类型，之后在画布搜索里输入它的名字（如「待办」）就能找出所有同类的主题。"}
+        </div>
+        {/* A file written by an older version can carry one of the thirty-four icons
+            the picker no longer offers. It is drawn rather than dropped, and offered
+            back the same way it was cleared — see MINDMAP_ICON_GROUPS. */}
+        {!currentType && legacyIcon ? (
+          <div className="mindmap-ctx-label-row">
+            <span className="mindmap-ctx-hint">旧版图标，仍会画在主题上</span>
             <button
               type="button"
               className="mindmap-icon-clear"
@@ -120,27 +161,8 @@ export function MindmapAnnotationSections({
             >
               清除
             </button>
-          ) : null}
-        </div>
-        {MINDMAP_ICON_GROUPS.map((group) => (
-          <div className="mindmap-icon-group" key={group.group}>
-            <span className="mindmap-icon-group-label">{group.group}</span>
-            <div className="mindmap-icon-grid">
-              {group.icons.map((entry) => (
-                <button
-                  key={entry.id}
-                  type="button"
-                  className={`mindmap-icon-btn ${icon === entry.id ? "is-active" : ""}`}
-                  onClick={() => onIconChange(nodeId, icon === entry.id ? "" : entry.id)}
-                  title={entry.label}
-                  aria-label={entry.label}
-                >
-                  <entry.Icon size={14} />
-                </button>
-              ))}
-            </div>
           </div>
-        ))}
+        ) : null}
       </div>
 
       {/* Priority and progress — the two marks a number says better than any

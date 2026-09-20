@@ -58,4 +58,16 @@ describe("滚轮与右键菜单", () => {
 
     expect(transformOf()).not.toBe(before);
   });
+
+  it("在顶栏上滚动：脑图同样不动 —— 顶栏是外壳，不是画布", () => {
+    // 这一条和测试文件里别的不太一样：它管的是"顶栏上面",而顶栏的布局问题（打开文件目录与
+    // 大纲后右侧控件消失）是 CSS 的换行改掉的，jsdom 看不见布局，能钉住的只有这一半 ——
+    // 滚轮落在顶栏上不该穿透到画布的缩放上。
+    render(<MindmapView title="测试" source={SOURCE} />);
+    const before = transformOf();
+
+    fireEvent.wheel(document.querySelector(".mindmap-toolbar") as Element, { deltaY: -240 });
+
+    expect(transformOf()).toBe(before);
+  });
 });

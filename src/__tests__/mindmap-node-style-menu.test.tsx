@@ -98,4 +98,59 @@ describe("节点样式菜单", () => {
 
     expect(screen.getByRole("button", { name: "已同步" })).toBeTruthy();
   });
+
+  it("菜单写明它作用于什么：一句总说明、三条分支操作、以及连带子主题的删除", () => {
+    render(<MindmapView title="测试" source={SOURCE} />);
+
+    fireEvent.click(screen.getByText("父节点"));
+    fireEvent.click(screen.getByRole("button", { name: "外观样式" }));
+
+    expect(screen.getByRole("button", { name: /复制整个主题/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /剪切整个主题/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /删除整个主题及其子主题/ })).toBeTruthy();
+
+    // 还没复制过，粘贴那行是灰的 —— 灰着并给出原因，比不出现好。
+    const paste = screen.getByRole("button", { name: /粘贴为子主题/ }) as HTMLButtonElement;
+    expect(paste.disabled).toBe(true);
+  });
+
+  it("点顶栏：右键菜单收起", () => {
+    render(<MindmapView title="测试" source={SOURCE} />);
+
+    fireEvent.click(screen.getByText("父节点"));
+    fireEvent.click(screen.getByRole("button", { name: "外观样式" }));
+    expect(document.querySelector(".mindmap-context-menu")).toBeTruthy();
+
+    const selectionBefore = document
+      .querySelector(".mindmap-node-interactive.is-selected")
+      ?.getAttribute("transform");
+
+    // 顶栏上的一次按下：菜单收起来，而这次点击不算"落在画布上"，
+    // 所以选择也不会被顺手清掉。
+    fireEvent.mouseDown(screen.getByRole("button", { name: "同级主题" }));
+
+    expect(document.querySelector(".mindmap-context-menu")).toBeNull();
+    expect(
+      document.querySelector(".mindmap-node-interactive.is-selected")?.getAttribute("transform")
+    ).toBe(selectionBefore);
+  });
+
+  it("在菜单里复制再粘贴：贴成当前主题的子主题，粘贴行随之可用", () => {
+    render(<MindmapView title="测试" source={SOURCE} />);
+
+    fireEvent.click(screen.getByText("父节点"));
+    fireEvent.click(screen.getByRole("button", { name: "外观样式" }));
+
+    fireEvent.click(screen.getByRole("button", { name: /复制整个主题/ }));
+
+    // 复制之后菜单不关（它什么都没改），粘贴那行必须立刻能用：靠 ref 判断可用性时它
+    // 会一直灰着，直到某次无关的交互顺手重渲染。
+    const paste = screen.getByRole("button", { name: /粘贴为子主题/ }) as HTMLButtonElement;
+    expect(paste.disabled).toBe(false);
+
+    fireEvent.click(paste);
+
+    // 「父节点」那一支有三个主题，原来的五个加上它们。
+    expect(screen.getByText("8 节点")).toBeTruthy();
+  });
 });

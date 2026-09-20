@@ -8744,11 +8744,18 @@ body:has(.flash-capsule-overlay) {
   top: 12px;
   left: 12px;
   right: 12px;
-  height: 44px;
+  /* 高度是下限，不是定值 —— 这一条和下面中间区的换行一起，修的是"打开文件目录与大纲后，
+     顶栏右侧那一半不见了"：面板一开，导图区变窄，旧的写法（定高 + 不换行 + 中间区横向
+     滚动且藏掉滚动条）会把右侧的控件推到可视区之外，滚轮又归画布缩放，于是既看不见也
+     够不着。现在装不下就换行，顶栏自己长高，什么都不会被推出框外。 */
+  min-height: 44px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 10px;
+  flex-wrap: wrap;
+  align-content: center;
+  row-gap: 6px;
+  padding: 6px 10px;
   background: color-mix(in srgb, var(--surface) 92%, transparent);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
@@ -8805,14 +8812,10 @@ body:has(.flash-capsule-overlay) {
   flex: 1 1 auto;
   min-width: 0;
   margin: 0 8px;
-  overflow-x: auto;
-  overflow-y: visible;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.mindmap-toolbar-center::-webkit-scrollbar {
-  display: none;
+  /* 换行，而不是横向滚动：藏起来的那一截既没有滚动条可拖，滚轮又属于画布的缩放，
+     于是"看不见"实际就等于"没有"。装不下就换到下一行，代价是顶栏高一行。 */
+  flex-wrap: wrap;
+  row-gap: 6px;
 }
 
 .mindmap-toolbar-btn-group {
@@ -8902,9 +8905,27 @@ body:has(.flash-capsule-overlay) {
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
-  margin-left: auto;
+  /* 右端由下面那组（缩放 + 导出）一起占据，所以这里不再各自往右顶。 */
+  margin-left: 0;
   position: relative;
   z-index: 2;
+}
+
+/* 缩放与导出：一起靠右，作为一组换行 —— 读者在看什么、要带走什么，不该跟着中间那排
+   地图级控件一起挪。 */
+.mindmap-toolbar-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  margin-left: auto;
+  margin-right: 6px;
+}
+
+/* 主题与布局两个下拉别把顶栏撑宽：它们是选了就走的控件，不是要读的内容。 */
+.mindmap-theme-select,
+.mindmap-layout-select {
+  max-width: 132px;
 }
 
 /* More Actions Dropdown in Mindmap Toolbar */
@@ -9063,8 +9084,8 @@ body:has(.flash-capsule-overlay) {
 .mindmap-view-container.is-ultra-narrow .mindmap-toolbar {
   left: 4px;
   right: 4px;
-  padding: 0 4px;
-  height: 40px;
+  padding: 4px;
+  min-height: 40px;
 }
 
 .mindmap-view-container.is-ultra-narrow .mindmap-toolbar-title {
@@ -11825,6 +11846,60 @@ body:has(.flash-capsule-overlay) {
 
 .mindmap-canvas-menu {
   min-width: 172px;
+}
+
+/* Node types: one row of eight, one meaning each. */
+.mindmap-type-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* 用来把"这一行作用于什么"写在菜单里：菜单很长，一行说明比一个 tooltip 更该在这儿。 */
+.mindmap-ctx-hint-line {
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--text-muted);
+  margin: 4px 0 2px;
+}
+
+/* 新分支放哪一边：这两个词就是这个弹层全部的正文，用次级色写等于让人凑近看。
+   给足对比度，也让它看起来是个能按的按钮，而不是一行说明。 */
+.mindmap-side-chooser .mindmap-ctx-actions {
+  gap: 8px;
+}
+
+.mindmap-side-chooser .mindmap-ctx-item {
+  min-height: 34px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  justify-content: center;
+}
+
+.mindmap-side-chooser .mindmap-ctx-item:hover:not(:disabled) {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+/* ── 节点上的链接徽章 ────────────────────────────────────────────────────
+   它能点，是因为它标的是一个去处：看得见的地方就该走得到。没有 onOpen 时
+   （例如导出成 SVG）它仍是原来的记号，只是没有指针与悬停反馈。
+   命中区是一个透明圆，不是为了好看 —— 9px 的记号本身太难点。
+   ─────────────────────────────────────────────────────────────────────── */
+.mindmap-link-marker.is-action {
+  cursor: pointer;
+}
+
+.mindmap-link-marker-hit {
+  fill: transparent;
+}
+
+.mindmap-link-marker.is-action:hover {
+  filter: brightness(1.3);
 }
 
 /* ── One visual language for the three mind map menus ──────────────────────────

@@ -132,13 +132,48 @@ export function NodeIcon({ iconId, height }: { iconId: string; height: number })
  *
  * At the bottom-left corner, mirroring the note badge at the top-left: both are
  * "there is more here than the text", and putting them on opposite corners means
- * a node can wear both without either hiding the other. A mark rather than a
- * control — following the link is done from the panel, which is where the reader
- * can also see where it goes before going there.
+ * a node can wear both without either hiding the other.
+ *
+ * The one badge that is a control rather than a mark, and the reason is what each
+ * one stands for: a note is read by opening the panel because the panel is where it
+ * is written, while a link is a place to go — and a place you can see marked on the
+ * map is a place you should be able to go to from the map, not two clicks away in a
+ * panel. Without `onOpen` it is still the mark it used to be, which is how the
+ * exported SVG draws it.
+ *
+ * The hit area is a transparent circle rather than the 9px drawing, so it is
+ * pleasant to hit; mousedown is swallowed because the same box carries selection and
+ * the drag that reorders a branch, and going to a link must not move the topic.
  */
-export function NodeLinkMark({ height }: { height: number }) {
+export function NodeLinkMark({
+  height,
+  onOpen,
+  label,
+}: {
+  height: number;
+  /** Where the link goes. */
+  onOpen?: () => void;
+  /** What the tooltip says, when the caller knows the target. */
+  label?: string;
+}) {
   return (
-    <g className="mindmap-link-marker" transform={`translate(-4, ${height + 4})`} aria-label="有链接">
+    <g
+      className={`mindmap-link-marker ${onOpen ? "is-action" : ""}`}
+      transform={`translate(-4, ${height + 4})`}
+      aria-label={onOpen ? "打开链接" : "有链接"}
+      role={onOpen ? "link" : undefined}
+      onMouseDown={onOpen ? (event) => event.stopPropagation() : undefined}
+      onClick={
+        onOpen
+          ? (event) => {
+              event.stopPropagation();
+              onOpen();
+            }
+          : undefined
+      }
+    >
+      {onOpen ? <title>{label ? `打开 ${label}` : "打开链接"}</title> : null}
+      {onOpen ? <circle className="mindmap-link-marker-hit" r="10" /> : null}
       <circle r="4.6" />
       {/* An arrow pointing out: the one glyph that means "this goes elsewhere". */}
       <path d="M -1.7 1.7 L 1.5 -1.5 M 1.5 -1.5 H -0.3 M 1.5 -1.5 V 0.3" />

@@ -71,18 +71,21 @@ describe("节点图标", () => {
     await waitFor(() => expect(nodeIcons().length).toBe(1));
   });
 
-  it("面板里点一个图标：先看到，随即落到文件", async () => {
+  it("面板里点一枚类型：先看到，随即落到文件", async () => {
     vi.useFakeTimers();
     const api = installBridge();
     render(<MindmapView title="测试" source={SOURCE} documentKey={DOC} />);
     openPanelFor("父节点");
 
-    // The picker offers the table, grouped.
-    expect(screen.getByText("重点")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "旗标" }));
+    // The picker offers the eight types, one row.
+    expect(document.querySelectorAll(".mindmap-type-row .mindmap-icon-btn").length).toBe(8);
+    expect(screen.getByText("未标")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "标记为待办" }));
 
     // On the canvas at once...
     expect(nodeIcons().length).toBe(1);
+    // ...and the panel says which one, in words.
+    expect(screen.getByText("待办")).toBeTruthy();
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(700);
@@ -91,21 +94,21 @@ describe("节点图标", () => {
     // ...and in the file a pause later, under this document.
     expect(api.saveMindmapSidecar).toHaveBeenCalledTimes(1);
     expect(api.saveMindmapSidecar.mock.calls[0][0].documentPath).toBe(DOC);
-    expect(lastWritten(api)?.icons[firstBranchId()]).toBe("flag");
+    expect(lastWritten(api)?.icons[firstBranchId()]).toBe("todo");
   });
 
-  it("再点同一个图标就摘掉", async () => {
+  it("再点同一枚就摘掉", async () => {
     vi.useFakeTimers();
     const api = installBridge();
     render(<MindmapView title="测试" source={SOURCE} documentKey={DOC} />);
     openPanelFor("父节点");
 
-    const starButton = screen.getByRole("button", { name: "星标" });
-    fireEvent.click(starButton);
+    const typeButton = screen.getByRole("button", { name: "标记为重点" });
+    fireEvent.click(typeButton);
 
     expect(nodeIcons().length).toBe(1);
 
-    fireEvent.click(starButton);
+    fireEvent.click(typeButton);
 
     expect(nodeIcons().length).toBe(0);
 
@@ -114,6 +117,27 @@ describe("节点图标", () => {
     });
 
     expect(lastWritten(api)?.icons).toEqual({});
+  });
+
+  it("按类型的名字搜索：找得到标了它的主题 —— 这才是标记的用处", async () => {
+    const api = installBridge();
+    api.readMindmapSidecar.mockResolvedValueOnce({
+      success: true,
+      exists: true,
+      content: sidecarWithIcon(firstBranchId(), "todo"),
+    });
+
+    render(<MindmapView title="测试" source={SOURCE} documentKey={DOC} />);
+    await waitFor(() => expect(nodeIcons().length).toBe(1));
+
+    // 「待办」两个字不在任何节点的文字里，所以命中的只可能是类型本身。
+    fireEvent.keyDown(document.body, { key: "f", ctrlKey: true });
+    const input = document.querySelector(".mindmap-search-input") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "待办" } });
+
+    await waitFor(() =>
+      expect(document.querySelectorAll(".mindmap-node-interactive.is-search-match").length).toBe(1)
+    );
   });
 
   it("面板上的清除按钮做同一件事", async () => {

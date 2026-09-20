@@ -203,7 +203,9 @@ export function MindmapCanvasMenu({
         title={canPaste ? "粘贴已复制的分支" : "先复制一个分支"}
       >
         <CornerDownRight size={13} />
-        <span>粘贴</span>
+        {/* 名字里写明贴的是什么：这一行贴的是整个主题（含它的子主题），
+            不是剪贴板里的文字 —— 要贴文字请在编辑框里按 Ctrl+V。 */}
+        <span>粘贴分支</span>
       </button>
 
       {/* A relation needs two topics, and two topics are what a Ctrl-click

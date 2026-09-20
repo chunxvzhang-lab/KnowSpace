@@ -38,6 +38,7 @@ export function MindmapFloatingTopics({
   onStartEdit,
   onStartDrag,
   onOpenMenu,
+  onOpenLink,
 }: {
   topics: FloatingBox[];
   selectedId: string | null;
@@ -46,6 +47,8 @@ export function MindmapFloatingTopics({
   onStartDrag: (id: string, event: React.MouseEvent) => void;
   /** A right click: the topic's own panel, as a right click on a node opens one. */
   onOpenMenu: (id: string, event: React.MouseEvent) => void;
+  /** Follows a free topic's link. Same value as on a node's badge, same reason. */
+  onOpenLink?: (id: string) => void;
 }) {
   if (topics.length === 0) return null;
 
@@ -112,7 +115,12 @@ export function MindmapFloatingTopics({
             <NodeIcon iconId={topic.iconId} height={topic.height} />
             <NodeMarks width={topic.width} markers={topic.markers} />
             <NodeTags height={topic.height} tags={topic.tags} />
-            {topic.hasLink ? <NodeLinkMark height={topic.height} /> : null}
+            {topic.hasLink ? (
+              <NodeLinkMark
+                height={topic.height}
+                onOpen={onOpenLink ? () => onOpenLink(topic.id) : undefined}
+              />
+            ) : null}
             {topic.hasNote ? <NodeNoteMark /> : null}
           </g>
         );

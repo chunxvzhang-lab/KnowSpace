@@ -399,6 +399,12 @@ export function MindmapToolbar({
           <span>编号</span>
         </button>
 
+      </div>
+
+      {/* View and export sit together on the right, outside the middle row's wrapping.
+          What a reader is looking at and what they take away from it are the two things
+          that should stay where they were while the map-level controls reflow. */}
+      <div className="mindmap-toolbar-zoom">
         <MindmapZoomGroup scale={scale} onStep={onZoomStep} onFitToScreen={onFitToScreen} />
       </div>
 

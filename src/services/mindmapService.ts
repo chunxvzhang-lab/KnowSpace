@@ -1154,14 +1154,25 @@ export function reparentNode(
 
 /**
  * Finds all node IDs that contain the search query
+ *
+ * `describeExtra` is for what a node carries that its text does not say — the icon,
+ * which lives in the companion file. Searching 「待办」 and getting every node marked
+ * that way is half the reason to mark them, and the answer has to come from the
+ * caller, which is the only side that knows the companion file. Omitted, the
+ * behaviour is exactly what it was: node text, and nothing else.
  */
-export function searchMindmapNodes(root: MindmapNode, query: string): string[] {
+export function searchMindmapNodes(
+  root: MindmapNode,
+  query: string,
+  describeExtra?: (nodeId: string) => string
+): string[] {
   const clean = (query || "").trim().toLowerCase();
   if (!clean) return [];
 
   const matches: string[] = [];
   const traverse = (node: MindmapNode) => {
-    if (node.text.toLowerCase().includes(clean)) {
+    const extra = describeExtra ? describeExtra(node.id) : "";
+    if (`${node.text} ${extra}`.toLowerCase().includes(clean)) {
       matches.push(node.id);
     }
     if (node.children) {
