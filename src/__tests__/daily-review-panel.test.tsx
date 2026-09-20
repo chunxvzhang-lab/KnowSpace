@@ -65,8 +65,12 @@ describe("DailyReviewPanel - 每日复盘视图", () => {
     expect(screen.getByText(/问题 :: 答案/)).toBeDefined();
   });
 
-  it("渲染第一张卡片的正面并隐藏答案", () => {
+  it("渲染第一张卡片的正面并隐藏答案", async () => {
     render(<DailyReviewPanel notes={THREE_CARDS} />);
+    // 分片解析是异步的 —— 这正是大库不冻结窗口的原因 —— 所以卡片不会在 render 返回时
+    // 就已经在屏幕上：并行跑全量、又赶上首次加载解析模块时，它会慢到断言之前还没落地。
+    // 这里等它出现，而不是假定它已经出现。规范里最先渲染卡片的就是这一条，所以它先撞上。
+    await screen.findByText("问题甲");
 
     expect(screen.getByText("问题甲")).toBeDefined();
     expect(screen.queryByText("答案甲")).toBeNull();
@@ -80,8 +84,9 @@ describe("DailyReviewPanel - 每日复盘视图", () => {
     expect(screen.getByText("行内")).toBeDefined();
   });
 
-  it("点击卡片显示答案", () => {
+  it("点击卡片显示答案", async () => {
     render(<DailyReviewPanel notes={THREE_CARDS} />);
+    await screen.findByText("问题甲");
 
     fireEvent.click(screen.getByText("问题甲"));
 

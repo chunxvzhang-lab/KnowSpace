@@ -2,7 +2,7 @@
 
 > **文档性质**：重构安全网的权威口径（release plan R3 交付物）
 > **生成时间**：2026-09-20
-> **应用版本**：`2.6.1`
+> **应用版本**：`2.6.2`
 > **生成方式**：`node scripts/capture-test-baseline.cjs`（自动生成，请勿手工编辑）
 
 ---
@@ -12,11 +12,11 @@
 | 项目 | 数值 |
 | :--- | ---: |
 | 测试文件 | **100** |
-| 用例总数 | **1239** |
-| 通过 | 1237 |
-| 失败 | 1 |
+| 用例总数 | **1242** |
+| 通过 | 1241 |
+| 失败 | 0 |
 | 跳过 | 1 |
-| 通过率 | 99.8% |
+| 通过率 | 99.9% |
 
 > ✅ **口径确认**：`vitest.config.ts` **未配置任何 `exclude`**，因此上述数字是全量真实口径。
 > 此前文档中出现过的 299 / 379 均为**历史阶段的过时数字**，不是被排除的测试。
@@ -33,7 +33,7 @@
 | `src/__tests__/mindmap-layouts.test.ts` | 69 | ✅ |
 | `src/__tests__/canvas-view.test.tsx` | 54 | ✅ |
 | `src/__tests__/mindmap-import.test.ts` | 48 | ✅ |
-| `src/__tests__/daily-review-panel.test.tsx` | 38 | ❌ |
+| `src/__tests__/daily-review-panel.test.tsx` | 38 | ✅ |
 | `src/__tests__/ui-store.test.ts` | 35 | ✅ |
 | `src/__tests__/tab-store.test.ts` | 34 | ✅ |
 | `src/__tests__/mindmap-reparent.test.ts` | 32 | ✅ |
@@ -60,6 +60,7 @@
 | `src/__tests__/zip.test.ts` | 9 | ✅ |
 | `src/__tests__/fsrs-verification.test.ts` | 8 | ✅ |
 | `src/__tests__/markdown-v150.test.ts` | 8 | ✅ |
+| `src/__tests__/mindmap-icons-ui.test.tsx` | 8 | ✅ |
 | `src/__tests__/mindmap-marker-table.test.ts` | 8 | ✅ |
 | `src/__tests__/mindmap-node-style-menu.test.tsx` | 8 | ✅ |
 | `src/__tests__/mindmap-relation-settings-ui.test.tsx` | 8 | ✅ |
@@ -71,7 +72,6 @@
 | `src/__tests__/mindmap-floating-ui.test.tsx` | 7 | ✅ |
 | `src/__tests__/mindmap-groups.test.ts` | 7 | ✅ |
 | `src/__tests__/mindmap-icon-table.test.ts` | 7 | ✅ |
-| `src/__tests__/mindmap-icons-ui.test.tsx` | 7 | ✅ |
 | `src/__tests__/mindmap-links-ui.test.tsx` | 7 | ✅ |
 | `src/__tests__/mindmap-notes.test.tsx` | 7 | ✅ |
 | `src/__tests__/mindmap-sides.test.ts` | 7 | ✅ |
@@ -95,6 +95,7 @@
 | `src/__tests__/global-shortcuts-hook.test.ts` | 5 | ✅ |
 | `src/__tests__/media-lightbox.test.tsx` | 5 | ✅ |
 | `src/__tests__/mindmap-alignment.test.tsx` | 5 | ✅ |
+| `src/__tests__/mindmap-link-badge.test.tsx` | 5 | ✅ |
 | `src/__tests__/mindmap-numbering.test.ts` | 5 | ✅ |
 | `src/__tests__/slash-commands.test.ts` | 5 | ✅ |
 | `src/__tests__/status-bar.test.tsx` | 5 | ✅ |
@@ -114,7 +115,6 @@
 | `src/__tests__/wikilink.test.ts` | 4 | ✅ |
 | `src/__tests__/backlinks-panel.test.tsx` | 3 | ✅ |
 | `src/__tests__/mindmap-bounds.test.ts` | 3 | ✅ |
-| `src/__tests__/mindmap-link-badge.test.tsx` | 3 | ✅ |
 | `src/__tests__/mindmap-shortcut-scope.test.tsx` | 3 | ✅ |
 | `src/__tests__/paths.test.ts` | 3 | ✅ |
 | `src/__tests__/search-panel.test.tsx` | 3 | ✅ |
@@ -143,7 +143,7 @@
 | `src/services/canvasGeometry.ts` | 1021 | R2 已拆分 ✅ |
 | `src/services/canvasService.ts` | 127 | R2 门面（127 行）✅ |
 | `src/services/fsrsService.ts` | 1014 | F1 新增 · 观察项 |
-| `src/components/MindmapView.tsx` | 3537 | 观察项（已达标） |
+| `src/components/MindmapView.tsx` | 3547 | 观察项（已达标） |
 | `src/services/mindmapService.ts` | 1194 | 观察项 |
 
 ---
@@ -152,7 +152,7 @@
 
 任何重构都必须满足：
 
-1. 用例总数 **不低于 1239**（删除测试需在 PR 说明中论证）
+1. 用例总数 **不低于 1242**（删除测试需在 PR 说明中论证）
 2. 通过率 **100%**
 3. 单文件用例数**不得下降**（防止测试被静默删除）
 

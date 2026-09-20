@@ -150,6 +150,21 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
               <span className="about-changelog-version-badge">v{__APP_VERSION__}</span>
             </div>
             <div className="about-changelog-list">
+              {/* v2.6.2 */}
+              <div className="about-changelog-group">
+                <div className="about-changelog-group-label">
+                  <Sparkles size={12} className="text-cyan" />
+                  <span>v2.6.2 导图细节打磨：顶栏对齐、徽章真能点、图标位置与 PNG 清晰度</span>
+                </div>
+                <ul className="about-changelog-items">
+                  <li>📐 <strong>顶栏两行对齐</strong>：两行布局下第二行与第一行左对齐（此前各组基线不同，保存 / 更多那一排看起来是错位的）。</li>
+                  <li>🔗 <strong>链接徽章真正可点</strong>：根因是父层的 <code>pointer-events: none</code> 被继承下来，徽章收不到点击 —— 改为显式 <code>auto</code>；顺带支持<strong>裸域名</strong>（<code>example.com</code>）。</li>
+                  <li>🏷️ <strong>节点类型图标画在主题盒子之上</strong>：不再落在盒内右下角被连线压住。</li>
+                  <li>🖼️ <strong>PNG 导出改为 3× 超采样</strong>：放大后文字与图标不再发虚。</li>
+                  <li>🧪 <strong>测试规模</strong>：<strong>99 个测试套件、1241 项</strong>单元与集成测试 100% 通过。</li>
+                </ul>
+              </div>
+
               {/* v2.6.1 */}
               <div className="about-changelog-group">
                 <div className="about-changelog-group-label">
