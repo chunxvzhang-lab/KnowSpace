@@ -8911,6 +8911,24 @@ body:has(.flash-capsule-overlay) {
   z-index: 2;
 }
 
+/* 顶栏的显式换行点：默认不占位，在窄档位把这一行断开。
+   不这么做的话，换行发生在"当前这行放不下"的那一刻 —— 被推下去的是右边的缩放与导出
+   那一组，于是第二行只有它自己、靠右、左边一大片空白，两行也不对齐。断开点固定放在结构性
+   控件之后、设置类控件之前：第二行从左边起排，右侧再由缩放与导出收尾。 */
+.mindmap-toolbar-break {
+  display: none;
+}
+
+.mindmap-view-container.is-semi-compact .mindmap-toolbar-break,
+.mindmap-view-container.is-compact .mindmap-toolbar-break,
+.mindmap-view-container.is-narrow .mindmap-toolbar-break,
+.mindmap-view-container.is-ultra-narrow .mindmap-toolbar-break {
+  display: block;
+  flex-basis: 100%;
+  width: 100%;
+  height: 0;
+}
+
 /* 缩放与导出：一起靠右，作为一组换行 —— 读者在看什么、要带走什么，不该跟着中间那排
    地图级控件一起挪。 */
 .mindmap-toolbar-zoom {
@@ -11892,6 +11910,15 @@ body:has(.flash-capsule-overlay) {
    ─────────────────────────────────────────────────────────────────────── */
 .mindmap-link-marker.is-action {
   cursor: pointer;
+  /* pointer-events 是**继承**的：上面那条 `.mindmap-link-marker` 为了"绝不偷走本该属于
+     节点的点击"把它关掉了，而关掉之后子元素（包括那个透明命中圆）一样收不到事件 ——
+     于是徽章看起来能点、点了没有任何反应，而 jsdom 不做命中测试，测试照旧全绿。
+     这里是那半个修复的另一半：可点的那一枚把事件重新打开，只对自己和它的命中圆。 */
+  pointer-events: auto;
+}
+
+.mindmap-link-marker.is-action * {
+  pointer-events: auto;
 }
 
 .mindmap-link-marker-hit {

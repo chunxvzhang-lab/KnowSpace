@@ -112,7 +112,7 @@ export function MindmapFloatingTopics({
             {/* The same decorations, in the same places, as a topic in the
                 outline wears — a reader should not have to learn two vocabularies
                 for "this one has a note". */}
-            <NodeIcon iconId={topic.iconId} height={topic.height} />
+            <NodeIcon iconId={topic.iconId} />
             <NodeMarks width={topic.width} markers={topic.markers} />
             <NodeTags height={topic.height} tags={topic.tags} />
             {topic.hasLink ? (

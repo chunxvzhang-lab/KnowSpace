@@ -102,28 +102,31 @@ export function NodeNoteMark() {
 }
 
 /**
- * The icon a topic wears, on its leading edge and outside its box.
+ * The icon a topic wears: above its box, at the left corner.
  *
- * Outside on purpose: a topic's size belongs to the layout, and growing the box
- * to fit a drawing would move every topic in the map — the golden layout
+ * Outside the box on purpose: a topic's size belongs to the layout, and growing
+ * the box to fit a drawing would move every topic in the map — the golden layout
  * snapshots exist to stop exactly that kind of drift. An id this build does not
  * know draws nothing rather than breaking the map.
+ *
+ * Above rather than beside, and that is the whole of this change. It used to sit at
+ * the vertical middle of the box's left edge, which is exactly where a connector
+ * arrives — so on every node whose parent is to its left (that is: nearly all of
+ * them) the icon was drawn on top of its own branch line, and the mark that is
+ * supposed to say what a topic is read as a smudge on the line. The space above the
+ * left corner is free: the line enters at the middle of a side, the note badge hangs
+ * just below the corner, the numbering sits to its right, and the priority and
+ * progress marks are at the opposite corner. Nowhere else on a node is empty.
  *
  * Here rather than in the view because it is worn by both a topic in the outline
  * and one floating beside it, and the two have to wear it the same way.
  */
-export function NodeIcon({ iconId, height }: { iconId: string; height: number }) {
+export function NodeIcon({ iconId }: { iconId: string }) {
   const icon = findMindmapIcon(iconId);
   if (!icon) return null;
   const Icon = icon.Icon;
   return (
-    <Icon
-      className="mindmap-node-icon"
-      size={16}
-      x={-22}
-      y={(height - 16) / 2}
-      strokeWidth={1.8}
-    />
+    <Icon className="mindmap-node-icon" size={16} x={-22} y={-18} strokeWidth={1.8} />
   );
 }
 

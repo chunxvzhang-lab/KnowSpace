@@ -1,7 +1,9 @@
+import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { MindmapView } from "../components/MindmapView";
 import { parseMarkdownToMindmapTree } from "../services/mindmapService";
+import { parseMindmapLink } from "../core/mindmapLinks";
 import { emptySidecar, serializeSidecar, setNodeLink } from "../services/mindmapSidecar";
 
 /**
@@ -102,5 +104,33 @@ describe("节点上的链接徽章", () => {
 
     expect(badge()).toBeNull();
     expect(api.openExternal).not.toHaveBeenCalled();
+  });
+
+  it("样式表把可点的那枚徽章的指针事件重新打开", () => {
+    // 这一条读的是 CSS，而它之所以存在，是因为上面两条测试都能通过、真实窗口里却点不动：
+    // `.mindmap-link-marker` 关掉了 pointer-events（它原本只是个记号，不该偷走节点的点击），
+    // 而 pointer-events 是**继承**的 —— 子元素那个透明命中圆同样收不到事件。jsdom 不做命中
+    // 测试，所以没有任何行为断言能发现它；能发现的只有"这一条规则还在不在"。
+    // 相对工作目录读：vitest + jsdom 下 `import.meta.url` 是 http 起始的地址，
+    // `new URL(..., import.meta.url)` 交给 readFileSync 会报"URL 必须是 file 协议"。
+    const css = readFileSync("src/styles.css", "utf8");
+    const actionRule = css.match(/\.mindmap-link-marker\.is-action\s*\{[^}]*\}/)?.[0] ?? "";
+
+    expect(actionRule).toContain("pointer-events: auto");
+  });
+
+  it("没写协议的域名也是链接：仍是外链，只是打开时补上 https", () => {
+    // 人们往"链接"里填的就是这个形状，而它此前什么都不是：不画徽章、点也没反应，
+    // 看起来和功能坏掉一模一样。存进文件里的仍然是原样，补协议只发生在打开的那一份。
+    expect(parseMindmapLink("www.example.com")).toEqual({
+      kind: "external",
+      target: "https://www.example.com",
+    });
+    expect(parseMindmapLink("example.com/docs")?.target).toBe("https://example.com/docs");
+
+    // 而"不是链接"的文字仍然是文字：版本号与带空格的句子都不该被当成网址。
+    expect(parseMindmapLink("v2.6.1")).toBeNull();
+    expect(parseMindmapLink("见 1.2 节")).toBeNull();
+    expect(parseMindmapLink("随便写点什么")).toBeNull();
   });
 });

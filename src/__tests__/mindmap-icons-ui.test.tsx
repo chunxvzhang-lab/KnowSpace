@@ -200,4 +200,26 @@ describe("节点图标", () => {
     // The picker is there, with nothing marked active.
     expect(document.querySelectorAll(".mindmap-icon-btn.is-active").length).toBe(0);
   });
+
+  it("图标画在盒子上方左角 —— 不压在连线上", async () => {
+    const api = installBridge();
+    api.readMindmapSidecar.mockResolvedValueOnce({
+      success: true,
+      exists: true,
+      content: sidecarWithIcon(firstBranchId(), "todo"),
+    });
+
+    render(<MindmapView title="测试" source={SOURCE} documentKey={DOC} />);
+    await waitFor(() => expect(nodeIcons().length).toBe(1));
+
+    const icon = nodeIcons()[0];
+    const x = Number(icon.getAttribute("x"));
+    const y = Number(icon.getAttribute("y"));
+
+    // 盒子左侧正中间正是连线进盒子的地方：图标的**下沿**必须在盒子上沿之上
+    // （图标 16px 高），否则它就会被自己的分支线压住 —— 那种"记号看起来像污点"的
+    // 样子，正是这次要修掉的。
+    expect(y + 16).toBeLessThanOrEqual(0);
+    expect(x).toBeLessThan(0);
+  });
 });

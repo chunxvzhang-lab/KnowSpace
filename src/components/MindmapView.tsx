@@ -1971,13 +1971,23 @@ export const MindmapView = memo(function MindmapView({
     img.crossOrigin = "anonymous";
     img.onload = () => {
       const canvas = document.createElement("canvas");
-      const dpr = window.devicePixelRatio || 2;
-      canvas.width = exportWidth * dpr;
-      canvas.height = exportHeight * dpr;
+      // How many device pixels each layout pixel gets in the file.
+      //
+      // This used to be `devicePixelRatio`, which made the exported image depend on the
+      // monitor the export happened on: on a 1× display a 1200px map became a 1200px
+      // file, and zooming into it was blurry — the picture was already at 100%. An
+      // export is a document rather than a screenshot, so its resolution is a decision:
+      // three device pixels per layout pixel, capped so a very large map cannot ask for
+      // a canvas the browser refuses to allocate (and refuses silently, which would be
+      // worse than a soft image).
+      const MAX_SIDE = 12000;
+      const scale = Math.max(1, Math.min(3, MAX_SIDE / Math.max(exportWidth, exportHeight, 1)));
+      canvas.width = Math.max(1, Math.round(exportWidth * scale));
+      canvas.height = Math.max(1, Math.round(exportHeight * scale));
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
 
-      ctx.scale(dpr, dpr);
+      ctx.scale(scale, scale);
       // Transparent background: clearRect without any fillRect
       ctx.clearRect(0, 0, exportWidth, exportHeight);
       ctx.drawImage(img, 0, 0, exportWidth, exportHeight);
@@ -3130,7 +3140,7 @@ export const MindmapView = memo(function MindmapView({
                       on its leading edge, a note badge and the marks on its corners.
                       The same drawings a floating topic wears — see
                       MindmapFloatingTopics, which is handed the same decorations. */}
-                  <NodeIcon iconId={iconFor(sidecar, node.id)} height={node.height} />
+                  <NodeIcon iconId={iconFor(sidecar, node.id)} />
                   <NodeMarks width={node.width} markers={markersFor(sidecar, node.id)} />
                   <NodeTags height={node.height} tags={tagsFor(sidecar, node.id)} />
                   {/* Only for a link this build recognises: the badge says "this

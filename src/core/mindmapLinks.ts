@@ -92,5 +92,18 @@ export function parseMindmapLink(text: string | null | undefined): MindmapLink |
     return anchor ? { kind: "anchor", target: anchor } : null;
   }
 
+  // A domain written without its scheme.
+  //
+  // `www.example.com` and `example.com/docs` are what people actually type into a field
+  // called "link". Refusing them looked like the feature was broken rather than like a
+  // rule: no badge was drawn at all, so there was nothing to click and nothing to
+  // explain. The shape is deliberately narrow — something.something, ending in letters,
+  // no spaces — so that prose stays prose; a version number like `v2.6.1` and a
+  // sentence like `见 1.2 节` are both still not links. What the reader typed is what
+  // the file keeps: `https://` is added only to the copy that gets opened.
+  if (!/\s/.test(trimmed) && /^[^\s/?#@]+\.[a-z]{2,}([/?#]\S*)?$/i.test(trimmed)) {
+    return { kind: "external", target: `https://${trimmed}` };
+  }
+
   return null;
 }

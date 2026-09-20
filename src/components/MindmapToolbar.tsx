@@ -342,6 +342,15 @@ export function MindmapToolbar({
           </>
         )}
 
+        {/* Where the bar breaks when there is not enough room for one line.
+            Without a deliberate break the browser wraps wherever the line runs out, and
+            the zoom and export cluster is what gets pushed to the second row — alone,
+            right-aligned, above a hole. The break is a real element so it can be
+            switched on at the widths where the bar is known to be two rows: the line
+            then ends after the structural controls, and the second row starts at the
+            left edge with the settings, filled out to the right by the view cluster. */}
+        <div className="mindmap-toolbar-break" aria-hidden="true" />
+
         {/* In-Canvas Search Toolbar Group */}
         <MindmapSearchGroup {...search} />
 
