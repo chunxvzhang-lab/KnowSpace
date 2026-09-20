@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-v2.6.0-1D9BF0?style=flat-square&logo=github" alt="Version 2.6.0" />
+  <img src="https://img.shields.io/badge/Version-v2.6.1-1D9BF0?style=flat-square&logo=github" alt="Version 2.6.1" />
   <img src="https://img.shields.io/badge/Presentation-Mode_2.3_Clockwise_Cycles-8B5CF6?style=flat-square" alt="Presentation Mode 2.3" />
   <img src="https://img.shields.io/badge/FSRS-5_Spaced_Repetition-F59E0B?style=flat-square" alt="FSRS-5 Spaced Repetition" />
   <img src="https://img.shields.io/badge/Mind_Map-Non--Destructive_Sync-00BA7C?style=flat-square" alt="Non-Destructive Mindmap Sync" />
@@ -18,7 +18,7 @@
   <img src="https://img.shields.io/badge/Multimodal-Canvas_Media_Cards-F59E0B?style=flat-square" alt="Multimodal Canvas" />
   <img src="https://img.shields.io/badge/Routing-AABB_Obstacle_Avoidance-00BA7C?style=flat-square" alt="AABB Obstacle Avoidance" />
   <img src="https://img.shields.io/badge/Performance-120FPS_Instant_Load-00BA7C?style=flat-square" alt="120FPS Instant Load" />
-  <img src="https://img.shields.io/badge/Tests-1208_Passing_100%25-00BA7C?style=flat-square" alt="1208 Passing Tests" />
+  <img src="https://img.shields.io/badge/Tests-1238_Passing_100%25-00BA7C?style=flat-square" alt="1238 Passing Tests" />
   <img src="https://img.shields.io/badge/Canvas-JSON_Canvas_1.0-00BA7C?style=flat-square" alt="Infinite Canvas" />
   <img src="https://img.shields.io/badge/Snapshots-Ctrl%2BShift%2BH-1D9BF0?style=flat-square" alt="Version History" />
   <img src="https://img.shields.io/badge/Search-Hybrid_Vault_Index-8B5CF6?style=flat-square" alt="Hybrid Vault Search" />
@@ -60,6 +60,7 @@
 
 ## 🏛️ 核心能力体系
 
+- **🗺️ Mind Map 2.6.1（交互对象与可读性收口 · v2.6.1 更新）**：**顶栏在打开文件目录与大纲后不再丢右侧控件**（装不下就换行；缩放与导出归右侧同一组；滚轮落在顶栏上不再缩放画布 ✓）；**快捷键归属插入符所在的输入框** —— 在备注框里按 `Delete` 不再删掉整个主题、在标签或链接框里按 `Ctrl+V` 不再贴出一个分支，节点菜单里新增**复制/剪切整个主题、粘贴为子主题**三行，删除行明确写着"整个主题及其子主题" ✓；节点可标 **8 枚语义类型**（待办 / 进行中 / 已完成 / 疑问 / 想法 / 风险 / 重点 / 参考，一名一义，画布搜索里输入类型名即可找出同类主题 ✓）；节点上的**链接徽章可直接点击打开**（外链走系统浏览器 ✓）；点击顶栏即可收起右键菜单且不丢选择 ✓。
 - **🧠 Mind Map 2.3（思维导图双端非破坏性同步体系与响应式工具栏 · v2.3.0 升级）**：Markdown 架构一键转化为交互式思维脑图（`Ctrl+M`），**核心无损同步算法 `syncMindmapToDocument`** 彻底攻克导图编辑抹杀正文段落的历史顽疾，基于 AST 章节区块映射进行增量标题结构同步，**100% 完整保全所有正文文字、代码块、表格与数学公式**；顶栏增设「🔄 同步到文档」按键、脏状态感知与绿色呼吸脉冲徽标、支持 `Ctrl+S` / `Cmd+S` 快捷同步与反向自动联动；移除节点旁冗余悬浮加号，界面清爽无杂音；**顶栏按钮自适应换行排版（Responsive Wrapped Toolbar）**，小窗口或高系统缩放比例下功能按钮不溢出、不被截断；支持**分支拖拽改变层级/同级重排（防环闭环保护）**、**导图内搜索与运镜聚焦**、**标准 OPML 2.0 / FreeMind (.mm) / Markdown / 视网膜级 PNG 透明底高清导出**；**v2.6.0 补齐「导出 × 导入」闭环**：新增 **SVG / 打印即 PDF** 导出与 **`.xmind` 导出、导入**（DEFLATE 解压与 ZIP 读写自写实现，是**唯一一种本应用能读回来**的格式），导出共 **7 种**、导入 **3 种**（`.opml` / `.mm` / `.xmind`，导入为新文档并带回备注、链接、关系线、概要与边界）。
 - **🌐 Graph & Backlinks 2.2（知识图谱深度、交互解耦与视觉升维 · v2.2.0 重构）**：60FPS 极速拓扑图谱，**单击与双击交互精准解耦**（单击节点仅高亮 1-hop 邻域并展示详情卡片，绝不在左侧打开文件；双击 350ms 内平滑打开对应笔记；点击空白背景清空高亮）；**重塑 280px 结构化毛玻璃文件夹详情卡片**（顶部 Meta 徽标行 + 专属标题行 + 路径行 + 3 列指标微型网格），彻底告别文字挤压与换行折叠；引入 **Cytoscape 0.18s 补间平滑过渡动效** 与 **悬停探灯连线点亮机制（Hover Headlight）**；支持 `1-Hop` 直接关联 / `2-Hop` 扩展网络局部深度控制、目录语义色彩聚类、MOC 核心枢纽节点挖掘与未链接孤岛发现。
 - **🎨 Infinite Canvas 2.4（空间多模态无限白板 · 交互式排布间距调校 · 导出链路工业级加固 · v2.4.0 重磅升级）**：标准开放的二维空间思维白板（`Ctrl+Shift+C`），**多模态媒体卡片自由挂载**（剪贴板截图 `Ctrl+V` 一键自动存入 `assets/` 落地为媒体卡片、**右键菜单一键插入图片/视频/音频并按点击位置精准落卡**、**双击媒体卡片全屏预览（灯箱支持视频播放与音频播放器，✕ / Esc 关闭）**、桌面图片/音视频文件批量拖拽投放、富文本 Markdown、嵌入文档滚动预览、逻辑分组容器），**智能正交折线 AABB 绕障避障寻路算法**（自动检测卡片包围盒与 +14px 安全边距，**多障碍链式包络合并绕行（相邻卡片串一次绕开，不再穿透后续障碍）**，5 段平滑正交绕行，彻底杜绝线条穿透遮挡卡片文字，标签中心点自适应吸附），**F5 沉浸式分镜全屏演示模式 2.3**（**同一容器优先顺序演播**、**深入子例程推演与自然归栈**、**先单卡后环形分支演播策略**、**成环卡片组顺时针完整演播与环外延伸分支演播**、**跨容器上下文感知复现**、电影级平滑聚焦运镜、当前演播卡片脉冲呼吸发光光晕、背景优雅弱化、悬浮控制台全键盘调度与自动播放），**高精度 4 锚点几何中心对齐与贝塞尔/正交折线/直线矢量连线**，支持**环形对齐（Ring Layout · 真实平滑圆形弧线闭环）与矩形网格对齐（Rectangular Grid Layout · 闭环以矩形直线框呈现）**、**交互式排布间距调校（环半径滑块 + 直接拖拽环上卡片实时调距 · 网格行列间距拖拽微调 · 多选组中心空白区整体平移 · 手势结束仅记一条历史）**、**折线手柄平移拖拽**、**防冲天平滑曲线**、**上下分层垂直优先路由**、**12 色专业调色盘（标准 6 色 + 靛蓝/粉樱/玫瑰/青碧/青柠/石板灰扩展色）与单条连线·批量卡片·批量连线自定义 HEX 颜色拾取器（拖动即时预览，防抖提交单条历史，杜绝取色闪退）**、**连线成环卡片视觉解耦（对外发射连线独立着色，消除视觉混淆）**、**一对多发起源全景识别（起点锚固圆点、发起源徽章、高亮辉光与多选动态标注）**、**连线多选与底部批量工具栏**、**多选卡片一键断开连线**、**120FPS 硬件栅格化与视口视锥剔除（Viewport Frustum Culling）**；**PNG 高清位图导出与剪贴板复制链路工业级加固（渲染进程栅格化失败时自动改用主进程离屏 `capturePage()` 出图，绝不悄悄降级格式；剪贴板改走系统原生 API 直写；导出配色与屏幕主题 1:1 一致；媒体相对路径按画布目录解析，图片卡片不再显示破图）**；**连线图层下沉至卡片之下，线条永不遮挡卡片文字**；配备右下角缩略雷达小地图与全景聚焦控制；**独创画布逆向拓扑萃取长文算法**，一键将白板因果关系逆向萃取为逻辑严密的 Markdown 专著。
@@ -530,12 +531,12 @@
 
 ## 📦 安装程序与便携版下载 (Downloads & Release Assets)
 
-本项目为 Windows 64 位系统深度优化，提供图形化安装程序、标准 MSI 安装包与免安装便携版，最新 `v2.6.0` 资产已发布：
+本项目为 Windows 64 位系统深度优化，提供图形化安装程序、标准 MSI 安装包与免安装便携版，最新 `v2.6.1` 资产已发布：
 
-> 🌐 **GitHub 官方发布主页**：[GitHub Releases · v2.6.0](https://github.com/chunxvzhang-lab/KnowSpace/releases/tag/v2.6.0)
+> 🌐 **GitHub 官方发布主页**：[GitHub Releases · v2.6.1](https://github.com/chunxvzhang-lab/KnowSpace/releases/tag/v2.6.1)
 
 ### 1. Windows 图形化安装程序（推荐）
-- **安装文件**：[`KnowSpace-Setup-2.6.0.exe`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.6.0/KnowSpace-Setup-2.6.0.exe)
+- **安装文件**：[`KnowSpace-Setup-2.6.1.exe`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.6.1/KnowSpace-Setup-2.6.1.exe)
 - **特点**：双击即可向导式安装，支持自定义安装目录，自动创建桌面快捷方式与开始菜单官方品牌图标，深度集成系统级 `.md` 与 `.canvas` 文件关联，内置标准卸载程序。
 
 ### 2. Windows MSI 标准安装包
@@ -543,7 +544,7 @@
 - **特点**：Windows Installer 官方格式，适合企业批量部署、组策略分发与企业级静默安装，支持标准控制面板卸载。
 
 ### 3. Windows 绿色免安装便携版
-- **便携文件**：[`KnowSpace-win-x64-portable.zip`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.6.0/KnowSpace-win-x64-portable.zip)
+- **便携文件**：[`KnowSpace-win-x64-portable.zip`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.6.1/KnowSpace-win-x64-portable.zip)
 - **直接运行**：解压后双击 `KnowSpace.exe` 即可直接使用完整功能。
 - **特点**：解压即用、随身携带（支持装入 U 盘或移动硬盘）；完全自包含 Electron 运行时与全套本地依赖，无需配置任何外部开发环境；支持右键「打开方式」关联 Markdown 与白板文档。
 

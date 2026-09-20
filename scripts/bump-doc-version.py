@@ -12,6 +12,7 @@
 只改"当前版本"的引用，不改历史记录：形如 `| v2.5.0 | 主题 | 内容 |` 的变更表行、
 "v2.5.0 新增"这类历史标注都**不在**替换范围内，它们的替换由人按发布内容单独写。
 """
+import re
 import sys
 from pathlib import Path
 
@@ -21,8 +22,6 @@ PATTERNS = [
     ("# KnowSpace 用户手册（v{old}）", "# KnowSpace 用户手册（v{new}）"),
     ("| **v{old}**（`package.json`", "| **v{new}**（`package.json`"),
     ("**v{old} 实际实现**", "**v{new} 实际实现**"),
-    # 版本演进一节的标题
-    ("（v2.2 → v2.5）", "（v2.2 → v2.6）"),
     # 安装与卸载
     ("`KnowSpace-Setup-{old}.exe`", "`KnowSpace-Setup-{new}.exe`"),
     # 不带反引号：手册里这处出现在代码块中（msiexec 命令）而不是行内代码。
@@ -32,6 +31,15 @@ PATTERNS = [
     # 快捷键表的依据版本
     ("**v{old} 实际生效**", "**v{new} 实际生效**"),
     ("但 **v{old} 未实现**", "但 **v{new} 未实现**"),
+]
+
+# 同样要逐条命中，但形状是"任何版本 → 新版本"的几条。
+#
+# 「版本演进（v2.2 → v2.5）」这个标题里的右端是**上一次发布**的版本号，不是一个定值。
+# 把它写成字面量，这个脚本自己就变成了需要每次手工更新的一处版本引用 —— 而它存在的意义
+# 恰恰是不让人记版本号。所以这里匹配任意版本，一律改写成新版本。
+REGEX_PATTERNS = [
+    (r"（v2\.2 → v[0-9.]+）", "（v2.2 → v{new}）"),
 ]
 
 
@@ -54,6 +62,13 @@ def main() -> int:
             continue
         text = text.replace(before, after)
         print(f"  {count} 处: {before[:60]}")
+
+    for pattern, replacement in REGEX_PATTERNS:
+        text, count = re.subn(pattern, replacement.format(old=old, new=new), text)
+        if count == 0:
+            missing.append(pattern)
+            continue
+        print(f"  {count} 处（正则）: {pattern[:60]}")
 
     if missing:
         print("\n以下替换没有命中，文档里没有这段文字（版本提升未进行）：")

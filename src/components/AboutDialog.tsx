@@ -150,6 +150,22 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
               <span className="about-changelog-version-badge">v{__APP_VERSION__}</span>
             </div>
             <div className="about-changelog-list">
+              {/* v2.6.1 */}
+              <div className="about-changelog-group">
+                <div className="about-changelog-group-label">
+                  <Sparkles size={12} className="text-cyan" />
+                  <span>v2.6.1 交互对象收口：顶栏、按键归属、链接徽章与节点类型</span>
+                </div>
+                <ul className="about-changelog-items">
+                  <li>📐 <strong>顶栏不再丢右侧控件</strong>：打开文件目录与大纲后，顶栏改为<strong>装不下就换行</strong>（旧写法是定高 + 横向滚动且藏掉滚动条，右侧控件既看不见也够不着）；<strong>缩放与导出</strong>移到右侧同一组，不再跟着中间那排控件重排；滚轮落在顶栏上<strong>不再缩放画布</strong>。</li>
+                  <li>⌨️ <strong>快捷键归属插入符所在的输入框</strong>：在<strong>备注框</strong>里按 <code>Delete</code> 此前会删掉备注所属的<strong>整个主题</strong>，在<strong>标签 / 链接框</strong>里按 <code>Ctrl+V</code> 会贴出一个分支 —— 现在有插入符的地方键就属于那个框（<code>Escape</code> 除外）。节点菜单新增 <strong>复制整个主题 / 剪切整个主题 / 粘贴为子主题</strong> 三行，删除行明确为「<strong>删除整个主题及其子主题</strong>」。</li>
+                  <li>🔗 <strong>点链接徽章直接打开</strong>：节点右下角的链接徽章从"记号"变成"控件" —— 外链走系统浏览器，<code>[[笔记]]</code> 与 <code>#标题</code> 走阅读器自己的两条通道；命中区放大，悬停提亮，且<strong>不会顺手选中或拖动主题</strong>（自由主题上的徽章同样可点）。</li>
+                  <li>🏷️ <strong>节点图标重做为「节点类型」</strong>：从 34 枚按无关分组排列的图片，改为 <strong>一行 8 枚、一名一义</strong>（待办 / 进行中 / 已完成 / 疑问 / 想法 / 风险 / 重点 / 参考），每枚附一句"何时使用"；一个主题至多一枚，点击设置、再点取消，<strong>在画布搜索里输入类型名即可找出同类主题</strong>；旧文件写过的图标 id 仍会画出来。</li>
+                  <li>🖱️ <strong>点顶栏收起右键菜单</strong>，且不像点画布那样连选择一起丢掉；「换到另一侧」弹层的两行字改为正文色加粗按钮，不再需要凑近看。</li>
+                  <li>🧪 <strong>测试规模</strong>：<strong>99 个测试套件、1238 项</strong>单元与集成测试 100% 通过。</li>
+                </ul>
+              </div>
+
               {/* v2.6.0 */}
               <div className="about-changelog-group">
                 <div className="about-changelog-group-label">
