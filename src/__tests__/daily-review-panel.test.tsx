@@ -49,6 +49,14 @@ describe("DailyReviewPanel - 每日复盘视图", () => {
   let saveMarkdownFile: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
+    // The panel remembers the review source in `localStorage`, and nothing here
+    // cleared it, so the source one test picked was still in place for the next.
+    // It only surfaced under a loaded full-suite run: the panel persists on a
+    // deferred step, so whether the leak landed before the next test rendered
+    // came down to timing — "3 张待复习" failed intermittently, and never once in
+    // isolation. Storage is cleared per test now, as it is in the eight suites
+    // that use `resetStores`.
+    localStorage.clear();
     saveMarkdownFile = vi.fn().mockResolvedValue({ success: true, absolutePath: "x" });
     (window as unknown as Record<string, unknown>).knowSpaceDesktop = { saveMarkdownFile };
   });
@@ -386,6 +394,7 @@ describe("DailyReviewPanel - 撤销上一次评分", () => {
   const savedContent = () => onDisk();
 
   beforeEach(() => {
+    localStorage.clear();
     saveMarkdownFile = vi.fn().mockResolvedValue({ success: true });
     // A real file, modelled honestly: reading gives back what was last written, or the
     // note as it started. Anything else would make the merge look better than it is.
@@ -521,6 +530,7 @@ describe("DailyReviewPanel - 评分与保存的边角", () => {
   const savedContent = () => String(saveMarkdownFile.mock.calls.at(-1)?.[0]?.content ?? "");
 
   beforeEach(() => {
+    localStorage.clear();
     saveMarkdownFile = vi.fn().mockResolvedValue({ success: true, absolutePath: "x" });
     // By default the file on disk is whatever the panel was given, which is the
     // ordinary case: nothing wrote to it between loading and rating.
