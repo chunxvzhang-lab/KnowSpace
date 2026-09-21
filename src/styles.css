@@ -4542,8 +4542,8 @@ body.is-resizing-col * {
    若某个主题漏定义，属性会在计算值阶段变成 unset（继承或初始值），
    那比硬编码更糟——会静默拿到别的颜色。
 
-   取值全部按 WCAG 2.1 算过，在该主题**实际用到的最深淡色底**上也 ≥ 4.5:1
-   （改动前最低 1.48:1）。两条取值上的说明：
+   取值全部按 WCAG 2.1 算过，在**该主题实际用到的每一种底**上都 ≥ 4.5:1
+   （改动前最低 1.48:1）。三处取值上的说明：
 
    - `--flash-accent-on-tint` 是叠在琥珀底上时用的。深色下取 #fbbf24（amber-400）
      而不是 #f59e0b：琥珀底最深到 0.30（`.flash-mini-btn:hover`），#f59e0b 在上面
@@ -4553,6 +4553,13 @@ body.is-resizing-col * {
      `.flash-close-btn:hover` 的红色底从 0.25 归一到 0.15：0.25 时 #f87171 只有
      4.32:1。它同时被当**文字**色用（`.flash-status-msg.error`），不能只按图标的
      3:1 阈值放行。
+   - `--flash-hint` 不只用纯底，还叠在**中性水洗底**（`rgba(0,0,0,.04~.05)`）和
+     eink 的**实色米底**（#ded9cd）上。所以 light 取 #475569（纯底 7.58、0.05 洗底
+     6.77），而不是纯底刚好及格的 #64748b（纯底 4.76，但 0.05 洗底只有 4.25）。
+
+   「实际用到的底」必须**按主题分别取**：区块里最深的黑水洗是 0.3，但那条规则
+   （`.flash-recorder-input`）属于深色主题，拿它约束浅色的令牌会造出一个不存在的
+   场景。这也是守卫测试用逐对表格、而不是"扫一个全局最深档"的原因。
 
    守卫测试：`src/__tests__/flash-capsule-theme-contrast.test.ts`
    -------------------------------------------------------------------------- */
@@ -4569,36 +4576,34 @@ body.is-resizing-col * {
 [data-theme="light"] .flash-capsule-overlay {
   --flash-accent: #b45309;
   --flash-accent-on-tint: #92400e;
-  --flash-success: #047857;
+  /* emerald-800 而不是 700（#047857）：700 落在 0.15 的绿淡底上只有 4.51:1，
+     而这个淡底是 rgba 合成出来的（有取整），0.01 的余量等于随时可能翻。
+     800 给到 6.75:1（eink 纸底 6.32:1）。 */
+  --flash-success: #065f46;
   --flash-danger: #b91c1c;
   --flash-info: #0369a1;
-  --flash-hint: #64748b;
+  --flash-hint: #475569;
 }
 
-/* eink 是低饱和"纸张"主题，强调色取值与 light 相同（都是浅底），
-   只有次要文字因为底更黄一点而略深。 */
+/* eink 是低饱和"纸张"主题：主强调色与 light 相同（都是浅底），但叠色用的
+   `-on-tint` 要比 light 更深——eink 的淡底是**实色**米色（#ded9cd / #cfc7b5），
+   比 light 的黑水洗更暗，#92400e 落在 #cfc7b5 上只有 4.22:1。 */
 .flash-capsule-overlay.theme-eink,
 [data-theme="eink"] .flash-capsule-overlay {
   --flash-accent: #b45309;
-  --flash-accent-on-tint: #92400e;
-  --flash-success: #047857;
+  --flash-accent-on-tint: #78350f;
+  --flash-success: #065f46;
   --flash-danger: #b91c1c;
   --flash-info: #0369a1;
   --flash-hint: #57544e;
 }
 
-/* theme-system 跟随系统：浅色时走与 light 相同的取值。
-   这里必须重复一遍——媒体查询不能和非媒体查询的选择器合并成一条规则。 */
-@media (prefers-color-scheme: light) {
-  .flash-capsule-overlay.theme-system {
-    --flash-accent: #b45309;
-    --flash-accent-on-tint: #92400e;
-    --flash-success: #047857;
-    --flash-danger: #b91c1c;
-    --flash-info: #0369a1;
-    --flash-hint: #64748b;
-  }
-}
+/* 浅色取值只有这一处来源。系统主题（`theme-system`）不在这里覆盖——它在渲染层就被
+   解析成了具体主题（`resolveThemeMode()`，浅色系统 → `theme-light`），所以
+   `.theme-light` 是浅色的唯一入口。这里原来另有一组
+   `@media (prefers-color-scheme: light) { .flash-capsule-overlay.theme-system … }`，
+   是手工复制出来的第二份来源，只覆盖了容器和两个 textarea，其余控件全漏了——
+   "跟随系统 + 浅色系统"这条**默认**路径因此拿到白水洗底配 #cbd5e1（1.48:1）。 */
 
 html:has(.flash-capsule-overlay),
 body:has(.flash-capsule-overlay) {
@@ -4659,15 +4664,6 @@ body:has(.flash-capsule-overlay) {
   border: none !important;
   color: #111111;
   box-shadow: none !important;
-}
-
-@media (prefers-color-scheme: light) {
-  .flash-capsule-overlay.theme-system .flash-capsule-container {
-    background: rgba(255, 255, 255, 0.96);
-    color: #0f172a;
-    border: none !important;
-    box-shadow: none !important;
-  }
 }
 
 /* Header */
@@ -5225,16 +5221,6 @@ body:has(.flash-capsule-overlay) {
 .flash-capsule-overlay.theme-eink .flash-textarea::placeholder,
 [data-theme="eink"] .flash-textarea::placeholder {
   color: #383530 !important;
-}
-
-/* System Theme in Light mode */
-@media (prefers-color-scheme: light) {
-  .flash-capsule-overlay.theme-system .flash-textarea {
-    color: #0f172a !important;
-  }
-  .flash-capsule-overlay.theme-system .flash-textarea::placeholder {
-    color: #475569 !important;
-  }
 }
 
 /* Footer */
@@ -5810,16 +5796,6 @@ body:has(.flash-capsule-overlay) {
 .flash-capsule-overlay.theme-eink .flash-persistent-textarea::placeholder,
 [data-theme="eink"] .flash-persistent-textarea::placeholder {
   color: #383530 !important;
-}
-
-/* System Theme in Light mode */
-@media (prefers-color-scheme: light) {
-  .flash-capsule-overlay.theme-system .flash-persistent-textarea {
-    color: #0f172a !important;
-  }
-  .flash-capsule-overlay.theme-system .flash-persistent-textarea::placeholder {
-    color: #475569 !important;
-  }
 }
 
 /* Responsive adaptations for Flash Capsule Window */

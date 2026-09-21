@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Zap, Settings, X, Check, Hash, Link, Clock, Lightbulb, Keyboard, AlertCircle, FileText, Pin, PinOff, Folder, RotateCcw, Copy, StickyNote, Sparkles, Trash2 } from "lucide-react";
 import { loadPreferences, savePreferences } from "../services/storage";
+import { resolveThemeMode } from "../services/themeMode";
 import type { ThemeMode } from "../core/types";
 
 export const FlashCapsule: React.FC = () => {
@@ -11,6 +12,10 @@ export const FlashCapsule: React.FC = () => {
   const [shortcut, setShortcut] = useState("Alt+Space");
   const [targetDisplay, setTargetDisplay] = useState("Space/YYYY-MM-DD_HHmm.md");
   const [theme, setTheme] = useState<ThemeMode>("system");
+  const [systemPrefersLight, setSystemPrefersLight] = useState(
+    () => window.matchMedia?.("(prefers-color-scheme: light)")?.matches ?? false
+  );
+  const resolvedTheme = resolveThemeMode(theme, systemPrefersLight);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordedShortcut, setRecordedShortcut] = useState("");
@@ -65,10 +70,7 @@ export const FlashCapsule: React.FC = () => {
   useEffect(() => {
     const applyTheme = (t?: string) => {
       const prefs = loadPreferences();
-      const nextTheme = (t as ThemeMode) || prefs.theme || "system";
-      setTheme(nextTheme);
-      document.documentElement.setAttribute("data-theme", nextTheme);
-      document.documentElement.dataset.theme = nextTheme;
+      setTheme((t as ThemeMode) || prefs.theme || "system");
     };
 
     applyTheme();
@@ -199,6 +201,27 @@ export const FlashCapsule: React.FC = () => {
       }
     };
   }, [desktop]);
+
+  // 主题设成"跟随系统"时，操作系统在浅色/深色之间切换必须立刻反映到配色上。
+  // 改前这一步是 CSS 媒体查询自动完成的；把系统主题解析成具体主题之后，
+  // 不自己监听就会出现"窗口不重开就一直用旧配色"。
+  useEffect(() => {
+    const mq = window.matchMedia?.("(prefers-color-scheme: light)");
+    if (!mq) return;
+    const onChange = (e: MediaQueryListEvent) => setSystemPrefersLight(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
+  // `data-theme` 也写**解析后**的主题，并且必须和 overlay 的类名一致：
+  // 区块里的浅色覆盖一半写成 `.flash-capsule-overlay.theme-light …`、一半写成
+  // `[data-theme="light"] …`，只解析其中一个会让另一族规则在"跟随系统 + 浅色系统"下
+  // 静默失效（`.flash-dir-label`、`.flash-starter-tag` 会退回 1.3~1.5:1）。
+  // 胶囊是独立窗口，这里改的是它自己的 document，不会影响主窗口。
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", resolvedTheme);
+    document.documentElement.dataset.theme = resolvedTheme;
+  }, [resolvedTheme]);
 
   const handleClose = () => {
     if (desktop?.hideFlashCapsule) {
@@ -570,7 +593,7 @@ export const FlashCapsule: React.FC = () => {
   };
 
   return (
-    <div className={`flash-capsule-overlay theme-${theme}`}>
+    <div className={`flash-capsule-overlay theme-${resolvedTheme}`}>
       <div className="flash-capsule-container">
         {/* Header Bar - Draggable */}
         <div className="flash-header" style={{ WebkitAppRegion: "drag" } as React.CSSProperties}>

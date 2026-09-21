@@ -26,6 +26,7 @@
 | 白板数据结构与序列化 | `src/services/canvasSerialization.ts` |
 | 弹窗通用样式令牌 | `src/components/canvas/canvasModalStyles.ts` |
 | 闪念胶囊配色令牌 | `src/styles.css` 中 `.flash-capsule-overlay` 的 `--flash-*` 定义块 |
+| 「系统主题」解析成具体主题 | `src/services/themeMode.ts` |
 | 测试用例数权威口径 | `docs/TEST_BASELINE.md`（脚本生成，**禁止手改**） |
 | 测试环境重置 | `src/__tests__/helpers/resetStores.ts` |
 
@@ -37,7 +38,7 @@
 
 ---
 
-## 二、从历次修复中沉淀的八条规则
+## 二、从历次修复中沉淀的九条规则
 
 规则 1–6 出自 v2.6.3 之后「白板卡片斜杠命令」与「滚动清单带动画布」两处改动；
 规则 7–8 出自闪念胶囊浅色主题的对比度修复。
@@ -137,12 +138,50 @@
 把它换成 WCAG 2.1 的对比度比值（正文 4.5:1、图标 3:1），就变成一个**可以在 CI 里断言的数**。
 
 闪念胶囊那 19 处漏覆盖就是这么暴露的：最低 1.48:1（`#cbd5e1` 配白水洗底）。
-守卫测试在 `src/__tests__/flash-capsule-theme-contrast.test.ts`——它直接从 `styles.css`
-**文本**里读令牌值再算，不复制常量；底色也不是写死的，而是扫出区块里**实际用到的最深淡色底**，
-所以把 0.25 调成 0.4 会立刻变红。
+守卫测试在 `src/__tests__/flash-capsule-theme-contrast.test.ts`。它做三件事：
+
+1. **从 `styles.css` 文本里按主题解析级联**——同一个控件往往有多条规则（基线、
+   `.theme-light`、`[data-theme="light"]`、`:hover`），测试按 CSS 的逐属性级联
+   （特异度 → 源码顺序）算出每条规则**实际生效**的前景色和底色。手写一张
+   「令牌 ↔ 底色」对照表看着更直白，但它会随 CSS 改动过期，而**过期正是这个 bug 的成因**。
+2. **自动收全待测选择器**：凡是把 `color` 写成 `var(--flash-*)` 的规则都会被扫到，
+   新增规则自动进入测试。只改 `background`、颜色靠继承的 hover 态扫不到，显式列在
+   `EXTRA_SELECTORS` 里——它们恰恰是「令牌叠在更深淡色底上」的场景。
+3. **底色不写死**：从胶囊面往上逐层叠（目录设置卡 → 控件自身淡色底），所以把
+   0.25 调成 0.4 会立刻变红。
+
+解析器本身也要防错——它错解会把「真失败」报成绿。所以另有一组断言钉住已知结果：
+主题覆盖压过基线、hover 态的颜色继承基础规则、实色底取到具体颜色、特异度按**整条**
+选择器算（只数最后一个复合选择器会丢掉 `.theme-eink` 的权重，报出不存在的失败——
+这个 bug 真的写出来过）。
 
 配套要求：**「达标」的断言必须配一条「不达标时确实会报」的断言**（见规则 5）。
 这条测试里就是「改动前的 `#f59e0b` 在白底上确实 < 4.5」——否则阈值被改成永远通过也没人知道。
+
+### 规则 9：主题必须只有一个决定点
+
+`ThemeMode` 里有 `"system"`，而 CSS 里的主题覆盖是写在**具体主题**上的
+（`.theme-light` / `[data-theme="light"]`）。把 `"system"` 直接当类名用，所有浅色规则
+一条都匹配不到——而 `"system"` 是**默认值**，所以这条路径不是边缘情况，是主路径。
+
+原来的补法是手工复制一组
+`@media (prefers-color-scheme: light) { .flash-capsule-overlay.theme-system … }`，
+只覆盖了容器和两个 textarea（面积大的控件），预设标签、徽章、小按钮、Tab 一个没补——
+"跟随系统 + 浅色系统"的用户拿到白水洗底配 `#cbd5e1`（1.48:1）。
+
+**规则：`"system"` 这类「间接取值」必须在渲染层解析成具体主题，不能让它流进 CSS。**
+解析函数是 `src/services/themeMode.ts` 的 `resolveThemeMode()`，纯函数、可单测。
+
+两个容易踩的细节：
+
+- **解析结果必须同时用于类名和 `data-theme`。** 区块里的浅色覆盖一半写成
+  `.flash-capsule-overlay.theme-light …`、一半写成 `[data-theme="light"] …`；只解析其中一个，
+  另一族规则就会静默失效（`.flash-dir-label`、`.flash-starter-tag` 会退回 1.3~1.5:1）。
+  胶囊是独立窗口，改它自己的 `data-theme` 不影响主窗口。
+- **改前靠 CSS 媒体查询自动跟随系统，改成渲染层解析后必须自己监听 `matchMedia`**，
+  否则用户切换系统主题时要重开窗口才生效。
+
+区块内因此**不应再出现任何 `prefers-color-scheme` 规则**——守卫测试里有一条专门盯这个。
 
 ---
 
@@ -371,7 +410,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/push.ps1
 | 中 | 更新元数据是死文件 | `release/latest.yml`（停在 2.6.3）与 `resources/app-update.yml` **无人消费**：`electron/`、`src/` 里没有 `autoUpdater`，依赖里没有 `electron-updater`，`publish_github_release.py` 也不上传它们 | 要么接上自动更新（并把 `latest.yml` 加入上传清单），要么删掉这两个文件，别再让它们每版误导人 |
 | 低 | 发布目录膨胀 | `release/` 曾累积 **3.0G**（历史版本产物 + `asar-staging` 14550 文件）。2026-09-21 已清理到 **2.1G**，保留当前版与上一版安装包、便携目录、便携 zip、`win-unpacked` | 每次发版后按同一口径清一次：删 `asar-staging`、`__msi-x64`、`*.nsis.7z`、旧于上一版的 msi/Setup，以及全部 `*.blockmap`（没有自动更新，它们是死文件） |
 | 低 | 发布清理脚本已失效 | `scripts/organize-release.cjs` **0 处**引用 KnowSpace，整篇指向改名前的 `BookMD-Reader-win-x64` / `BookMD Reader.exe`，且只搬 MSI、不清理历史版本 | 建议直接删掉——留着比没有更危险，会让人以为清理过了。清理口径见上一条 |
-| 低 | 闪念胶囊控件轮廓在浅色/eink 下几乎看不见 | `.flash-mini-btn` 的淡琥珀底（0.18）与淡琥珀描边（0.35）叠在浅色底上分别只有 **1.14:1 / 1.31:1**（eink 同）。文字已达标（6.19:1），但控件轮廓未达 WCAG 1.4.11 的 3:1 | 浅色/eink 的按钮描边换实色（如 `var(--flash-accent)`）或加深底；`.flash-tool-insert-persistent`（0.12 底 / 0.3 描边）同理 |
+| 低 | 闪念胶囊控件轮廓在浅色/eink 下几乎看不见 | `.flash-mini-btn` 的淡琥珀底（0.18）与淡琥珀描边（0.35）相对所在底分别只有 **1.14:1 / 1.28:1**（eink 同）；`.flash-tool-insert-persistent`（0.12 底 / 0.3 描边）是 **1.09:1 / 1.24:1**。文字已达标（浅色 5.83:1、eink 7.39:1），但控件轮廓未达 WCAG 1.4.11 的 3:1 | 把浅色/eink 的描边换成实色 `var(--flash-accent)` 即可达 **4.69:1 / 4.65:1**（已验算），底也可以顺势加深。这是**刻意留下**的：本次只修文字可读性，改轮廓会动到按钮的外观手感，该由设计定 |
 
 ---
 
@@ -391,6 +430,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/push.ps1
 - [ ] 新增了颜色令牌？**基线块里给出值了吗？**主题块只做覆盖——漏定义会变成 `unset` 静默回落。
 - [ ] 新增/改了颜色？**对比度算过吗**（正文 4.5:1、图标 3:1）？配套的守卫测试是否读的是
       CSS 文本而不是复制一份常量？（规则 8）
+- [ ] 新样式挂在某个主题上？**这个主题是「间接取值」吗**（`"system"` 这类需要先解析的）？
+      是的话必须在渲染层解析成具体主题，并且解析结果要同时用于类名和 `data-theme`（规则 9）。
 - [ ] 注释是否在解释「为什么」，而不是复述代码？
 - [ ] `tsc --noEmit` 干净、`vitest run` 全绿、用例数未下降？
 - [ ] 是否引入了新的 `beforeEach` 状态，而没有清理？
