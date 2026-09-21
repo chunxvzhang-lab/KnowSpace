@@ -347,3 +347,62 @@ export function getCommandTemplate(cmd: SlashCommand): { text: string; cursorOff
   }
   return { text: cmd.template, cursorOffset: cmd.cursorOffset ?? cmd.template.length };
 }
+
+/** Where a `/` command is being typed, if it is. */
+export interface SlashTrigger {
+  /** What has been typed after the slash, lower-cased. */
+  query: string;
+  /** Index of the slash itself, relative to the `text` that was searched. */
+  startIndex: number;
+}
+
+/**
+ * A slash only counts at the start of a line or after whitespace.
+ *
+ * That one condition is what keeps `notes/a.md`, `https://example.com`, `a//b`
+ * and `\/` from opening the menu: in each of them the character before the slash
+ * is not whitespace. The query stops at the first space, so a sentence typed
+ * after a command is a new word, not a longer search.
+ */
+const SLASH_TRIGGER = /(?:^|\s)\/([a-zA-Z0-9_\u4e00-\u9fa5-]*)$/;
+
+/**
+ * Find the slash command being typed at `caret`, if there is one.
+ *
+ * One rule, two editors: the CodeMirror editor and the canvas card's textarea
+ * both ask this, which is what makes `/` offer the same list in both. `text` may
+ * be a whole document or a single line — `startIndex` is relative to whatever was
+ * passed, and the caller adds its own offset.
+ *
+ * The search stops at the current line, because a slash two lines up is not the
+ * slash being typed.
+ */
+export function detectSlashTrigger(text: string, caret: number): SlashTrigger | null {
+  const lineStart = text.lastIndexOf("\n", Math.max(0, caret - 1)) + 1;
+  const before = text.slice(lineStart, caret);
+  const match = SLASH_TRIGGER.exec(before);
+  if (!match) return null;
+  return {
+    query: match[1].toLowerCase(),
+    startIndex: lineStart + before.lastIndexOf("/"),
+  };
+}
+
+/**
+ * Replace the `/query` at the caret with the command's template.
+ *
+ * Returns the new text and where the caret belongs in it, so a textarea editor
+ * needs no knowledge of templates, cursor offsets or dynamic commands.
+ */
+export function applySlashCommand(
+  text: string,
+  trigger: SlashTrigger,
+  caret: number,
+  command: SlashCommand
+): { text: string; caret: number } {
+  const { text: inserted, cursorOffset } = getCommandTemplate(command);
+  return {
+    text: text.slice(0, trigger.startIndex) + inserted + text.slice(caret),
+    caret: trigger.startIndex + cursorOffset,
+  };
+}

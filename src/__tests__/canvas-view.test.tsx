@@ -1,4 +1,4 @@
-import { render, fireEvent, screen } from "@testing-library/react";
+import { render, fireEvent, screen, act } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { CanvasView } from "../components/CanvasView";
 import type { CanvasData } from "../types/canvasTypes";
@@ -908,6 +908,55 @@ describe("CanvasView Component", () => {
 
     // Canvas zoom must remain exactly 100% (wheel event did not zoom/pan canvas)
     expect(screen.getByText("100%")).toBeDefined();
+  });
+
+  /**
+   * The wheel belongs to whatever is under it.
+   *
+   * A card body scrolls; the canvas pans. Both used to happen at once, because
+   * the wheel reached the card, scrolled it, and then bubbled up to the canvas —
+   * so scrolling a card's checklist dragged the whole whiteboard sideways.
+   *
+   * The pair of tests is deliberate: jsdom lays nothing out, so the "card that
+   * cannot scroll" case is also the proof that the frame being awaited really is
+   * the frame the canvas pans in. On its own the first test would pass even if the
+   * wheel had been dropped on the floor.
+   */
+  const wheelOnCardBody = async (makeScrollable: boolean) => {
+    render(
+      <CanvasView
+        title="卡片滚轮归属测试"
+        source={JSON.stringify(initialCanvasData)}
+        onSourceChange={vi.fn()}
+      />
+    );
+
+    const world = document.querySelector(".canvas-world") as HTMLElement;
+    const before = world.style.transform;
+    const body = document.querySelector(".canvas-card-markdown")!.parentElement as HTMLElement;
+
+    if (makeScrollable) {
+      Object.defineProperty(body, "scrollHeight", { value: 400, configurable: true });
+      Object.defineProperty(body, "clientHeight", { value: 100, configurable: true });
+      Object.defineProperty(body, "scrollTop", { value: 0, writable: true, configurable: true });
+    }
+
+    await act(async () => {
+      fireEvent.wheel(body, { deltaY: 120 });
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    });
+
+    return { before, after: world.style.transform };
+  };
+
+  it("a wheel over a scrollable card body scrolls the card and leaves the canvas alone", async () => {
+    const { before, after } = await wheelOnCardBody(true);
+    expect(after).toBe(before);
+  });
+
+  it("a wheel over a card with nothing left to scroll still pans the canvas", async () => {
+    const { before, after } = await wheelOnCardBody(false);
+    expect(after).not.toBe(before);
   });
 
   it("opens group-specific context menu with label rename, color palette, and duplicate actions", () => {

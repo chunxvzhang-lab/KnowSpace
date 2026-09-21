@@ -28,7 +28,7 @@ import { oneDark } from "@codemirror/theme-one-dark";
 import { autocompletion, closeBrackets, closeBracketsKeymap, startCompletion, type CompletionContext, type CompletionResult } from "@codemirror/autocomplete";
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
 import type { ThemeMode } from "../core/types";
-import { matchSlashCommands, getCommandTemplate } from "../services/slashCommands";
+import { matchSlashCommands, getCommandTemplate, detectSlashTrigger } from "../services/slashCommands";
 import { EditorContextMenu } from "./EditorContextMenu";
 
 export type WikiLinkTarget = {
@@ -529,24 +529,19 @@ export const EditorPane = memo(function EditorPane({
     };
 
     const slashCommandCompletionSource = (context: CompletionContext): CompletionResult | null => {
-      // Trigger when user types / at line start or anywhere in paragraph (beginning, middle, end)
-      const word = context.matchBefore(/\/([a-zA-Z0-9_\u4e00-\u9fa5-]*)$/);
-      if (!word) return null;
+      // One rule, both editors: the canvas card's textarea asks the same function,
+      // so `/` cannot come to mean two different things in the two places a note
+      // gets written. It fires only at a line start or after whitespace, which is
+      // what keeps `https://…`, `a//b` and paths like `notes/a.md` out of it.
+      const line = context.state.doc.lineAt(context.pos);
+      const trigger = detectSlashTrigger(line.text, context.pos - line.from);
+      if (!trigger) return null;
 
-      // Smart avoidance: do not trigger on URLs (http://, https://), code comments (//), or escape slashes (\/)
-      if (word.from > 0) {
-        const charBefore = context.state.doc.sliceString(word.from - 1, word.from);
-        if (charBefore === "/" || charBefore === ":" || charBefore === "\\") {
-          return null;
-        }
-      }
-
-      const query = word.text.slice(1);
-      const matchedCommands = matchSlashCommands(query);
+      const matchedCommands = matchSlashCommands(trigger.query);
       if (matchedCommands.length === 0) return null;
 
       return {
-        from: word.from,
+        from: line.from + trigger.startIndex,
         to: context.pos,
         options: matchedCommands.map((cmd) => {
           const { text, cursorOffset } = getCommandTemplate(cmd);

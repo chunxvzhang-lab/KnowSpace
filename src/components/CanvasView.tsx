@@ -6,9 +6,17 @@ import type { CanvasData, CanvasNode, CanvasEdge, CanvasNodeSide, CanvasTextNode
 import { parseCanvasData, serializeCanvasData, createDefaultCanvas, computeBoundingBox, getNodeAnchorPoint, extractCanvasToMarkdown, CANVAS_COLOR_PALETTES, CANVAS_STANDARD_COLOR_IDS, isNodeInsideGroup, toggleChecklistInMarkdown, spawnConnectedCard, connectOneToMany, connectChainNodes, connectLoopNodes, disconnectNodeEdges, spawnMultipleBranches, computeEdgeMidpoint, cycleEdgeArrow, cycleEdgeStyle, cycleEdgeStrokePattern, reverseEdgeDirection, getOptimalAnchorSides, getSourceNodeEdgeColor, computeSourceDisplayColorMap, expandLoopEdgeSelection, syncLoopEdgeGeometry, computeGridLayout, resizeGridSpacing, computeRingSpacingLayout, resizeRingSpacing, isPointInsideNodeHull, alignNodesInCircle, downloadCanvasAsImage, copyCanvasImageToClipboard, CanvasAlignDirection, alignNodes, getMediaFileType, isMediaFile, resolveMediaSrc, buildPresentationSequence, findContainerForNode } from "../services/canvasService";
 import { renderCardMarkdown } from "../services/markdown";
 import { getCanvasThemeColors } from "../services/canvasTheme";
+import {
+  applySlashCommand,
+  detectSlashTrigger,
+  matchSlashCommands,
+  type SlashCommand,
+} from "../services/slashCommands";
+import { wheelBelongsToInnerScroller } from "../services/wheelScrollGuard";
 import { MediaLightbox, type LightboxMedia } from "./MediaLightbox";
 // Extracted during the R2 split (docs/CANVAS_SPLIT_DESIGN.md, batch B2).
 import { CanvasToast } from "./canvas/CanvasToast";
+import { CanvasCardSuggestMenu, type CanvasCardSuggestItem } from "./canvas/CanvasCardSuggestMenu";
 import { MarqueeSelectionBox } from "./canvas/MarqueeSelectionBox";
 import { CanvasMinimap } from "./canvas/CanvasMinimap";
 import { CanvasEdgeBatchToolbar } from "./canvas/CanvasEdgeBatchToolbar";
@@ -307,21 +315,24 @@ export const CanvasView = memo(function CanvasView({
   const [editingText, setEditingText] = useState("");
 
   /**
-   * The "insert a reference" popup inside a card's textarea.
+   * The suggestion popup inside a card's textarea.
    *
-   * A card is Markdown like any other, and `[[笔记]]` renders as a link in it —
-   * but the card editor is a plain textarea, so until now the only way to write
-   * one was to type the brackets and the title by hand and hope the spelling
-   * matched. `/` (and `[[`) now opens the workspace's notes right there, the
-   * same way the main editor and the flash capsule do it.
+   * A card is Markdown like any other, and its editor is a plain textarea, so
+   * both of the things the document editor offers while typing have to be offered
+   * here too, by the same triggers: `[[` opens the workspace's notes, and `/`
+   * opens the slash commands. They share one popup — and, for `/`, the very same
+   * command list and trigger rule the document editor uses
+   * (`services/slashCommands.ts`), so the two editors cannot drift apart.
    */
-  const [cardRefSuggest, setCardRefSuggest] = useState<{
+  const [cardSuggest, setCardSuggest] = useState<{
+    /** Which list is open. */
+    kind: "note" | "command";
     /** What has been typed after the trigger, lower-cased. */
     query: string;
     /** Where the trigger (`/` or `[[`) begins, in the textarea's value. */
     startIndex: number;
     selectedIndex: number;
-    filtered: Array<{ title: string; relativePath: string; absolutePath?: string }>;
+    items: CanvasCardSuggestItem[];
     /** Where to draw the popup, in screen pixels. */
     x: number;
     y: number;
@@ -965,6 +976,21 @@ export const CanvasView = memo(function CanvasView({
   // Mouse wheel zoom and pan with requestAnimationFrame batching
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
+      // A wheel over something that can still scroll belongs to that something —
+      // a card body, the suggestion popup — and the canvas must leave it alone.
+      // Without this the wheel reached the card, scrolled it, and bubbled up here
+      // as well, so scrolling a checklist dragged the whole whiteboard with it.
+      // Once the inner region is pinned at its edge the canvas takes the wheel
+      // back, so a wheel over a card is never a dead zone. Ctrl+wheel is a zoom
+      // gesture and always belongs to the canvas.
+      if (
+        !e.ctrlKey &&
+        !e.metaKey &&
+        wheelBelongsToInnerScroller(e.target, e.deltaX, e.deltaY, containerRef.current)
+      ) {
+        return;
+      }
+
       e.preventDefault();
       if (e.ctrlKey || e.metaKey) {
         const delta = e.deltaY < 0 ? 1.15 : 0.85;
@@ -3247,9 +3273,16 @@ export const CanvasView = memo(function CanvasView({
    * way to know those is to measure. CJK counts double, which is what a
    * monospace font does with it.
    */
-  const caretScreenPosition = (textarea: HTMLTextAreaElement) => {
+  /**
+   * Where the caret is on screen, for a given value and caret index.
+   *
+   * The value and the caret are passed in rather than read off the textarea: an
+   * insertion has already computed them, and the DOM still holds the previous
+   * value until React re-renders. Only the layout is read from the element.
+   */
+  const caretScreenPosition = (textarea: HTMLTextAreaElement, text: string, caret: number) => {
     const style = getComputedStyle(textarea);
-    const value = textarea.value.slice(0, textarea.selectionStart ?? 0);
+    const value = text.slice(0, caret);
     const lines = value.split("\n");
     const column = Array.from(lines[lines.length - 1] ?? "").reduce(
       (width, ch) => width + (ch.charCodeAt(0) > 0x2e7f ? 2 : 1),
@@ -3290,56 +3323,142 @@ export const CanvasView = memo(function CanvasView({
       .slice(0, 8);
   };
 
-  const handleCardEditorChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const value = e.target.value;
-    setEditingText(value);
-    const caret = e.target.selectionStart ?? value.length;
-    const before = value.slice(0, caret);
+  /** The rows the popup shows, in the order it shows them. */
+  const buildCardSuggestItems = (
+    kind: "note" | "command",
+    query: string
+  ): CanvasCardSuggestItem[] => {
+    if (kind === "command") {
+      return matchSlashCommands(query).map((cmd) => ({
+        key: `command:${cmd.id}`,
+        icon: cmd.icon,
+        title: cmd.title,
+        subtitle: cmd.description,
+      }));
+    }
+    return matchCardRefTargets(query).map((target) => ({
+      key: `note:${target.relativePath}:${target.title}`,
+      title: target.title,
+      subtitle: target.relativePath,
+    }));
+  };
 
-    // `[[` anywhere, or `/` at the start of a line or after a space — never in
-    // the middle of a path or a URL, where a slash is just a slash.
+  /**
+   * Open (or move) the popup for whatever the caret now sits in.
+   *
+   * Called on every keystroke, and again after an insertion, so picking `[[]]`
+   * from the command list offers the notes straight away rather than waiting for
+   * the next key — the document editor does the same.
+   */
+  const openCardSuggestFor = (textarea: HTMLTextAreaElement, value: string, caret: number) => {
+    const before = value.slice(0, caret);
+    let kind: "note" | "command" | null = null;
+    let query = "";
+    let startIndex = 0;
+
     const wiki = before.match(/\[\[([^\]\n]*)$/);
-    const slash = before.match(/(?:^|\s)\/([^\s/]*)$/);
-    const match = wiki ?? slash;
-    if (!match) {
-      setCardRefSuggest(null);
+    if (wiki) {
+      kind = "note";
+      query = wiki[1];
+      startIndex = caret - wiki[0].length;
+    } else {
+      // The same rule the document editor uses, which is what keeps a slash in
+      // the middle of a path or a URL from opening anything.
+      const slash = detectSlashTrigger(value, caret);
+      if (slash) {
+        kind = "command";
+        query = slash.query;
+        startIndex = slash.startIndex;
+      }
+    }
+
+    if (!kind || startIndex < 0) {
+      setCardSuggest(null);
       return;
     }
-    const query = match[1];
-    // For `[[` the trigger starts at the match; for `/` the match may carry a
-    // leading space (or nothing, at the start of a line), so take the slash
-    // itself — the query can never contain one.
-    const startIndex = wiki ? caret - match[0].length : before.lastIndexOf("/");
-    if (startIndex < 0) {
-      setCardRefSuggest(null);
-      return;
-    }
-    const filtered = matchCardRefTargets(query);
-    const caretPos = caretScreenPosition(e.target);
-    setCardRefSuggest({
+
+    const caretPos = caretScreenPosition(textarea, value, caret);
+    setCardSuggest({
+      kind,
       query: query.toLowerCase(),
       startIndex,
       selectedIndex: 0,
-      filtered,
+      items: buildCardSuggestItems(kind, query),
       x: caretPos.x,
       y: caretPos.y,
     });
   };
 
-  const insertCardReference = (title: string) => {
-    const suggest = cardRefSuggest;
+  const handleCardEditorChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setEditingText(e.target.value);
+    openCardSuggestFor(e.target, e.target.value, e.target.selectionStart ?? e.target.value.length);
+  };
+
+  /**
+   * Put the caret where an insertion left it, and re-open the popup for whatever
+   * it landed in — picking `[[]]` from the command list offers the notes straight
+   * away rather than waiting for the next key, the way the document editor does.
+   *
+   * The popup is refreshed before the frame is requested: it is positioned from
+   * the value and caret we already have, so it does not have to wait for React to
+   * write the new value into the textarea. Only the caret itself has to.
+   */
+  const commitCardEdit = (next: string, caret: number) => {
+    setEditingText(next);
+    const textarea = cardEditorRef.current;
+    if (!textarea) return;
+    openCardSuggestFor(textarea, next, caret);
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(caret, caret);
+    });
+  };
+
+  /**
+   * Insert whatever row `index` of the open popup stands for.
+   *
+   * The rows are re-derived from the query rather than carried in the state:
+   * both builders are pure and take the query the popup was drawn with, so the
+   * inserted row cannot disagree with the row the user was looking at.
+   */
+  const pickCardSuggest = (index: number) => {
+    const suggest = cardSuggest;
     const textarea = cardEditorRef.current;
     if (!suggest || !textarea) return;
     const caret = textarea.selectionStart ?? editingText.length;
-    const inserted = `[[${title}]]`;
-    const next = `${editingText.slice(0, suggest.startIndex)}${inserted}${editingText.slice(caret)}`;
-    setEditingText(next);
-    setCardRefSuggest(null);
-    const caretAfter = suggest.startIndex + inserted.length;
-    requestAnimationFrame(() => {
-      textarea.focus();
-      textarea.setSelectionRange(caretAfter, caretAfter);
-    });
+
+    if (suggest.kind === "command") {
+      const command: SlashCommand | undefined = matchSlashCommands(suggest.query)[index];
+      if (!command) return;
+      const applied = applySlashCommand(
+        editingText,
+        { query: suggest.query, startIndex: suggest.startIndex },
+        caret,
+        command
+      );
+      commitCardEdit(applied.text, applied.caret);
+      return;
+    }
+
+    const target = matchCardRefTargets(suggest.query)[index];
+    if (!target) return;
+    const inserted = `[[${target.title}]]`;
+    commitCardEdit(
+      `${editingText.slice(0, suggest.startIndex)}${inserted}${editingText.slice(caret)}`,
+      suggest.startIndex + inserted.length
+    );
+  };
+
+  /** Move the popup's highlight by `delta`, wrapping at both ends. */
+  const moveCardSuggest = (delta: number) => {
+    setCardSuggest((prev) =>
+      prev && prev.items.length > 0
+        ? {
+            ...prev,
+            selectedIndex: (prev.selectedIndex + delta + prev.items.length) % prev.items.length,
+          }
+        : prev
+    );
   };
 
   // Global mouse move and up listeners
@@ -5743,45 +5862,26 @@ export const CanvasView = memo(function CanvasView({
                     onClick={(e) => e.stopPropagation()}
                     onDoubleClick={(e) => e.stopPropagation()}
                     onKeyDown={(e) => {
-                      // The reference popup owns the keys while it is open.
-                      if (cardRefSuggest && cardRefSuggest.filtered.length > 0) {
+                      // The suggestion popup owns the keys while it is open.
+                      if (cardSuggest && cardSuggest.items.length > 0) {
                         if (e.key === "ArrowDown") {
                           e.preventDefault();
-                          setCardRefSuggest((prev) =>
-                            prev
-                              ? {
-                                  ...prev,
-                                  selectedIndex: (prev.selectedIndex + 1) % prev.filtered.length,
-                                }
-                              : prev
-                          );
+                          moveCardSuggest(1);
                           return;
                         }
                         if (e.key === "ArrowUp") {
                           e.preventDefault();
-                          setCardRefSuggest((prev) =>
-                            prev
-                              ? {
-                                  ...prev,
-                                  selectedIndex:
-                                    (prev.selectedIndex - 1 + prev.filtered.length) %
-                                    prev.filtered.length,
-                                }
-                              : prev
-                          );
+                          moveCardSuggest(-1);
                           return;
                         }
                         if (e.key === "Enter" || e.key === "Tab") {
-                          const picked = cardRefSuggest.filtered[cardRefSuggest.selectedIndex];
-                          if (picked) {
-                            e.preventDefault();
-                            insertCardReference(picked.title);
-                            return;
-                          }
+                          e.preventDefault();
+                          pickCardSuggest(cardSuggest.selectedIndex);
+                          return;
                         }
                         if (e.key === "Escape") {
                           e.preventDefault();
-                          setCardRefSuggest(null);
+                          setCardSuggest(null);
                           return;
                         }
                       }
@@ -5800,11 +5900,11 @@ export const CanvasView = memo(function CanvasView({
                     onBlur={() => {
                       // A click on a suggestion is a mousedown, so the popup has
                       // already acted by the time the textarea loses focus.
-                      setCardRefSuggest(null);
+                      setCardSuggest(null);
                       handleSaveNodeEdit();
                     }}
                     autoFocus
-                    placeholder="输入 Markdown 内容（支持标题、清单、加粗、代码块）；键入 / 或 [[ 引用其他笔记"
+                    placeholder="输入 Markdown 内容（支持标题、清单、加粗、代码块）；键入 / 打开命令，键入 [[ 引用其他笔记"
                     style={{
                       width: "100%",
                       height: "100%",
@@ -6257,82 +6357,32 @@ export const CanvasView = memo(function CanvasView({
       <CanvasEdgeBatchToolbar count={selectedEdgeIds.size} theme={theme} isDark={isDark} colors={colors} onSetStyle={handleBatchSetEdgeStyle} onCycleStrokePattern={handleBatchCycleStrokePattern} onToggleArrow={handleBatchToggleArrow} onReverse={handleBatchReverseEdges} onSetColor={handleBatchSetEdgeColor} onDelete={handleBatchDeleteEdges} onClear={() => setSelectedEdgeIds(new Set())} />
       )}
 
-      {/* 8.6 Reference picker for the card editor (/ or [[). Through a portal,
-          because the card lives inside the transformed canvas world and a popup
-          drawn there would be scaled and clipped with it. */}
-      {cardRefSuggest &&
+      {/* 8.6 Suggestion popup for the card editor (`[[` for a note, `/` for a
+          command). Through a portal, because the card lives inside the
+          transformed canvas world and a popup drawn there would be scaled and
+          clipped with it. */}
+      {cardSuggest &&
         typeof document !== "undefined" &&
         createPortal(
-          <div
-            className="canvas-card-ref-menu"
-            style={{
-              position: "fixed",
-              left: cardRefSuggest.x,
-              top: cardRefSuggest.y + 20,
-              zIndex: 10001,
-              backgroundColor: theme === "eink" ? "#f4f1ea" : !isDark ? "#ffffff" : "#1e293b",
-              color: colors.cardText,
-              border: `1px solid ${colors.cardBorder}`,
-              boxShadow: !isDark ? "0 10px 32px rgba(0,0,0,0.16)" : "0 14px 40px rgba(0,0,0,0.55)",
-              borderRadius: 10,
-              padding: "4px 0",
-              minWidth: 240,
-              maxWidth: 320,
-              maxHeight: 260,
-              overflowY: "auto",
-              fontSize: 12.5,
-              userSelect: "none",
-            }}
-            onMouseDown={(e) => e.preventDefault()}
-          >
-            <div
-              className="canvas-card-ref-header"
-              style={{
-                padding: "4px 12px 6px",
-                fontSize: 11,
-                fontWeight: 600,
-                color: colors.edgeColor,
-                borderBottom: `1px solid ${colors.cardHeaderBorder}`,
-              }}
-            >
-              引用笔记{cardRefSuggest.query ? `：${cardRefSuggest.query}` : ""}
-            </div>
-            {cardRefSuggest.filtered.length === 0 ? (
-              <div style={{ padding: "8px 12px", opacity: 0.7 }}>没有匹配的笔记</div>
-            ) : (
-              cardRefSuggest.filtered.map((target, idx) => (
-                <button
-                  key={`${target.relativePath}:${target.title}`}
-                  type="button"
-                  className={`canvas-card-ref-item ${idx === cardRefSuggest.selectedIndex ? "active" : ""}`}
-                  onMouseDown={(e) => {
-                    // mousedown, not click: the textarea must not lose focus and
-                    // close the popup before the pick registers.
-                    e.preventDefault();
-                    e.stopPropagation();
-                    insertCardReference(target.title);
-                  }}
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "flex-start",
-                    gap: 1,
-                    width: "100%",
-                    padding: "6px 12px",
-                    background: idx === cardRefSuggest.selectedIndex ? "rgba(56,189,248,0.16)" : "transparent",
-                    border: "none",
-                    color: "inherit",
-                    font: "inherit",
-                    textAlign: "left",
-                    cursor: "pointer",
-                  }}
-                >
-                  <span style={{ fontWeight: 600 }}>{target.title}</span>
-                  <span style={{ fontSize: 10.5, opacity: 0.65 }}>{target.relativePath}</span>
-                </button>
-              ))
-            )}
-          </div>,
+          <CanvasCardSuggestMenu
+            header={
+              cardSuggest.kind === "note"
+                ? `引用笔记${cardSuggest.query ? `：${cardSuggest.query}` : ""}`
+                : undefined
+            }
+            items={cardSuggest.items}
+            selectedIndex={cardSuggest.selectedIndex}
+            emptyText={cardSuggest.kind === "note" ? "没有匹配的笔记" : "没有匹配的命令"}
+            x={cardSuggest.x}
+            y={cardSuggest.y}
+            colors={colors}
+            isDark={isDark}
+            isEink={isEink}
+            onPick={pickCardSuggest}
+            onHover={(index) =>
+              setCardSuggest((prev) => (prev ? { ...prev, selectedIndex: index } : prev))
+            }
+          />,
           document.body
         )}
 

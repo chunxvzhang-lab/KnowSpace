@@ -128,7 +128,7 @@ describe("canvas card checklist", () => {
   });
 });
 
-describe("canvas card reference picker", () => {
+describe("canvas card suggestion popup", () => {
   const openEditor = () => {
     const card = document.querySelector(".canvas-card-markdown") as HTMLElement;
     act(() => {
@@ -137,42 +137,85 @@ describe("canvas card reference picker", () => {
     return document.querySelector("textarea") as HTMLTextAreaElement;
   };
 
-  it("typing / lists the workspace's notes, and Enter inserts one", () => {
+  const menu = () => document.querySelector(".canvas-card-suggest-menu") as HTMLElement | null;
+
+  it("[[ lists the workspace's notes, and Enter inserts one", () => {
     renderCanvas();
     const textarea = openEditor();
     act(() => {
-      fireEvent.change(textarea, { target: { value: "参见 /" } });
+      fireEvent.change(textarea, { target: { value: "参见 [[" } });
     });
-    const menu = document.querySelector(".canvas-card-ref-menu") as HTMLElement;
-    expect(menu).toBeTruthy();
-    expect(menu.textContent).toContain("笔记甲");
-    expect(menu.textContent).toContain("笔记乙");
+    expect(menu()).toBeTruthy();
+    expect(menu()!.textContent).toContain("笔记甲");
+    expect(menu()!.textContent).toContain("笔记乙");
 
     act(() => {
-      fireEvent.change(textarea, { target: { value: "参见 /乙" } });
+      fireEvent.change(textarea, { target: { value: "参见 [[乙" } });
     });
-    expect(
-      (document.querySelector(".canvas-card-ref-menu") as HTMLElement).textContent
-    ).not.toContain("笔记甲");
+    expect(menu()!.textContent).not.toContain("笔记甲");
 
     act(() => {
       fireEvent.keyDown(textarea, { key: "Enter" });
     });
     expect(textarea.value).toBe("参见 [[笔记乙]]");
-    expect(document.querySelector(".canvas-card-ref-menu")).toBeNull();
+    expect(menu()).toBeNull();
   });
 
-  it("[[ opens the same picker, and Escape closes it", () => {
+  it("typing / opens the command list, and Enter inserts the template", () => {
+    // The card's `/` is the document editor's `/`: the same command list, so a
+    // command learned in one place works in the other.
     renderCanvas();
     const textarea = openEditor();
     act(() => {
-      fireEvent.change(textarea, { target: { value: "[[" } });
+      fireEvent.change(textarea, { target: { value: "清单 /todo" } });
     });
-    expect(document.querySelector(".canvas-card-ref-menu")).toBeTruthy();
+    expect(menu()).toBeTruthy();
+    expect(menu()!.textContent).toContain("待办清单");
+
+    act(() => {
+      fireEvent.keyDown(textarea, { key: "Enter" });
+    });
+    expect(textarea.value).toBe("清单 - [ ] 待办事项内容\n");
+    expect(menu()).toBeNull();
+  });
+
+  it("the command list is searchable, and Escape closes it", () => {
+    renderCanvas();
+    const textarea = openEditor();
+    act(() => {
+      fireEvent.change(textarea, { target: { value: "/" } });
+    });
+    expect(menu()!.textContent).toContain("一级标题");
+    expect(menu()!.textContent).toContain("待办清单");
+
+    act(() => {
+      fireEvent.change(textarea, { target: { value: "/闪卡" } });
+    });
+    expect(menu()!.textContent).toContain("闪卡");
+    expect(menu()!.textContent).not.toContain("一级标题");
+
     act(() => {
       fireEvent.keyDown(textarea, { key: "Escape" });
     });
-    expect(document.querySelector(".canvas-card-ref-menu")).toBeNull();
+    expect(menu()).toBeNull();
+  });
+
+  it("picking [[]] from the command list offers the notes straight away", () => {
+    // The document editor chains the two, so the card does too.
+    renderCanvas();
+    const textarea = openEditor();
+    act(() => {
+      fireEvent.change(textarea, { target: { value: "/wiki" } });
+    });
+    expect(menu()!.textContent).toContain("双向链接");
+
+    act(() => {
+      fireEvent.keyDown(textarea, { key: "Enter" });
+    });
+    expect(textarea.value).toBe("[[]]");
+    // Now inside the brackets, so the note picker takes over.
+    expect(menu()).toBeTruthy();
+    expect(menu()!.textContent).toContain("笔记甲");
   });
 
   it("a slash in the middle of a path is just a slash", () => {
@@ -181,7 +224,7 @@ describe("canvas card reference picker", () => {
     act(() => {
       fireEvent.change(textarea, { target: { value: "notes/a.md 里的内容" } });
     });
-    expect(document.querySelector(".canvas-card-ref-menu")).toBeNull();
+    expect(menu()).toBeNull();
   });
 
   it("Ctrl+Enter finishes the edit instead of reopening it", () => {
