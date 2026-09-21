@@ -16,6 +16,31 @@
   --accent-surface: rgba(245, 158, 11, 0.12);
   --accent-cyan: #f59e0b;
   --accent-blue: #d97706;
+
+  /* ── 青色强调色（`--accent-info`）──────────────────────────────────────
+     图视图、局部图谱、思维导图、画布、块锚点、命令面板共用这个青色。它原来是一串
+     **字面量 `#38bdf8`**，散在 **112 条规则 / 200 处声明**里，且**没有任何主题覆盖**——
+     于是浅色主题下它一直是 `#38bdf8`：白底上 **2.14:1**、`--surface-2` 上 1.95:1，
+     而它被用在 39 处 `color:`（正文级文字）上。`#38bdf8` 是深色主题的正确取值
+     （黑底 9.80:1），错的是**没有随主题切换**。
+
+     修法是把它收成一个**语义令牌**，而不是逐条补浅色覆盖——逐条补正是当初出问题的
+     原因（`.flash-wikilink-item:hover` 就是这么漏掉的）。收成令牌后，任何新增规则
+     只要写 `var(--accent-info)` 就自动跟随主题，不需要记得补覆盖。
+
+     取值依据（实测对比度，脚本算的不是眼估的）：
+       - 深色 `#38bdf8`：黑底 9.80:1、`--surface` 上 8.64:1（维持原观感，不变）；
+       - 浅色/eink `#0369a1`：白底 **5.93:1**、`--surface-2` 5.40:1、eink 纸底 5.64:1
+         —— 全部达 AA 正文阈值 4.5:1。
+       为什么不沿用 TSX 里那套 `isDark ? "#38bdf8" : "#0284c7"`：`#0284c7` 在白底只有
+       **4.10:1**，低于正文阈值，只够 3:1 的图形阈值。`#0369a1` 与闪念胶囊的
+       `--flash-info` 取值一致（那边已经按对比度定过），所以两处也顺带收敛到同一档。
+
+     `-rgb` 是同一颜色的通道三元组，供 `rgba(var(--accent-info-rgb), 0.12)` 这类
+     需要**透明度合成**的地方使用（淡底、光晕、阴影共 80 处，alpha 有 21 种不同取值）。
+     三元组必须与上面的十六进制**成对维护**——守卫会核对两者是否指向同一颜色。 */
+  --accent-info: #0369a1;
+  --accent-info-rgb: 3, 105, 161;
   --danger: #ef4444;
   --status-bar-bg: #18181b;
   --status-bar-text: #e4e4e7;
@@ -111,6 +136,9 @@
   --accent-surface: rgba(0, 0, 0, 0.08);
   --accent-cyan: #3b3935;
   --accent-blue: #222222;
+  /* 青色强调色：eink 是浅底纸张主题，与浅色同档（纸底 5.64:1）。见 `:root` 的说明。 */
+  --accent-info: #0369a1;
+  --accent-info-rgb: 3, 105, 161;
   --danger: #842029;
   --status-bar-bg: #eae5dc;
   --status-bar-text: #1a1a1a;
@@ -138,6 +166,9 @@
   --accent-surface: rgba(29, 155, 240, 0.14);
   --accent-cyan: #22d3ee;
   --accent-blue: #1d9bf0;
+  /* 青色强调色：深色下就是原来的 `#38bdf8`（黑底 9.80:1）。见 `:root` 的说明。 */
+  --accent-info: #38bdf8;
+  --accent-info-rgb: 56, 189, 248;
   --danger: #f87171;
   --status-bar-bg: #000000;
   --status-bar-text: #e7e9ea;
@@ -166,6 +197,9 @@
     --accent-surface: rgba(29, 155, 240, 0.14);
     --accent-cyan: #22d3ee;
     --accent-blue: #1d9bf0;
+    /* 青色强调色：跟随系统深色时与 twitter 同值。见 `:root` 的说明。 */
+    --accent-info: #38bdf8;
+    --accent-info-rgb: 56, 189, 248;
     --danger: #f87171;
     --status-bar-bg: #000000;
     --status-bar-text: #e7e9ea;
@@ -1637,9 +1671,9 @@ body.is-resizing-col * {
 }
 
 .search-card-pill.link-pill {
-  background: rgba(56, 189, 248, 0.12);
+  background: rgba(var(--accent-info-rgb), 0.12);
   color: #0284c7;
-  border: 1px solid rgba(56, 189, 248, 0.25);
+  border: 1px solid rgba(var(--accent-info-rgb), 0.25);
 }
 
 .search-empty-state {
@@ -1999,8 +2033,8 @@ body.is-resizing-col * {
   display: inline-flex;
   align-items: center;
   gap: 1px;
-  color: #38bdf8;
-  background: rgba(56, 189, 248, 0.1);
+  color: var(--accent-info);
+  background: rgba(var(--accent-info-rgb), 0.1);
   padding: 1px 7px;
   border-radius: 5px;
   text-decoration: none !important;
@@ -2008,17 +2042,17 @@ body.is-resizing-col * {
   font-size: 0.95em;
   transition: all 0.15s ease;
   cursor: pointer;
-  border: 1px solid rgba(56, 189, 248, 0.22);
+  border: 1px solid rgba(var(--accent-info-rgb), 0.22);
   vertical-align: baseline;
   line-height: normal;
 }
 
 .markdown-body a.wikilink:hover {
-  background: rgba(56, 189, 248, 0.22);
-  border-color: rgba(56, 189, 248, 0.5);
+  background: rgba(var(--accent-info-rgb), 0.22);
+  border-color: rgba(var(--accent-info-rgb), 0.5);
   color: #7dd3fc;
   text-decoration: none !important;
-  border-bottom: 1px solid rgba(56, 189, 248, 0.5);
+  border-bottom: 1px solid rgba(var(--accent-info-rgb), 0.5);
   transform: translateY(-0.5px);
 }
 
@@ -2203,8 +2237,8 @@ body.is-resizing-col * {
 }
 
 .cm-tooltip-autocomplete ul li[aria-selected] {
-  background: rgba(56, 189, 248, 0.2) !important;
-  color: #38bdf8 !important;
+  background: rgba(var(--accent-info-rgb), 0.2) !important;
+  color: var(--accent-info) !important;
   font-weight: 600 !important;
 }
 
@@ -2271,8 +2305,7 @@ body.is-resizing-col * {
   font-weight: 550;
 }
 
-:root[data-theme="twitter"] .markdown-body mark,
-:root[data-theme="dark"] .markdown-body mark {
+:root[data-theme="twitter"] .markdown-body mark {
   background: rgba(250, 204, 21, 0.25);
   color: #fef08a;
   border-bottom: 1.5px solid rgba(250, 204, 21, 0.6);
@@ -3133,18 +3166,14 @@ body.is-resizing-col * {
 }
 
 [data-theme="twitter"] .markdown-body [data-source-line].sync-highlight-active,
-[data-theme="dark"] .markdown-body [data-source-line].sync-highlight-active,
-:root[data-theme="twitter"] .markdown-body [data-source-line].sync-highlight-active,
-:root[data-theme="dark"] .markdown-body [data-source-line].sync-highlight-active {
+:root[data-theme="twitter"] .markdown-body [data-source-line].sync-highlight-active {
   background: rgba(29, 155, 240, 0.16) !important;
   box-shadow: 0 0 0 1.5px rgba(29, 155, 240, 0.70), 0 4px 18px rgba(29, 155, 240, 0.22) !important;
   border-radius: 6px !important;
 }
 
 [data-theme="twitter"] .markdown-body li[data-source-line].sync-highlight-active,
-[data-theme="dark"] .markdown-body li[data-source-line].sync-highlight-active,
-:root[data-theme="twitter"] .markdown-body li[data-source-line].sync-highlight-active,
-:root[data-theme="dark"] .markdown-body li[data-source-line].sync-highlight-active {
+:root[data-theme="twitter"] .markdown-body li[data-source-line].sync-highlight-active {
   background: rgba(29, 155, 240, 0.20) !important;
   box-shadow: 0 0 0 1.5px rgba(29, 155, 240, 0.75) !important;
   border-radius: 6px !important;
@@ -3207,9 +3236,7 @@ body.is-resizing-col * {
 }
 
 [data-theme="twitter"] .markdown-body .search-highlight-active,
-[data-theme="dark"] .markdown-body .search-highlight-active,
-:root[data-theme="twitter"] .markdown-body .search-highlight-active,
-:root[data-theme="dark"] .markdown-body .search-highlight-active {
+:root[data-theme="twitter"] .markdown-body .search-highlight-active {
   background: rgba(29, 155, 240, 0.16) !important;
   box-shadow: 0 0 0 2px #1d9bf0, 0 6px 26px rgba(29, 155, 240, 0.32) !important;
 }
@@ -3267,9 +3294,7 @@ body.is-resizing-col * {
 }
 
 [data-theme="twitter"] .markdown-body mark.search-keyword-match,
-[data-theme="dark"] .markdown-body mark.search-keyword-match,
-:root[data-theme="twitter"] .markdown-body mark.search-keyword-match,
-:root[data-theme="dark"] .markdown-body mark.search-keyword-match {
+:root[data-theme="twitter"] .markdown-body mark.search-keyword-match {
   background: #1d9bf0 !important;
   color: #ffffff !important;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25) !important;
@@ -4410,9 +4435,9 @@ body.is-resizing-col * {
   height: 24px;
   padding: 0 8px;
   border-radius: 4px;
-  border: 1px solid rgba(56, 189, 248, 0.25);
-  background: rgba(56, 189, 248, 0.06);
-  color: #38bdf8;
+  border: 1px solid rgba(var(--accent-info-rgb), 0.25);
+  background: rgba(var(--accent-info-rgb), 0.06);
+  color: var(--accent-info);
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
@@ -4421,16 +4446,16 @@ body.is-resizing-col * {
 }
 
 .tab-graph-toggle-btn:hover {
-  background: rgba(56, 189, 248, 0.12);
-  border-color: rgba(56, 189, 248, 0.45);
-  color: #38bdf8;
+  background: rgba(var(--accent-info-rgb), 0.12);
+  border-color: rgba(var(--accent-info-rgb), 0.45);
+  color: var(--accent-info);
 }
 
 .tab-graph-toggle-btn.is-active {
-  background: rgba(56, 189, 248, 0.2);
-  border-color: #38bdf8;
-  color: #38bdf8;
-  box-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
+  background: rgba(var(--accent-info-rgb), 0.2);
+  border-color: var(--accent-info);
+  color: var(--accent-info);
+  box-shadow: 0 0 10px rgba(var(--accent-info-rgb), 0.3);
 }
 
 .tab-exit-split-btn {
@@ -4671,6 +4696,11 @@ body.is-resizing-col * {
   --flash-success: #22c55e;
   --flash-danger: #f87171;
   --flash-info: #38bdf8;
+  /* 通道三元组：实色用 `--flash-info`，需要透明度合成的地方（淡底、边框、光晕）用
+     `rgba(var(--flash-info-rgb), a)`。胶囊**不消费任何全局变量**（规则 9）——
+     它的主题是靠渲染层解析 `data-theme` 决定的，一旦读全局令牌，解析前后外观会变。
+     所以这里必须自带一份，不能借用 `--accent-info` / `--accent-info-rgb`。 */
+  --flash-info-rgb: 56, 189, 248;
   --flash-hint: #94a3b8;
 }
 
@@ -4684,6 +4714,7 @@ body.is-resizing-col * {
   --flash-success: #065f46;
   --flash-danger: #b91c1c;
   --flash-info: #0369a1;
+  --flash-info-rgb: 3, 105, 161;
   --flash-hint: #475569;
 }
 
@@ -4697,6 +4728,7 @@ body.is-resizing-col * {
   --flash-success: #065f46;
   --flash-danger: #b91c1c;
   --flash-info: #0369a1;
+  --flash-info-rgb: 3, 105, 161;
   --flash-hint: #57544e;
 }
 
@@ -6001,7 +6033,7 @@ body:has(.flash-capsule-overlay) {
   background: rgba(15, 23, 42, 0.95);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(56, 189, 248, 0.35);
+  border: 1px solid rgba(var(--flash-info-rgb), 0.35);
   border-radius: 8px;
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6);
   z-index: 100;
@@ -6056,8 +6088,8 @@ body:has(.flash-capsule-overlay) {
 
 .flash-wikilink-item:hover,
 .flash-wikilink-item.active {
-  background: rgba(56, 189, 248, 0.2);
-  color: #38bdf8;
+  background: rgba(var(--flash-info-rgb), 0.2);
+  color: var(--flash-info);
 }
 
 .flash-capsule-overlay.theme-light .flash-wikilink-dropdown,
@@ -7177,9 +7209,9 @@ body:has(.flash-capsule-overlay) {
   font-weight: 600;
   padding: 2px 7px;
   border-radius: 10px;
-  background: rgba(56, 189, 248, 0.15);
-  color: #38bdf8;
-  border: 1px solid rgba(56, 189, 248, 0.25);
+  background: rgba(var(--accent-info-rgb), 0.15);
+  color: var(--accent-info);
+  border: 1px solid rgba(var(--accent-info-rgb), 0.25);
 }
 
 .unlinked-count-badge {
@@ -7304,7 +7336,7 @@ body:has(.flash-capsule-overlay) {
 }
 
 .backlinks-group-card:hover {
-  border-color: rgba(56, 189, 248, 0.35);
+  border-color: rgba(var(--accent-info-rgb), 0.35);
 }
 
 .backlinks-group-header {
@@ -7319,7 +7351,7 @@ body:has(.flash-capsule-overlay) {
 }
 
 .backlinks-group-header:hover {
-  background: rgba(56, 189, 248, 0.08);
+  background: rgba(var(--accent-info-rgb), 0.08);
 }
 
 .group-title {
@@ -7337,8 +7369,8 @@ body:has(.flash-capsule-overlay) {
   font-weight: 600;
   padding: 1px 5px;
   border-radius: 8px;
-  background: rgba(56, 189, 248, 0.15);
-  color: #38bdf8;
+  background: rgba(var(--accent-info-rgb), 0.15);
+  color: var(--accent-info);
 }
 
 .group-arrow {
@@ -7392,8 +7424,8 @@ body:has(.flash-capsule-overlay) {
 
 .backlink-snippet-pill {
   font-weight: 600;
-  color: #38bdf8;
-  background: rgba(56, 189, 248, 0.12);
+  color: var(--accent-info);
+  background: rgba(var(--accent-info-rgb), 0.12);
   padding: 0 4px;
   border-radius: 3px;
   margin: 0 1px;
@@ -7439,17 +7471,17 @@ body:has(.flash-capsule-overlay) {
   font-size: 10.5px;
   font-weight: 600;
   border-radius: 5px;
-  background: rgba(56, 189, 248, 0.1);
-  color: #38bdf8;
-  border: 1px solid rgba(56, 189, 248, 0.28);
+  background: rgba(var(--accent-info-rgb), 0.1);
+  color: var(--accent-info);
+  border: 1px solid rgba(var(--accent-info-rgb), 0.28);
   cursor: pointer;
   transition: all 0.15s ease;
   margin-left: 6px;
 }
 
 .mention-convert-btn:hover {
-  background: rgba(56, 189, 248, 0.22);
-  border-color: rgba(56, 189, 248, 0.5);
+  background: rgba(var(--accent-info-rgb), 0.22);
+  border-color: rgba(var(--accent-info-rgb), 0.5);
   color: #7dd3fc;
   transform: translateY(-0.5px);
 }
@@ -7536,8 +7568,8 @@ body:has(.flash-capsule-overlay) {
   margin-top: 32px;
   padding: 8px 14px;
   border-radius: 8px;
-  background: rgba(56, 189, 248, 0.08);
-  border: 1px solid rgba(56, 189, 248, 0.2);
+  background: rgba(var(--accent-info-rgb), 0.08);
+  border: 1px solid rgba(var(--accent-info-rgb), 0.2);
   color: var(--text);
   font-size: 12px;
   cursor: pointer;
@@ -7545,14 +7577,14 @@ body:has(.flash-capsule-overlay) {
 }
 
 .article-backlinks-footer:hover {
-  background: rgba(56, 189, 248, 0.15);
-  border-color: rgba(56, 189, 248, 0.4);
+  background: rgba(var(--accent-info-rgb), 0.15);
+  border-color: rgba(var(--accent-info-rgb), 0.4);
   transform: translateY(-1px);
 }
 
 .article-backlinks-action {
   font-size: 11px;
-  color: #38bdf8;
+  color: var(--accent-info);
   font-weight: 600;
   margin-left: 4px;
 }
@@ -7624,9 +7656,9 @@ body:has(.flash-capsule-overlay) {
 }
 
 .backlinks-mode-tab.is-active {
-  background: rgba(56, 189, 248, 0.12);
-  color: #38bdf8;
-  border-color: rgba(56, 189, 248, 0.3);
+  background: rgba(var(--accent-info-rgb), 0.12);
+  color: var(--accent-info);
+  border-color: rgba(var(--accent-info-rgb), 0.3);
 }
 
 /* Local Subgraph in Sidebar */
@@ -7683,12 +7715,12 @@ body:has(.flash-capsule-overlay) {
 }
 
 .local-graph-btn.highlight-btn {
-  color: #38bdf8;
+  color: var(--accent-info);
 }
 
 .local-graph-btn.highlight-btn:hover {
-  background: rgba(56, 189, 248, 0.15);
-  border-color: rgba(56, 189, 248, 0.4);
+  background: rgba(var(--accent-info-rgb), 0.15);
+  border-color: rgba(var(--accent-info-rgb), 0.4);
 }
 
 .local-graph-canvas {
@@ -7707,7 +7739,7 @@ body:has(.flash-capsule-overlay) {
   border-radius: 6px;
   background: rgba(15, 23, 42, 0.88);
   backdrop-filter: blur(8px);
-  border: 1px solid rgba(56, 189, 248, 0.3);
+  border: 1px solid rgba(var(--accent-info-rgb), 0.3);
   color: #f8fafc;
   font-size: 11px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
@@ -7722,7 +7754,7 @@ body:has(.flash-capsule-overlay) {
   font-size: 9.5px;
   padding: 1px 4px;
   border-radius: 3px;
-  background: #38bdf8;
+  background: var(--accent-info);
   color: #030712;
   font-weight: 700;
   margin-left: 6px;
@@ -7752,9 +7784,9 @@ body:has(.flash-capsule-overlay) {
   max-width: 1380px;
   height: 90vh;
   background: #090d16;
-  border: 1px solid rgba(56, 189, 248, 0.25);
+  border: 1px solid rgba(var(--accent-info-rgb), 0.25);
   border-radius: 12px;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.65), 0 0 30px rgba(56, 189, 248, 0.1);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.65), 0 0 30px rgba(var(--accent-info-rgb), 0.1);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -7846,7 +7878,7 @@ body:has(.flash-capsule-overlay) {
 }
 
 .graph-search-box:focus-within {
-  border-color: #38bdf8;
+  border-color: var(--accent-info);
 }
 
 .graph-search-icon {
@@ -7899,9 +7931,9 @@ body:has(.flash-capsule-overlay) {
 }
 
 .graph-toggle-btn.is-active {
-  background: rgba(56, 189, 248, 0.15);
-  border-color: rgba(56, 189, 248, 0.4);
-  color: #38bdf8;
+  background: rgba(var(--accent-info-rgb), 0.15);
+  border-color: rgba(var(--accent-info-rgb), 0.4);
+  color: var(--accent-info);
   font-weight: 600;
 }
 
@@ -7958,14 +7990,14 @@ body:has(.flash-capsule-overlay) {
 }
 
 .graph-action-btn.focus-btn {
-  background: rgba(56, 189, 248, 0.12);
-  border-color: rgba(56, 189, 248, 0.35);
-  color: #38bdf8;
+  background: rgba(var(--accent-info-rgb), 0.12);
+  border-color: rgba(var(--accent-info-rgb), 0.35);
+  color: var(--accent-info);
   font-weight: 600;
 }
 
 .graph-action-btn.focus-btn:hover {
-  background: rgba(56, 189, 248, 0.22);
+  background: rgba(var(--accent-info-rgb), 0.22);
 }
 
 .graph-zoom-input-wrapper {
@@ -7991,14 +8023,14 @@ body:has(.flash-capsule-overlay) {
 }
 
 .graph-zoom-input:hover {
-  border-color: rgba(56, 189, 248, 0.5);
+  border-color: rgba(var(--accent-info-rgb), 0.5);
 }
 
 .graph-zoom-input:focus {
   background: rgba(15, 23, 42, 0.9);
-  border-color: #38bdf8;
-  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25);
-  color: #38bdf8;
+  border-color: var(--accent-info);
+  box-shadow: 0 0 0 2px rgba(var(--accent-info-rgb), 0.25);
+  color: var(--accent-info);
 }
 
 [data-theme="light"] .graph-zoom-input {
@@ -8129,9 +8161,9 @@ body:has(.flash-capsule-overlay) {
 }
 
 .node-folder-badge {
-  background: rgba(56, 189, 248, 0.15);
-  color: #38bdf8;
-  border: 1px solid rgba(56, 189, 248, 0.3);
+  background: rgba(var(--accent-info-rgb), 0.15);
+  color: var(--accent-info);
+  border: 1px solid rgba(var(--accent-info-rgb), 0.3);
   max-width: 130px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -8214,7 +8246,7 @@ body:has(.flash-capsule-overlay) {
 }
 
 .inspector-stat-cell .stat-num.highlight-cyan {
-  color: #38bdf8;
+  color: var(--accent-info);
 }
 
 .inspector-stat-cell .stat-label {
@@ -8283,8 +8315,8 @@ body:has(.flash-capsule-overlay) {
 }
 
 .dot-current {
-  background: #38bdf8;
-  box-shadow: 0 0 8px #38bdf8;
+  background: var(--accent-info);
+  box-shadow: 0 0 8px var(--accent-info);
 }
 
 .dot-chapter {
@@ -8535,7 +8567,7 @@ body:has(.flash-capsule-overlay) {
 .graph-workspace-splitter:hover,
 .graph-workspace-splitter.is-active,
 .graph-workspace-layout.is-resizing .graph-workspace-splitter {
-  background: var(--accent, #38bdf8);
+  background: var(--accent, var(--accent-info));
 }
 
 .graph-workspace-splitter .splitter-handle {
@@ -8626,9 +8658,9 @@ body:has(.flash-capsule-overlay) {
 }
 
 .splitter-btn-orientation:hover {
-  background: var(--accent, #38bdf8);
+  background: var(--accent, var(--accent-info));
   color: #ffffff;
-  border-color: var(--accent, #38bdf8);
+  border-color: var(--accent, var(--accent-info));
 }
 
 .splitter-ratio-chip {
@@ -8644,12 +8676,12 @@ body:has(.flash-capsule-overlay) {
 }
 
 .splitter-ratio-chip:hover {
-  background: rgba(56, 189, 248, 0.15);
-  color: var(--accent, #38bdf8);
+  background: rgba(var(--accent-info-rgb), 0.15);
+  color: var(--accent, var(--accent-info));
 }
 
 .splitter-ratio-chip.is-active {
-  background: var(--accent, #38bdf8);
+  background: var(--accent, var(--accent-info));
   color: #ffffff;
   font-weight: 600;
 }
@@ -8751,8 +8783,8 @@ body:has(.flash-capsule-overlay) {
 }
 
 .graph-pane-actions .graph-action-btn.is-active {
-  background: rgba(56, 189, 248, 0.15);
-  border-color: rgba(56, 189, 248, 0.45);
+  background: rgba(var(--accent-info-rgb), 0.15);
+  border-color: rgba(var(--accent-info-rgb), 0.45);
   color: var(--accent, #0284c7);
 }
 
@@ -8782,13 +8814,13 @@ body:has(.flash-capsule-overlay) {
 }
 
 .graph-zoom-group .graph-zoom-input:hover {
-  border-color: var(--accent, #38bdf8);
+  border-color: var(--accent, var(--accent-info));
 }
 
 .graph-zoom-group .graph-zoom-input:focus {
   background: var(--surface);
-  border-color: var(--accent, #38bdf8);
-  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+  border-color: var(--accent, var(--accent-info));
+  box-shadow: 0 0 0 2px rgba(var(--accent-info-rgb), 0.2);
 }
 
 .graph-pane-divider {
@@ -9159,20 +9191,20 @@ body:has(.flash-capsule-overlay) {
 }
 
 .mindmap-tool-btn.highlight-btn {
-  background: color-mix(in srgb, #38bdf8 8%, var(--surface-2));
-  border-color: color-mix(in srgb, #38bdf8 30%, var(--border));
-  color: #38bdf8;
+  background: color-mix(in srgb, var(--accent-info) 8%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--accent-info) 30%, var(--border));
+  color: var(--accent-info);
 }
 
 .mindmap-tool-btn.highlight-btn:hover {
-  background: color-mix(in srgb, #38bdf8 16%, var(--surface-2));
-  border-color: #38bdf8;
+  background: color-mix(in srgb, var(--accent-info) 16%, var(--surface-2));
+  border-color: var(--accent-info);
 }
 
 .mindmap-tool-btn.highlight-btn.active {
-  background: color-mix(in srgb, #38bdf8 20%, var(--surface-2));
-  border-color: #38bdf8;
-  color: #38bdf8;
+  background: color-mix(in srgb, var(--accent-info) 20%, var(--surface-2));
+  border-color: var(--accent-info);
+  color: var(--accent-info);
 }
 
 .mindmap-tool-btn.delete-btn:hover:not(:disabled) {
@@ -9501,7 +9533,7 @@ body:has(.flash-capsule-overlay) {
 }
 
 .mindmap-node-interactive.is-root .mindmap-node-rect:not([data-custom-color="true"]) {
-  fill: color-mix(in srgb, #38bdf8 12%, var(--surface));
+  fill: color-mix(in srgb, var(--accent-info) 12%, var(--surface));
 }
 
 .mindmap-node-interactive:hover .mindmap-node-rect:not([data-custom-color="true"]) {
@@ -9521,7 +9553,7 @@ body:has(.flash-capsule-overlay) {
 .mindmap-node-title-text.root-title {
   font-size: 14px;
   font-weight: 700;
-  fill: #38bdf8;
+  fill: var(--accent-info);
 }
 
 .mindmap-collapse-btn {
@@ -9554,7 +9586,7 @@ body:has(.flash-capsule-overlay) {
 }
 
 .mindmap-node-interactive.is-selected .mindmap-node-rect:not([data-custom-color="true"]) {
-  fill: color-mix(in srgb, #38bdf8 14%, var(--surface));
+  fill: color-mix(in srgb, var(--accent-info) 14%, var(--surface));
 }
 
 /* Quick Add Subtopic Button on Node */
@@ -9583,12 +9615,12 @@ body:has(.flash-capsule-overlay) {
 
 /* Mindmap Toolbar Buttons */
 .mindmap-tool-btn.highlight-btn {
-  color: #38bdf8;
+  color: var(--accent-info);
   font-weight: 500;
 }
 
 .mindmap-tool-btn.highlight-btn:hover {
-  background: color-mix(in srgb, #38bdf8 15%, transparent);
+  background: color-mix(in srgb, var(--accent-info) 15%, transparent);
 }
 
 .mindmap-tool-btn.delete-btn:hover:not(:disabled) {
@@ -9602,11 +9634,11 @@ body:has(.flash-capsule-overlay) {
   box-sizing: border-box;
   background: var(--surface);
   color: var(--text);
-  border: 1.5px solid #38bdf8;
+  border: 1.5px solid var(--accent-info);
   border-radius: 6px;
   padding: 2px 8px;
   outline: none;
-  box-shadow: 0 4px 14px rgba(56, 189, 248, 0.28), 0 0 0 2px rgba(56, 189, 248, 0.2);
+  box-shadow: 0 4px 14px rgba(var(--accent-info-rgb), 0.28), 0 0 0 2px rgba(var(--accent-info-rgb), 0.2);
   z-index: 30;
   font-family: inherit;
   font-weight: 500;
@@ -9740,8 +9772,8 @@ body:has(.flash-capsule-overlay) {
 
 .mindmap-custom-color-trigger:hover .mindmap-custom-color-badge {
   background: var(--surface);
-  color: #38bdf8;
-  border-color: #38bdf8;
+  color: var(--accent-info);
+  border-color: var(--accent-info);
 }
 
 .mindmap-bold-toggle-btn {
@@ -9767,9 +9799,9 @@ body:has(.flash-capsule-overlay) {
 }
 
 .mindmap-bold-toggle-btn.is-active {
-  background: #38bdf8;
+  background: var(--accent-info);
   color: #0f172a;
-  border-color: #38bdf8;
+  border-color: var(--accent-info);
 }
 
 .mindmap-ctx-palette {
@@ -9798,9 +9830,9 @@ body:has(.flash-capsule-overlay) {
 }
 
 .mindmap-color-swatch.is-active {
-  outline: 2px solid #38bdf8;
+  outline: 2px solid var(--accent-info);
   outline-offset: 1px;
-  box-shadow: 0 0 6px rgba(56, 189, 248, 0.6);
+  box-shadow: 0 0 6px rgba(var(--accent-info-rgb), 0.6);
 }
 
 .mindmap-color-swatch.is-transparent-swatch {
@@ -9836,7 +9868,7 @@ body:has(.flash-capsule-overlay) {
 
 .mindmap-pill-btn.is-active {
   background: var(--surface);
-  color: #38bdf8;
+  color: var(--accent-info);
   font-weight: 600;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
@@ -9919,11 +9951,11 @@ body:has(.flash-capsule-overlay) {
 
 .block-anchor:hover {
   opacity: 1;
-  color: #38bdf8;
-  border-color: rgba(56, 189, 248, 0.45);
-  background: rgba(56, 189, 248, 0.1);
+  color: var(--accent-info);
+  border-color: rgba(var(--accent-info-rgb), 0.45);
+  background: rgba(var(--accent-info-rgb), 0.1);
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(56, 189, 248, 0.15);
+  box-shadow: 0 2px 8px rgba(var(--accent-info-rgb), 0.15);
 }
 
 .block-anchor.is-copied {
@@ -9937,7 +9969,7 @@ body:has(.flash-capsule-overlay) {
 .block-anchor-symbol {
   font-size: 11px;
   font-weight: 600;
-  color: #38bdf8;
+  color: var(--accent-info);
   transition: color 0.15s ease;
 }
 
@@ -10005,13 +10037,13 @@ body:has(.flash-capsule-overlay) {
 
 /* Block reference link [[doc#^block]] */
 .wikilink.wikilink-block {
-  border-bottom: 1.5px dashed #38bdf8;
+  border-bottom: 1.5px dashed var(--accent-info);
 }
 
 .wikilink-block-symbol {
   font-size: 11px;
   margin-right: 2px;
-  color: #38bdf8;
+  color: var(--accent-info);
 }
 
 /* Block transclusion embed card ![[doc#^block]] */
@@ -10019,8 +10051,8 @@ body:has(.flash-capsule-overlay) {
   margin: 14px 0;
   padding: 10px 14px;
   border-radius: 6px;
-  border: 1px solid color-mix(in srgb, #38bdf8 35%, var(--border));
-  background: color-mix(in srgb, #38bdf8 4%, var(--surface-2));
+  border: 1px solid color-mix(in srgb, var(--accent-info) 35%, var(--border));
+  background: color-mix(in srgb, var(--accent-info) 4%, var(--surface-2));
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
@@ -10030,12 +10062,12 @@ body:has(.flash-capsule-overlay) {
   justify-content: space-between;
   margin-bottom: 6px;
   padding-bottom: 5px;
-  border-bottom: 1px solid color-mix(in srgb, #38bdf8 20%, var(--border));
+  border-bottom: 1px solid color-mix(in srgb, var(--accent-info) 20%, var(--border));
   font-size: 11px;
 }
 
 .wikilink-embed-card .embed-tag {
-  color: #38bdf8;
+  color: var(--accent-info);
   font-weight: 600;
 }
 
@@ -10047,7 +10079,7 @@ body:has(.flash-capsule-overlay) {
 }
 
 .wikilink-embed-card .embed-source-link:hover {
-  color: #38bdf8;
+  color: var(--accent-info);
   text-decoration: underline;
 }
 
@@ -10065,13 +10097,13 @@ body:has(.flash-capsule-overlay) {
 
 @keyframes jumpPulseGlow {
   0% {
-    background-color: rgba(56, 189, 248, 0.28);
-    outline: 2px solid #38bdf8;
-    box-shadow: 0 0 12px rgba(56, 189, 248, 0.35);
+    background-color: rgba(var(--accent-info-rgb), 0.28);
+    outline: 2px solid var(--accent-info);
+    box-shadow: 0 0 12px rgba(var(--accent-info-rgb), 0.35);
   }
   60% {
-    background-color: rgba(56, 189, 248, 0.10);
-    outline: 1.5px solid rgba(56, 189, 248, 0.25);
+    background-color: rgba(var(--accent-info-rgb), 0.10);
+    outline: 1.5px solid rgba(var(--accent-info-rgb), 0.25);
   }
   100% {
     background-color: transparent;
@@ -10241,8 +10273,8 @@ body:has(.flash-capsule-overlay) {
 }
 
 .format-ribbon-btn:hover {
-  background: rgba(56, 189, 248, 0.22);
-  color: #38bdf8;
+  background: rgba(var(--accent-info-rgb), 0.22);
+  color: var(--accent-info);
   transform: translateY(-1px);
 }
 
@@ -10280,8 +10312,8 @@ body:has(.flash-capsule-overlay) {
 .editor-context-menu .context-menu-item.active,
 .portal-submenu .context-menu-item:hover,
 .portal-submenu .context-menu-item.active {
-  background: rgba(56, 189, 248, 0.18);
-  color: #38bdf8;
+  background: rgba(var(--accent-info-rgb), 0.18);
+  color: var(--accent-info);
 }
 
 [data-theme="light"] .editor-context-menu .context-menu-item:hover,
@@ -10475,9 +10507,9 @@ body:has(.flash-capsule-overlay) {
   font-size: 11.5px;
   padding: 2.5px 8px;
   border-radius: 12px;
-  background: rgba(56, 189, 248, 0.2);
-  border: 1px solid rgba(56, 189, 248, 0.35);
-  color: #38bdf8;
+  background: rgba(var(--accent-info-rgb), 0.2);
+  border: 1px solid rgba(var(--accent-info-rgb), 0.35);
+  color: var(--accent-info);
   font-weight: 700;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
@@ -10539,9 +10571,9 @@ body:has(.flash-capsule-overlay) {
 
 .table-grid-cell:hover,
 .table-grid-cell.highlighted {
-  background: linear-gradient(135deg, rgba(56, 189, 248, 0.55), rgba(99, 102, 241, 0.65));
-  border-color: #38bdf8;
-  box-shadow: 0 0 8px rgba(56, 189, 248, 0.45);
+  background: linear-gradient(135deg, rgba(var(--accent-info-rgb), 0.55), rgba(99, 102, 241, 0.65));
+  border-color: var(--accent-info);
+  box-shadow: 0 0 8px rgba(var(--accent-info-rgb), 0.45);
   transform: scale(1.06);
 }
 
@@ -10615,9 +10647,9 @@ body:has(.flash-capsule-overlay) {
 }
 
 .table-step-btn:hover {
-  background: rgba(56, 189, 248, 0.22);
-  border-color: #38bdf8;
-  color: #38bdf8;
+  background: rgba(var(--accent-info-rgb), 0.22);
+  border-color: var(--accent-info);
+  color: var(--accent-info);
   transform: scale(1.05);
 }
 
@@ -10665,8 +10697,8 @@ body:has(.flash-capsule-overlay) {
 
 .table-num-input:focus {
   outline: none;
-  border-color: #38bdf8;
-  box-shadow: 0 0 0 1.5px rgba(56, 189, 248, 0.4);
+  border-color: var(--accent-info);
+  box-shadow: 0 0 0 1.5px rgba(var(--accent-info-rgb), 0.4);
 }
 
 [data-theme="light"] .table-num-input,
@@ -10708,9 +10740,9 @@ body:has(.flash-capsule-overlay) {
 }
 
 .table-preset-chip:hover {
-  background: rgba(56, 189, 248, 0.2);
-  border-color: #38bdf8;
-  color: #38bdf8;
+  background: rgba(var(--accent-info-rgb), 0.2);
+  border-color: var(--accent-info);
+  color: var(--accent-info);
   transform: translateY(-1px);
 }
 
@@ -10805,7 +10837,7 @@ body:has(.flash-capsule-overlay) {
   min-height: 30px;
   padding: 0 8px;
   background: rgba(24, 28, 36, 0.85);
-  border: 1px solid rgba(56, 189, 248, 0.35);
+  border: 1px solid rgba(var(--accent-info-rgb), 0.35);
   border-radius: 7px;
   margin-left: 6px;
   backdrop-filter: blur(12px);
@@ -10837,7 +10869,7 @@ body:has(.flash-capsule-overlay) {
 .mindmap-search-count {
   font-size: 11px;
   font-weight: 600;
-  color: #38bdf8;
+  color: var(--accent-info);
   margin: 0 4px;
 }
 
@@ -10880,10 +10912,10 @@ body:has(.flash-capsule-overlay) {
   gap: 6px;
   padding: 6px 12px;
   background: rgba(15, 23, 42, 0.92);
-  border: 1.5px dashed #38bdf8;
+  border: 1.5px dashed var(--accent-info);
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
-  color: #38bdf8;
+  color: var(--accent-info);
   font-size: 12px;
   font-weight: 600;
   backdrop-filter: blur(10px);
@@ -11182,9 +11214,9 @@ body:has(.flash-capsule-overlay) {
 
 .command-palette-tag-hints .mode-badge:hover,
 .command-palette-tag-hints .mode-badge.active {
-  background: rgba(56, 189, 248, 0.15);
-  border-color: rgba(56, 189, 248, 0.4);
-  color: #38bdf8;
+  background: rgba(var(--accent-info-rgb), 0.15);
+  border-color: rgba(var(--accent-info-rgb), 0.4);
+  color: var(--accent-info);
 }
 
 .command-palette-list {
@@ -11209,7 +11241,7 @@ body:has(.flash-capsule-overlay) {
 
 .command-palette-item:hover,
 .command-palette-item.is-selected {
-  background: rgba(56, 189, 248, 0.12);
+  background: rgba(var(--accent-info-rgb), 0.12);
 }
 
 .item-icon-wrapper {
@@ -11225,8 +11257,8 @@ body:has(.flash-capsule-overlay) {
 }
 
 .command-palette-item.is-selected .item-icon-wrapper {
-  background: rgba(56, 189, 248, 0.2);
-  color: #38bdf8;
+  background: rgba(var(--accent-info-rgb), 0.2);
+  color: var(--accent-info);
 }
 
 .item-body {
@@ -11273,8 +11305,8 @@ body:has(.flash-capsule-overlay) {
 }
 
 .item-recent-pill {
-  background: rgba(56, 189, 248, 0.15);
-  color: #38bdf8;
+  background: rgba(var(--accent-info-rgb), 0.15);
+  color: var(--accent-info);
 }
 
 .item-subtitle {
@@ -11308,7 +11340,7 @@ body:has(.flash-capsule-overlay) {
 
 .item-action-icon {
   opacity: 0;
-  color: #38bdf8;
+  color: var(--accent-info);
   transition: opacity 0.12s ease;
 }
 
@@ -11584,7 +11616,7 @@ body:has(.flash-capsule-overlay) {
 .canvas-card-markdown li.task-list-item input[type="checkbox"] {
   margin-top: 4px;
   cursor: pointer;
-  accent-color: var(--accent, #38bdf8);
+  accent-color: var(--accent, var(--accent-info));
   width: 14px;
   height: 14px;
 }
@@ -11592,8 +11624,8 @@ body:has(.flash-capsule-overlay) {
 .canvas-card-markdown blockquote {
   margin: 0.5em 0;
   padding: 0.25em 0.8em;
-  border-left: 3px solid var(--accent, #38bdf8);
-  background: rgba(56, 189, 248, 0.06);
+  border-left: 3px solid var(--accent, var(--accent-info));
+  background: rgba(var(--accent-info-rgb), 0.06);
   border-radius: 0 4px 4px 0;
   opacity: 0.9;
 }
@@ -11622,7 +11654,7 @@ body:has(.flash-capsule-overlay) {
 }
 
 .canvas-card-markdown a {
-  color: var(--accent, #38bdf8);
+  color: var(--accent, var(--accent-info));
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -11653,7 +11685,7 @@ body:has(.flash-capsule-overlay) {
 
 /* Whiteboard Marquee Box Selection */
 .canvas-selection-box {
-  background: rgba(56, 189, 248, 0.12);
+  background: rgba(var(--accent-info-rgb), 0.12);
   border: 1.5px dashed #0284c7;
   border-radius: 4px;
   pointer-events: none;
@@ -11662,8 +11694,8 @@ body:has(.flash-capsule-overlay) {
 
 :root[data-theme="twitter"] .canvas-selection-box,
 .knowspace-canvas-view.theme-twitter .canvas-selection-box {
-  background: rgba(56, 189, 248, 0.18);
-  border-color: #38bdf8;
+  background: rgba(var(--accent-info-rgb), 0.18);
+  border-color: var(--accent-info);
 }
 
 :root[data-theme="eink"] .canvas-selection-box,
@@ -12179,8 +12211,8 @@ body:has(.flash-capsule-overlay) {
 }
 
 .mindmap-zoom-value:hover {
-  background: rgba(56, 189, 248, 0.14);
-  color: #38bdf8;
+  background: rgba(var(--accent-info-rgb), 0.14);
+  color: var(--accent-info);
 }
 
 /* ── End mind map zoom controls ── */
@@ -12209,8 +12241,8 @@ body:has(.flash-capsule-overlay) {
 }
 
 .mindmap-ctx-item:hover:not(:disabled) {
-  background: rgba(56, 189, 248, 0.16);
-  color: #38bdf8;
+  background: rgba(var(--accent-info-rgb), 0.16);
+  color: var(--accent-info);
 }
 
 .mindmap-ctx-item:disabled {
@@ -12347,7 +12379,7 @@ body:has(.flash-capsule-overlay) {
 }
 
 .mindmap-note-input:focus-visible {
-  outline: 2px solid #38bdf8;
+  outline: 2px solid var(--accent-info);
   outline-offset: 1px;
 }
 
@@ -12382,7 +12414,7 @@ body:has(.flash-capsule-overlay) {
    the reader's colour, and changing it would read as a state of the boundary. */
 .mindmap-boundary-selection {
   fill: none;
-  stroke: #38bdf8;
+  stroke: var(--accent-info);
   stroke-width: 1.3;
   stroke-dasharray: 5 4;
   pointer-events: none;
@@ -12453,7 +12485,7 @@ body:has(.flash-capsule-overlay) {
    as a state of the bracket rather than as a selection. */
 .mindmap-summary-selection {
   fill: none;
-  stroke: #38bdf8;
+  stroke: var(--accent-info);
   stroke-width: 1.3;
   stroke-dasharray: 5 4;
   pointer-events: none;
@@ -12476,7 +12508,7 @@ body:has(.flash-capsule-overlay) {
 
 .mindmap-floating-rect {
   fill: var(--surface-2);
-  stroke: color-mix(in srgb, #38bdf8 35%, transparent);
+  stroke: color-mix(in srgb, var(--accent-info) 35%, transparent);
   stroke-width: 1.2;
   stroke-dasharray: 4 3;
 }
@@ -12492,7 +12524,7 @@ body:has(.flash-capsule-overlay) {
 
 .mindmap-floating-selection {
   fill: none;
-  stroke: #38bdf8;
+  stroke: var(--accent-info);
   stroke-width: 1.5;
   stroke-dasharray: 6 4;
   pointer-events: none;
@@ -12593,7 +12625,7 @@ body:has(.flash-capsule-overlay) {
 }
 
 .mindmap-relation-btn:focus-visible {
-  outline: 2px solid #38bdf8;
+  outline: 2px solid var(--accent-info);
   outline-offset: 1px;
 }
 
@@ -12604,7 +12636,7 @@ body:has(.flash-capsule-overlay) {
 
 .mindmap-node-number {
   pointer-events: none;
-  fill: color-mix(in srgb, #38bdf8 70%, var(--text-primary, #e2e8f0));
+  fill: color-mix(in srgb, var(--accent-info) 70%, var(--text-primary, #e2e8f0));
   font-size: 10px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -12655,7 +12687,7 @@ body:has(.flash-capsule-overlay) {
 }
 
 .mindmap-link-input:focus-visible {
-  outline: 2px solid #38bdf8;
+  outline: 2px solid var(--accent-info);
   outline-offset: 1px;
 }
 
@@ -12670,17 +12702,17 @@ body:has(.flash-capsule-overlay) {
 .mindmap-link-open {
   flex-shrink: 0;
   padding: 3px 10px;
-  border: 1px solid color-mix(in srgb, #38bdf8 45%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-info) 45%, transparent);
   border-radius: 5px;
-  background: color-mix(in srgb, #38bdf8 12%, transparent);
-  color: #38bdf8;
+  background: color-mix(in srgb, var(--accent-info) 12%, transparent);
+  color: var(--accent-info);
   font-size: 11px;
   cursor: pointer;
 }
 
 .mindmap-link-open:hover:not(:disabled) {
-  border-color: #38bdf8;
-  background: color-mix(in srgb, #38bdf8 20%, transparent);
+  border-color: var(--accent-info);
+  background: color-mix(in srgb, var(--accent-info) 20%, transparent);
 }
 
 .mindmap-link-open:disabled {
@@ -12713,8 +12745,8 @@ body:has(.flash-capsule-overlay) {
 }
 
 .mindmap-tag-chip {
-  fill: color-mix(in srgb, #38bdf8 14%, var(--surface-1, #1e293b));
-  stroke: color-mix(in srgb, #38bdf8 45%, transparent);
+  fill: color-mix(in srgb, var(--accent-info) 14%, var(--surface-1, #1e293b));
+  stroke: color-mix(in srgb, var(--accent-info) 45%, transparent);
   stroke-width: 0.8;
 }
 
@@ -12750,7 +12782,7 @@ body:has(.flash-capsule-overlay) {
 }
 
 .mindmap-tag-input:focus-visible {
-  outline: 2px solid #38bdf8;
+  outline: 2px solid var(--accent-info);
   outline-offset: 1px;
 }
 
@@ -12780,14 +12812,14 @@ body:has(.flash-capsule-overlay) {
 }
 
 .mindmap-tag-suggestion:hover {
-  border-color: #38bdf8;
-  color: #38bdf8;
+  border-color: var(--accent-info);
+  color: var(--accent-info);
 }
 
 .mindmap-tag-suggestion.is-active {
-  background: color-mix(in srgb, #38bdf8 18%, transparent);
-  border-color: #38bdf8;
-  color: #38bdf8;
+  background: color-mix(in srgb, var(--accent-info) 18%, transparent);
+  border-color: var(--accent-info);
+  color: var(--accent-info);
 }
 
 .mindmap-tag-count {
@@ -12839,7 +12871,7 @@ body:has(.flash-capsule-overlay) {
 
 .mindmap-priority-btn:focus-visible,
 .mindmap-progress-btn:focus-visible {
-  outline: 2px solid #38bdf8;
+  outline: 2px solid var(--accent-info);
   outline-offset: 1px;
 }
 
@@ -12861,8 +12893,8 @@ body:has(.flash-capsule-overlay) {
 }
 
 .mindmap-progress-btn.is-active {
-  background: color-mix(in srgb, #38bdf8 18%, var(--surface-2));
-  border-color: #38bdf8;
+  background: color-mix(in srgb, var(--accent-info) 18%, var(--surface-2));
+  border-color: var(--accent-info);
 }
 
 /* The dial itself, in both places it is drawn. */
@@ -12873,7 +12905,7 @@ body:has(.flash-capsule-overlay) {
 }
 
 .mindmap-progress-fill {
-  fill: #38bdf8;
+  fill: var(--accent-info);
 }
 
 .mindmap-progress-glyph .mindmap-progress-track {
@@ -12959,13 +12991,13 @@ body:has(.flash-capsule-overlay) {
 }
 
 .mindmap-icon-btn.is-active {
-  background: color-mix(in srgb, #38bdf8 18%, var(--surface-2));
-  border-color: #38bdf8;
-  color: #38bdf8;
+  background: color-mix(in srgb, var(--accent-info) 18%, var(--surface-2));
+  border-color: var(--accent-info);
+  color: var(--accent-info);
 }
 
 .mindmap-icon-btn:focus-visible {
-  outline: 2px solid #38bdf8;
+  outline: 2px solid var(--accent-info);
   outline-offset: 1px;
 }
 
@@ -12980,8 +13012,8 @@ body:has(.flash-capsule-overlay) {
 }
 
 .mindmap-icon-clear:hover {
-  border-color: #38bdf8;
-  color: #38bdf8;
+  border-color: var(--accent-info);
+  color: var(--accent-info);
 }
 
 /* The icon on the node. Colour comes from the drawing itself — lucide strokes
@@ -12989,7 +13021,7 @@ body:has(.flash-capsule-overlay) {
    must never take the click meant for the node under it. */
 .mindmap-node-icon {
   pointer-events: none;
-  color: color-mix(in srgb, #38bdf8 82%, var(--text-primary, #e2e8f0));
+  color: color-mix(in srgb, var(--accent-info) 82%, var(--text-primary, #e2e8f0));
 }
 
 .mindmap-note-marker {
@@ -12997,14 +13029,14 @@ body:has(.flash-capsule-overlay) {
 }
 
 .mindmap-note-marker circle {
-  fill: color-mix(in srgb, #38bdf8 24%, var(--surface-1, #1e293b));
-  stroke: color-mix(in srgb, #38bdf8 72%, transparent);
+  fill: color-mix(in srgb, var(--accent-info) 24%, var(--surface-1, #1e293b));
+  stroke: color-mix(in srgb, var(--accent-info) 72%, transparent);
   stroke-width: 1;
 }
 
 .mindmap-note-marker path {
   fill: none;
-  stroke: #38bdf8;
+  stroke: var(--accent-info);
   stroke-width: 1.1;
   stroke-linecap: round;
 }
@@ -13049,12 +13081,12 @@ body:has(.flash-capsule-overlay) {
 
 .mindmap-theme-select:hover,
 .mindmap-layout-select:hover {
-  border-color: rgba(56, 189, 248, 0.55);
+  border-color: rgba(var(--accent-info-rgb), 0.55);
 }
 
 .mindmap-theme-select:focus-visible,
 .mindmap-layout-select:focus-visible {
-  outline: 2px solid #38bdf8;
+  outline: 2px solid var(--accent-info);
   outline-offset: 1px;
 }
 

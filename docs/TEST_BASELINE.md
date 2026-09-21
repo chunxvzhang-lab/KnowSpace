@@ -11,9 +11,9 @@
 
 | 项目 | 数值 |
 | :--- | ---: |
-| 测试文件 | **107** |
-| 用例总数 | **1324** |
-| 通过 | 1323 |
+| 测试文件 | **109** |
+| 用例总数 | **1335** |
+| 通过 | 1334 |
 | 失败 | 0 |
 | 跳过 | 1 |
 | 通过率 | 99.9% |
@@ -39,7 +39,7 @@
 | `src/__tests__/mindmap-reparent.test.ts` | 32 | ✅ |
 | `src/__tests__/review-sources.test.tsx` | 29 | ✅ |
 | `src/__tests__/mindmap-themes.test.ts` | 28 | ✅ |
-| `src/__tests__/flash-capsule-theme-contrast.test.ts` | 25 | ✅ |
+| `src/__tests__/flash-capsule-theme-contrast.test.ts` | 26 | ✅ |
 | `src/__tests__/mindmap-collapse-persistence.test.tsx` | 24 | ✅ |
 | `src/__tests__/mindmap.test.ts` | 23 | ✅ |
 | `src/__tests__/search-index-service.test.ts` | 20 | ✅ |
@@ -83,6 +83,7 @@
 | `src/__tests__/review-focus.test.tsx` | 7 | ✅ |
 | `src/__tests__/review-source-reader.test.ts` | 7 | ✅ |
 | `src/__tests__/theme-mode.test.ts` | 7 | ✅ |
+| `src/__tests__/css-accent-info.test.ts` | 6 | ✅ |
 | `src/__tests__/css-custom-properties.test.ts` | 6 | ✅ |
 | `src/__tests__/dialogs-conflict-about.test.tsx` | 6 | ✅ |
 | `src/__tests__/diff-service.test.ts` | 6 | ✅ |
@@ -109,6 +110,7 @@
 | `src/__tests__/vault-opening.test.ts` | 5 | ✅ |
 | `src/__tests__/chapter-list.test.tsx` | 4 | ✅ |
 | `src/__tests__/command-palette.test.ts` | 4 | ✅ |
+| `src/__tests__/css-theme-vocabulary.test.ts` | 4 | ✅ |
 | `src/__tests__/editor-context-menu-component.test.tsx` | 4 | ✅ |
 | `src/__tests__/file-download.test.ts` | 4 | ✅ |
 | `src/__tests__/mermaid-service.test.ts` | 4 | ✅ |
@@ -159,7 +161,7 @@
 
 任何重构都必须满足：
 
-1. 用例总数 **不低于 1324**（删除测试需在 PR 说明中论证）
+1. 用例总数 **不低于 1335**（删除测试需在 PR 说明中论证）
 2. 通过率 **100%**
 3. 单文件用例数**不得下降**（防止测试被静默删除）
 

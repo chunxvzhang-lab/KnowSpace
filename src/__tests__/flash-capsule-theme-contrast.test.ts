@@ -313,6 +313,21 @@ const CONTAINER_OF: Record<string, string> = {
   ".flash-wikilink-item.active": ".flash-wikilink-dropdown",
 };
 
+/**
+ * 把值里的 `var(--flash-*)` 展开成该主题的取值。
+ *
+ * 为什么需要：**令牌三元组** `rgba(var(--flash-info-rgb), 0.2)` 是一种新写法——实色用
+ * `--flash-info`，需要透明度合成的地方（淡底、边框、光晕）用通道三元组。`toRgb()` 只认
+ * `#` / `rgb()` / `rgba()` 字面量，内层的 `var()` 不先展开就会抛「无法解析颜色」。
+ *
+ * 展开后仍是 `rgba(56, 189, 248, 0.2)`，交给 `toRgb()` 正常合成。
+ * 未知令牌保持原样，让 `toRgb()` 抛错——**不静默跳过**，否则守卫会悄悄失去这条覆盖。
+ */
+function expandFlashTokens(value: string, theme: ThemeKey): string {
+  const tokens = tokensOf(theme);
+  return value.replace(/var\((--flash-[\w-]+)\)/g, (whole, name: string) => tokens[name] ?? whole);
+}
+
 /** 该元素在某主题下文字实际落在什么颜色上（从容器底往上逐层叠）。 */
 function backdropOf(elementSelector: string, theme: ThemeKey): Rgb {
   const container = CONTAINER_OF[elementSelector];
@@ -321,12 +336,12 @@ function backdropOf(elementSelector: string, theme: ThemeKey): Rgb {
   if (container) {
     const resolved = resolveProperty(container, "background", theme);
     expect(resolved, `解析不到容器 ${container} 的 background（${theme}）`).not.toBeNull();
-    const rgb = toRgb(resolved!.value, base);
+    const rgb = toRgb(expandFlashTokens(resolved!.value, theme), base);
     if (rgb) base = rgb;
   }
   const own = resolveProperty(elementSelector, "background", theme);
   if (own) {
-    const rgb = toRgb(own.value, base);
+    const rgb = toRgb(expandFlashTokens(own.value, theme), base);
     if (rgb) base = rgb;
   }
   return base;
@@ -512,11 +527,40 @@ describe("闪念胶囊配色令牌", () => {
     }
   });
 
-  it("每个令牌都是合法的十六进制颜色", () => {
+  it("每个令牌都是合法的颜色写法（hex 或通道三元组）", () => {
     // 少一个 `#`、写成 `rgb(...)`、或漏了分号，都会让上面的对比度计算悄悄算错。
+    // `-rgb` 后缀的令牌是**通道三元组**（供 `rgba(var(--flash-x-rgb), a)` 合成淡底/
+    // 边框/光晕），它不是 hex，但同样必须格式正确——写歪了会让淡底偏色而肉眼看不出。
     for (const theme of THEME_KEYS) {
       for (const [name, value] of Object.entries(tokensOf(theme))) {
-        expect(value, `${theme} 的 ${name} 不是 hex 颜色: ${value}`).toMatch(/^#[0-9a-f]{6}$/i);
+        if (name.endsWith("-rgb")) {
+          const parts = value.split(",").map((s) => s.trim());
+          expect(parts.length, `${theme} 的 ${name} 不是 3 个通道: ${value}`).toBe(3);
+          for (const p of parts) {
+            expect(p, `${theme} 的 ${name} 通道不是 0-255 的整数: ${value}`).toMatch(/^\d{1,3}$/);
+            expect(Number(p), `${theme} 的 ${name} 通道越界: ${value}`).toBeLessThanOrEqual(255);
+          }
+        } else {
+          expect(value, `${theme} 的 ${name} 不是 hex 颜色: ${value}`).toMatch(/^#[0-9a-f]{6}$/i);
+        }
+      }
+    }
+  });
+
+  it("通道三元组与对应的实色令牌同色", () => {
+    // `--flash-info-rgb` 与 `--flash-info` 是分开维护的两份（实色 vs 透明度合成用的通道）。
+    // 写歪了会变成「淡底偏一个色、实色偏另一个色」——肉眼看不太出来，所以必须机器核对。
+    for (const theme of THEME_KEYS) {
+      const tokens = tokensOf(theme);
+      for (const [name, value] of Object.entries(tokens)) {
+        if (!name.endsWith("-rgb")) continue;
+        const baseName = name.replace(/-rgb$/, "");
+        const base = tokens[baseName];
+        expect(base, `${theme} 有 ${name} 却没有对应的 ${baseName}`).toBeTruthy();
+        expect(
+          value.split(",").map((s) => Number(s.trim())),
+          `${theme} 的 ${name} 与 ${baseName} 不是同一颜色`
+        ).toEqual(parseHex(base));
       }
     }
   });
