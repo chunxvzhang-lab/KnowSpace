@@ -261,6 +261,48 @@ node scripts/package-desktop.cjs --skip-builder
 跳过 electron-builder。它慢，而且每次都会先清空 `release/win-unpacked` 和自己的暂存目录——
 只想同步的时候那两件事都是白做的。
 
+### 5.6 推送：网络与凭据是两个独立的坑，别把它们混成一个
+
+发版最后一步是 `git push`。它有两种失败，**排查方向完全相反**，所以先分清是哪一种。
+
+**坑一：`github.com` 只能走本地代理，而且端口不是文档默认值。**
+
+`github.com` 在这台网络下直连不通（表现为 20 秒超时后
+`Failed to connect to github.com port 443`）。可用的代理端口是 **`7897`**——
+文档里常写的 `7890` 在这里并没有监听。用 `scripts/push.ps1`，它按候选端口逐个探测：
+
+```bash
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/push.ps1
+```
+
+**坑二：代理对了，但 git 读的不是你设的那个变量。**
+
+这是最容易误判的一处。`push.ps1` 原先只设 `HTTPS_PROXY` / `HTTP_PROXY`（大写），
+而 git 走 libcurl，**libcurl 优先读小写 `https_proxy`**。环境里一旦已经存在小写那份
+（代理软件导出的、包装脚本留下的、上次实验忘了清的），大写变量就被完全忽略，push 走了
+另一个代理，然后失败——报 `Empty reply from server`，或者一个根本没被要求承载这份流量的
+代理回 `502`。**这看起来像网络故障，其实是变量优先级问题。** 脚本已改为四个变量同设，
+并在找不到代理时显式清掉四个（否则"直连"并没有在直连）。
+
+> 同理：**curl 的 `-x` 优先级高于环境变量**。所以
+> `curl -x http://127.0.0.1:7897 https://github.com` 返回 200、而 `git push` 仍报 502 是
+> 完全可能的——两者读的不是同一处配置。判"某主机是否可达"必须**用同一个客户端**测。
+
+**坑三：凭据助手需要交互式桌面会话。**
+
+如果 push 卡住约 30 秒、最后报 `could not read Username ... terminal prompts disabled`，
+那代理是好的，问题在凭据：`git credential fill` 取不到账号。这台机器上的 git 是
+**WorkBuddy 自带的 PortableGit**（`credential.helper=helper-selector` → `manager`），
+凭据助手要读交互式桌面会话，在 agent 会话里取不到。SSH 路线也不通（没有 `~/.ssh`，
+`ssh.github.com:443` 走代理也不可达）。
+
+> **`ls-remote` 成功不代表鉴权正常。** 公开仓库的读操作不需要凭据，所以
+> `git ls-remote origin` 会漂亮地成功，而紧接着的 `git push` 卡在凭据上。
+> 别把前者当成"鉴权没问题"的证据。
+
+**结论：推送这一步由人在普通终端里执行。** agent 会话可以完成到提交为止，但不要为了
+"走通"去改 remote 地址、把 token 写进命令或配置文件——那会把一个环境限制变成一份凭据泄漏。
+
 ---
 
 ## 六、当前已知技术债（按处理优先级）
