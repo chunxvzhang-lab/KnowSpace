@@ -296,6 +296,9 @@ CSS 里 `animation: fadeIn 0.2s` 引用一个**不存在**的 `@keyframes fadeIn
 1. **同时扫 CSS 与 TS/TSX。** 本项目 JS 侧注入 CSS 变量的唯一方式是内联 style 对象
    （`"--name": value`，`setProperty` 只有两处且都是 `cursor`），但**引用**可以出现在 TSX 里
    （`color: "var(--text-subtle)"`）——只扫 CSS 会漏掉 `AboutDialog` 那两处。
+   反过来，**只扫 CSS 也会误报**：`--reader-scale` / `--tree-depth` / `--slide-glow-rgb` 等
+   定义在 TSX 里，产物级只查 `dist/assets/*.css` 会把它们报成「无兜底且未定义」。
+   所以校验要连 JS 产物一起扫——实测加上 JS 后是 49 定义 / 49 引用 / **0 悬空**。
 2. **允许清单要配「腐坏检查」。** 清单里若某条令牌后来被定义了，说明问题已修，
    那条白名单就成了掩盖范围的盲区。所以有一条断言专门要求「清单里的令牌确实仍未定义」，
    并要求每条都写清理由（理由短于 20 字符就报错）。这是规则 5 的成对断言。
