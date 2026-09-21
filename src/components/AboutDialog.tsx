@@ -150,6 +150,20 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
               <span className="about-changelog-version-badge">v{__APP_VERSION__}</span>
             </div>
             <div className="about-changelog-list">
+              {/* v2.6.4 */}
+              <div className="about-changelog-group">
+                <div className="about-changelog-group-label">
+                  <Sparkles size={12} className="text-cyan" />
+                  <span>v2.6.4 白板卡片：斜杠命令侧边栏与滚轮归属</span>
+                </div>
+                <ul className="about-changelog-items">
+                  <li>⌨️ <strong>卡片里键入 <code>/</code> 弹出与文档编辑器同一套斜杠命令</strong>：此前卡片里的 <code>/</code> 打开的是「引用笔记」弹层，而且两个编辑器各写了一份触发规则 —— 照抄一份界面只能保证今天一样，所以这次让两边<strong>调用同一个判定函数与同一张命令表</strong>。上下键选择、Enter / Tab 插入、Esc 关闭、英文与拼音首字母搜索，在哪儿都一样。</li>
+                  <li>🔗 <strong>引用笔记改用 <code>[[</code></strong>，与文档编辑器语义对齐；从命令列表里选「双向链接 <code>[[]]</code>」会<strong>自动接上</strong>笔记列表。斜杠只在一行开头或空格之后生效 —— 路径、网址与 <code>//</code> 注释里的斜杠不会再弹出面板。</li>
+                  <li>🖱️ <strong>滚动卡片内的清单不再带动画布</strong>：滚轮此前同时做了两件事 —— 卡片自己滚，事件又冒泡到画布把整块白板一起平移。现在按<strong>滚动链语义</strong>判定归属：内层还有得滚就归内层，滚到顶或底才交还给画布，所以滚轮停在卡片上永远不会变成死区。</li>
+                  <li>🧪 <strong>测试规模</strong>：<strong>103 个测试套件、1276 项</strong>单元与集成测试 100% 通过；另修掉一条在全量运行下偶发失败的用例（复习来源写入本地存储却未在测试之间清理）。</li>
+                </ul>
+              </div>
+
               {/* v2.6.3 */}
               <div className="about-changelog-group">
                 <div className="about-changelog-group-label">
