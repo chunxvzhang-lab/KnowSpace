@@ -170,6 +170,36 @@ function computeBoxSelectionEdgeHits(
   return hitEdgeIds;
 }
 
+/**
+ * A text card's body: the rendered Markdown, with its checkboxes and links live.
+ *
+ * Memoised on the text alone, and deliberately so. The canvas re-renders on
+ * hover, on selection, on every pan frame — and React rewrites
+ * `dangerouslySetInnerHTML` on each of those, which throws away every node
+ * inside, including a checkbox that is mid-click. Keeping this subtree out of
+ * the parent's render path is what makes "press on the box, release on the box"
+ * survive as one click; the drag guard in `handleNodeDragStart` is the other
+ * half, because it stops the mouseup that used to force such a re-render.
+ */
+const CanvasCardMarkdown = memo(function CanvasCardMarkdown({
+  text,
+  nodeId,
+  onActivate,
+}: {
+  text: string;
+  nodeId: string;
+  onActivate: (event: React.MouseEvent<HTMLDivElement>) => void;
+}) {
+  return (
+    <div
+      className="canvas-card-markdown"
+      data-node-id={nodeId}
+      onClick={onActivate}
+      dangerouslySetInnerHTML={{ __html: renderCardMarkdown(text) }}
+      />
+    );
+  });
+
 export const CanvasView = memo(function CanvasView({
   title,
   source = "",
@@ -275,6 +305,28 @@ export const CanvasView = memo(function CanvasView({
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
+
+  /**
+   * The "insert a reference" popup inside a card's textarea.
+   *
+   * A card is Markdown like any other, and `[[笔记]]` renders as a link in it —
+   * but the card editor is a plain textarea, so until now the only way to write
+   * one was to type the brackets and the title by hand and hope the spelling
+   * matched. `/` (and `[[`) now opens the workspace's notes right there, the
+   * same way the main editor and the flash capsule do it.
+   */
+  const [cardRefSuggest, setCardRefSuggest] = useState<{
+    /** What has been typed after the trigger, lower-cased. */
+    query: string;
+    /** Where the trigger (`/` or `[[`) begins, in the textarea's value. */
+    startIndex: number;
+    selectedIndex: number;
+    filtered: Array<{ title: string; relativePath: string; absolutePath?: string }>;
+    /** Where to draw the popup, in screen pixels. */
+    x: number;
+    y: number;
+  } | null>(null);
+  const cardEditorRef = useRef<HTMLTextAreaElement | null>(null);
   const editingNodeIdRef = useRef<string | null>(null);
   editingNodeIdRef.current = editingNodeId;
   const editingTextRef = useRef<string>("");
@@ -2801,11 +2853,30 @@ export const CanvasView = memo(function CanvasView({
       (target.tagName === "INPUT" ||
         target.tagName === "TEXTAREA" ||
         target.tagName === "BUTTON" ||
+        target.tagName === "SELECT" ||
+        target.tagName === "A" ||
         Boolean(target.closest("button")) ||
         Boolean(target.closest("input")) ||
         Boolean(target.closest("textarea")) ||
+        Boolean(target.closest("select")) ||
+        Boolean(target.closest("a")) ||
         Boolean(target.closest(".canvas-resize-handle")))
     ) {
+      // The press belongs to the control, not to the canvas — and saying so is
+      // what makes the control work. Without this stop the canvas root's own
+      // mousedown handler would arm a pan, and the mouseup that follows would
+      // clear the selection: a state update, which re-renders the card, which
+      // rewrites the card's markdown, and a rewritten markdown is a brand-new
+      // checkbox. The click that should have toggled it never lands, because
+      // the element it was pressed on is no longer in the document.
+      // The press belongs to the control, not to the canvas — and saying so is
+      // what makes the control work. Without this stop the canvas root's own
+      // mousedown handler would arm a pan, and the mouseup that follows would
+      // clear the selection: a state update, which re-renders the card, which
+      // rewrites the card's markdown, and a rewritten markdown is a brand-new
+      // checkbox. The click that should have toggled it never lands, because
+      // the element it was pressed on is no longer in the document.
+      e.stopPropagation();
       return;
     }
 
@@ -3115,29 +3186,160 @@ export const CanvasView = memo(function CanvasView({
     [connectingState, pushHistory, showToast]
   );
 
-  // Interactive checklist toggle in Markdown card
-  const handleCardClick = (e: React.MouseEvent, node: CanvasNode) => {
-    const target = e.target as HTMLElement;
-    if (
-      target &&
-      target.tagName === "INPUT" &&
-      (target as HTMLInputElement).type === "checkbox" &&
-      node.type === "text"
-    ) {
-      e.stopPropagation();
-      const cardEl = target.closest(".canvas-card-markdown");
-      if (cardEl) {
-        const allCheckboxes = Array.from(cardEl.querySelectorAll('input[type="checkbox"]'));
-        const idx = allCheckboxes.indexOf(target as HTMLInputElement);
-        if (idx !== -1) {
-          const updatedText = toggleChecklistInMarkdown(node.text, idx);
-          pushHistory({
-            ...data,
-            nodes: data.nodes.map((n) => (n.id === node.id ? { ...n, text: updatedText } : n)),
-          });
+  // What a press on a rendered card body means: a link opens the note it names,
+  // a checkbox toggles its line. One handler for both, kept stable so the card
+  // body can be memoised (see CanvasCardMarkdown below).
+  const handleCardBodyActivate = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      const target = e.target as HTMLElement | null;
+      const cardEl = target?.closest(".canvas-card-markdown") as HTMLElement | null;
+      if (!target || !cardEl) return;
+
+      // A rendered [[link]] goes to the note it names.
+      const link = target.closest("a[data-wikilink-target]") as HTMLAnchorElement | null;
+      if (link) {
+        e.stopPropagation();
+        const wanted = (link.getAttribute("data-wikilink-target") || "")
+          .replace(/\.md$/i, "")
+          .trim()
+          .toLowerCase();
+        const hit = allChapters.find((c) => {
+          const title = c.title.trim().toLowerCase();
+          const fileName = (c.src.split("/").pop() ?? "").replace(/\.md$/i, "").toLowerCase();
+          return title === wanted || fileName === wanted;
+        });
+        if (hit?.absolutePath && onOpenFile) {
+          onOpenFile(hit.absolutePath);
+          showToast(`已打开：${hit.title}`);
+        } else {
+          showToast(`找不到笔记：${link.getAttribute("data-wikilink-target")}`);
         }
+        return;
       }
+
+      // A checkbox flips its own line in the Markdown.
+      if (target.tagName === "INPUT" && (target as HTMLInputElement).type === "checkbox") {
+        e.stopPropagation();
+        const nodeId = cardEl.dataset.nodeId;
+        if (!nodeId) return;
+        const idx = Array.from(cardEl.querySelectorAll('input[type="checkbox"]')).indexOf(
+          target as HTMLInputElement
+        );
+        if (idx === -1) return;
+        const live = latestDataRef.current;
+        const node = live.nodes.find((n) => n.id === nodeId);
+        if (!node || node.type !== "text") return;
+        const updatedText = toggleChecklistInMarkdown(node.text, idx);
+        pushHistory({
+          ...live,
+          nodes: live.nodes.map((n) => (n.id === nodeId ? { ...n, text: updatedText } : n)),
+        });
+      }
+    },
+    [allChapters, onOpenFile, pushHistory, showToast]
+  );
+
+  /**
+   * Where the caret is, in screen pixels.
+   *
+   * The card editor is a monospace textarea inside a transformed canvas world,
+   * so the popup is drawn through a portal at fixed coordinates — and the only
+   * way to know those is to measure. CJK counts double, which is what a
+   * monospace font does with it.
+   */
+  const caretScreenPosition = (textarea: HTMLTextAreaElement) => {
+    const style = getComputedStyle(textarea);
+    const value = textarea.value.slice(0, textarea.selectionStart ?? 0);
+    const lines = value.split("\n");
+    const column = Array.from(lines[lines.length - 1] ?? "").reduce(
+      (width, ch) => width + (ch.charCodeAt(0) > 0x2e7f ? 2 : 1),
+      0
+    );
+    const probe = document.createElement("span");
+    probe.style.cssText = `position:absolute;visibility:hidden;white-space:pre;font:${style.font}`;
+    probe.textContent = "0000000000";
+    document.body.appendChild(probe);
+    const charWidth = probe.getBoundingClientRect().width / 10;
+    probe.remove();
+    const rect = textarea.getBoundingClientRect();
+    const scale = rect.width / textarea.offsetWidth || 1;
+    return {
+      x: rect.left + (parseFloat(style.paddingLeft) || 0) * scale + column * charWidth * scale,
+      y:
+        rect.top +
+        (parseFloat(style.paddingTop) || 0) * scale +
+        (lines.length - 1) * (parseFloat(style.lineHeight) || 20) * scale,
+    };
+  };
+
+  /** Notes whose title or file name contains what has been typed so far. */
+  const matchCardRefTargets = (query: string) => {
+    const clean = query.trim().toLowerCase();
+    return allChapters
+      .map((c) => ({
+        title: c.title,
+        relativePath: c.src,
+        absolutePath: c.absolutePath,
+      }))
+      .filter((t) => {
+        if (!clean) return true;
+        const title = t.title.toLowerCase();
+        const fileName = (t.relativePath.split("/").pop() ?? "").toLowerCase();
+        return title.includes(clean) || fileName.includes(clean);
+      })
+      .slice(0, 8);
+  };
+
+  const handleCardEditorChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setEditingText(value);
+    const caret = e.target.selectionStart ?? value.length;
+    const before = value.slice(0, caret);
+
+    // `[[` anywhere, or `/` at the start of a line or after a space — never in
+    // the middle of a path or a URL, where a slash is just a slash.
+    const wiki = before.match(/\[\[([^\]\n]*)$/);
+    const slash = before.match(/(?:^|\s)\/([^\s/]*)$/);
+    const match = wiki ?? slash;
+    if (!match) {
+      setCardRefSuggest(null);
+      return;
     }
+    const query = match[1];
+    // For `[[` the trigger starts at the match; for `/` the match may carry a
+    // leading space (or nothing, at the start of a line), so take the slash
+    // itself — the query can never contain one.
+    const startIndex = wiki ? caret - match[0].length : before.lastIndexOf("/");
+    if (startIndex < 0) {
+      setCardRefSuggest(null);
+      return;
+    }
+    const filtered = matchCardRefTargets(query);
+    const caretPos = caretScreenPosition(e.target);
+    setCardRefSuggest({
+      query: query.toLowerCase(),
+      startIndex,
+      selectedIndex: 0,
+      filtered,
+      x: caretPos.x,
+      y: caretPos.y,
+    });
+  };
+
+  const insertCardReference = (title: string) => {
+    const suggest = cardRefSuggest;
+    const textarea = cardEditorRef.current;
+    if (!suggest || !textarea) return;
+    const caret = textarea.selectionStart ?? editingText.length;
+    const inserted = `[[${title}]]`;
+    const next = `${editingText.slice(0, suggest.startIndex)}${inserted}${editingText.slice(caret)}`;
+    setEditingText(next);
+    setCardRefSuggest(null);
+    const caretAfter = suggest.startIndex + inserted.length;
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(caretAfter, caretAfter);
+    });
   };
 
   // Global mouse move and up listeners
@@ -3782,6 +3984,23 @@ export const CanvasView = memo(function CanvasView({
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
         e.preventDefault();
         handleSave();
+        return;
+      }
+
+      // While a card's text is being edited, the keys belong to the text.
+      // Without this guard the Enter below is the trap: it closes the editor,
+      // React flushes, and this handler — whose closure still says "not
+      // editing" — opens it straight back, so Ctrl+Enter looked like it did
+      // nothing at all. The same guard is what stops Delete from deleting the
+      // card out from under the sentence being typed, and Tab from spawning a
+      // branch beside it.
+      const keyTarget = e.target as HTMLElement | null;
+      if (
+        keyTarget &&
+        (keyTarget.tagName === "TEXTAREA" ||
+          keyTarget.tagName === "INPUT" ||
+          keyTarget.isContentEditable)
+      ) {
         return;
       }
 
@@ -5517,12 +5736,55 @@ export const CanvasView = memo(function CanvasView({
               >
                 {isEditing ? (
                   <textarea
+                    ref={cardEditorRef}
                     value={editingText}
-                    onChange={(e) => setEditingText(e.target.value)}
+                    onChange={handleCardEditorChange}
                     onMouseDown={(e) => e.stopPropagation()}
                     onClick={(e) => e.stopPropagation()}
                     onDoubleClick={(e) => e.stopPropagation()}
                     onKeyDown={(e) => {
+                      // The reference popup owns the keys while it is open.
+                      if (cardRefSuggest && cardRefSuggest.filtered.length > 0) {
+                        if (e.key === "ArrowDown") {
+                          e.preventDefault();
+                          setCardRefSuggest((prev) =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  selectedIndex: (prev.selectedIndex + 1) % prev.filtered.length,
+                                }
+                              : prev
+                          );
+                          return;
+                        }
+                        if (e.key === "ArrowUp") {
+                          e.preventDefault();
+                          setCardRefSuggest((prev) =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  selectedIndex:
+                                    (prev.selectedIndex - 1 + prev.filtered.length) %
+                                    prev.filtered.length,
+                                }
+                              : prev
+                          );
+                          return;
+                        }
+                        if (e.key === "Enter" || e.key === "Tab") {
+                          const picked = cardRefSuggest.filtered[cardRefSuggest.selectedIndex];
+                          if (picked) {
+                            e.preventDefault();
+                            insertCardReference(picked.title);
+                            return;
+                          }
+                        }
+                        if (e.key === "Escape") {
+                          e.preventDefault();
+                          setCardRefSuggest(null);
+                          return;
+                        }
+                      }
                       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
                         e.preventDefault();
                         handleSave();
@@ -5535,9 +5797,14 @@ export const CanvasView = memo(function CanvasView({
                       }
                       if (e.key === "Escape") setEditingNodeId(null);
                     }}
-                    onBlur={handleSaveNodeEdit}
+                    onBlur={() => {
+                      // A click on a suggestion is a mousedown, so the popup has
+                      // already acted by the time the textarea loses focus.
+                      setCardRefSuggest(null);
+                      handleSaveNodeEdit();
+                    }}
                     autoFocus
-                    placeholder="输入 Markdown 内容（支持标题、清单、加粗、代码块）..."
+                    placeholder="输入 Markdown 内容（支持标题、清单、加粗、代码块）；键入 / 或 [[ 引用其他笔记"
                     style={{
                       width: "100%",
                       height: "100%",
@@ -5554,10 +5821,10 @@ export const CanvasView = memo(function CanvasView({
                     }}
                   />
                 ) : node.type === "text" ? (
-                  <div
-                    className="canvas-card-markdown"
-                    onClick={(e) => handleCardClick(e, node)}
-                    dangerouslySetInnerHTML={{ __html: renderCardMarkdown(node.text) }}
+                  <CanvasCardMarkdown
+                    text={node.text}
+                    nodeId={node.id}
+                    onActivate={handleCardBodyActivate}
                   />
                 ) : node.type === "file" ? (
                   (() => {
@@ -5989,6 +6256,85 @@ export const CanvasView = memo(function CanvasView({
       {selectedEdgeIds.size > 1 && (
       <CanvasEdgeBatchToolbar count={selectedEdgeIds.size} theme={theme} isDark={isDark} colors={colors} onSetStyle={handleBatchSetEdgeStyle} onCycleStrokePattern={handleBatchCycleStrokePattern} onToggleArrow={handleBatchToggleArrow} onReverse={handleBatchReverseEdges} onSetColor={handleBatchSetEdgeColor} onDelete={handleBatchDeleteEdges} onClear={() => setSelectedEdgeIds(new Set())} />
       )}
+
+      {/* 8.6 Reference picker for the card editor (/ or [[). Through a portal,
+          because the card lives inside the transformed canvas world and a popup
+          drawn there would be scaled and clipped with it. */}
+      {cardRefSuggest &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            className="canvas-card-ref-menu"
+            style={{
+              position: "fixed",
+              left: cardRefSuggest.x,
+              top: cardRefSuggest.y + 20,
+              zIndex: 10001,
+              backgroundColor: theme === "eink" ? "#f4f1ea" : !isDark ? "#ffffff" : "#1e293b",
+              color: colors.cardText,
+              border: `1px solid ${colors.cardBorder}`,
+              boxShadow: !isDark ? "0 10px 32px rgba(0,0,0,0.16)" : "0 14px 40px rgba(0,0,0,0.55)",
+              borderRadius: 10,
+              padding: "4px 0",
+              minWidth: 240,
+              maxWidth: 320,
+              maxHeight: 260,
+              overflowY: "auto",
+              fontSize: 12.5,
+              userSelect: "none",
+            }}
+            onMouseDown={(e) => e.preventDefault()}
+          >
+            <div
+              className="canvas-card-ref-header"
+              style={{
+                padding: "4px 12px 6px",
+                fontSize: 11,
+                fontWeight: 600,
+                color: colors.edgeColor,
+                borderBottom: `1px solid ${colors.cardHeaderBorder}`,
+              }}
+            >
+              引用笔记{cardRefSuggest.query ? `：${cardRefSuggest.query}` : ""}
+            </div>
+            {cardRefSuggest.filtered.length === 0 ? (
+              <div style={{ padding: "8px 12px", opacity: 0.7 }}>没有匹配的笔记</div>
+            ) : (
+              cardRefSuggest.filtered.map((target, idx) => (
+                <button
+                  key={`${target.relativePath}:${target.title}`}
+                  type="button"
+                  className={`canvas-card-ref-item ${idx === cardRefSuggest.selectedIndex ? "active" : ""}`}
+                  onMouseDown={(e) => {
+                    // mousedown, not click: the textarea must not lose focus and
+                    // close the popup before the pick registers.
+                    e.preventDefault();
+                    e.stopPropagation();
+                    insertCardReference(target.title);
+                  }}
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "flex-start",
+                    gap: 1,
+                    width: "100%",
+                    padding: "6px 12px",
+                    background: idx === cardRefSuggest.selectedIndex ? "rgba(56,189,248,0.16)" : "transparent",
+                    border: "none",
+                    color: "inherit",
+                    font: "inherit",
+                    textAlign: "left",
+                    cursor: "pointer",
+                  }}
+                >
+                  <span style={{ fontWeight: 600 }}>{target.title}</span>
+                  <span style={{ fontSize: 10.5, opacity: 0.65 }}>{target.relativePath}</span>
+                </button>
+              ))
+            )}
+          </div>,
+          document.body
+        )}
 
       {/* 9. Floating Toast Feedback */}
       <CanvasToast
