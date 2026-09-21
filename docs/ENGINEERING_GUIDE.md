@@ -425,6 +425,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/push.ps1
 | 低 | 发布目录膨胀 | `release/` 曾累积 **3.0G**（历史版本产物 + `asar-staging` 14550 文件）。2026-09-21 已清理到 **2.1G**，保留当前版与上一版安装包、便携目录、便携 zip、`win-unpacked` | 每次发版后按同一口径清一次：删 `asar-staging`、`__msi-x64`、`*.nsis.7z`、旧于上一版的 msi/Setup，以及全部 `*.blockmap`（没有自动更新，它们是死文件） |
 | 低 | 发布清理脚本已失效 | `scripts/organize-release.cjs` **0 处**引用 KnowSpace，整篇指向改名前的 `BookMD-Reader-win-x64` / `BookMD Reader.exe`，且只搬 MSI、不清理历史版本 | 建议直接删掉——留着比没有更危险，会让人以为清理过了。清理口径见上一条 |
 | 低 | 闪念胶囊控件轮廓在浅色/eink 下几乎看不见 | `.flash-mini-btn` 的淡琥珀底（0.18）与淡琥珀描边（0.35）相对所在底分别只有 **1.14:1 / 1.28:1**（eink 同）；`.flash-tool-insert-persistent`（0.12 底 / 0.3 描边）是 **1.09:1 / 1.24:1**。文字已达标（浅色 5.83:1、eink 7.39:1），但控件轮廓未达 WCAG 1.4.11 的 3:1 | 把浅色/eink 的描边换成实色 `var(--flash-accent)` 即可达 **4.69:1 / 4.65:1**（已验算），底也可以顺势加深。这是**刻意留下**的：本次只修文字可读性，改轮廓会动到按钮的外观手感，该由设计定 |
+| 中 | 胶囊 CSS 有一整段放错位置 | `.flash-wikilink-*`（约 8255~8353）物理上落在「Knowledge Graph」区块里，离胶囊主区块 3000 行。这直接导致守卫测试按「连续区块」取范围时**漏扫了一半**，`.flash-wikilink-header .hint`（深色 3.30:1）与 `.flash-recorder-input`（eink 2.17:1）藏了很久 | 移到胶囊主区块（`src/components/canvas/` 之类按组件分文件更好）。测试已改成按选择器取范围，不再依赖位置——但位置本身仍该收口，否则下次改 CSS 的人还是会找错地方 |
 
 ---
 
