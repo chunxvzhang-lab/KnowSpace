@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-v2.6.3-1D9BF0?style=flat-square&logo=github" alt="Version 2.6.3" />
+  <img src="https://img.shields.io/badge/Version-v2.6.4-1D9BF0?style=flat-square&logo=github" alt="Version 2.6.4" />
   <img src="https://img.shields.io/badge/Presentation-Mode_2.3_Clockwise_Cycles-8B5CF6?style=flat-square" alt="Presentation Mode 2.3" />
   <img src="https://img.shields.io/badge/FSRS-5_Spaced_Repetition-F59E0B?style=flat-square" alt="FSRS-5 Spaced Repetition" />
   <img src="https://img.shields.io/badge/Mind_Map-Non--Destructive_Sync-00BA7C?style=flat-square" alt="Non-Destructive Mindmap Sync" />
@@ -18,7 +18,7 @@
   <img src="https://img.shields.io/badge/Multimodal-Canvas_Media_Cards-F59E0B?style=flat-square" alt="Multimodal Canvas" />
   <img src="https://img.shields.io/badge/Routing-AABB_Obstacle_Avoidance-00BA7C?style=flat-square" alt="AABB Obstacle Avoidance" />
   <img src="https://img.shields.io/badge/Performance-120FPS_Instant_Load-00BA7C?style=flat-square" alt="120FPS Instant Load" />
-  <img src="https://img.shields.io/badge/Tests-1238_Passing_100%25-00BA7C?style=flat-square" alt="1238 Passing Tests" />
+  <img src="https://img.shields.io/badge/Tests-1276_Passing_100%25-00BA7C?style=flat-square" alt="1276 Passing Tests" />
   <img src="https://img.shields.io/badge/Canvas-JSON_Canvas_1.0-00BA7C?style=flat-square" alt="Infinite Canvas" />
   <img src="https://img.shields.io/badge/Snapshots-Ctrl%2BShift%2BH-1D9BF0?style=flat-square" alt="Version History" />
   <img src="https://img.shields.io/badge/Search-Hybrid_Vault_Index-8B5CF6?style=flat-square" alt="Hybrid Vault Search" />
@@ -60,6 +60,7 @@
 
 ## 🏛️ 核心能力体系
 
+- **🎨 Canvas Card 2.6.4（卡片斜杠命令与滚轮归属 · v2.6.4 更新）**：白板卡片编辑器键入 `/` 弹出**与文档编辑器同一套**斜杠命令 —— 不是"照抄一份界面"，而是两边调用**同一条触发规则、同一张命令表**（`src/services/slashCommands.ts`），所以 `↑` `↓` 选择、`Enter` / `Tab` 插入、`Esc` 关闭、英文与拼音首字母搜索的行为在哪儿都一致 ✓；**引用笔记改用 `[[`**（与文档编辑器语义对齐），从命令列表里选「双向链接 `[[]]`」会**自动接上**笔记列表 ✓；`/` 只在一行开头或空格之后触发 —— 路径（`notes/a.md`）、网址（`https://…`）与 `//` 注释里的斜杠**不会**弹面板 ✓。**滚动卡片内的清单不再带动画布**：滚轮按**滚动链语义**判定归属 —— 内层还有得滚就归内层，滚到顶或底才交还给画布，所以滚轮停在卡片上永远不会变成死区 ✓。
 - **🗺️ Mind Map 2.6.3（顶栏重排 · v2.6.3 更新）**：**双栏展开时两行对齐成一列** —— 顶栏从"会自己换行的横排"改成网格：设置控件（搜索 / 主题 / 布局 / 编号）整排换行，并与第一行第一个控件**同列**；两行时缩放与导出整组搬到**第二行右端**，第二行不再空半行 ✓。一行还是两行由顶栏**按实测宽度自行决定**：把六种排法（单行/两行 × 全文字/收次级标签/收主级标签）各量一遍，第一种放得下的胜出 —— 搜索框开闭、多选节点、标题长短都自动算进去，不再有写死的宽度阈值 ✓。控件统一 30px 高、组间 6px / 组内 4px，各窄档位补回上下留白，主题与布局两个下拉做成真正的控件（此前无边框、偏矮、文字偏暗，看着像被禁用 ✓）；节点上的**链接徽章改为透明底**（只剩箭头与细边，SVG 导出同步 ✓）。
 - **🗺️ Mind Map 2.6.2（细节打磨 · v2.6.2 更新）**：**顶栏两行对齐** —— 两行布局下第二行与第一行左对齐，右侧那排不再看起来错位 ✓；**链接徽章真正可点** —— 根因是父层的 `pointer-events: none` 被继承下来、徽章收不到点击，改为显式 `auto`，并支持**裸域名**（`example.com` ✓）；节点类型图标改画在**主题盒子之上**，不再被连线压住 ✓；**PNG 导出改为 3× 超采样**，放大后文字与图标不再发虚 ✓。
 - **🗺️ Mind Map 2.6.1（交互对象与可读性收口 · v2.6.1 更新）**：**顶栏在打开文件目录与大纲后不再丢右侧控件**（装不下就换行；缩放与导出归右侧同一组；滚轮落在顶栏上不再缩放画布 ✓）；**快捷键归属插入符所在的输入框** —— 在备注框里按 `Delete` 不再删掉整个主题、在标签或链接框里按 `Ctrl+V` 不再贴出一个分支，节点菜单里新增**复制/剪切整个主题、粘贴为子主题**三行，删除行明确写着"整个主题及其子主题" ✓；节点可标 **8 枚语义类型**（待办 / 进行中 / 已完成 / 疑问 / 想法 / 风险 / 重点 / 参考，一名一义，画布搜索里输入类型名即可找出同类主题 ✓）；节点上的**链接徽章可直接点击打开**（外链走系统浏览器 ✓）；点击顶栏即可收起右键菜单且不丢选择 ✓。
@@ -462,7 +463,7 @@
 ---
 
 ### 15. 🧪 交互子功能与端到端稳定性保障体系 (Sub-function Ecosystem & 100% Test Coverage)
-*高阶空间功能与底层每个交互细节并驾齐驱，构筑 347 项全量自动化测试 100% 绿灯守卫的坚实壁垒。*
+*高阶空间功能与底层每个交互细节并驾齐驱，构筑 1276 项全量自动化测试 100% 绿灯守卫的坚实壁垒。*
 
 <p align="center">
   <img src="docs/manual-images/22-backlinks-panel.png" alt="双向链接与未链接提及面板" width="48%" style="border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35); display: inline-block; margin-right: 2%;" />
@@ -479,7 +480,7 @@
 - **📁 知识库目录树与闪念速记物理隔离 (ChapterList)**：支持多级文件夹折叠/展开与记忆；`space/` 目录下的闪念速记卡片默认在主知识树中完全隐藏，仅在当前激活时智能局部展开，保持知识主干清爽干净。
 - **🌐 网页快照与容量淘汰服务 (WebSnapshotService)**：网页快照自动去重与时间戳刷新，严格执行 30 条上限 FIFO 自动淘汰机制，防止本地磁盘无限膨胀。
 - **📊 矢量 Mermaid 安全渲染引擎 (MermaidService)**：通过 `data-mermaid-src` Base64 编码从源头彻底杜绝 HTML 实体转义破损，具备 SVG 内存缓存与语法异常优雅降级保护 UI，绝不白屏。
-- **🧪 工业级 100% 自动化测试保障**：42 个测试套件，共 **347** 项自动化测试（覆盖空间白板、脑图、图谱、编辑器、双链、检索、版本时光机及所有细化子功能组件）全量 100% 绿灯通过！
+- **🧪 工业级 100% 自动化测试保障**：103 个测试套件，共 **1276** 项自动化测试（覆盖空间白板、脑图、图谱、编辑器、双链、检索、版本时光机及所有细化子功能组件）全量 100% 绿灯通过！权威口径见 [`docs/TEST_BASELINE.md`](docs/TEST_BASELINE.md)（由 `scripts/capture-test-baseline.cjs` 自动生成）。
 
 ---
 
@@ -533,20 +534,20 @@
 
 ## 📦 安装程序与便携版下载 (Downloads & Release Assets)
 
-本项目为 Windows 64 位系统深度优化，提供图形化安装程序、标准 MSI 安装包与免安装便携版，最新 `v2.6.3` 资产已发布：
+本项目为 Windows 64 位系统深度优化，提供图形化安装程序、标准 MSI 安装包与免安装便携版，最新 `v2.6.4` 资产已发布：
 
-> 🌐 **GitHub 官方发布主页**：[GitHub Releases · v2.6.3](https://github.com/chunxvzhang-lab/KnowSpace/releases/tag/v2.6.3)
+> 🌐 **GitHub 官方发布主页**：[GitHub Releases · v2.6.4](https://github.com/chunxvzhang-lab/KnowSpace/releases/tag/v2.6.4)
 
 ### 1. Windows 图形化安装程序（推荐）
-- **安装文件**：[`KnowSpace-Setup-2.6.3.exe`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.6.3/KnowSpace-Setup-2.6.3.exe)
+- **安装文件**：[`KnowSpace-Setup-2.6.4.exe`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.6.4/KnowSpace-Setup-2.6.4.exe)
 - **特点**：双击即可向导式安装，支持自定义安装目录，自动创建桌面快捷方式与开始菜单官方品牌图标，深度集成系统级 `.md` 与 `.canvas` 文件关联，内置标准卸载程序。
 
 ### 2. Windows MSI 标准安装包
-- **安装文件**：[`KnowSpace-2.6.3.msi`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.6.3/KnowSpace-2.6.3.msi)
+- **安装文件**：[`KnowSpace-2.6.4.msi`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.6.4/KnowSpace-2.6.4.msi)
 - **特点**：Windows Installer 官方格式，适合企业批量部署、组策略分发与企业级静默安装，支持标准控制面板卸载。
 
 ### 3. Windows 绿色免安装便携版
-- **便携文件**：[`KnowSpace-win-x64-portable.zip`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.6.3/KnowSpace-win-x64-portable.zip)
+- **便携文件**：[`KnowSpace-win-x64-portable.zip`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.6.4/KnowSpace-win-x64-portable.zip)
 - **直接运行**：解压后双击 `KnowSpace.exe` 即可直接使用完整功能。
 - **特点**：解压即用、随身携带（支持装入 U 盘或移动硬盘）；完全自包含 Electron 运行时与全套本地依赖，无需配置任何外部开发环境；支持右键「打开方式」关联 Markdown 与白板文档。
 
@@ -671,7 +672,7 @@
   - *Conflict Detection*: Automatic alert when files are modified externally.
 - **🧪 Sub-function Ecosystem & 100% Test Coverage**:
   - *Full Spectrum Granular Sub-functions*: Zoomable Media Lightbox (0.2×~6×, smooth pan, download, Esc), Typography Status Bar (word/char count, reading time estimation, dirty state, readonly lock), Backlinks & Unlinked Mentions with 1-click upgrade to `[[wikilinks]]`, External File Conflict Arbitrator (`FileConflictDialog`), Unsaved Changes Protector (`UnsavedChangesDialog`), Dynamic TOC & Cross-Chapter Bookmark Resolver, Space Flash Note Directory Isolation, Web Snapshot FIFO Pruning (30-cap), and Mermaid Base64 entity-safe SVG rendering with graceful error fallbacks.
-  - *Rock-Solid Reliability*: 94 test suites, **1208** automated unit and integration tests passing with a 100% success rate!
+  - *Rock-Solid Reliability*: 103 test suites, **1276** automated unit and integration tests passing with a 100% success rate!
 
 ---
 

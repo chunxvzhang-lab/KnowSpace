@@ -1,8 +1,8 @@
 # KnowSpace · 测试基线快照
 
 > **文档性质**：重构安全网的权威口径（release plan R3 交付物）
-> **生成时间**：2026-09-20
-> **应用版本**：`2.6.3`
+> **生成时间**：2026-09-21
+> **应用版本**：`2.6.4`
 > **生成方式**：`node scripts/capture-test-baseline.cjs`（自动生成，请勿手工编辑）
 
 ---
@@ -11,9 +11,9 @@
 
 | 项目 | 数值 |
 | :--- | ---: |
-| 测试文件 | **100** |
-| 用例总数 | **1242** |
-| 通过 | 1241 |
+| 测试文件 | **103** |
+| 用例总数 | **1276** |
+| 通过 | 1275 |
 | 失败 | 0 |
 | 跳过 | 1 |
 | 通过率 | 99.9% |
@@ -31,7 +31,7 @@
 | `src/__tests__/mindmap-sidecar.test.ts` | 82 | ✅ |
 | `src/__tests__/fsrs-service.test.ts` | 70 | ✅ |
 | `src/__tests__/mindmap-layouts.test.ts` | 69 | ✅ |
-| `src/__tests__/canvas-view.test.tsx` | 54 | ✅ |
+| `src/__tests__/canvas-view.test.tsx` | 56 | ✅ |
 | `src/__tests__/mindmap-import.test.ts` | 48 | ✅ |
 | `src/__tests__/daily-review-panel.test.tsx` | 38 | ✅ |
 | `src/__tests__/ui-store.test.ts` | 35 | ✅ |
@@ -51,9 +51,12 @@
 | `src/__tests__/mindmap-export-ecosystem.test.ts` | 13 | ✅ |
 | `src/__tests__/backlink-index-hook.test.ts` | 12 | ✅ |
 | `src/__tests__/mindmap-relations.test.ts` | 12 | ✅ |
+| `src/__tests__/slash-command-trigger.test.ts` | 12 | ✅ |
 | `src/__tests__/app-smoke.test.tsx` | 11 | ✅ |
+| `src/__tests__/canvas-card-interactions.test.tsx` | 10 | ✅ |
 | `src/__tests__/editor-context-menu.test.ts` | 10 | ✅ |
 | `src/__tests__/mindmap-xmind-export.test.tsx` | 10 | ✅ |
+| `src/__tests__/wheel-scroll-guard.test.ts` | 10 | ✅ |
 | `src/__tests__/flash-capsule.test.ts` | 9 | ✅ |
 | `src/__tests__/graph.test.ts` | 9 | ✅ |
 | `src/__tests__/inflate.test.ts` | 9 | ✅ |
@@ -136,7 +139,7 @@
 
 | 文件 | 当前行数 | 目标 |
 | :--- | ---: | :--- |
-| `src/components/CanvasView.tsx` | 6301 | R2 待拆分: 目标各模块 < 2500 行 |
+| `src/components/CanvasView.tsx` | 6697 | R2 待拆分: 目标各模块 < 2500 行 |
 | `src/App.tsx` | 2295 | R1: < 500 行 |
 | `src/services/canvasGraph.ts` | 1152 | R2 已拆分 ✅ |
 | `src/services/canvasExport.ts` | 1075 | R2 已拆分 ✅ |
@@ -152,7 +155,7 @@
 
 任何重构都必须满足：
 
-1. 用例总数 **不低于 1242**（删除测试需在 PR 说明中论证）
+1. 用例总数 **不低于 1276**（删除测试需在 PR 说明中论证）
 2. 通过率 **100%**
 3. 单文件用例数**不得下降**（防止测试被静默删除）
 
