@@ -12,6 +12,16 @@
 # separate shells, which is the trap: the variable looks set, and the next
 # command behaves as though it were not. This sets it for the push it runs.
 #
+# Both spellings are set, and that is not belt-and-braces. libcurl — which is
+# what git uses for https — reads the lowercase `https_proxy` and ignores the
+# uppercase one when both are present. Setting only `HTTPS_PROXY` therefore does
+# nothing on a machine where something else has already exported the lowercase
+# name (an agent session, a wrapper, a previous experiment). The push then goes
+# through that other proxy instead, and the failure reads as a network fault:
+# `Empty reply from server`, or a `502` from a proxy that was never asked to
+# carry this traffic. Clearing them when no proxy is found matters for the same
+# reason — a stale lowercase variable would otherwise outlive this script.
+#
 # Usage:
 #   powershell -NoProfile -ExecutionPolicy Bypass -File scripts/push.ps1
 #   powershell -NoProfile -ExecutionPolicy Bypass -File scripts/push.ps1 origin main
@@ -36,10 +46,18 @@ foreach ($port in $proxyCandidates) {
 }
 
 if ($proxyPort) {
-  $env:HTTPS_PROXY = "http://127.0.0.1:$proxyPort"
-  $env:HTTP_PROXY = "http://127.0.0.1:$proxyPort"
+  $proxyUrl = "http://127.0.0.1:$proxyPort"
+  # Lowercase first: libcurl prefers it, so it is the one that actually decides.
+  $env:https_proxy = $proxyUrl
+  $env:http_proxy = $proxyUrl
+  $env:HTTPS_PROXY = $proxyUrl
+  $env:HTTP_PROXY = $proxyUrl
   Write-Host "pushing through the local proxy on port $proxyPort"
 } else {
+  # Not just "leave them alone": an inherited lowercase proxy variable would
+  # still be honoured by libcurl, and the failure would look like a network
+  # fault rather than like a proxy that should not be in the path.
+  Remove-Item Env:https_proxy, Env:http_proxy, Env:HTTPS_PROXY, Env:HTTP_PROXY -ErrorAction SilentlyContinue
   Write-Host "no local proxy found; trying a direct connection"
 }
 
@@ -65,6 +83,9 @@ if ($LASTEXITCODE -ne 0) {
   Write-Host ""
   Write-Host "push failed. If the cause is a connection timeout, start your proxy client and retry;"
   Write-Host "if a proxy is running on a port not listed above, add it to `$proxyCandidates."
+  Write-Host "If it hung for ~30s and then reported 'could not read Username', the proxy is fine"
+  Write-Host "and the credential helper is the problem: git needs the interactive desktop session"
+  Write-Host "that the helper reads from, so run this from a normal terminal, not from an agent."
   exit $LASTEXITCODE
 }
 
