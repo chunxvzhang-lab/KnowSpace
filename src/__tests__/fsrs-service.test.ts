@@ -686,10 +686,22 @@ describe("fsrsService - 性能（验收标准：评分响应 < 50ms）", () => {
   });
 
   it("反复计算保持率也保持廉价", () => {
-    const started = performance.now();
-    for (let i = 0; i < 10000; i += 1) {
-      currentRetrievability("2026-09-01", 30, new Date(2026, 8, 17));
-    }
-    expect(performance.now() - started).toBeLessThan(200);
+    const run = () => {
+      const started = performance.now();
+      for (let i = 0; i < 10000; i += 1) {
+        currentRetrievability("2026-09-01", 30, new Date(2026, 8, 17));
+      }
+      return performance.now() - started;
+    };
+
+    // 单次墙钟采样不是一个测量值：第一轮还在解释执行，之后任何一次 GC 或调度抖动都能把它
+    // 推过线——实测空闲时约 130ms，机器一忙就 234ms，而阈值是 200ms。于是这条用例会随负载
+    // 时红时绿，红了也说不清是回归还是噪声。
+    //
+    // 先热身，再取三次里最快的一次。**阈值不动，被测的循环也一字未改**——它要抓的是数量级
+    // 级别的回归（比如不小心写成 O(n²)），不是调度噪声。
+    run();
+    const samples = [run(), run(), run()];
+    expect(Math.min(...samples)).toBeLessThan(200);
   });
 });
