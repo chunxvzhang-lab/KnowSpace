@@ -29,6 +29,59 @@
   --radius-pill: 9999px;
   --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ── 补齐「幽灵令牌」─────────────────────────────────────────────────────
+     下面这一组名字在仓库里共被引用 **63 处**，但**从来没有定义过**——
+     `git log -S "--surface-3:" -- src/styles.css` 连初始提交都查不到，也就是说
+     它们是照着**外部设计系统的词汇**写下的（`--surface-3` / `--text-secondary` /
+     `--border-strong` 是典型的一套），而本项目用的是 `--surface-2` / `--text-muted` /
+     `--border-hover`。
+
+     分布：`--surface-3` 13、`--font-mono` 13、`--text-tertiary` 10、`--text-primary` 9、
+     `--text-secondary` 8、`--surface-hover` 5、`--border-strong` 2、`--shadow-floating` 2、
+     `--surface-bg` 1。
+
+     后果不是报错，而是**静默失效**：`background: var(--surface-3)` 里 var 解析不出来，
+     整条声明被浏览器丢弃（不是回退到默认值，是这条属性**完全没应用**）。实测症状：
+     悬停没有底色、标签/徽章没有底色、`.tab-context-menu` 既没边框也没阴影、
+     `.local-graph-header` 没有底色、`.item-snippet` 不显次要色。
+
+     这里把每个幽灵名字**桥接到本项目已有的同角色令牌**，而不是另造一套值。桥接是惰性的
+     （`var()` 在**使用处**才解析），所以四个主题各自取到正确的值，不会出现
+     「按浅色挑的值在深色下不对」。映射依据逐条写在右边。
+
+     想收敛成单一词汇表的话：把这些引用改成右边的既有令牌，再删掉这个桥接块。 */
+  --surface-3: var(--surface-sunken);      /* 比 --surface-2 再远一档：.empty-action-card
+                                              用 --surface-2、其 :hover 用 --surface-3，
+                                              可见两者是相邻两级 */
+  --surface-hover: var(--surface-2);       /* 悬停洗底 */
+  --surface-bg: var(--surface-2);          /* 面板头底色（映射到 --surface 会与面板同色
+                                              ＝等于没修，看不出是条 header） */
+  --border-strong: var(--border-hover);    /* 既有的最强边框色 */
+  --shadow-floating: var(--shadow-modal);  /* 浮层阴影取最高一级：右键菜单现在既无边框
+                                              也无阴影，用更轻的 --shadow-card 仍会显平 */
+  --text-secondary: var(--text-muted);     /* 既有的次要文字色 */
+
+  /* `--text-primary`（9 处）与 `--text-tertiary`（10 处）覆盖的是**整个思维导图节点编辑
+     UI**——右键菜单、笔记输入框、链接输入框、标签输入/芯片、节点编号、浮动文字、
+     图标按钮 hover、布局下拉。它们的底色是 `var(--surface)` / `var(--surface-2)`
+     （**随主题**），而 `--text-primary` 的兜底是 `#e2e8f0`（近白）——
+     浅色主题下就是近白字配近白底，实测 **1.23:1**（eink 1.17:1），等于看不见。
+     桥接到既有令牌后 16~18:1。 */
+  --text-primary: var(--text);
+  --text-tertiary: var(--text-muted);
+
+  /* 以下三个**故意不桥接**，因为它们的兜底值是「死代码」而非 bug：
+     `--surface-1`（#1e293b）/ `--text-normal`（#f8fafc）/ `--border-color`
+     只出现在命令面板与快速工具条上，而这两处的浅色/eink 配色由
+     `[data-theme="light"] .command-palette-*` 等**显式覆盖**兜住了，实测不会漏。
+     也就是说：兜底值恒定不生效，但主题覆盖让结果正确。真要收口，改成既有令牌即可。 */
+
+  /* 等宽字体。这个栈与文件里 8 处直接写死的 `ui-monospace, SFMono-Regular, …` 一致，
+     把 JetBrains Mono / Fira Code 放在最前是为了**保持代码块现有观感**——应用没有加载
+     webfont，它们只在用户本机装了时才生效，和定义这个令牌之前的行为一样。 */
+  --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
   font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
