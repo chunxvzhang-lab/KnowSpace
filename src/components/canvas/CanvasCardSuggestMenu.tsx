@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import type { CanvasThemeColors } from "../../services/canvasTheme";
 
 /** One row of the popup. The caller owns what a row means; this only draws it. */
@@ -39,6 +40,15 @@ export type CanvasCardSuggestMenuProps = {
  * the stylesheet, which only knows about the app's theme. The metrics mirror the
  * document editor's completion popup (`styles.css` → `.cm-tooltip-autocomplete`),
  * because `/` is supposed to read the same in both editors.
+ *
+ * Being portalled is also why this popup has to stop the wheel itself. The canvas
+ * pans on wheel and decides whose wheel it is by walking up from the event target
+ * to the canvas root (`services/wheelScrollGuard.ts`) — but this popup's DOM chain
+ * is `menu → body → html`, so that walk never reaches the canvas root and the
+ * popup is invisible to it. The event still arrives at the canvas, because React
+ * propagates through the component tree rather than the DOM tree. Every other
+ * popup in this folder (`ExportModal`, `FilePickerModal`, `ExtractModal`,
+ * `SpawnBranchModal`) stops the wheel the same way.
  */
 export function CanvasCardSuggestMenu({
   header,
@@ -55,9 +65,36 @@ export function CanvasCardSuggestMenu({
 }: CanvasCardSuggestMenuProps) {
   const accent = isEink ? "rgba(0,0,0,0.10)" : !isDark ? "rgba(245,158,11,0.15)" : "rgba(56,189,248,0.2)";
   const accentText = isEink ? "#000000" : !isDark ? "#b45309" : "#38bdf8";
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  /**
+   * Keep the highlighted row on screen.
+   *
+   * The list is capped at 260px, so arrowing past the bottom used to move the
+   * highlight out of sight — the popup looked like it had stopped responding, and
+   * the only way to find the selection again was to arrow back.
+   *
+   * `block: "nearest"` is the load-bearing part. It scrolls only as far as the row
+   * needs and only when the row is not already visible, so a hover or a wheel that
+   * leaves the row in view does not nudge the list under the reader. It also
+   * cannot drag the page: `nearest` never scrolls an ancestor that does not need
+   * to move.
+   *
+   * The row is looked up through the listbox roles instead of through a ref per
+   * row because the rows are re-created whenever the query narrows the list; a ref
+   * array would have to be rebuilt on every keystroke and would still be one
+   * render behind the row that is actually selected.
+   */
+  useEffect(() => {
+    const active = menuRef.current?.querySelector<HTMLElement>(
+      '[role="option"][aria-selected="true"]'
+    );
+    active?.scrollIntoView({ block: "nearest" });
+  }, [selectedIndex, items.length]);
 
   return (
     <div
+      ref={menuRef}
       className="canvas-card-suggest-menu"
       role="listbox"
       style={{
@@ -81,6 +118,12 @@ export function CanvasCardSuggestMenu({
       // mousedown, not click: the textarea must not lose focus and close the
       // popup before the pick registers.
       onMouseDown={(e) => e.preventDefault()}
+      // A wheel over the popup scrolls the list and nothing else. Without this it
+      // scrolled the list *and* panned the whiteboard behind it, so the two moved
+      // together. See the component comment for why the canvas's own ownership
+      // check cannot cover a portalled popup. Stopping propagation does not stop
+      // the browser's default scroll, so the list still scrolls normally.
+      onWheel={(e) => e.stopPropagation()}
     >
       {header && (
         <div

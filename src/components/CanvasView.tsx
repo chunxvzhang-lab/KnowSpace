@@ -977,12 +977,17 @@ export const CanvasView = memo(function CanvasView({
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
       // A wheel over something that can still scroll belongs to that something —
-      // a card body, the suggestion popup — and the canvas must leave it alone.
-      // Without this the wheel reached the card, scrolled it, and bubbled up here
-      // as well, so scrolling a checklist dragged the whole whiteboard with it.
-      // Once the inner region is pinned at its edge the canvas takes the wheel
-      // back, so a wheel over a card is never a dead zone. Ctrl+wheel is a zoom
-      // gesture and always belongs to the canvas.
+      // a card body — and the canvas must leave it alone. Without this the wheel
+      // reached the card, scrolled it, and bubbled up here as well, so scrolling a
+      // checklist dragged the whole whiteboard with it. Once the inner region is
+      // pinned at its edge the canvas takes the wheel back, so a wheel over a card
+      // is never a dead zone. Ctrl+wheel is a zoom gesture and always belongs to
+      // the canvas.
+      //
+      // This only sees what is inside the canvas. A popup portalled to
+      // `document.body` — the card editor's suggestion list — is not on the walk
+      // (its ancestors are body and html, not this container), so it stops the
+      // wheel itself; see `canvas/CanvasCardSuggestMenu`.
       if (
         !e.ctrlKey &&
         !e.metaKey &&

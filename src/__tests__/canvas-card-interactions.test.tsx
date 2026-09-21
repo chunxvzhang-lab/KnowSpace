@@ -242,4 +242,135 @@ describe("canvas card suggestion popup", () => {
     const card = document.querySelector(".canvas-card-markdown") as HTMLElement;
     expect(card.textContent).toContain("改过的内容");
   });
+
+  /**
+   * The popup is capped at 260px, so arrowing past the bottom used to move the
+   * highlight somewhere the reader could not see: the popup looked like it had
+   * stopped responding, and the only way to find the selection again was to arrow
+   * back up.
+   *
+   * jsdom lays nothing out, so these tests cannot check *where* the list scrolled
+   * to. What they can check is the half that breaks silently: that the row which
+   * is now highlighted is the row that was asked to scroll into view, and that the
+   * argument asks for the minimal scroll. A stale index would scroll the row the
+   * reader just left, and `block: "start"` would yank the list to the top on every
+   * arrow press.
+   */
+  const scrollSpyOn = () => vi.spyOn(Element.prototype, "scrollIntoView");
+  const rowScrolledBy = (spy: ReturnType<typeof scrollSpyOn>) =>
+    spy.mock.instances[0] as HTMLElement | undefined;
+
+  it("arrowing the command list scrolls the newly highlighted row into view", () => {
+    renderCanvas();
+    const textarea = openEditor();
+    act(() => {
+      fireEvent.change(textarea, { target: { value: "/" } });
+    });
+    // Installed after the popup opens: opening it already scrolls row 0, and that
+    // call is not what this test is about.
+    const spy = scrollSpyOn();
+    const before = menu()!.querySelector('[aria-selected="true"]') as HTMLElement;
+
+    act(() => {
+      fireEvent.keyDown(textarea, { key: "ArrowDown" });
+    });
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledWith({ block: "nearest" });
+    const scrolled = rowScrolledBy(spy);
+    // The row that moved is the one now highlighted...
+    expect(scrolled?.getAttribute("aria-selected")).toBe("true");
+    // ...and not the one that was highlighted before, which is what a stale index
+    // produces.
+    expect(scrolled).not.toBe(before);
+    spy.mockRestore();
+  });
+
+  it("arrowing the note list scrolls it too, not just the command list", () => {
+    // The two lists share one popup, so this is the same effect — but they are
+    // reached by different keys, and only the command list was reported.
+    renderCanvas();
+    const textarea = openEditor();
+    act(() => {
+      fireEvent.change(textarea, { target: { value: "参见 [[" } });
+    });
+    const spy = scrollSpyOn();
+
+    act(() => {
+      fireEvent.keyDown(textarea, { key: "ArrowDown" });
+    });
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(rowScrolledBy(spy)?.getAttribute("aria-selected")).toBe("true");
+    spy.mockRestore();
+  });
+
+  it("a re-render that does not move the selection does not scroll again", () => {
+    // The reverse half of the pair above. The popup re-renders on every keystroke
+    // and on every hover, and `items` is a fresh array on each of those renders —
+    // so an effect that depended on the array, or that had no dependency list at
+    // all, would scroll the list again each time and make it twitch under the
+    // pointer. Re-selecting the row that is already selected produces exactly that
+    // render: a new state object carrying the same index.
+    renderCanvas();
+    const textarea = openEditor();
+    act(() => {
+      fireEvent.change(textarea, { target: { value: "/" } });
+    });
+    const spy = scrollSpyOn();
+
+    act(() => {
+      fireEvent.keyDown(textarea, { key: "ArrowDown" });
+    });
+    expect(spy).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      fireEvent.mouseEnter(menu()!.querySelector('[aria-selected="true"]') as HTMLElement);
+    });
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
+  });
+
+  /**
+   * A wheel over the popup is the popup's, not the whiteboard's.
+   *
+   * The popup is portalled to `document.body`, so the canvas's ownership check
+   * (`services/wheelScrollGuard.ts`) cannot see it: that check walks up from the
+   * event target to the canvas root, and this popup's ancestors are `body` and
+   * `html`. The event still reaches the canvas, because React propagates through
+   * the component tree rather than the DOM tree — which is exactly why the popup
+   * scrolled and the whiteboard panned at the same time.
+   */
+  const wheelOn = async (target: HTMLElement) => {
+    const world = document.querySelector(".canvas-world") as HTMLElement;
+    const before = world.style.transform;
+    await act(async () => {
+      fireEvent.wheel(target, { deltaY: 120 });
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    });
+    return { before, after: world.style.transform };
+  };
+
+  it("a wheel over the suggestion popup leaves the whiteboard where it is", async () => {
+    renderCanvas();
+    const textarea = openEditor();
+    act(() => {
+      fireEvent.change(textarea, { target: { value: "参见 [[" } });
+    });
+    const row = menu()!.querySelector("button") as HTMLElement;
+
+    const { before, after } = await wheelOn(row);
+    expect(after).toBe(before);
+  });
+
+  it("a wheel over the whiteboard still pans it", async () => {
+    // The frame awaited above has to be the frame the canvas pans in, or the test
+    // before this one would pass even if the wheel had been dropped on the floor.
+    renderCanvas();
+    const world = document.querySelector(".canvas-world") as HTMLElement;
+
+    const { before, after } = await wheelOn(world);
+    expect(after).not.toBe(before);
+  });
 });

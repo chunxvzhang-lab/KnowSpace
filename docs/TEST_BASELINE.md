@@ -12,8 +12,8 @@
 | 项目 | 数值 |
 | :--- | ---: |
 | 测试文件 | **103** |
-| 用例总数 | **1276** |
-| 通过 | 1275 |
+| 用例总数 | **1281** |
+| 通过 | 1280 |
 | 失败 | 0 |
 | 跳过 | 1 |
 | 通过率 | 99.9% |
@@ -45,6 +45,7 @@
 | `src/__tests__/column-resize.test.tsx` | 19 | ✅ |
 | `src/__tests__/markdown-files.test.ts` | 19 | ✅ |
 | `src/__tests__/vault-store.test.ts` | 19 | ✅ |
+| `src/__tests__/canvas-card-interactions.test.tsx` | 15 | ✅ |
 | `src/__tests__/mindmap-svg-export.test.tsx` | 15 | ✅ |
 | `src/__tests__/table-generator.test.ts` | 14 | ✅ |
 | `src/__tests__/document-creation.test.ts` | 13 | ✅ |
@@ -53,7 +54,6 @@
 | `src/__tests__/mindmap-relations.test.ts` | 12 | ✅ |
 | `src/__tests__/slash-command-trigger.test.ts` | 12 | ✅ |
 | `src/__tests__/app-smoke.test.tsx` | 11 | ✅ |
-| `src/__tests__/canvas-card-interactions.test.tsx` | 10 | ✅ |
 | `src/__tests__/editor-context-menu.test.ts` | 10 | ✅ |
 | `src/__tests__/mindmap-xmind-export.test.tsx` | 10 | ✅ |
 | `src/__tests__/wheel-scroll-guard.test.ts` | 10 | ✅ |
@@ -139,7 +139,7 @@
 
 | 文件 | 当前行数 | 目标 |
 | :--- | ---: | :--- |
-| `src/components/CanvasView.tsx` | 6697 | R2 待拆分: 目标各模块 < 2500 行 |
+| `src/components/CanvasView.tsx` | 6702 | R2 待拆分: 目标各模块 < 2500 行 |
 | `src/App.tsx` | 2295 | R1: < 500 行 |
 | `src/services/canvasGraph.ts` | 1152 | R2 已拆分 ✅ |
 | `src/services/canvasExport.ts` | 1075 | R2 已拆分 ✅ |
@@ -155,7 +155,7 @@
 
 任何重构都必须满足：
 
-1. 用例总数 **不低于 1276**（删除测试需在 PR 说明中论证）
+1. 用例总数 **不低于 1281**（删除测试需在 PR 说明中论证）
 2. 通过率 **100%**
 3. 单文件用例数**不得下降**（防止测试被静默删除）
 

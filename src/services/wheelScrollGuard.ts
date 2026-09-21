@@ -4,13 +4,20 @@
  * The canvas pans on wheel. A card body scrolls on wheel. Both used to happen at
  * once: the wheel reached the card, scrolled it, and then bubbled up to the
  * canvas, which panned as well — so scrolling a checklist dragged the whole
- * whiteboard sideways. The card body and the suggestion popup now say so before
- * the canvas acts.
+ * whiteboard sideways. The card body now says so before the canvas acts.
  *
  * The rule is the one browsers use for scroll chaining, and it is deliberately
  * narrower than "is this element scrollable": an inner region only owns the wheel
  * while it still has somewhere to scroll. Once it is pinned at its edge the wheel
  * goes back to the canvas, so a wheel over a card never becomes a dead zone.
+ *
+ * This walk only covers things that are *inside* the canvas. A popup that the
+ * canvas portals out to `document.body` — the card editor's suggestion list — is
+ * not on the walk at all, because its ancestors are `body` and `html` rather than
+ * the canvas root. The event still reaches the canvas's handler, since React
+ * propagates through the component tree and not the DOM tree, so such a popup has
+ * to stop the wheel itself. That is why `CanvasCardSuggestMenu` carries its own
+ * `onWheel` and why adding a popup here is not enough to keep it off the canvas.
  */
 
 const SCROLLABLE_OVERFLOW = new Set(["auto", "scroll", "overlay"]);
