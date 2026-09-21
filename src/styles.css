@@ -5099,6 +5099,24 @@ body:has(.flash-capsule-overlay) {
   box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.3);
 }
 
+/* eink 原来**没有** `.flash-recorder-input` 覆盖：基线是 `rgba(0,0,0,0.3)` 的黑洗底配
+   `#f8fafc`，落在纸色上合成出中灰（约 rgb(174,172,168)），近白文字只有 2.17:1。
+   取值跟 `.flash-dir-path` / 两个 textarea 的既有 eink 约定一致。 */
+.flash-capsule-overlay.theme-eink .flash-recorder-input,
+[data-theme="eink"] .flash-recorder-input {
+  background: #e2dcd0;
+  border-color: #8c8273;
+  color: #111111;
+}
+
+/* 同上一条的坑：eink 覆盖与 `.recording` 特异度相同，不补这条会让 eink 下录音态
+   没有琥珀反馈。 */
+.flash-capsule-overlay.theme-eink .flash-recorder-input.recording,
+[data-theme="eink"] .flash-recorder-input.recording {
+  background: rgba(245, 158, 11, 0.14);
+  border-color: var(--flash-accent);
+}
+
 .flash-settings-toggles-row {
   display: flex;
   align-items: center;
@@ -8279,13 +8297,15 @@ body:has(.flash-capsule-overlay) {
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   font-size: 10.5px;
   font-weight: 600;
-  color: #94a3b8;
+  color: var(--flash-hint);
   background: rgba(255, 255, 255, 0.02);
 }
 
 .flash-wikilink-header .hint {
   font-size: 9.5px;
-  color: #64748b;
+  /* 原来是硬编码 #64748b：深色下只有 3.30:1（这层底是 rgba(15,23,42,0.95) 叠桌面），
+     eink 下也没有覆盖。走令牌，三个主题各自取到可读的值。 */
+  color: var(--flash-hint);
 }
 
 .flash-wikilink-list {
@@ -8328,7 +8348,6 @@ body:has(.flash-capsule-overlay) {
 .flash-capsule-overlay.theme-light .flash-wikilink-header,
 [data-theme="light"] .flash-wikilink-header {
   border-bottom-color: #e2e8f0;
-  color: #475569;
   background: #f8fafc;
 }
 

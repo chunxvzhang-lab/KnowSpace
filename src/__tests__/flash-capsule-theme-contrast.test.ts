@@ -2,8 +2,6 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const CSS = readFileSync(resolve(__dirname, "../styles.css"), "utf8");
-
 /**
  * 闪念胶囊配色对比度守卫。
  *
@@ -30,18 +28,22 @@ const CSS = readFileSync(resolve(__dirname, "../styles.css"), "utf8");
 // ---------------------------------------------------------------- 区块与规则
 
 /**
- * 闪念胶囊那一段。
+ * 闪念胶囊那一段 CSS 的范围，**不按连续区块取**。
  *
- * 切片起点必须是该标记所在**注释的开头**：从标记处切会让注释残片混进第一条规则的
- * 选择器，基线令牌块就匹配不上，于是「令牌齐全」那条断言永远通过——一个假的绿灯。
+ * 原来的做法是切「从 `KnowSpace Flash Capsule` 注释到 `Space Timeline` 注释」这一段。
+ * 那是个陷阱：`flash-` 规则在文件里有**两个**聚集区——主区块（约 4566~5874）和
+ * wikilink 下拉（约 8255~8353，物理上落在 Knowledge Graph 区块里，是放错位置的 CSS）。
+ * 按连续切片取范围时，第二段**从来没被扫到**，于是 `.flash-wikilink-item:hover`
+ * 在浅色下只有 1.84:1 也一直是绿的。
+ *
+ * 改成「凡选择器里出现 `flash-` 就纳入」，范围由选择器本身决定，加在文件哪儿都算数。
  */
-function capsuleSection(): string {
-  const marker = CSS.indexOf("KnowSpace Flash Capsule (闪念胶囊) Floating");
-  const end = CSS.indexOf("Space Timeline & Flash Notes Hub Panel Styles");
-  expect(marker, "找不到闪念胶囊区块的起始注释").toBeGreaterThan(-1);
-  expect(end, "找不到区块结束标记").toBeGreaterThan(marker);
-  return CSS.slice(CSS.lastIndexOf("/*", marker), end).replace(/\/\*[\s\S]*?\*\//g, "");
-}
+const RAW_CSS = readFileSync(resolve(__dirname, "../styles.css"), "utf8");
+// 先剥注释：注释里会以散文形式写出 `@media (prefers-color-scheme: light) { … }` 和
+// `var(--flash-accent)`，不剥的话前者会被当成真的 at-rule、后者会被当成真的引用。
+const { stripped: STRIPPED_CSS, atRules: AT_RULES } = stripAtRules(
+  RAW_CSS.replace(/\/\*[\s\S]*?\*\//g, "")
+);
 
 /** 剥离 `@media` / `@keyframes` / `@supports` 块，返回剥离后的文本与被剥离的内容。 */
 function stripAtRules(text: string): { stripped: string; atRules: string[] } {
@@ -95,17 +97,16 @@ function declaredValue(body: string, prop: string): string | null {
 
 type Rule = { selector: string; body: string; order: number };
 
-const SECTION_RAW = capsuleSection();
-const { stripped: SECTION, atRules: AT_RULES } = stripAtRules(SECTION_RAW);
-
 const RULES: Rule[] = (() => {
   const out: Rule[] = [];
   const re = /([^{}]+)\{([^{}]*)\}/g;
   let m: RegExpExecArray | null;
-  while ((m = re.exec(SECTION))) {
+  while ((m = re.exec(STRIPPED_CSS))) {
     for (const part of m[1].split(",")) {
       const selector = part.trim().replace(/\s+/g, " ");
       if (!selector || selector.startsWith("@")) continue;
+      // 范围由选择器决定：`flash-` 出现在哪儿都算胶囊的样式。
+      if (!selector.includes("flash-")) continue;
       out.push({ selector, body: m[2], order: m.index });
     }
   }
@@ -291,6 +292,9 @@ function surfaceOf(theme: ThemeKey): Rgb {
  *
  * 区块里只有目录设置卡这一层嵌套，而它的背景在深色下是 0.25 的黑洗底——比胶囊面更暗。
  * 卡里的控件背景多半是半透明的，不把这一层叠上去会算出偏亮的底，得到偏乐观的对比度。
+ *
+ * wikilink 下拉是另一层容器（`.flash-wikilink-dropdown`），而且它 `bottom: calc(100% + 4px)`
+ * **浮在胶囊外面**——背后是桌面，不是胶囊面，所以它的基准底取白（见 `backdropOf`）。
  */
 const CONTAINER_OF: Record<string, string> = {
   ".flash-dir-label": ".flash-dir-settings-card",
@@ -302,12 +306,18 @@ const CONTAINER_OF: Record<string, string> = {
   ".flash-mini-btn:hover": ".flash-dir-settings-card",
   ".flash-mini-btn.secondary": ".flash-dir-settings-card",
   ".flash-mini-btn.secondary:hover": ".flash-dir-settings-card",
+  ".flash-wikilink-header": ".flash-wikilink-dropdown",
+  ".flash-wikilink-header .hint": ".flash-wikilink-dropdown",
+  ".flash-wikilink-item": ".flash-wikilink-dropdown",
+  ".flash-wikilink-item:hover": ".flash-wikilink-dropdown",
+  ".flash-wikilink-item.active": ".flash-wikilink-dropdown",
 };
 
-/** 该元素在某主题下文字实际落在什么颜色上（从胶囊面往上逐层叠）。 */
+/** 该元素在某主题下文字实际落在什么颜色上（从容器底往上逐层叠）。 */
 function backdropOf(elementSelector: string, theme: ThemeKey): Rgb {
-  let base = surfaceOf(theme);
   const container = CONTAINER_OF[elementSelector];
+  // 浮在胶囊外的容器：背后是桌面，取最坏情况的白；否则从胶囊面起算。
+  let base = container === ".flash-wikilink-dropdown" ? WHITE : surfaceOf(theme);
   if (container) {
     const resolved = resolveProperty(container, "background", theme);
     expect(resolved, `解析不到容器 ${container} 的 background（${theme}）`).not.toBeNull();
@@ -371,16 +381,24 @@ const EXTRA_SELECTORS = [
   ".flash-btn-secondary:hover",
   ".flash-btn-primary",
   ".flash-save-btn",
+  // 录音态只改边框/底色，文字色继承 `.flash-recorder-input`——正是「主题覆盖与状态类
+  // 特异度相同」那类坑的现场，必须单独核对。
+  ".flash-recorder-input.recording",
 ];
 
 const SCANNED_SELECTORS: string[] = (() => {
   const out = new Set<string>(EXTRA_SELECTORS);
-  const usesToken = /var\(--flash-[\w-]+\)/;
+  const isToken = /var\(--flash-[\w-]+\)/;
+  const isLiteral = /^(#|rgba?\()/;
   for (const rule of RULES) {
-    const hasTokenColor = declarations(rule.body).some(
-      (d) => d.prop === "color" && usesToken.test(d.value)
-    );
-    if (hasTokenColor) out.add(normalize(rule.selector));
+    const color = declaredValue(rule.body, "color");
+    if (!color) continue;
+    const value = color.replace(/\s*!important\s*$/, "").trim();
+    // 硬编码色**也要收**：只扫令牌会漏掉「写死了深色调、且没补主题覆盖」的规则——
+    // `.flash-wikilink-item:hover` 的 #38bdf8 就是这么漏的。能算出对比度的值才收，
+    // `inherit` / `currentColor` 之类交给 EXTRA_SELECTORS 显式列出的场景。
+    if (!isToken.test(value) && !isLiteral.test(value)) continue;
+    out.add(normalize(rule.selector));
   }
   return [...out].sort();
 })();
@@ -424,12 +442,14 @@ describe("闪念胶囊配色令牌", () => {
     expect(offenders, `这些前景色应改用 var(--flash-*): ${offenders.join(" | ")}`).toEqual([]);
   });
 
-  it("区块内没有 prefers-color-scheme 规则——系统主题只在渲染层解析一次", () => {
+  it("胶囊规则不再依赖 prefers-color-scheme——系统主题只在渲染层解析一次", () => {
     // 曾经这里有一组 `@media (prefers-color-scheme: light) { .theme-system … }`，
     // 是手工复制出来的第二份浅色来源，只覆盖了容器和两个 textarea。
     // 现在系统主题由 resolveThemeMode() 解析成具体主题（见 theme-mode.test.ts）。
-    const offenders = AT_RULES.filter((block) => block.includes("prefers-color-scheme"));
-    expect(offenders, `胶囊区块不应再出现 prefers-color-scheme：${offenders.join(" | ")}`).toEqual([]);
+    const offenders = AT_RULES.filter(
+      (block) => block.includes("prefers-color-scheme") && block.includes("flash-")
+    );
+    expect(offenders, `胶囊规则不应再出现 prefers-color-scheme：${offenders.join(" | ")}`).toEqual([]);
   });
 
   it("扫描集足够大，且每条显式列出的选择器都真的存在", () => {
