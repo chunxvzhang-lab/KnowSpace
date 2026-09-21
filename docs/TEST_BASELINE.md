@@ -12,8 +12,8 @@
 | 项目 | 数值 |
 | :--- | ---: |
 | 测试文件 | **105** |
-| 用例总数 | **1313** |
-| 通过 | 1312 |
+| 用例总数 | **1315** |
+| 通过 | 1314 |
 | 失败 | 0 |
 | 跳过 | 1 |
 | 通过率 | 99.9% |
@@ -82,6 +82,7 @@
 | `src/__tests__/mindmap-tags-ui.test.tsx` | 7 | ✅ |
 | `src/__tests__/review-focus.test.tsx` | 7 | ✅ |
 | `src/__tests__/review-source-reader.test.ts` | 7 | ✅ |
+| `src/__tests__/theme-mode.test.ts` | 7 | ✅ |
 | `src/__tests__/dialogs-conflict-about.test.tsx` | 6 | ✅ |
 | `src/__tests__/diff-service.test.ts` | 6 | ✅ |
 | `src/__tests__/mindmap-link-parse.test.ts` | 6 | ✅ |
@@ -104,7 +105,6 @@
 | `src/__tests__/slash-commands.test.ts` | 5 | ✅ |
 | `src/__tests__/status-bar.test.tsx` | 5 | ✅ |
 | `src/__tests__/svg-export.test.ts` | 5 | ✅ |
-| `src/__tests__/theme-mode.test.ts` | 5 | ✅ |
 | `src/__tests__/vault-opening.test.ts` | 5 | ✅ |
 | `src/__tests__/chapter-list.test.tsx` | 4 | ✅ |
 | `src/__tests__/command-palette.test.ts` | 4 | ✅ |
@@ -157,7 +157,7 @@
 
 任何重构都必须满足：
 
-1. 用例总数 **不低于 1313**（删除测试需在 PR 说明中论证）
+1. 用例总数 **不低于 1315**（删除测试需在 PR 说明中论证）
 2. 通过率 **100%**
 3. 单文件用例数**不得下降**（防止测试被静默删除）
 
