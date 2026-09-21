@@ -6127,6 +6127,14 @@ export const CanvasView = memo(function CanvasView({
               e.preventDefault();
               e.stopPropagation();
             }}
+            // The menu is portalled to `document.body`, so the canvas's wheel
+            // ownership check cannot see it — that check walks up the *DOM* to the
+            // canvas root, and this menu's ancestors are `body` and `html`. The
+            // event still reaches the canvas because React propagates through the
+            // component tree, so without this the menu scrolled and the whiteboard
+            // panned at the same time. `NodeContextMenu` and `EdgeContextMenu` are
+            // rendered inside this element, so this one handler covers all three.
+            onWheel={(e) => e.stopPropagation()}
           >
             {contextMenu.targetEdgeId ? (
             <EdgeContextMenu data={data} nodeMap={nodeMap} contextMenu={contextMenu} selectedEdgeIds={selectedEdgeIds} batchEdgeCustomColor={batchEdgeCustomColor} colors={colors} isDark={isDark} setContextMenu={setContextMenu} handleToggleEdgeStyle={handleToggleEdgeStyle} handleToggleEdgeArrow={handleToggleEdgeArrow} handleToggleEdgeStrokePattern={handleToggleEdgeStrokePattern} handleReverseEdge={handleReverseEdge} handleEdgeColorChange={handleEdgeColorChange} handleEdgeLabelChange={handleEdgeLabelChange} handleEdgeLabelShapeChange={handleEdgeLabelShapeChange} handleSetEdgeAnchorSide={handleSetEdgeAnchorSide} handleDeleteEdge={handleDeleteEdge} handleBatchSetEdgeStyle={handleBatchSetEdgeStyle} handleBatchCycleStrokePattern={handleBatchCycleStrokePattern} handleBatchToggleArrow={handleBatchToggleArrow} handleBatchSetEdgeColor={handleBatchSetEdgeColor} handleBatchDeleteEdges={handleBatchDeleteEdges} handleBatchReverseEdges={handleBatchReverseEdges} previewBatchEdgeColor={previewBatchEdgeColor} previewEdgeColor={previewEdgeColor} debounceCommitColorPick={debounceCommitColorPick} />

@@ -43,6 +43,15 @@ export const MediaLightbox = memo(function MediaLightbox({
   // Zoom with mouse wheel
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
+    // Claim the wheel. This overlay is rendered inside the canvas, so the canvas's
+    // wheel-ownership check (`services/wheelScrollGuard.ts`) does look at it — but
+    // that check only understands *scrolling*, and this overlay does not scroll: it
+    // zooms. Its computed `overflow` is `visible`, so the check reports "nothing to
+    // scroll here" and hands the wheel back to the canvas, which panned the
+    // whiteboard behind the preview. Closing the preview then left the whiteboard
+    // somewhere else. A region that uses the wheel for a non-scroll gesture has to
+    // say so itself; the check cannot infer it.
+    e.stopPropagation();
     const zoomFactor = e.deltaY < 0 ? 1.15 : 0.85;
     setScale((prev) => Math.min(Math.max(prev * zoomFactor, 0.2), 6));
   }, []);

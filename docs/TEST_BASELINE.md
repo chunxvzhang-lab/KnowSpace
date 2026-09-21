@@ -12,8 +12,8 @@
 | 项目 | 数值 |
 | :--- | ---: |
 | 测试文件 | **103** |
-| 用例总数 | **1281** |
-| 通过 | 1280 |
+| 用例总数 | **1283** |
+| 通过 | 1282 |
 | 失败 | 0 |
 | 跳过 | 1 |
 | 通过率 | 99.9% |
@@ -31,7 +31,7 @@
 | `src/__tests__/mindmap-sidecar.test.ts` | 82 | ✅ |
 | `src/__tests__/fsrs-service.test.ts` | 70 | ✅ |
 | `src/__tests__/mindmap-layouts.test.ts` | 69 | ✅ |
-| `src/__tests__/canvas-view.test.tsx` | 56 | ✅ |
+| `src/__tests__/canvas-view.test.tsx` | 58 | ✅ |
 | `src/__tests__/mindmap-import.test.ts` | 48 | ✅ |
 | `src/__tests__/daily-review-panel.test.tsx` | 38 | ✅ |
 | `src/__tests__/ui-store.test.ts` | 35 | ✅ |
@@ -139,7 +139,7 @@
 
 | 文件 | 当前行数 | 目标 |
 | :--- | ---: | :--- |
-| `src/components/CanvasView.tsx` | 6702 | R2 待拆分: 目标各模块 < 2500 行 |
+| `src/components/CanvasView.tsx` | 6710 | R2 待拆分: 目标各模块 < 2500 行 |
 | `src/App.tsx` | 2295 | R1: < 500 行 |
 | `src/services/canvasGraph.ts` | 1152 | R2 已拆分 ✅ |
 | `src/services/canvasExport.ts` | 1075 | R2 已拆分 ✅ |
@@ -155,7 +155,7 @@
 
 任何重构都必须满足：
 
-1. 用例总数 **不低于 1281**（删除测试需在 PR 说明中论证）
+1. 用例总数 **不低于 1283**（删除测试需在 PR 说明中论证）
 2. 通过率 **100%**
 3. 单文件用例数**不得下降**（防止测试被静默删除）
 

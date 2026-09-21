@@ -959,6 +959,98 @@ describe("CanvasView Component", () => {
     expect(after).not.toBe(before);
   });
 
+  /**
+   * The context menu is the same trap as the card editor's suggestion popup, and
+   * it was missed for longer: it is portalled to `document.body` too, so the
+   * canvas's ownership check — which walks up the DOM to the canvas root — cannot
+   * see it either. React still delivers the wheel to the canvas, because React
+   * propagates through the component tree and not the DOM tree.
+   *
+   * It matters more here than for the popup: this menu is long (the background one
+   * has four sections) and is capped at the viewport height, so scrolling it is
+   * the normal case, not the exception.
+   *
+   * `NodeContextMenu` and `EdgeContextMenu` are rendered inside this element, so
+   * the assertion covers all three menus.
+   */
+  it("a wheel over the canvas context menu leaves the whiteboard where it is", async () => {
+    render(
+      <CanvasView
+        title="右键菜单滚轮归属测试"
+        source={JSON.stringify(initialCanvasData)}
+        onSourceChange={vi.fn()}
+        editable={true}
+      />
+    );
+
+    const world = document.querySelector(".canvas-world") as HTMLElement;
+    const before = world.style.transform;
+
+    fireEvent.contextMenu(document.querySelector(".knowspace-canvas-view") as HTMLElement, {
+      clientX: 200,
+      clientY: 200,
+    });
+    const menu = document.querySelector(".canvas-context-menu") as HTMLElement | null;
+    expect(menu).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.wheel(menu!, { deltaY: 120 });
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    });
+
+    expect(world.style.transform).toBe(before);
+  });
+
+  /**
+   * The media lightbox is the third instance of the same trap, and the one the
+   * ownership check can never learn to handle on its own.
+   *
+   * It is rendered inside the canvas, so unlike the two portalled popups the check
+   * does walk over it — but the check only understands *scrolling*, and this
+   * overlay zooms. Its computed `overflow` is `visible`, so the check reports
+   * "nothing to scroll here" and hands the wheel back to the canvas, which panned
+   * the whiteboard behind the preview. The symptom only shows up later: you close
+   * the preview and the whiteboard is somewhere else.
+   *
+   * The readout is asserted as well as the transform, and for the usual reason: a
+   * test that only checked "the canvas did not move" would pass if the wheel had
+   * been swallowed by nobody at all.
+   */
+  it("a wheel over the media lightbox zooms the image and leaves the whiteboard alone", async () => {
+    const mediaData: CanvasData = {
+      nodes: [
+        { id: "media-1", type: "file", file: "photo.png", x: 100, y: 100, width: 240, height: 160, color: "4" },
+      ],
+      edges: [],
+    };
+    render(
+      <CanvasView
+        title="灯箱滚轮归属测试"
+        source={JSON.stringify(mediaData)}
+        onSourceChange={vi.fn()}
+        editable={true}
+      />
+    );
+
+    const world = document.querySelector(".canvas-world") as HTMLElement;
+    const before = world.style.transform;
+
+    fireEvent.doubleClick(document.querySelector('[title="双击全屏预览"]') as HTMLElement);
+    const overlay = document.querySelector(".media-lightbox-overlay") as HTMLElement | null;
+    expect(overlay).toBeTruthy();
+    expect(overlay!.textContent).toContain("100%");
+
+    await act(async () => {
+      fireEvent.wheel(overlay!, { deltaY: -120 });
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    });
+
+    // The lightbox did handle it...
+    expect(overlay!.textContent).toContain("115%");
+    // ...and the canvas did not.
+    expect(world.style.transform).toBe(before);
+  });
+
   it("opens group-specific context menu with label rename, color palette, and duplicate actions", () => {
     const groupData: CanvasData = {
       nodes: [
