@@ -11,9 +11,9 @@
 
 | 项目 | 数值 |
 | :--- | ---: |
-| 测试文件 | **103** |
-| 用例总数 | **1283** |
-| 通过 | 1282 |
+| 测试文件 | **104** |
+| 用例总数 | **1302** |
+| 通过 | 1301 |
 | 失败 | 0 |
 | 跳过 | 1 |
 | 通过率 | 99.9% |
@@ -43,6 +43,7 @@
 | `src/__tests__/mindmap.test.ts` | 23 | ✅ |
 | `src/__tests__/search-index-service.test.ts` | 20 | ✅ |
 | `src/__tests__/column-resize.test.tsx` | 19 | ✅ |
+| `src/__tests__/flash-capsule-theme-contrast.test.ts` | 19 | ✅ |
 | `src/__tests__/markdown-files.test.ts` | 19 | ✅ |
 | `src/__tests__/vault-store.test.ts` | 19 | ✅ |
 | `src/__tests__/canvas-card-interactions.test.tsx` | 15 | ✅ |
@@ -155,7 +156,7 @@
 
 任何重构都必须满足：
 
-1. 用例总数 **不低于 1283**（删除测试需在 PR 说明中论证）
+1. 用例总数 **不低于 1302**（删除测试需在 PR 说明中论证）
 2. 通过率 **100%**
 3. 单文件用例数**不得下降**（防止测试被静默删除）
 

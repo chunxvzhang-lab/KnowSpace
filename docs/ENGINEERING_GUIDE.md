@@ -25,6 +25,7 @@
 | 卡片 Markdown 渲染 | `src/services/markdown.ts` |
 | 白板数据结构与序列化 | `src/services/canvasSerialization.ts` |
 | 弹窗通用样式令牌 | `src/components/canvas/canvasModalStyles.ts` |
+| 闪念胶囊配色令牌 | `src/styles.css` 中 `.flash-capsule-overlay` 的 `--flash-*` 定义块 |
 | 测试用例数权威口径 | `docs/TEST_BASELINE.md`（脚本生成，**禁止手改**） |
 | 测试环境重置 | `src/__tests__/helpers/resetStores.ts` |
 
@@ -36,9 +37,10 @@
 
 ---
 
-## 二、本次两个修复示范的六条规则
+## 二、从历次修复中沉淀的八条规则
 
-以 v2.6.3 之后「白板卡片斜杠命令」与「滚动清单带动画布」两处改动为例。
+规则 1–6 出自 v2.6.3 之后「白板卡片斜杠命令」与「滚动清单带动画布」两处改动；
+规则 7–8 出自闪念胶囊浅色主题的对比度修复。
 
 ### 规则 1：交互行为要抽成纯函数，而不是写在事件回调里
 
@@ -109,6 +111,38 @@
 
 代码本身说明了「做了什么」。注释唯一的价值是记录**当时为什么这么选**，
 尤其是「不这么写会出什么事」。
+
+### 规则 7：主题覆盖会盖掉状态类——状态必须自带主题变体
+
+一条主题覆盖选择器天然比状态类多一层。`.flash-capsule-overlay.theme-light .flash-preset-tag`
+是 (0,3,0)，而 `.flash-preset-tag.current` 只有 (0,2,0)——于是浅色主题下「当前预设」的
+琥珀高亮被整条盖掉，看起来和没选中一样。这不是「覆盖写漏了」，是**写对了也照样被盖**。
+
+**规则：给某个组件加了 `[data-theme=…]` / `.theme-…` 覆盖之后，必须同时检查它的全部状态类**
+（`.active` / `.current` / `.pinned` / `.recording` / `:hover`），给每个状态补一条带主题前缀的规则。
+仓库里 `.flash-tab-btn.active` 一直是这么写的，照它的样子办。
+
+同一个坑的另外两种形态：
+
+- **特异度相同不算「我赢」，源码顺序决定胜负。** `.flash-recorder-input.recording`（0,2,0）和
+  `[data-theme="light"] .flash-recorder-input`（0,2,0）特异度一样，后者源码更靠后，
+  于是浅色主题下录音态被整条抹掉，录制时没有任何视觉反馈。
+- **主题块漏定义某个令牌时，属性会在计算值阶段变成 `unset`**——静默继承或回落初始值，
+  比硬编码更难查（硬编码至少能在源码里搜到）。所以令牌必须在**基线块里全部给出值**，
+  主题块只做覆盖，不做补充。
+
+### 规则 8：颜色不靠眼睛判断，靠算
+
+「这个颜色在浅色主题下有点淡」不是可执行的判据，而且开发时多半开着深色主题，肉眼根本看不出来。
+把它换成 WCAG 2.1 的对比度比值（正文 4.5:1、图标 3:1），就变成一个**可以在 CI 里断言的数**。
+
+闪念胶囊那 19 处漏覆盖就是这么暴露的：最低 1.48:1（`#cbd5e1` 配白水洗底）。
+守卫测试在 `src/__tests__/flash-capsule-theme-contrast.test.ts`——它直接从 `styles.css`
+**文本**里读令牌值再算，不复制常量；底色也不是写死的，而是扫出区块里**实际用到的最深淡色底**，
+所以把 0.25 调成 0.4 会立刻变红。
+
+配套要求：**「达标」的断言必须配一条「不达标时确实会报」的断言**（见规则 5）。
+这条测试里就是「改动前的 `#f59e0b` 在白底上确实 < 4.5」——否则阈值被改成永远通过也没人知道。
 
 ---
 
@@ -337,6 +371,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/push.ps1
 | 中 | 更新元数据是死文件 | `release/latest.yml`（停在 2.6.3）与 `resources/app-update.yml` **无人消费**：`electron/`、`src/` 里没有 `autoUpdater`，依赖里没有 `electron-updater`，`publish_github_release.py` 也不上传它们 | 要么接上自动更新（并把 `latest.yml` 加入上传清单），要么删掉这两个文件，别再让它们每版误导人 |
 | 低 | 发布目录膨胀 | `release/` 曾累积 **3.0G**（历史版本产物 + `asar-staging` 14550 文件）。2026-09-21 已清理到 **2.1G**，保留当前版与上一版安装包、便携目录、便携 zip、`win-unpacked` | 每次发版后按同一口径清一次：删 `asar-staging`、`__msi-x64`、`*.nsis.7z`、旧于上一版的 msi/Setup，以及全部 `*.blockmap`（没有自动更新，它们是死文件） |
 | 低 | 发布清理脚本已失效 | `scripts/organize-release.cjs` **0 处**引用 KnowSpace，整篇指向改名前的 `BookMD-Reader-win-x64` / `BookMD Reader.exe`，且只搬 MSI、不清理历史版本 | 建议直接删掉——留着比没有更危险，会让人以为清理过了。清理口径见上一条 |
+| 低 | 闪念胶囊控件轮廓在浅色/eink 下几乎看不见 | `.flash-mini-btn` 的淡琥珀底（0.18）与淡琥珀描边（0.35）叠在浅色底上分别只有 **1.14:1 / 1.31:1**（eink 同）。文字已达标（6.19:1），但控件轮廓未达 WCAG 1.4.11 的 3:1 | 浅色/eink 的按钮描边换实色（如 `var(--flash-accent)`）或加深底；`.flash-tool-insert-persistent`（0.12 底 / 0.3 描边）同理 |
 
 ---
 
@@ -350,6 +385,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/push.ps1
 - [ ] 新增/改动了画布内的浮层？**它是 portal 出去的吗？它用滚轮做的是滚动吗？** 任一为「否」
       就必须自己 `stopPropagation`（规则 4）；判定器看不到 portal，也看不懂非滚动手势。
 - [ ] 「不要做某事」的测试，是否配了「该做时确实做了」的反向断言？
+- [ ] 给组件加了主题覆盖（`[data-theme=…]` / `.theme-…`）？**它的每个状态类都补了主题变体吗？**
+      （规则 7：`.active` / `.current` / `.pinned` / `.recording` / `:hover`；注意特异度相同的情况下
+      源码顺序也决定胜负）
+- [ ] 新增了颜色令牌？**基线块里给出值了吗？**主题块只做覆盖——漏定义会变成 `unset` 静默回落。
+- [ ] 新增/改了颜色？**对比度算过吗**（正文 4.5:1、图标 3:1）？配套的守卫测试是否读的是
+      CSS 文本而不是复制一份常量？（规则 8）
 - [ ] 注释是否在解释「为什么」，而不是复述代码？
 - [ ] `tsc --noEmit` 干净、`vitest run` 全绿、用例数未下降？
 - [ ] 是否引入了新的 `beforeEach` 状态，而没有清理？

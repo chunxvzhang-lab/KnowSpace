@@ -4523,6 +4523,83 @@ body.is-resizing-col * {
 /* ==========================================================================
    KnowSpace Flash Capsule (闪念胶囊) Floating Window & Hotkey Customization
    ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   闪念胶囊配色令牌
+
+   为什么要有这一层：本区块原先 100% 硬编码颜色，浅色/eink 覆盖是逐条手补的，
+   结果漏了 19 处——琥珀前景 #f59e0b 直接落在白底上只有 2.15:1，
+   `rgba(255,255,255,…)` 的水洗底在白底上等于不存在（文字 #cbd5e1 只有 1.48:1）。
+   逐条补丁已经漏过一次，还会漏第二次，所以改成令牌：一处定义，处处引用。
+
+   为什么**不**复用全局 `--accent`：胶囊窗口会把 data-theme 写到 documentElement，
+   全局令牌确实可见，但 twitter 主题下 `--accent` 是蓝色 #1d9bf0、eink 下是近黑
+   #2b2925。套进来会把胶囊的琥珀品牌色改成蓝/黑——注意 `.flash-btn-primary`
+   在 eink 下也刻意保持琥珀，说明"跨主题保持琥珀身份"是既定设计。所以令牌
+   作用域限定在 `.flash-capsule-overlay` 内，只让明度随主题走，色相不变。
+
+   基线 = 深色（theme-twitter / theme-system 暗）。**所有令牌都必须在这里给出值**：
+   若某个主题漏定义，属性会在计算值阶段变成 unset（继承或初始值），
+   那比硬编码更糟——会静默拿到别的颜色。
+
+   取值全部按 WCAG 2.1 算过，在该主题**实际用到的最深淡色底**上也 ≥ 4.5:1
+   （改动前最低 1.48:1）。两条取值上的说明：
+
+   - `--flash-accent-on-tint` 是叠在琥珀底上时用的。深色下取 #fbbf24（amber-400）
+     而不是 #f59e0b：琥珀底最深到 0.30（`.flash-mini-btn:hover`），#f59e0b 在上面
+     只有 4.06:1。amber-400 也不是新发明的值——原来 `.flash-shortcut-badge:hover`
+     和 `.flash-tab-btn.active` 用的就是它，这里只是把它推广到全部"叠琥珀底"的场景。
+   - `--flash-danger` 深色下是 #f87171，配 0.15 的红色淡底达标（4.95:1）。所以
+     `.flash-close-btn:hover` 的红色底从 0.25 归一到 0.15：0.25 时 #f87171 只有
+     4.32:1。它同时被当**文字**色用（`.flash-status-msg.error`），不能只按图标的
+     3:1 阈值放行。
+
+   守卫测试：`src/__tests__/flash-capsule-theme-contrast.test.ts`
+   -------------------------------------------------------------------------- */
+.flash-capsule-overlay {
+  --flash-accent: #f59e0b;
+  --flash-accent-on-tint: #fbbf24;
+  --flash-success: #22c55e;
+  --flash-danger: #f87171;
+  --flash-info: #38bdf8;
+  --flash-hint: #94a3b8;
+}
+
+.flash-capsule-overlay.theme-light,
+[data-theme="light"] .flash-capsule-overlay {
+  --flash-accent: #b45309;
+  --flash-accent-on-tint: #92400e;
+  --flash-success: #047857;
+  --flash-danger: #b91c1c;
+  --flash-info: #0369a1;
+  --flash-hint: #64748b;
+}
+
+/* eink 是低饱和"纸张"主题，强调色取值与 light 相同（都是浅底），
+   只有次要文字因为底更黄一点而略深。 */
+.flash-capsule-overlay.theme-eink,
+[data-theme="eink"] .flash-capsule-overlay {
+  --flash-accent: #b45309;
+  --flash-accent-on-tint: #92400e;
+  --flash-success: #047857;
+  --flash-danger: #b91c1c;
+  --flash-info: #0369a1;
+  --flash-hint: #57544e;
+}
+
+/* theme-system 跟随系统：浅色时走与 light 相同的取值。
+   这里必须重复一遍——媒体查询不能和非媒体查询的选择器合并成一条规则。 */
+@media (prefers-color-scheme: light) {
+  .flash-capsule-overlay.theme-system {
+    --flash-accent: #b45309;
+    --flash-accent-on-tint: #92400e;
+    --flash-success: #047857;
+    --flash-danger: #b91c1c;
+    --flash-info: #0369a1;
+    --flash-hint: #64748b;
+  }
+}
+
 html:has(.flash-capsule-overlay),
 body:has(.flash-capsule-overlay) {
   background: transparent !important;
@@ -4641,12 +4718,12 @@ body:has(.flash-capsule-overlay) {
 .flash-title {
   white-space: nowrap;
   flex-shrink: 0;
-  color: #f59e0b !important;
+  color: var(--flash-accent) !important;
   font-weight: 800;
 }
 
 .flash-zap-icon {
-  color: #f59e0b;
+  color: var(--flash-accent);
   flex-shrink: 0;
 }
 
@@ -4670,7 +4747,7 @@ body:has(.flash-capsule-overlay) {
 
 .flash-shortcut-badge:hover {
   background: rgba(245, 158, 11, 0.25);
-  color: #fbbf24;
+  color: var(--flash-accent-on-tint);
   border-color: rgba(245, 158, 11, 0.5);
 }
 
@@ -4685,7 +4762,7 @@ body:has(.flash-capsule-overlay) {
 .flash-capsule-overlay.theme-light .flash-shortcut-badge:hover,
 [data-theme="light"] .flash-shortcut-badge:hover {
   background: rgba(217, 119, 6, 0.15);
-  color: #b45309;
+  color: var(--flash-accent-on-tint);
 }
 
 .flash-capsule-overlay.theme-eink .flash-shortcut-badge,
@@ -4782,12 +4859,12 @@ body:has(.flash-capsule-overlay) {
 
 .flash-icon-btn.active {
   background: rgba(245, 158, 11, 0.25);
-  color: #f59e0b;
+  color: var(--flash-accent-on-tint);
 }
 
 .flash-close-btn:hover {
-  background: rgba(239, 68, 68, 0.25);
-  color: #ef4444;
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--flash-danger);
 }
 
 /* Quick Tools Bar */
@@ -4900,7 +4977,7 @@ body:has(.flash-capsule-overlay) {
   font-size: 12px;
   font-weight: 600;
   margin-bottom: 8px;
-  color: #f59e0b;
+  color: var(--flash-accent);
 }
 
 .flash-settings-title {
@@ -4912,7 +4989,7 @@ body:has(.flash-capsule-overlay) {
 .flash-settings-close-btn {
   background: transparent;
   border: none;
-  color: #94a3b8;
+  color: var(--flash-hint);
   cursor: pointer;
   font-size: 12px;
 }
@@ -4927,7 +5004,7 @@ body:has(.flash-capsule-overlay) {
 }
 
 .flash-preset-label {
-  color: #94a3b8;
+  color: var(--flash-hint);
   min-width: 65px;
 }
 
@@ -4946,11 +5023,50 @@ body:has(.flash-capsule-overlay) {
   background: rgba(255, 255, 255, 0.15);
 }
 
+/* 白水洗底（rgba(255,255,255,…)）在浅色主题的白底上等于不存在，文字 #cbd5e1
+   只有 1.48:1。这里不是"换个颜色"，而是把水洗方向翻过来——和 .flash-starter-tag
+   的既有做法一致。 */
+.flash-capsule-overlay.theme-light .flash-preset-tag,
+[data-theme="light"] .flash-preset-tag {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.1);
+  color: #475569;
+}
+
+.flash-capsule-overlay.theme-light .flash-preset-tag:hover,
+[data-theme="light"] .flash-preset-tag:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.flash-capsule-overlay.theme-eink .flash-preset-tag,
+[data-theme="eink"] .flash-preset-tag {
+  background: #ded9cd;
+  border-color: #8c8273;
+  color: #111111;
+}
+
 .flash-preset-tag.current {
   background: rgba(245, 158, 11, 0.25);
-  border-color: #f59e0b;
-  color: #f59e0b;
+  border-color: var(--flash-accent);
+  color: var(--flash-accent-on-tint);
   font-weight: 600;
+}
+
+/* `.flash-preset-tag.current` 只有 (0,2,0)，会被上面 (0,3,0) 的主题覆盖整条盖掉，
+   浅色主题下"当前预设"就丢了琥珀高亮——看起来和没选中一样。所以状态类必须
+   各自带主题变体；既有的 `.flash-tab-btn.active` 就是这么处理的，照抄这个约定。 */
+.flash-capsule-overlay.theme-light .flash-preset-tag.current,
+[data-theme="light"] .flash-preset-tag.current {
+  background: rgba(245, 158, 11, 0.25);
+  border-color: var(--flash-accent);
+  color: var(--flash-accent-on-tint);
+}
+
+.flash-capsule-overlay.theme-eink .flash-preset-tag.current,
+[data-theme="eink"] .flash-preset-tag.current {
+  background: #fdfcf9;
+  border-color: #8c8273;
+  color: #111111;
 }
 
 .flash-recorder-input {
@@ -4966,7 +5082,7 @@ body:has(.flash-capsule-overlay) {
 }
 
 .flash-recorder-input.recording {
-  border-color: #f59e0b;
+  border-color: var(--flash-accent);
   box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25);
   background: rgba(245, 158, 11, 0.08);
 }
@@ -4975,6 +5091,16 @@ body:has(.flash-capsule-overlay) {
   background: #ffffff;
   border-color: #cbd5e1;
   color: #0f172a;
+}
+
+/* `.flash-recorder-input.recording` 与 `[data-theme="light"] .flash-recorder-input`
+   特异度相同（都是 0,2,0），后者在源码里更靠后，于是浅色主题下录音态的琥珀边框
+   和底色被整条盖掉——录制时完全没有视觉反馈。所以这条必须比上面那条更具体。 */
+.flash-capsule-overlay.theme-light .flash-recorder-input.recording,
+[data-theme="light"] .flash-recorder-input.recording {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: var(--flash-accent);
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.3);
 }
 
 .flash-settings-toggles-row {
@@ -5021,7 +5147,7 @@ body:has(.flash-capsule-overlay) {
 }
 
 .flash-toggle-label input[type="checkbox"] {
-  accent-color: #f59e0b;
+  accent-color: var(--flash-accent);
   width: 14px;
   height: 14px;
   cursor: pointer;
@@ -5039,12 +5165,12 @@ body:has(.flash-capsule-overlay) {
 
 .flash-feedback-error {
   background: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
+  color: var(--flash-danger);
 }
 
 .flash-feedback-success {
   background: rgba(34, 197, 94, 0.15);
-  color: #22c55e;
+  color: var(--flash-success);
 }
 
 /* Textarea Input */
@@ -5141,7 +5267,7 @@ body:has(.flash-capsule-overlay) {
 .flash-char-count {
   font-size: 11.5px;
   font-weight: 550;
-  color: #64748b;
+  color: var(--flash-hint);
 }
 
 [data-theme="light"] .flash-char-count {
@@ -5153,10 +5279,6 @@ body:has(.flash-capsule-overlay) {
   font-weight: 600;
 }
 
-[data-theme="dark"] .flash-char-count {
-  color: #94a3b8;
-}
-
 .flash-status-msg {
   font-size: 11.5px;
   display: inline-flex;
@@ -5166,15 +5288,15 @@ body:has(.flash-capsule-overlay) {
 }
 
 .flash-status-msg.saving {
-  color: #0284c7;
+  color: var(--flash-info);
 }
 
 .flash-status-msg.saved {
-  color: #16a34a;
+  color: var(--flash-success);
 }
 
 .flash-status-msg.error {
-  color: #dc2626;
+  color: var(--flash-danger);
 }
 
 .flash-footer-right {
@@ -5312,7 +5434,7 @@ body:has(.flash-capsule-overlay) {
 
 .flash-tab-btn.active {
   background: rgba(245, 158, 11, 0.28);
-  color: #fbbf24;
+  color: var(--flash-accent-on-tint);
   font-weight: 700;
 }
 
@@ -5329,7 +5451,7 @@ body:has(.flash-capsule-overlay) {
 .flash-capsule-overlay.theme-light .flash-tab-btn.active,
 [data-theme="light"] .flash-tab-btn.active {
   background: #ffffff;
-  color: #b45309;
+  color: var(--flash-accent);
   font-weight: 700;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.14);
 }
@@ -5351,13 +5473,13 @@ body:has(.flash-capsule-overlay) {
 /* Pinned Icon Button */
 .flash-icon-btn.pinned {
   background: rgba(245, 158, 11, 0.2);
-  color: #f59e0b;
+  color: var(--flash-accent-on-tint);
 }
 
 .flash-tool-insert-persistent {
   background: rgba(245, 158, 11, 0.12) !important;
   border-color: rgba(245, 158, 11, 0.3) !important;
-  color: #f59e0b !important;
+  color: var(--flash-accent-on-tint) !important;
 }
 
 /* Space Directory Settings Card */
@@ -5399,10 +5521,16 @@ body:has(.flash-capsule-overlay) {
   color: #334155;
 }
 
+/* eink 之前漏了：`#cbd5e1` 落在 eink 的浅色纸底上只有 1.5:1 */
+.flash-capsule-overlay.theme-eink .flash-dir-label,
+[data-theme="eink"] .flash-dir-label {
+  color: #2b2926;
+}
+
 .flash-dir-path {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 10.5px;
-  color: #94a3b8;
+  color: var(--flash-hint);
   background: rgba(255, 255, 255, 0.06);
   padding: 2px 6px;
   border-radius: 4px;
@@ -5417,6 +5545,12 @@ body:has(.flash-capsule-overlay) {
   color: #475569;
 }
 
+.flash-capsule-overlay.theme-eink .flash-dir-path,
+[data-theme="eink"] .flash-dir-path {
+  background: #e2dcd0;
+  color: #403e39;
+}
+
 .flash-dir-badge {
   font-size: 10px;
   padding: 1px 6px;
@@ -5427,12 +5561,23 @@ body:has(.flash-capsule-overlay) {
 
 .flash-dir-badge.custom {
   background: rgba(245, 158, 11, 0.2);
-  color: #f59e0b;
+  color: var(--flash-accent-on-tint);
 }
 
 .flash-dir-badge.default {
   background: rgba(255, 255, 255, 0.08);
-  color: #94a3b8;
+  color: var(--flash-hint);
+}
+
+/* 同 .flash-preset-tag：白水洗底在白底上不存在，翻成黑水洗 */
+.flash-capsule-overlay.theme-light .flash-dir-badge.default,
+[data-theme="light"] .flash-dir-badge.default {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.flash-capsule-overlay.theme-eink .flash-dir-badge.default,
+[data-theme="eink"] .flash-dir-badge.default {
+  background: #ded9cd;
 }
 
 .flash-dir-settings-actions {
@@ -5451,7 +5596,7 @@ body:has(.flash-capsule-overlay) {
   border-radius: 5px;
   background: rgba(245, 158, 11, 0.18);
   border: 1px solid rgba(245, 158, 11, 0.35);
-  color: #f59e0b;
+  color: var(--flash-accent-on-tint);
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -5463,7 +5608,7 @@ body:has(.flash-capsule-overlay) {
 .flash-mini-btn.secondary {
   background: rgba(255, 255, 255, 0.06);
   border-color: rgba(255, 255, 255, 0.1);
-  color: #94a3b8;
+  color: var(--flash-hint);
 }
 
 .flash-mini-btn.secondary:hover {
@@ -5471,9 +5616,34 @@ body:has(.flash-capsule-overlay) {
   color: #f1f5f9;
 }
 
+/* 同 .flash-preset-tag：白水洗底 + 白描边在白底上不存在 */
+.flash-capsule-overlay.theme-light .flash-mini-btn.secondary,
+[data-theme="light"] .flash-mini-btn.secondary {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.12);
+}
+
+.flash-capsule-overlay.theme-light .flash-mini-btn.secondary:hover,
+[data-theme="light"] .flash-mini-btn.secondary:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: #0f172a;
+}
+
+.flash-capsule-overlay.theme-eink .flash-mini-btn.secondary,
+[data-theme="eink"] .flash-mini-btn.secondary {
+  background: #ded9cd;
+  border-color: #8c8273;
+}
+
+.flash-capsule-overlay.theme-eink .flash-mini-btn.secondary:hover,
+[data-theme="eink"] .flash-mini-btn.secondary:hover {
+  background: #cfc7b5;
+  color: #000000;
+}
+
 .flash-dir-hint {
   font-size: 10px;
-  color: #64748b;
+  color: var(--flash-hint);
   width: 100%;
   margin-top: 3px;
 }
@@ -5517,7 +5687,7 @@ body:has(.flash-capsule-overlay) {
 
 .flash-persistent-badge-feedback {
   font-size: 10px;
-  color: #22c55e;
+  color: var(--flash-success);
   font-weight: 600;
   background: rgba(34, 197, 94, 0.15);
   padding: 2px 6px;
@@ -5542,7 +5712,7 @@ body:has(.flash-capsule-overlay) {
 
 .flash-starter-label {
   font-size: 11px;
-  color: #64748b;
+  color: var(--flash-hint);
   white-space: nowrap;
 }
 
@@ -5561,7 +5731,7 @@ body:has(.flash-capsule-overlay) {
 .flash-starter-tag:hover {
   background: rgba(245, 158, 11, 0.18);
   border-color: rgba(245, 158, 11, 0.35);
-  color: #f59e0b;
+  color: var(--flash-accent-on-tint);
 }
 
 [data-theme="light"] .flash-starter-tag {
@@ -5572,7 +5742,22 @@ body:has(.flash-capsule-overlay) {
 
 [data-theme="light"] .flash-starter-tag:hover {
   background: rgba(217, 119, 6, 0.12);
-  color: #d97706;
+  color: var(--flash-accent-on-tint);
+}
+
+/* eink 之前完全漏了这两条：`#cbd5e1` 落在 eink 的浅色纸底上只有 1.5:1 */
+.flash-capsule-overlay.theme-eink .flash-starter-tag,
+[data-theme="eink"] .flash-starter-tag {
+  background: #ded9cd;
+  border-color: #8c8273;
+  color: #111111;
+}
+
+.flash-capsule-overlay.theme-eink .flash-starter-tag:hover,
+[data-theme="eink"] .flash-starter-tag:hover {
+  background: #cfc7b5;
+  border-color: #8c8273;
+  color: var(--flash-accent-on-tint);
 }
 
 .flash-persistent-input-wrapper {
@@ -5705,14 +5890,14 @@ body:has(.flash-capsule-overlay) {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #64748b;
+  color: var(--flash-hint);
   opacity: 0.5;
   transition: opacity 0.15s ease, color 0.15s ease;
 }
 
 .flash-resize-handle:hover {
   opacity: 1;
-  color: #f59e0b;
+  color: var(--flash-accent);
 }
 
 /* ==========================================================================
