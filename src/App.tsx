@@ -40,6 +40,9 @@ import { useVaultOpening } from "./hooks/useVaultOpening";
 import { useSearch } from "./hooks/useSearch";
 import { useBacklinkIndex } from "./hooks/useBacklinkIndex";
 import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
+import { useCommandRegistrations } from "./hooks/useCommandRegistrations";
+import { commandBus } from "./services/commandBus";
+import { listPaletteCommands } from "./core/commands";
 import { useBookmarks } from "./hooks/useBookmarks";
 import { useDocumentSession, renderedCacheKey } from "./hooks/useDocumentSession";
 import { useReadingTracker } from "./hooks/useReadingTracker";
@@ -896,19 +899,11 @@ export function App() {
     navLockUntilRef,
   });
 
-  const createNewFileRef = useRef(createNewFile);
-  const openMarkdownDirectoryRef = useRef(openMarkdownDirectory);
   const openDesktopMarkdownPathRef = useRef(openDesktopMarkdownPath);
-  const saveSessionRef = useRef(saveSession);
-  const saveSessionAsRef = useRef(saveSessionAs);
   const guardActionRef = useRef(guardAction);
 
   useEffect(() => {
-    createNewFileRef.current = createNewFile;
-    openMarkdownDirectoryRef.current = openMarkdownDirectory;
     openDesktopMarkdownPathRef.current = openDesktopMarkdownPath;
-    saveSessionRef.current = saveSession;
-    saveSessionAsRef.current = saveSessionAs;
     guardActionRef.current = guardAction;
   });
 
@@ -926,9 +921,6 @@ export function App() {
       }
     }
   }, []);
-
-  const toggleFullscreenRef = useRef(toggleFullscreen);
-  toggleFullscreenRef.current = toggleFullscreen;
 
   // Sync fullscreen state
   useEffect(() => {
@@ -1383,229 +1375,87 @@ export function App() {
     setSidebarOpen(true);
   }, []);
 
-  // Action commands list for Command Palette (> ...)
+  // Commands: the registry in core/commands.ts is the single source of truth
+  // for WHAT commands exist; the bindings below wire each id to its handler
+  // exactly once. The palette `>` list, the keyboard and the Electron menu all
+  // execute through the bus — the same action can no longer be re-implemented
+  // per entry point (that duplication is how the mindmap toggle grew two
+  // verbatim copies and the typewriter toggle two divergent ones).
+  useCommandRegistrations({
+    "view.read": () => setViewMode("read"),
+    "view.split": () => setViewMode("split"),
+    "view.source": () => setViewMode("source"),
+    "view.toggleMindmap": () => setViewMode((m) => (m === "mindmap" ? "split" : "mindmap")),
+    "view.toggleCanvas": () =>
+      setViewMode((m) => {
+        const next = m === "canvas" ? "split" : "canvas";
+        if (next === "canvas") {
+          setDirectoryOpen(false);
+          setSidebarOpen(false);
+        }
+        return next;
+      }),
+    "view.toggleGraph": handleToggleGraphPane,
+    "view.toggleTypewriter": toggleTypewriterMode,
+    "review.start": () => {
+      // Opened rather than toggled: asking to start a review while the Space panel
+      // is already open on another tab should still open the review, which the
+      // sidebar's own toggle would not do.
+      setSidebarTab("space");
+      setSidebarOpen(true);
+      setReviewRequest((n) => n + 1);
+    },
+    "document.print": handlePrintDocument,
+    "document.newFile": createNewFile,
+    "document.newCanvas": createNewCanvas,
+    "document.save": saveSession,
+    "document.saveAs": saveSessionAs,
+    // The toolbar hosts the real file input; opening a single file reuses it
+    // instead of building a second dialog path (pre-existing wiring, moved here
+    // from the keyboard handler so both entries share it).
+    "document.openFile": () =>
+      document.querySelector<HTMLInputElement>(".toolbar input[type='file']")?.click(),
+    "document.openDirectory": openMarkdownDirectory,
+    "document.addBookmark": addBookmark,
+    "navigation.focusSearch": focusSearch,
+    "navigation.previous": goPrevious,
+    "navigation.next": goNext,
+    "ui.openVersionHistory": () => setVersionHistoryOpen(true),
+    "navigation.toggleDirectory": () => setDirectoryOpen((open) => !open),
+    "ui.toggleFullscreen": toggleFullscreen,
+    "ui.themeTwitter": () => setPreferences((p) => ({ ...p, theme: "twitter" })),
+    "ui.themeLight": () => setPreferences((p) => ({ ...p, theme: "light" })),
+    "ui.themeEink": () => setPreferences((p) => ({ ...p, theme: "eink" })),
+    "ui.about": () => setAboutOpen(true),
+  });
+
   const commandActions = useMemo<CommandAction[]>(
-    () => [
-      {
-        id: "cmd-view-read",
-        title: "切换视图: 阅读模式",
-        description: "沉浸式无干扰文档阅读模式",
-        shortcut: "Alt+1",
-        category: "视图与排版",
-        run: () => setViewMode("read"),
-      },
-      {
-        id: "cmd-view-split",
-        title: "切换视图: 双栏实时预览",
-        description: "左侧编辑器，右侧实时渲染与同步滚动",
-        shortcut: "Alt+2",
-        category: "视图与排版",
-        run: () => setViewMode("split"),
-      },
-      {
-        id: "cmd-view-source",
-        title: "切换视图: 源码编辑",
-        description: "全宽纯净 Markdown 源码编辑模式",
-        shortcut: "Alt+3",
-        category: "视图与排版",
-        run: () => setViewMode("source"),
-      },
-      {
-        id: "cmd-view-mindmap",
-        title: "切换视图: 思维导图",
-        description: "将文档大纲结构转换为无限画布可视化脑图",
-        shortcut: "Ctrl+M",
-        category: "视图与排版",
-        run: () => setViewMode((m) => (m === "mindmap" ? "split" : "mindmap")),
-      },
-      {
-        id: "cmd-view-canvas",
-        title: "切换视图: 空间白板",
-        description: "进入无限多模态可视化白板工作区",
-        category: "视图与排版",
-        run: () =>
-          setViewMode((m) => {
-            const next = m === "canvas" ? "split" : "canvas";
-            if (next === "canvas") {
-              setDirectoryOpen(false);
-              setSidebarOpen(false);
-            }
-            return next;
-          }),
-      },
-      {
-        id: "cmd-start-review",
-        title: "开始复习：闪卡",
-        description: "打开侧栏的复盘视图，从上次用过的来源继续",
-        category: "复习",
-        run: () => {
-          // Opened rather than toggled: asking to start a review while the Space panel
-          // is already open on another tab should still open the review, which the
-          // sidebar's own toggle would not do.
-          setSidebarTab("space");
-          setSidebarOpen(true);
-          setReviewRequest((n) => n + 1);
-        },
-      },
-      {
-        id: "cmd-toggle-graph",
-        title: "切换知识图谱分栏",
-        description: "开启或收起右侧全局双向引用关系图谱",
-        shortcut: "Ctrl+G",
-        category: "视图与排版",
-        run: () => handleToggleGraphPane(),
-      },
-      {
-        id: "cmd-print-pdf",
-        title: "高保真专业 PDF 打印",
-        description: "生成高分辨率向量级打印文稿与 PDF 导出",
-        shortcut: "Ctrl+P",
-        category: "导出与分发",
-        run: () => handlePrintDocument(),
-      },
-      {
-        id: "cmd-new-file",
-        title: "新建 Markdown 笔记",
-        description: "在当前知识库中创建一个全新空白笔记",
-        shortcut: "Ctrl+N",
-        category: "文档操作",
-        run: () => createNewFile(),
-      },
-      {
-        id: "cmd-new-canvas",
-        title: "新建空间白板 (.canvas)",
-        description: "创建一个无限可视化白板，自由拖拽卡片与建立语义连线",
-        category: "文档操作",
-        run: () => createNewCanvas(),
-      },
-      {
-        id: "cmd-save-doc",
-        title: "保存当前笔记",
-        description: "将当前编辑中的笔记落盘保存至本地磁盘",
-        shortcut: "Ctrl+S",
-        category: "文档操作",
-        run: () => saveSession(),
-      },
-      {
-        id: "cmd-save-doc-as",
-        title: "另存为笔记...",
-        description: "将当前笔记内容导出另存到自定义目录",
-        shortcut: "Ctrl+Shift+S",
-        category: "文档操作",
-        run: () => saveSessionAs(),
-      },
-      {
-        id: "cmd-version-history",
-        title: "版本快照历史与双栏比对",
-        description: "查看本地历史版本快照、逐行差异对比与一键安全还原",
-        shortcut: "Ctrl+Shift+H",
-        category: "文档操作",
-        run: () => setVersionHistoryOpen(true),
-      },
-      {
-        id: "cmd-open-folder",
-        title: "打开本地知识库目录",
-        description: "加载本地包含 Markdown 笔记的文件夹",
-        shortcut: "Ctrl+Shift+O",
-        category: "知识库管理",
-        run: () => openMarkdownDirectory(),
-      },
-      {
-        id: "cmd-toggle-directory",
-        title: "展开 / 收起文档目录侧边栏",
-        description: "切换左侧工作区文件树目录的显示状态",
-        shortcut: "Ctrl+\\",
-        category: "界面交互",
-        run: () => setDirectoryOpen((open) => !open),
-      },
-      {
-        id: "cmd-toggle-fullscreen",
-        title: "切换全屏模式",
-        description: "最大化工作区进入全屏无边框书写体验",
-        shortcut: "F11",
-        category: "界面交互",
-        run: () => toggleFullscreen(),
-      },
-      {
-        id: "cmd-toggle-typewriter",
-        title: "切换打字机居中模式",
-        description: "保持当前输入光标始终居中于视口中心",
-        shortcut: "Alt+T",
-        category: "写作辅助",
-        run: () => toggleTypewriterMode(),
-      },
-      {
-        id: "cmd-theme-twitter",
-        title: "视觉主题: 暗黑深邃 (Dark)",
-        description: "适合夜间专注书写的暗色主题",
-        category: "个性化外观",
-        run: () => setPreferences((p) => ({ ...p, theme: "twitter" })),
-      },
-      {
-        id: "cmd-theme-light",
-        title: "视觉主题: 极简纯白 (Light)",
-        description: "高对比度纸张级明亮主题",
-        category: "个性化外观",
-        run: () => setPreferences((p) => ({ ...p, theme: "light" })),
-      },
-      {
-        id: "cmd-theme-eink",
-        title: "视觉主题: 电子墨水屏 (E-ink)",
-        description: "纯黑白极简无色差墨水屏质感",
-        category: "个性化外观",
-        run: () => setPreferences((p) => ({ ...p, theme: "eink" })),
-      },
-      {
-        id: "cmd-about",
-        title: "关于 KnowSpace 与帮助",
-        description: "查看当前软件版本、系统信息与开源协议",
-        category: "系统与支持",
-        run: () => setAboutOpen(true),
-      },
-    ],
-    [
-      setViewMode,
-      handleToggleGraphPane,
-      handlePrintDocument,
-      createNewFile,
-      createNewCanvas,
-      saveSession,
-      saveSessionAs,
-      openMarkdownDirectory,
-      toggleFullscreen,
-      toggleTypewriterMode,
-    ],
+    () =>
+      listPaletteCommands().map((d) => ({
+        id: d.id,
+        title: d.title,
+        description: d.description,
+        shortcut: d.shortcut,
+        category: d.category,
+        run: () => commandBus.execute(d.id),
+      })),
+    [],
   );
 
   // Global keybindings
   // ── Desktop shell wiring and keyboard shortcuts (R1 batch B3b-6) ─────────
   //
-  // The eight refs below are the same mirrors App.tsx already kept: these
-  // handlers are registered once and must not close over values that change.
+  // Keybindings execute commands through the bus; the handlers themselves are
+  // bound once in useCommandRegistrations above, so the keyboard holds no
+  // second copy of any action. The refs still passed here serve the shell
+  // wiring (launch file, close guard) rather than actions.
   useGlobalShortcuts({
     initialHandledRef,
     openDesktopMarkdownPathRef,
-    createNewFileRef,
-    openMarkdownDirectoryRef,
-    saveSessionRef,
-    saveSessionAsRef,
-    toggleFullscreenRef,
     guardActionRef,
-    toggleFullscreen,
     handleCloseDualSplit,
     handleCloseTab,
     selectChapter,
-    saveSession,
-    saveSessionAs,
-    createNewFile,
-    openMarkdownDirectory,
-    handlePrintDocument,
-    handleToggleGraphPane,
-    goPrevious,
-    goNext,
-    addBookmark,
-    focusSearch,
-    setViewMode,
   });
 
   useEffect(() => {

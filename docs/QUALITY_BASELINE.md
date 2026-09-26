@@ -17,7 +17,7 @@
 | `as-any` | 10 | 只减不增（`as any`） |
 | `files-over-1000-lines` | 15 | 只减不增（src 非测试代码，> 1000 行） |
 | `max-file-lines` | 7179 | 只减不增（最大单文件行数） |
-| `src-lines` | 58607 | 记录趋势，不设闸 |
+| `src-lines` | 58744 | 记录趋势，不设闸 |
 | `test-cases` | 见 `TEST_BASELINE.md` | 只增不减——由测试基线守护，本文件不重复设闸 |
 
 ---
@@ -28,7 +28,7 @@
 | :--- | ---: |
 | `src/components/CanvasView.tsx` | 7179 |
 | `src/components/MindmapView.tsx` | 3586 |
-| `src/App.tsx` | 2499 |
+| `src/App.tsx` | 2349 |
 | `src/services/mindmapLayout.ts` | 1266 |
 | `src/components/DailyReviewPanel.tsx` | 1237 |
 | `src/services/mindmapSidecar.ts` | 1215 |
@@ -50,9 +50,9 @@
 
 | 位置 | 代码 |
 | :--- | :--- |
-| `src/App.tsx:744` | `: any) {` |
-| `src/App.tsx:1763` | `: any) {` |
-| `src/App.tsx:1804` | `: any) => {` |
+| `src/App.tsx:747` | `: any) {` |
+| `src/App.tsx:1613` | `: any) {` |
+| `src/App.tsx:1654` | `: any) => {` |
 | `src/components/DocumentWorkspace.tsx:33` | `: any) => void;` |
 | `src/components/DualDocumentWorkspace.tsx:33` | `: any) => void;` |
 | `src/components/EditorPane.tsx:582` | `: any, from: number, to: number) => {` |

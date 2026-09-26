@@ -11,9 +11,9 @@
 
 | 项目 | 数值 |
 | :--- | ---: |
-| 测试文件 | **111** |
-| 用例总数 | **1384** |
-| 通过 | 1383 |
+| 测试文件 | **113** |
+| 用例总数 | **1411** |
+| 通过 | 1410 |
 | 失败 | 0 |
 | 跳过 | 1 |
 | 通过率 | 99.9% |
@@ -51,6 +51,7 @@
 | `src/__tests__/perf-regressions.test.ts` | 14 | ✅ |
 | `src/__tests__/table-generator.test.ts` | 14 | ✅ |
 | `src/__tests__/document-creation.test.ts` | 13 | ✅ |
+| `src/__tests__/ipc-channel-contract.test.ts` | 13 | ✅ |
 | `src/__tests__/mindmap-export-ecosystem.test.ts` | 13 | ✅ |
 | `src/__tests__/backlink-index-hook.test.ts` | 12 | ✅ |
 | `src/__tests__/mindmap-relations.test.ts` | 12 | ✅ |
@@ -59,8 +60,10 @@
 | `src/__tests__/scan-notice.test.ts` | 11 | ✅ |
 | `src/__tests__/chapter-list.test.tsx` | 10 | ✅ |
 | `src/__tests__/editor-context-menu.test.ts` | 10 | ✅ |
+| `src/__tests__/global-shortcuts-hook.test.ts` | 10 | ✅ |
 | `src/__tests__/mindmap-xmind-export.test.tsx` | 10 | ✅ |
 | `src/__tests__/wheel-scroll-guard.test.ts` | 10 | ✅ |
+| `src/__tests__/command-bus.test.ts` | 9 | ✅ |
 | `src/__tests__/flash-capsule.test.ts` | 9 | ✅ |
 | `src/__tests__/graph.test.ts` | 9 | ✅ |
 | `src/__tests__/inflate.test.ts` | 9 | ✅ |
@@ -102,7 +105,6 @@
 | `src/__tests__/sync-selection.test.ts` | 6 | ✅ |
 | `src/__tests__/blocklink.test.ts` | 5 | ✅ |
 | `src/__tests__/book-source.test.ts` | 5 | ✅ |
-| `src/__tests__/global-shortcuts-hook.test.ts` | 5 | ✅ |
 | `src/__tests__/media-lightbox.test.tsx` | 5 | ✅ |
 | `src/__tests__/mindmap-alignment.test.tsx` | 5 | ✅ |
 | `src/__tests__/mindmap-link-badge.test.tsx` | 5 | ✅ |
@@ -147,14 +149,14 @@
 
 | 文件 | 当前行数 | 目标 |
 | :--- | ---: | :--- |
-| `src/components/CanvasView.tsx` | 6710 | R2 待拆分: 目标各模块 < 2500 行 |
-| `src/App.tsx` | 2412 | R1: < 500 行 |
-| `src/services/canvasGraph.ts` | 1152 | R2 已拆分 ✅ |
-| `src/services/canvasExport.ts` | 1075 | R2 已拆分 ✅ |
-| `src/services/canvasGeometry.ts` | 1021 | R2 已拆分 ✅ |
-| `src/services/canvasService.ts` | 127 | R2 门面（127 行）✅ |
-| `src/services/fsrsService.ts` | 1050 | F1 新增 · 观察项 |
-| `src/components/MindmapView.tsx` | 3547 | 观察项（已达标） |
+| `src/components/CanvasView.tsx` | 7179 | R2 待拆分: 目标各模块 < 2500 行 |
+| `src/App.tsx` | 2349 | R1: < 500 行 |
+| `src/services/canvasGraph.ts` | 1150 | R2 已拆分 ✅ |
+| `src/services/canvasExport.ts` | 1123 | R2 已拆分 ✅ |
+| `src/services/canvasGeometry.ts` | 998 | R2 已拆分 ✅ |
+| `src/services/canvasService.ts` | 120 | R2 门面（127 行）✅ |
+| `src/services/fsrsService.ts` | 1062 | F1 新增 · 观察项 |
+| `src/components/MindmapView.tsx` | 3586 | 观察项（已达标） |
 | `src/services/mindmapService.ts` | 1194 | 观察项 |
 
 ---
@@ -163,7 +165,7 @@
 
 任何重构都必须满足：
 
-1. 用例总数 **不低于 1384**（删除测试需在 PR 说明中论证）
+1. 用例总数 **不低于 1411**（删除测试需在 PR 说明中论证）
 2. 通过率 **100%**
 3. 单文件用例数**不得下降**（防止测试被静默删除）
 

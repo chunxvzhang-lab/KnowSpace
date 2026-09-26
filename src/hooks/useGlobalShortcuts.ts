@@ -3,7 +3,7 @@ import { useTabStore } from "../store/useTabStore";
 import { useUiStore } from "../store/useUiStore";
 import { useVaultStore } from "../store/useVaultStore";
 import type { ChapterSource } from "../core/types";
-import type { DocumentSessionState } from "./useDocumentSession";
+import { commandBus } from "../services/commandBus";
 
 /**
  * How the app is driven from outside its own UI: the launch file, the
@@ -14,12 +14,23 @@ import type { DocumentSessionState } from "./useDocumentSession";
  * registrations that live for the life of the window and both are written in
  * terms of the same refs.
  *
- * Those refs are the point of the interface. Every one of them mirrors a value
- * App.tsx owns, because a handler registered once cannot close over a callback
- * that changes identity on the next render. Passing the mirrors in keeps that
- * mechanism intact; the alternative would be for this hook to reach back into
- * App, which it cannot.
+ * Since the command bus (phase 1 batch 1), the keyboard and the menu no longer
+ * hold their own copies of what actions do: a key that matches a command in
+ * core/commands.ts executes `commandBus.execute(id)`, and App binds the actual
+ * handler once in useCommandRegistrations. What remains as props here is the
+ * shell wiring (launch file, close guard — not user commands) and the tab
+ * domain, which is navigation state the bus does not model.
  */
+
+/** Electron menu command ids → command-bus ids. The contract lives in main.cjs. */
+const MENU_COMMAND_TO_COMMAND_ID: Record<string, string> = {
+  "new-file": "document.newFile",
+  "open-directory": "document.openDirectory",
+  save: "document.save",
+  "save-as": "document.saveAs",
+  "toggle-fullscreen": "ui.toggleFullscreen",
+  togglefullscreen: "ui.toggleFullscreen",
+};
 
 type UseGlobalShortcutsParams = {
   /** The launch file has already been handled this session. */
@@ -27,11 +38,6 @@ type UseGlobalShortcutsParams = {
   openDesktopMarkdownPathRef: {
     current: (absolutePath: string, preloadedSource?: ChapterSource | null) => void;
   };
-  createNewFileRef: { current: () => void };
-  openMarkdownDirectoryRef: { current: () => void };
-  saveSessionRef: { current: () => void };
-  saveSessionAsRef: { current: () => void };
-  toggleFullscreenRef: { current: () => void };
   /**
    * Routes the window-close request through App's unsaved-changes guard.
    *
@@ -40,59 +46,18 @@ type UseGlobalShortcutsParams = {
    * unchanged: the narrower parameter is the assignable direction.
    */
   guardActionRef: { current: (action: { type: "close-window"; requestId: number }) => void };
-  // The key handler is re-registered whenever these change, so they are passed
-  // by value rather than through a mirror.
-  toggleFullscreen: () => void;
   handleCloseDualSplit: () => void;
   handleCloseTab: (tabId: string) => void;
   selectChapter: (chapterId: string) => void;
-  saveSession: () => void;
-  saveSessionAs: () => void;
-  createNewFile: () => void;
-  openMarkdownDirectory: () => void;
-  handlePrintDocument: () => void;
-  handleToggleGraphPane: () => void;
-  goPrevious: () => void;
-  goNext: () => void;
-  addBookmark: () => void;
-  focusSearch: () => void;
-  /**
-   * Which pane the shortcuts act on.
-   *
-   * Takes an updater as well as a value, because one binding flips between two
-   * panes by reading the current one.
-   */
-  setViewMode: (
-    mode:
-      | DocumentSessionState["viewMode"]
-      | ((prev: DocumentSessionState["viewMode"]) => DocumentSessionState["viewMode"]),
-  ) => void;
 };
 
 export function useGlobalShortcuts({
   initialHandledRef,
   openDesktopMarkdownPathRef,
-  createNewFileRef,
-  openMarkdownDirectoryRef,
-  saveSessionRef,
-  saveSessionAsRef,
-  toggleFullscreenRef,
   guardActionRef,
-  toggleFullscreen,
   handleCloseDualSplit,
   handleCloseTab,
   selectChapter,
-  saveSession,
-  saveSessionAs,
-  createNewFile,
-  openMarkdownDirectory,
-  handlePrintDocument,
-  handleToggleGraphPane,
-  goPrevious,
-  goNext,
-  addBookmark,
-  focusSearch,
-  setViewMode,
 }: UseGlobalShortcutsParams) {
   const setNotice = useUiStore((s) => s.setNotice);
   const setManifest = useVaultStore((s) => s.setManifest);
@@ -107,8 +72,6 @@ export function useGlobalShortcuts({
   const dualSplitTabId = useTabStore((s) => s.dualSplitTabId);
   const chapterId = useTabStore((s) => s.activeTabId);
   const tabs = useTabStore((s) => s.tabs);
-  const toggleTypewriterMode = useUiStore((s) => s.toggleTypewriterMode);
-  const setDirectoryOpen = useUiStore((s) => s.setDirectoryOpen);
 
   useEffect(() => {
     if (!window.bookMDDesktop) return undefined;
@@ -138,12 +101,10 @@ export function useGlobalShortcuts({
     });
 
     const unsubscribeMenu = window.bookMDDesktop.onMenuCommand?.((command) => {
-      if (command === "new-file") createNewFileRef.current();
-      else if (command === "open-directory") openMarkdownDirectoryRef.current();
-      else if (command === "save") saveSessionRef.current();
-      else if (command === "save-as") saveSessionAsRef.current();
-      else if (command === "toggle-fullscreen" || command === "togglefullscreen")
-        toggleFullscreenRef.current();
+      // The menu speaks Electron ids; the bus speaks command ids. One mapping,
+      // here — the handlers themselves are bound once in App.
+      const commandId = MENU_COMMAND_TO_COMMAND_ID[command];
+      if (commandId) commandBus.execute(commandId);
     });
 
     const unsubscribeClose = window.bookMDDesktop.onBeforeClose?.(({ requestId }) => {
@@ -172,31 +133,29 @@ export function useGlobalShortcuts({
     };
   }, [
     manifest?.rootPath,
-    createNewFileRef,
     guardActionRef,
     initialHandledRef,
     openDesktopMarkdownPathRef,
-    openMarkdownDirectoryRef,
-    saveSessionAsRef,
-    saveSessionRef,
     setManifest,
     setNotice,
-    toggleFullscreenRef,
   ]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
+      const target = event.target;
+      // For synthetic events dispatched on window/document, target is not an
+      // Element and has no closest() — it simply counts as "not editing"
+      // instead of throwing and killing the whole shortcut chain.
       const isEditing =
         target instanceof HTMLInputElement ||
         target instanceof HTMLTextAreaElement ||
         target instanceof HTMLSelectElement ||
-        target?.isContentEditable ||
-        target?.closest(".cm-editor");
+        (target instanceof HTMLElement && target.isContentEditable) ||
+        (target instanceof Element && target.closest(".cm-editor") !== null);
 
       if (event.key === "F11") {
         event.preventDefault();
-        toggleFullscreen();
+        commandBus.execute("ui.toggleFullscreen");
         return;
       }
 
@@ -223,7 +182,7 @@ export function useGlobalShortcuts({
         }
         if (isFullscreen) {
           event.preventDefault();
-          toggleFullscreen();
+          commandBus.execute("ui.toggleFullscreen");
           return;
         }
       }
@@ -269,57 +228,48 @@ export function useGlobalShortcuts({
       // Toggle Typewriter Mode: Alt+T
       if (event.altKey && event.key.toLowerCase() === "t") {
         event.preventDefault();
-        toggleTypewriterMode();
+        commandBus.execute("view.toggleTypewriter");
         return;
       }
 
       if (event.ctrlKey && event.key.toLowerCase() === "s") {
         event.preventDefault();
-        if (event.shiftKey) {
-          saveSessionAs();
-        } else {
-          saveSession();
-        }
+        commandBus.execute(event.shiftKey ? "document.saveAs" : "document.save");
         return;
       }
 
       if (event.ctrlKey && event.key.toLowerCase() === "n") {
         event.preventDefault();
-        createNewFile();
+        commandBus.execute("document.newFile");
         return;
       }
 
       if (event.ctrlKey && event.key.toLowerCase() === "o") {
         event.preventDefault();
-        if (event.shiftKey) {
-          openMarkdownDirectory();
-        } else {
-          // Open single file
-          document.querySelector<HTMLInputElement>(".toolbar input[type='file']")?.click();
-        }
+        commandBus.execute(event.shiftKey ? "document.openDirectory" : "document.openFile");
         return;
       }
 
       if (event.ctrlKey && event.key.toLowerCase() === "p") {
         event.preventDefault();
-        handlePrintDocument();
+        commandBus.execute("document.print");
         return;
       }
 
       // Global navigation shortcuts that penetrate editor focus:
       if (event.ctrlKey && event.key.toLowerCase() === "g") {
         event.preventDefault();
-        handleToggleGraphPane();
+        commandBus.execute("view.toggleGraph");
         return;
       }
       if (event.ctrlKey && event.key.toLowerCase() === "m") {
         event.preventDefault();
-        setViewMode((m) => (m === "mindmap" ? "split" : "mindmap"));
+        commandBus.execute("view.toggleMindmap");
         return;
       }
       if (event.ctrlKey && event.key === "\\") {
         event.preventDefault();
-        setDirectoryOpen((open) => !open);
+        commandBus.execute("navigation.toggleDirectory");
         return;
       }
 
@@ -327,50 +277,36 @@ export function useGlobalShortcuts({
 
       if (event.ctrlKey && event.key.toLowerCase() === "b") {
         event.preventDefault();
-        addBookmark();
+        commandBus.execute("document.addBookmark");
       }
       if (event.ctrlKey && event.key.toLowerCase() === "f") {
         event.preventDefault();
-        focusSearch();
+        commandBus.execute("navigation.focusSearch");
       }
       if (event.altKey && event.key === "ArrowLeft") {
         event.preventDefault();
-        goPrevious();
+        commandBus.execute("navigation.previous");
       }
       if (event.altKey && event.key === "ArrowRight") {
         event.preventDefault();
-        goNext();
+        commandBus.execute("navigation.next");
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [
-    addBookmark,
     chapterId,
     commandPaletteOpen,
-    createNewFile,
     dualSplitTabId,
-    focusSearch,
-    goNext,
-    goPrevious,
     handleCloseDualSplit,
     handleCloseTab,
-    handlePrintDocument,
-    handleToggleGraphPane,
     isFullscreen,
     lightboxMedia,
-    openMarkdownDirectory,
-    saveSession,
-    saveSessionAs,
     selectChapter,
     tabs,
-    toggleFullscreen,
-    toggleTypewriterMode,
     setCommandPaletteOpen,
-    setDirectoryOpen,
     setLightboxMedia,
     setVersionHistoryOpen,
-    setViewMode,
     versionHistoryOpen,
   ]);
 }
