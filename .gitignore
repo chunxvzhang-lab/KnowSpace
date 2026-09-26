@@ -4,6 +4,10 @@
 # Build and release outputs
 /dist
 /release/*
+# electron-builder's alternate output, used when a file under release/ is held
+# open by something that permits writes but not deletion — the normal pipeline
+# cannot clear win-unpacked in that state. See scripts/refresh-release-in-place.cjs.
+/release-next
 !/release/KnowSpace-win-x64
 /release/KnowSpace-win-x64/*
 !/release/KnowSpace-win-x64/docs
