@@ -16,8 +16,8 @@
 | `colon-any` | 30 | 只减不增（`: any`，含 `any[]`；不含 `Array<any>` 泛型） |
 | `as-any` | 10 | 只减不增（`as any`） |
 | `files-over-1000-lines` | 15 | 只减不增（src 非测试代码，> 1000 行） |
-| `max-file-lines` | 4393 | 只减不增（最大单文件行数） |
-| `src-lines` | 60769 | 记录趋势，不设闸 |
+| `max-file-lines` | 3586 | 只减不增（最大单文件行数） |
+| `src-lines` | 61575 | 记录趋势，不设闸 |
 | `test-cases` | 见 `TEST_BASELINE.md` | 只增不减——由测试基线守护，本文件不重复设闸 |
 
 ---
@@ -26,8 +26,8 @@
 
 | 文件 | 行数 |
 | :--- | ---: |
-| `src/components/CanvasView.tsx` | 4393 |
 | `src/components/MindmapView.tsx` | 3586 |
+| `src/components/CanvasView.tsx` | 3088 |
 | `src/services/mindmapLayout.ts` | 1266 |
 | `src/components/DailyReviewPanel.tsx` | 1237 |
 | `src/services/mindmapSidecar.ts` | 1215 |

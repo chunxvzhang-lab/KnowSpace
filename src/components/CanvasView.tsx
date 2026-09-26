@@ -1,45 +1,5 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import {
-  ZoomIn,
-  ZoomOut,
-  Maximize2,
-  Plus,
-  FileText,
-  Boxes,
-  RotateCcw,
-  RotateCw,
-  BookOpen,
-  ExternalLink,
-  X,
-  Link,
-  Save,
-  BoxSelect,
-  CheckSquare,
-  ArrowUpToLine,
-  ArrowDownToLine,
-  GitBranch,
-  AlignLeft,
-  AlignRight,
-  AlignJustify,
-  Image as ImageIcon,
-  Clipboard,
-  Grid,
-  Minimize2,
-  AlignCenter,
-  AlignHorizontalJustifyCenter,
-  AlignVerticalJustifyCenter,
-  Share2,
-  Play,
-  Pause,
-  ChevronLeft,
-  ChevronRight,
-  Music,
-  Video,
-  Film,
-  List,
-  Scan,
-} from "lucide-react";
 import type { ThemeMode } from "../core/types";
 import type {
   CanvasNode,
@@ -48,7 +8,6 @@ import type {
   CanvasTextNode,
   CanvasFileNode,
   CanvasGroupNode,
-  CanvasViewport,
   CanvasEdgeLabelShape,
   CanvasEdgeLineStyle,
   CanvasObstacle,
@@ -65,9 +24,7 @@ import {
   computeSourceDisplayColorMap,
   expandLoopEdgeSelection,
   syncLoopEdgeGeometry,
-  computeRingSpacingLayout,
   isPointInsideNodeHull,
-  alignNodesInCircle,
   downloadCanvasAsImage,
   copyCanvasImageToClipboard,
   CanvasAlignDirection,
@@ -75,8 +32,6 @@ import {
   getMediaFileType,
   isMediaFile,
   resolveMediaSrc,
-  buildPresentationSequence,
-  findContainerForNode,
 } from "../services/canvasService";
 import { getCanvasThemeColors } from "../services/canvasTheme";
 import {
@@ -85,22 +40,14 @@ import {
   matchSlashCommands,
   type SlashCommand,
 } from "../services/slashCommands";
-import { MediaLightbox, type LightboxMedia } from "./MediaLightbox";
+import type { LightboxMedia } from "./MediaLightbox";
 // Extracted during the R2 split (batch B2).
-import { CanvasToast } from "./canvas/CanvasToast";
 import { CanvasCardSuggestMenu, type CanvasCardSuggestItem } from "./canvas/CanvasCardSuggestMenu";
 import { MarqueeSelectionBox } from "./canvas/MarqueeSelectionBox";
 import { CanvasMinimap } from "./canvas/CanvasMinimap";
 import { CanvasEdgeBatchToolbar } from "./canvas/CanvasEdgeBatchToolbar";
-import { toolBtnStyle } from "./canvas/canvasModalStyles";
 import { CanvasEdgeLabelLayer } from "./canvas/CanvasEdgeLabelLayer";
 import { CanvasEdgeLayer } from "./canvas/CanvasEdgeLayer";
-import { EdgeContextMenu } from "./canvas/EdgeContextMenu";
-import { NodeContextMenu } from "./canvas/NodeContextMenu";
-import { ExtractModal } from "./canvas/ExtractModal";
-import { FilePickerModal } from "./canvas/FilePickerModal";
-import { ExportModal } from "./canvas/ExportModal";
-import { SpawnBranchModal } from "./canvas/SpawnBranchModal";
 // Document (data/history/save) and camera (viewport/wheel) state domains,
 // extracted during the wave-1 CanvasView decomposition.
 import { useCanvasDocument } from "./canvas/useCanvasDocument";
@@ -114,6 +61,12 @@ import { useCanvasPointer } from "./canvas/useCanvasPointer";
 // The node layer (the group hulls and the card chrome), extracted during the
 // wave-3 CanvasView decomposition.
 import { CanvasNodeLayer } from "./canvas/CanvasNodeLayer";
+// The presentation domain hook and the toolbar / overlay / presentation-chrome
+// components, extracted during the wave-4 CanvasView decomposition.
+import { useCanvasPresentation } from "./canvas/useCanvasPresentation";
+import { CanvasToolbar } from "./canvas/CanvasToolbar";
+import { CanvasOverlayMenus, type CanvasContextMenuState } from "./canvas/CanvasOverlayMenus";
+import { CanvasPresentationChrome } from "./canvas/CanvasPresentationChrome";
 
 export type CanvasViewProps = {
   title: string;
@@ -204,18 +157,11 @@ export const CanvasView = memo(function CanvasView({
   // a fixed-positioned portal. The menu is intentionally rendered at the
   // document body level so it can never be clipped by the canvas container's
   // `overflow: hidden` or any ancestor that would otherwise occlude it.
+  // The align menu's open flag deliberately stays here rather than inside
+  // CanvasToolbar: the context-menu keydown handler below also closes it on
+  // Escape, so two domains write it and it cannot be toolbar-local.
   const [showAlignMenu, setShowAlignMenu] = useState(false);
-  // Non-null while the ring radius slider is being dragged; holds the radius
-  // being previewed so the label and the board stay in step.
-  const [ringRadiusDraft, setRingRadiusDraft] = useState<number | null>(null);
-  const [contextMenu, setContextMenu] = useState<{
-    x: number;
-    y: number;
-    canvasX: number;
-    canvasY: number;
-    targetNodeId?: string;
-    targetEdgeId?: string;
-  } | null>(null);
+  const [contextMenu, setContextMenu] = useState<CanvasContextMenuState | null>(null);
   const contextMenuRef = useRef<HTMLDivElement | null>(null);
 
   // Document domain: board state, source sync, history, save paths and the
@@ -323,16 +269,6 @@ export const CanvasView = memo(function CanvasView({
   /** Media preview opened by double-clicking an image / video / audio card. */
   const [lightboxMedia, setLightboxMedia] = useState<LightboxMedia | null>(null);
 
-  // Presentation Mode state
-  const [isPresentationMode, setIsPresentationMode] = useState(false);
-  const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
-  const [isAutoPlaying, setIsAutoPlaying] = useState(false);
-  const [showSlideDrawer, setShowSlideDrawer] = useState(false);
-  const [isPresentationFullscreen, setIsPresentationFullscreen] = useState(false);
-  const isFullscreenActive = isFullscreen ?? isPresentationFullscreen;
-  const slideDrawerRef = useRef<HTMLDivElement>(null);
-  const savedViewportBeforePresentationRef = useRef<CanvasViewport | null>(null);
-
   // Dynamically clamp context menu position against the actual viewport so
   // the menu never spills off-screen, even when the canvas is nested in a
   // narrow layout (e.g. dual-document workspace).
@@ -419,11 +355,12 @@ export const CanvasView = memo(function CanvasView({
   const [editingEdgeLabel, setEditingEdgeLabel] = useState("");
 
   // Modals & Panels
+  // (The file picker's search draft moved into CanvasOverlayMenus in wave 4 —
+  // only its wiring read or wrote it.)
   const [showFilePicker, setShowFilePicker] = useState(false);
   const [showExtractModal, setShowExtractModal] = useState(false);
   const [extractedMarkdown, setExtractedMarkdown] = useState("");
   const [copiedNotification, setCopiedNotification] = useState(false);
-  const [searchKeyword, setSearchKeyword] = useState("");
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportFormat, setExportFormat] = useState<"png" | "svg">("png");
   const [exportBg, setExportBg] = useState<"theme" | "white" | "transparent">("theme");
@@ -440,6 +377,132 @@ export const CanvasView = memo(function CanvasView({
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 2200);
   }, []);
+
+  // Node id → node lookup. Declared before the presentation hook (which reads
+  // it to frame slides) and before the gesture hooks; previously it lived
+  // further down among the other derived maps.
+  const nodeMap = useMemo(() => new Map(data.nodes.map((n) => [n.id, n])), [data.nodes]);
+
+  // Presentation domain: slide-sequence state, camera framing, autoplay,
+  // fullscreen and the F5 / slide-navigation keys (extracted hook, wave 4).
+  const {
+    isPresentationMode,
+    currentSlideIndex,
+    isAutoPlaying,
+    showSlideDrawer,
+    isFullscreenActive,
+    setIsAutoPlaying,
+    setShowSlideDrawer,
+    slideDrawerRef,
+    presentationSequence,
+    handleJumpToSlide,
+    handleTogglePresentation,
+    handleNextSlide,
+    handlePrevSlide,
+    handleToggleFullscreen,
+  } = useCanvasPresentation({
+    containerRef,
+    data,
+    nodeMap,
+    viewport,
+    setViewport,
+    selectedNodeId,
+    selectedNodeIds,
+    setSelectedNodeIds,
+    setSelectedNodeId,
+    isFullscreen,
+    onToggleFullscreen,
+    showToast,
+  });
+
+  // Escape-key priority chain. F5 and the in-presentation slide keys live in
+  // useCanvasPresentation's own listener; the Escape chain stays whole here
+  // because it is ONE ordered list that also covers non-presentation overlays
+  // (modals → context menu → fullscreen). Splitting it across two listeners
+  // would let a later branch fire where the original handler had `return`ed —
+  // e.g. Escape with both the slide drawer and presentation active must close
+  // only the drawer, never exit the presentation.
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (showSlideDrawer) {
+        e.preventDefault();
+        setShowSlideDrawer(false);
+        return;
+      }
+      if (showExtractModal) {
+        e.preventDefault();
+        setShowExtractModal(false);
+        return;
+      }
+      if (showExportModal) {
+        e.preventDefault();
+        setShowExportModal(false);
+        return;
+      }
+      if (showFilePicker) {
+        e.preventDefault();
+        setShowFilePicker(false);
+        return;
+      }
+      if (contextMenu) {
+        e.preventDefault();
+        setContextMenu(null);
+        return;
+      }
+      if (isPresentationMode) {
+        e.preventDefault();
+        handleTogglePresentation();
+        return;
+      }
+      if (isFullscreenActive) {
+        e.preventDefault();
+        handleToggleFullscreen();
+        return;
+      }
+
+      // ── Fallback: force-exit whatever fullscreen is actually active ────
+      // The React flag above can go stale (e.g. the window went fullscreen
+      // through a path that never updated it), and then ESC appeared to do
+      // nothing. These checks ask the real sources of truth instead.
+      if (typeof document !== "undefined" && document.fullscreenElement) {
+        e.preventDefault();
+        document.exitFullscreen?.().catch(() => {});
+        return;
+      }
+      const desktopFs = (
+        window as unknown as {
+          bookMDDesktop?: {
+            isFullScreen?: () => Promise<boolean>;
+            toggleFullScreen?: () => Promise<boolean>;
+          };
+        }
+      ).bookMDDesktop;
+      if (desktopFs?.isFullScreen && desktopFs?.toggleFullScreen) {
+        e.preventDefault();
+        desktopFs
+          .isFullScreen()
+          .then((full) => {
+            if (full) return desktopFs.toggleFullScreen?.();
+            return undefined;
+          })
+          .catch(() => {});
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [
+    showSlideDrawer,
+    showExtractModal,
+    showExportModal,
+    showFilePicker,
+    contextMenu,
+    isPresentationMode,
+    isFullscreenActive,
+    handleTogglePresentation,
+    handleToggleFullscreen,
+  ]);
 
   // Node gesture starts: what a mousedown on a card means — plain drag,
   // collaborative multi-drag, grid/ring re-flow, group scoop, resize — written
@@ -1831,9 +1894,8 @@ export const CanvasView = memo(function CanvasView({
     [editable, currentFilePath, pushHistory, showToast],
   );
 
-  // Node lookups & relationship maps
-  const nodeMap = useMemo(() => new Map(data.nodes.map((n) => [n.id, n])), [data.nodes]);
-
+  // Node lookups & relationship maps (nodeMap moved up next to the
+  // presentation hook, which consumes it).
   const canvasObstacles = useMemo<CanvasObstacle[]>(
     () =>
       data.nodes.map((n) => ({
@@ -1845,276 +1907,6 @@ export const CanvasView = memo(function CanvasView({
       })),
     [data.nodes],
   );
-
-  const presentationSequence = useMemo(() => buildPresentationSequence(data), [data]);
-
-  const focusSlide = useCallback(
-    (index: number) => {
-      if (presentationSequence.length === 0 || !containerRef.current) return;
-      const targetId = presentationSequence[index];
-      const targetNode = nodeMap.get(targetId);
-      if (!targetNode) return;
-
-      const rect = containerRef.current.getBoundingClientRect();
-      const containerW = rect.width || 1000;
-      const containerH = rect.height || 700;
-
-      // Available vertical height clearing the bottom floating presentation bar (~80px)
-      const usableH = Math.max(300, containerH - 90);
-      const targetZoom = Math.min(
-        1.35,
-        Math.max(
-          0.35,
-          Math.min((containerW - 160) / targetNode.width, (usableH - 120) / targetNode.height),
-        ),
-      );
-
-      // Target center slightly shifted upward to give clearance to the bottom presentation controller
-      const visualCenterY = usableH / 2 + 10;
-      const targetPanX = Math.round(
-        containerW / 2 - (targetNode.x + targetNode.width / 2) * targetZoom,
-      );
-      const targetPanY = Math.round(
-        visualCenterY - (targetNode.y + targetNode.height / 2) * targetZoom,
-      );
-
-      setViewport({ panX: targetPanX, panY: targetPanY, zoom: targetZoom });
-      setSelectedNodeIds(new Set([targetId]));
-      setSelectedNodeId(targetId);
-    },
-    [presentationSequence, nodeMap],
-  );
-
-  const handleJumpToSlide = useCallback(
-    (index: number) => {
-      if (index < 0 || index >= presentationSequence.length) return;
-      setCurrentSlideIndex(index);
-      focusSlide(index);
-    },
-    [presentationSequence.length, focusSlide],
-  );
-
-  const handleTogglePresentation = useCallback(() => {
-    if (isPresentationMode) {
-      setIsPresentationMode(false);
-      setIsAutoPlaying(false);
-      setShowSlideDrawer(false);
-      if (savedViewportBeforePresentationRef.current) {
-        setViewport(savedViewportBeforePresentationRef.current);
-      }
-    } else {
-      if (presentationSequence.length === 0) {
-        showToast("画布中暂无可演示的卡片");
-        return;
-      }
-      savedViewportBeforePresentationRef.current = { ...viewport };
-      setIsPresentationMode(true);
-      setShowSlideDrawer(false);
-
-      // "就近开播": Check if currently selected node is in presentation sequence
-      const currentSelected = selectedNodeId || Array.from(selectedNodeIds)[0];
-      const targetIndex = currentSelected ? presentationSequence.indexOf(currentSelected) : -1;
-      const startIndex = targetIndex >= 0 ? targetIndex : 0;
-
-      setCurrentSlideIndex(startIndex);
-      focusSlide(startIndex);
-    }
-  }, [
-    isPresentationMode,
-    presentationSequence,
-    viewport,
-    selectedNodeId,
-    selectedNodeIds,
-    focusSlide,
-    showToast,
-  ]);
-
-  const handleNextSlide = useCallback(() => {
-    if (presentationSequence.length === 0) return;
-    const nextIdx = (currentSlideIndex + 1) % presentationSequence.length;
-    setCurrentSlideIndex(nextIdx);
-    focusSlide(nextIdx);
-  }, [currentSlideIndex, presentationSequence.length, focusSlide]);
-
-  const handlePrevSlide = useCallback(() => {
-    if (presentationSequence.length === 0) return;
-    const prevIdx =
-      (currentSlideIndex - 1 + presentationSequence.length) % presentationSequence.length;
-    setCurrentSlideIndex(prevIdx);
-    focusSlide(prevIdx);
-  }, [currentSlideIndex, presentationSequence.length, focusSlide]);
-
-  const handleToggleFullscreen = useCallback(async () => {
-    if (onToggleFullscreen) {
-      onToggleFullscreen();
-      return;
-    }
-    const desktopWin = (
-      window as unknown as { bookMDDesktop?: { toggleFullScreen?: () => Promise<boolean> } }
-    ).bookMDDesktop;
-    if (desktopWin?.toggleFullScreen) {
-      const next = await desktopWin.toggleFullScreen();
-      setIsPresentationFullscreen(Boolean(next));
-    } else if (typeof document !== "undefined") {
-      if (!document.fullscreenElement) {
-        await document.documentElement.requestFullscreen?.().catch(() => {});
-        setIsPresentationFullscreen(true);
-      } else {
-        await document.exitFullscreen?.().catch(() => {});
-        setIsPresentationFullscreen(false);
-      }
-    }
-  }, [onToggleFullscreen]);
-
-  useEffect(() => {
-    const handleFsChange = () => {
-      setIsPresentationFullscreen(Boolean(document.fullscreenElement));
-    };
-    document.addEventListener("fullscreenchange", handleFsChange);
-    return () => document.removeEventListener("fullscreenchange", handleFsChange);
-  }, []);
-
-  useEffect(() => {
-    if (!showSlideDrawer) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (slideDrawerRef.current && !slideDrawerRef.current.contains(e.target as Node)) {
-        setShowSlideDrawer(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [showSlideDrawer]);
-
-  useEffect(() => {
-    if (!isPresentationMode || !isAutoPlaying) return;
-    const timer = setInterval(() => {
-      handleNextSlide();
-    }, 3500);
-    return () => clearInterval(timer);
-  }, [isPresentationMode, isAutoPlaying, handleNextSlide]);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // NOTE: F11 is intentionally NOT handled here — App.tsx already has a
-      // global F11 listener. Handling it in both places toggled fullscreen
-      // twice per keypress, which looked like "F11 does nothing".
-
-      if (e.key === "F5") {
-        e.preventDefault();
-        handleTogglePresentation();
-        return;
-      }
-
-      if (e.key === "Escape") {
-        if (showSlideDrawer) {
-          e.preventDefault();
-          setShowSlideDrawer(false);
-          return;
-        }
-        if (showExtractModal) {
-          e.preventDefault();
-          setShowExtractModal(false);
-          return;
-        }
-        if (showExportModal) {
-          e.preventDefault();
-          setShowExportModal(false);
-          return;
-        }
-        if (showFilePicker) {
-          e.preventDefault();
-          setShowFilePicker(false);
-          return;
-        }
-        if (contextMenu) {
-          e.preventDefault();
-          setContextMenu(null);
-          return;
-        }
-        if (isPresentationMode) {
-          e.preventDefault();
-          handleTogglePresentation();
-          return;
-        }
-        if (isFullscreenActive) {
-          e.preventDefault();
-          handleToggleFullscreen();
-          return;
-        }
-
-        // ── Fallback: force-exit whatever fullscreen is actually active ────
-        // The React flag above can go stale (e.g. the window went fullscreen
-        // through a path that never updated it), and then ESC appeared to do
-        // nothing. These checks ask the real sources of truth instead.
-        if (typeof document !== "undefined" && document.fullscreenElement) {
-          e.preventDefault();
-          document.exitFullscreen?.().catch(() => {});
-          return;
-        }
-        const desktopFs = (
-          window as unknown as {
-            bookMDDesktop?: {
-              isFullScreen?: () => Promise<boolean>;
-              toggleFullScreen?: () => Promise<boolean>;
-            };
-          }
-        ).bookMDDesktop;
-        if (desktopFs?.isFullScreen && desktopFs?.toggleFullScreen) {
-          e.preventDefault();
-          desktopFs
-            .isFullScreen()
-            .then((full) => {
-              if (full) return desktopFs.toggleFullScreen?.();
-              return undefined;
-            })
-            .catch(() => {});
-          return;
-        }
-      }
-
-      if (!isPresentationMode) return;
-
-      if (e.key === "ArrowRight" || e.key === " " || e.key === "PageDown" || e.key === "Enter") {
-        e.preventDefault();
-        handleNextSlide();
-      } else if (e.key === "ArrowLeft" || e.key === "PageUp" || e.key === "Backspace") {
-        e.preventDefault();
-        handlePrevSlide();
-      } else if (e.key === "Home") {
-        e.preventDefault();
-        handleJumpToSlide(0);
-      } else if (e.key === "End") {
-        e.preventDefault();
-        handleJumpToSlide(presentationSequence.length - 1);
-      } else if (e.key === "f" || e.key === "F") {
-        e.preventDefault();
-        handleToggleFullscreen();
-      } else if (e.key === "l" || e.key === "L") {
-        e.preventDefault();
-        setShowSlideDrawer((prev) => !prev);
-      } else if (e.key === "p" || e.key === "P") {
-        e.preventDefault();
-        setIsAutoPlaying((prev) => !prev);
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [
-    isPresentationMode,
-    showSlideDrawer,
-    showExtractModal,
-    showExportModal,
-    showFilePicker,
-    contextMenu,
-    isFullscreenActive,
-    handleTogglePresentation,
-    handleToggleFullscreen,
-    handleNextSlide,
-    handlePrevSlide,
-    handleJumpToSlide,
-    presentationSequence.length,
-  ]);
 
   // Global Clipboard Paste listener for media cards (Ctrl+V / Cmd+V)
   useEffect(() => {
@@ -2822,73 +2614,6 @@ export const CanvasView = memo(function CanvasView({
     [currentFilePath],
   );
 
-  // ── Ring spacing controls ────────────────────────────────────────────────
-  // Live metrics for the alignment dropdown's radius slider. Only meaningful
-  // while three or more selected cards actually sit on a common circle.
-  const selectedRingInfo = useMemo(() => {
-    if (selectedNodeIds.size < 3) return null;
-    const cards = data.nodes.filter((n) => selectedNodeIds.has(n.id) && n.type !== "group");
-    if (cards.length < 3) return null;
-    const layout = computeRingSpacingLayout(cards);
-    if (!layout) return null;
-    return {
-      layout,
-      // Generous upper bound so the slider has usable travel without letting
-      // the ring fly off the board.
-      maxRadius: Math.max(layout.radius * 3, layout.minRadius * 4, 1200),
-    };
-  }, [selectedNodeIds, data.nodes]);
-
-  // Frozen snapshot taken when a slider drag begins. Re-deriving the ring every
-  // frame would let the seating order and start angle drift, making the cards
-  // visibly jitter while the handle moves.
-  const ringSliderSnapshotRef = useRef<typeof selectedRingInfo>(null);
-
-  const applyRingRadius = useCallback(
-    (radius: number, info: NonNullable<typeof selectedRingInfo>) => {
-      const current = latestDataRef.current;
-      const nextNodes = alignNodesInCircle(current.nodes, new Set(info.layout.orderedIds), {
-        radius,
-        startAngleDeg: info.layout.startAngleDeg,
-        orderedIds: info.layout.orderedIds,
-        clampToMinRadius: true,
-        // Pin the centre so the ring grows in place rather than drifting.
-        center: info.layout.center,
-      });
-      const nextData = {
-        ...current,
-        nodes: nextNodes,
-        // Keep the closed loop's arc glued to the resized cards
-        edges: syncLoopEdgeGeometry(nextNodes, current.edges),
-      };
-      latestDataRef.current = nextData;
-      setData(nextData);
-    },
-    [],
-  );
-
-  const handleRingSliderStart = useCallback(() => {
-    ringSliderSnapshotRef.current = selectedRingInfo;
-  }, [selectedRingInfo]);
-
-  const handleRingSliderChange = useCallback(
-    (radius: number) => {
-      const info = ringSliderSnapshotRef.current ?? selectedRingInfo;
-      if (!info) return;
-      setRingRadiusDraft(radius);
-      applyRingRadius(radius, info);
-    },
-    [selectedRingInfo, applyRingRadius],
-  );
-
-  const handleRingSliderCommit = useCallback(() => {
-    if (!ringSliderSnapshotRef.current) return;
-    ringSliderSnapshotRef.current = null;
-    setRingRadiusDraft(null);
-    // A single history entry for the whole gesture, not one per frame.
-    pushHistory(latestDataRef.current);
-  }, [pushHistory]);
-
   return (
     <div
       ref={containerRef}
@@ -2944,580 +2669,55 @@ export const CanvasView = memo(function CanvasView({
         multiple
       />
 
-      {/* 1. TOP FLOATING GLASSMORPHIC TOOLBAR */}
-      <div
-        className="canvas-toolbar"
-        style={{
-          position: "absolute",
-          top: 16,
-          left: "50%",
-          transform: "translateX(-50%)",
-          zIndex: 100,
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          padding: "6px 14px",
-          borderRadius: 30,
-          backgroundColor:
-            theme === "eink"
-              ? "rgba(244, 241, 234, 0.95)"
-              : !isDark
-                ? "rgba(255, 255, 255, 0.94)"
-                : "rgba(15, 23, 42, 0.9)",
-          backdropFilter: "blur(12px)",
-          boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
-          border: `1px solid ${colors.cardBorder}`,
-          color: colors.cardText,
-        }}
-        onMouseDown={(e) => e.stopPropagation()}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <span
-          className="canvas-toolbar-title"
-          style={{
-            fontSize: 13,
-            fontWeight: 600,
-            marginRight: 6,
-            color: colors.edgeColor,
-            whiteSpace: "nowrap",
-            flexShrink: 0,
-            display: "inline-flex",
-            alignItems: "center",
-            maxWidth: isNarrow ? 120 : 260,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
-          title={title || "空间白板"}
-        >
-          🪐 {title || "空间白板"}
-        </span>
-
-        <div style={{ width: 1, height: 18, background: colors.cardBorder }} />
-
-        {/* Save button (Ctrl+S) */}
-        {onSave && (
-          <button
-            className={`canvas-tool-btn save-btn ${isDirty ? "is-dirty" : ""}`}
-            onClick={handleSave}
-            disabled={isSaving}
-            title="保存白板 (Ctrl+S)"
-            style={{
-              ...toolBtnStyle(theme, colors),
-              position: "relative",
-              fontWeight: isDirty ? 600 : 500,
-              color: isDirty ? "#0284c7" : colors.cardText,
-            }}
-          >
-            <Save size={14} />
-            <span className="canvas-btn-label">{isSaving ? "保存中..." : "保存"}</span>
-            {isDirty && (
-              <span
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: "50%",
-                  backgroundColor: "#f59e0b",
-                  marginLeft: 2,
-                  display: "inline-block",
-                }}
-                title="有未保存修改"
-              />
-            )}
-          </button>
-        )}
-
-        {editable && (
-          <>
-            <button
-              className="canvas-tool-btn"
-              onClick={() => handleAddTextCard()}
-              title="新建 Markdown 文本卡片"
-              style={toolBtnStyle(theme, colors)}
-            >
-              <Plus size={14} /> <span className="canvas-btn-label">文本卡片</span>
-            </button>
-            <button
-              className="canvas-tool-btn"
-              onClick={handleTriggerInsertMedia}
-              title="插入多模态媒体卡片 (支持剪贴板图片与本地文件)"
-              style={toolBtnStyle(theme, colors)}
-            >
-              <ImageIcon size={14} /> <span className="canvas-btn-label">图片卡片</span>
-            </button>
-            <button
-              className="canvas-tool-btn"
-              onClick={() => setShowFilePicker(true)}
-              title="引入已有知识库笔记"
-              style={toolBtnStyle(theme, colors)}
-            >
-              <FileText size={14} /> <span className="canvas-btn-label">引入笔记</span>
-            </button>
-            <button
-              className="canvas-tool-btn"
-              onClick={() => handleAddGroup()}
-              title="新建概念分组容器"
-              style={toolBtnStyle(theme, colors)}
-            >
-              <Boxes size={14} /> <span className="canvas-btn-label">分组容器</span>
-            </button>
-            <div style={{ width: 1, height: 18, background: colors.cardBorder }} />
-          </>
-        )}
-
-        {/* Marquee Box Selection Toggle Button */}
-        <button
-          className={`canvas-tool-btn ${isBoxSelectMode ? "active" : ""}`}
-          onClick={() => setIsBoxSelectMode((prev) => !prev)}
-          title={
-            isBoxSelectMode
-              ? "退出框选模式 (可直接按 Shift+拖动)"
-              : "开启框选模式 (或按住 Shift+鼠标拖动)"
-          }
-          style={{
-            ...toolBtnStyle(theme, colors),
-            backgroundColor: isBoxSelectMode
-              ? isDark
-                ? "rgba(56, 189, 248, 0.2)"
-                : "rgba(2, 132, 199, 0.12)"
-              : "transparent",
-            color: isBoxSelectMode ? (isDark ? "#38bdf8" : "#0284c7") : colors.cardText,
-          }}
-        >
-          <BoxSelect size={14} />
-          <span className="canvas-btn-label">{isBoxSelectMode ? "框选中" : "框选"}</span>
-        </button>
-
-        {/* Multi-selection count indicator & quick relation actions */}
-        {selectedNodeIds.size > 0 && (
-          <span
-            style={{
-              fontSize: 11,
-              padding: "2px 8px",
-              borderRadius: 10,
-              backgroundColor: isDark ? "rgba(245, 158, 11, 0.2)" : "rgba(245, 158, 11, 0.15)",
-              color: isDark ? "#fbbf24" : "#d97706",
-              fontWeight: 600,
-              whiteSpace: "nowrap",
-            }}
-          >
-            已选 {selectedNodeIds.size} 项
-          </span>
-        )}
-
-        {selectedNodeIds.size >= 2 && editable && (
-          <>
-            <button
-              className="canvas-tool-btn"
-              onClick={() => handleConnectOneToMany(currentMultiRootNode?.id)}
-              title="以当前选中卡片为源，向其余所有选中卡片放射建立一对多关联"
-              style={{
-                ...toolBtnStyle(theme, colors),
-                backgroundColor: "rgba(16, 185, 129, 0.15)",
-                color: "#10b981",
-                border: "1px solid rgba(16, 185, 129, 0.4)",
-                fontWeight: 600,
-              }}
-            >
-              <Share2 size={13} />
-              <span className="canvas-btn-label">
-                一对多关联 (以「{currentMultiRootTitle}」发起源)
-              </span>
-            </button>
-            <button
-              className="canvas-tool-btn"
-              onClick={handleConnectSelectedNodes}
-              title="在选中的卡片/分组之间自动建立顺序链式连线"
-              style={{
-                ...toolBtnStyle(theme, colors),
-                backgroundColor: "rgba(2, 132, 199, 0.15)",
-                color: "#0284c7",
-                border: "1px solid rgba(2, 132, 199, 0.3)",
-                fontWeight: 600,
-              }}
-            >
-              <Link size={13} />
-              <span className="canvas-btn-label">链式串联</span>
-            </button>
-            {selectedNodeIds.size >= 3 && (
-              <button
-                className="canvas-tool-btn"
-                onClick={handleConnectLoopNodes}
-                title="在选中的卡片/分组之间建立闭合环形连线 (A -> B -> C -> A)"
-                style={{
-                  ...toolBtnStyle(theme, colors),
-                  backgroundColor: "rgba(168, 85, 247, 0.15)",
-                  color: "#a855f7",
-                  border: "1px solid rgba(168, 85, 247, 0.3)",
-                  fontWeight: 600,
-                }}
-              >
-                <RotateCw size={13} />
-                <span className="canvas-btn-label">环形闭环</span>
-              </button>
-            )}
-            {/* Unified align / distribute dropdown */}
-            <div
-              style={{ position: "relative", flexShrink: 0 }}
-              onMouseDown={(e) => e.stopPropagation()}
-            >
-              <button
-                className="canvas-tool-btn"
-                onClick={() => setShowAlignMenu((v) => !v)}
-                title="对齐与分布 (多选卡片)"
-                style={{
-                  ...toolBtnStyle(theme, colors),
-                  backgroundColor: showAlignMenu
-                    ? "rgba(2, 132, 199, 0.24)"
-                    : "rgba(2, 132, 199, 0.12)",
-                  color: "#0284c7",
-                  border: "1px solid rgba(2, 132, 199, 0.25)",
-                  fontWeight: 600,
-                }}
-              >
-                <AlignCenter size={13} />
-                <span className="canvas-btn-label">对齐 ▾</span>
-              </button>
-              {showAlignMenu && (
-                <div
-                  className="canvas-align-menu"
-                  style={{
-                    position: "absolute",
-                    top: "calc(100% + 8px)",
-                    right: 0,
-                    zIndex: 300,
-                    minWidth: 196,
-                    padding: "6px 0",
-                    borderRadius: 10,
-                    backgroundColor: theme === "eink" ? "#f4f1ea" : !isDark ? "#ffffff" : "#1e293b",
-                    border: `1px solid ${colors.cardBorder}`,
-                    boxShadow: "0 12px 36px rgba(0,0,0,0.22)",
-                    fontSize: 12.5,
-                    color: colors.cardText,
-                    userSelect: "none",
-                  }}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="canvas-ctx-section-label">中心对齐</div>
-                  {(
-                    [
-                      ["horizontal", "水平中线对齐", AlignJustify],
-                      ["vertical", "垂直中线对齐", AlignCenter],
-                    ] as const
-                  ).map(([dir, label, Icon]) => (
-                    <div
-                      key={dir}
-                      className="canvas-ctx-item"
-                      onClick={() => {
-                        handleAlignSelected(dir);
-                        setShowAlignMenu(false);
-                      }}
-                    >
-                      <Icon size={13} />
-                      <span style={{ fontWeight: 600 }}>{label}</span>
-                    </div>
-                  ))}
-
-                  <div className="canvas-ctx-divider" />
-                  <div className="canvas-ctx-section-label">整体排布</div>
-                  {selectedNodeIds.size >= 3 && (
-                    <>
-                      <div
-                        className="canvas-ctx-item"
-                        title="将选中卡片沿圆周均匀排布，配合「环形闭环连线」即可得到完全圆形的闭环"
-                        onClick={() => handleAlignSelected("circle")}
-                      >
-                        <RotateCw size={13} color="#a855f7" />
-                        <span style={{ fontWeight: 600 }}>环形对齐 (圆周等分)</span>
-                      </div>
-                      {selectedRingInfo && (
-                        <div className="canvas-ctx-slider" onMouseDown={(e) => e.stopPropagation()}>
-                          <div className="canvas-ctx-section-label">
-                            环半径 · {Math.round(ringRadiusDraft ?? selectedRingInfo.layout.radius)}
-                            px
-                          </div>
-                          <input
-                            type="range"
-                            aria-label="环半径"
-                            min={Math.round(selectedRingInfo.layout.minRadius)}
-                            max={Math.round(selectedRingInfo.maxRadius)}
-                            step={2}
-                            value={Math.round(ringRadiusDraft ?? selectedRingInfo.layout.radius)}
-                            onPointerDown={handleRingSliderStart}
-                            onChange={(e) => handleRingSliderChange(Number(e.target.value))}
-                            onPointerUp={handleRingSliderCommit}
-                            onKeyUp={handleRingSliderCommit}
-                            onBlur={handleRingSliderCommit}
-                          />
-                          <div className="canvas-ctx-slider-hint">
-                            也可直接拖动环上的卡片实时调整间距
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  )}
-                  <div
-                    className="canvas-ctx-item"
-                    title="将选中卡片按规整的矩形网格矩阵排布"
-                    onClick={() => {
-                      handleAlignSelected("grid");
-                      setShowAlignMenu(false);
-                    }}
-                  >
-                    <Grid size={13} color="#10b981" />
-                    <span style={{ fontWeight: 600 }}>矩形排布 (网格矩阵)</span>
-                  </div>
-
-                  <div className="canvas-ctx-divider" />
-                  <div className="canvas-ctx-section-label">边缘对齐</div>
-                  {(
-                    [
-                      ["left", "左对齐", AlignLeft],
-                      ["center", "水平居中", null],
-                      ["right", "右对齐", AlignRight],
-                      ["top", "顶端对齐", ArrowUpToLine],
-                      ["bottom", "底端对齐", ArrowDownToLine],
-                    ] as const
-                  ).map(([dir, label, Icon]) => (
-                    <div
-                      key={dir}
-                      className="canvas-ctx-item"
-                      onClick={() => {
-                        handleAlignSelected(dir);
-                        setShowAlignMenu(false);
-                      }}
-                    >
-                      {Icon ? <Icon size={13} /> : <AlignCenter size={13} />}
-                      <span>{label}</span>
-                    </div>
-                  ))}
-
-                  {selectedNodeIds.size >= 3 && (
-                    <>
-                      <div className="canvas-ctx-divider" />
-                      <div className="canvas-ctx-section-label">等距分布</div>
-                      <div
-                        className="canvas-ctx-item"
-                        onClick={() => {
-                          handleAlignSelected("distribute-h");
-                          setShowAlignMenu(false);
-                        }}
-                      >
-                        <AlignHorizontalJustifyCenter size={13} />
-                        <span>水平等距分布</span>
-                      </div>
-                      <div
-                        className="canvas-ctx-item"
-                        onClick={() => {
-                          handleAlignSelected("distribute-v");
-                          setShowAlignMenu(false);
-                        }}
-                      >
-                        <AlignVerticalJustifyCenter size={13} />
-                        <span>垂直等距分布</span>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-          </>
-        )}
-
-        {selectedNodeIds.size === 1 && editable && (
-          <>
-            <button
-              className="canvas-tool-btn"
-              onClick={() => handleSpawnConnectedChild(Array.from(selectedNodeIds)[0], "right")}
-              title="从当前卡片派生子想法 (快捷键: Tab)"
-              style={{
-                ...toolBtnStyle(theme, colors),
-                backgroundColor: "rgba(16, 185, 129, 0.12)",
-                color: "#10b981",
-                border: "1px solid rgba(16, 185, 129, 0.3)",
-                fontWeight: 500,
-              }}
-            >
-              <GitBranch size={13} />
-              <span className="canvas-btn-label">派生想法</span>
-            </button>
-            <button
-              className="canvas-tool-btn"
-              onClick={() => {
-                const id = Array.from(selectedNodeIds)[0];
-                setSpawnModalState({ nodeId: id, count: 3, direction: "right" });
-              }}
-              title="从当前卡片批量派生多个分支 (弹窗设置数量与方向)"
-              style={{
-                ...toolBtnStyle(theme, colors),
-                backgroundColor: "rgba(139, 92, 246, 0.12)",
-                color: "#8b5cf6",
-                border: "1px solid rgba(139, 92, 246, 0.3)",
-                fontWeight: 500,
-              }}
-            >
-              <Share2 size={13} />
-              <span className="canvas-btn-label">批量派生...</span>
-            </button>
-          </>
-        )}
-
-        <div style={{ width: 1, height: 18, background: colors.cardBorder }} />
-
-        <button
-          className="canvas-tool-btn"
-          onClick={handleUndo}
-          disabled={history.past.length === 0}
-          title="撤销 (Ctrl+Z)"
-          style={{ ...toolBtnStyle(theme, colors), opacity: history.past.length > 0 ? 1 : 0.4 }}
-        >
-          <RotateCcw size={14} />
-        </button>
-        <button
-          className="canvas-tool-btn"
-          onClick={handleRedo}
-          disabled={history.future.length === 0}
-          title="重做 (Ctrl+Y)"
-          style={{ ...toolBtnStyle(theme, colors), opacity: history.future.length > 0 ? 1 : 0.4 }}
-        >
-          <RotateCw size={14} />
-        </button>
-
-        <div style={{ width: 1, height: 18, background: colors.cardBorder }} />
-
-        <button
-          className="canvas-tool-btn highlight"
-          onClick={handleOpenExtractModal}
-          title="将白板空间卡片逆向萃取为 Markdown 专著"
-          style={{
-            ...toolBtnStyle(theme, colors),
-            background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-            color: "#ffffff",
-            fontWeight: 600,
-          }}
-        >
-          <BookOpen size={14} /> <span className="canvas-btn-label">萃取长文</span>
-        </button>
-
-        <button
-          className="canvas-tool-btn"
-          onClick={() => setShowExportModal(true)}
-          title="导出白板为高清图片 (PNG / 矢量 SVG)"
-          style={{
-            ...toolBtnStyle(theme, colors),
-            color: "#0284c7",
-            fontWeight: 600,
-          }}
-        >
-          <ImageIcon size={14} /> <span className="canvas-btn-label">导出图片</span>
-        </button>
-
-        <button
-          className={`canvas-tool-btn ${isPresentationMode ? "active" : ""}`}
-          onClick={handleTogglePresentation}
-          title={isPresentationMode ? "退出演示模式 (Esc)" : "进入白板分镜演示模式 (F5)"}
-          style={{
-            ...toolBtnStyle(theme, colors),
-            color: isPresentationMode
-              ? isDark
-                ? "#818cf8"
-                : isEink
-                  ? "#1e293b"
-                  : "#6366f1"
-              : colors.cardText,
-            fontWeight: 600,
-            backgroundColor: isPresentationMode
-              ? isDark
-                ? "rgba(129, 140, 248, 0.22)"
-                : isEink
-                  ? "rgba(30, 41, 59, 0.12)"
-                  : "rgba(99, 102, 241, 0.15)"
-              : "transparent",
-          }}
-        >
-          <Play size={14} />{" "}
-          <span className="canvas-btn-label">{isPresentationMode ? "退出演示" : "演示 (F5)"}</span>
-        </button>
-
-        <div style={{ width: 1, height: 18, background: colors.cardBorder }} />
-
-        {/* Zoom Controls */}
-        <button
-          className="canvas-tool-btn"
-          onClick={() => handleZoom(0.85)}
-          title="缩小"
-          style={toolBtnStyle(theme, colors)}
-        >
-          <ZoomOut size={14} />
-        </button>
-        <span
-          style={{
-            fontSize: 12,
-            fontWeight: 500,
-            minWidth: 42,
-            textAlign: "center",
-            cursor: "pointer",
-          }}
-          onClick={() => setViewport((prev) => ({ ...prev, zoom: 1.0 }))}
-          title="重置为 100% 缩放"
-        >
-          {Math.round(viewport.zoom * 100)}%
-        </span>
-        <button
-          className="canvas-tool-btn"
-          onClick={() => handleZoom(1.15)}
-          title="放大"
-          style={toolBtnStyle(theme, colors)}
-        >
-          <ZoomIn size={14} />
-        </button>
-        <button
-          className="canvas-tool-btn"
-          onClick={handleZoomToFit}
-          title="自适应全图"
-          style={toolBtnStyle(theme, colors)}
-        >
-          <Scan size={14} />
-        </button>
-        <button
-          className={`canvas-tool-btn ${isFullscreenActive ? "active" : ""}`}
-          onClick={handleToggleFullscreen}
-          title={isFullscreenActive ? "退出全屏 (F11 / Esc)" : "全屏沉浸白板 (F11)"}
-          style={{
-            ...toolBtnStyle(theme, colors),
-            color: isFullscreenActive
-              ? isDark
-                ? "#818cf8"
-                : isEink
-                  ? "#1e293b"
-                  : "#6366f1"
-              : colors.cardText,
-            backgroundColor: isFullscreenActive
-              ? isDark
-                ? "rgba(129, 140, 248, 0.22)"
-                : isEink
-                  ? "rgba(30, 41, 59, 0.12)"
-                  : "rgba(99, 102, 241, 0.15)"
-              : "transparent",
-          }}
-        >
-          {isFullscreenActive ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-        </button>
-
-        {onClose && (
-          <>
-            <div style={{ width: 1, height: 18, background: colors.cardBorder }} />
-            <button
-              className="canvas-tool-btn close"
-              onClick={onClose}
-              title="退出白板模式"
-              style={{ ...toolBtnStyle(theme, colors), color: "#f43f5e" }}
-            >
-              <X size={15} />
-            </button>
-          </>
-        )}
-      </div>
+      {/* 1. TOP FLOATING GLASSMORPHIC TOOLBAR (extracted component, wave 4) */}
+      <CanvasToolbar
+        theme={theme}
+        colors={colors}
+        isDark={isDark}
+        isEink={isEink}
+        isNarrow={isNarrow}
+        title={title}
+        onSave={onSave}
+        isDirty={isDirty}
+        isSaving={isSaving}
+        handleSave={handleSave}
+        editable={editable}
+        handleAddTextCard={handleAddTextCard}
+        handleTriggerInsertMedia={handleTriggerInsertMedia}
+        setShowFilePicker={setShowFilePicker}
+        handleAddGroup={handleAddGroup}
+        isBoxSelectMode={isBoxSelectMode}
+        setIsBoxSelectMode={setIsBoxSelectMode}
+        selectedNodeIds={selectedNodeIds}
+        currentMultiRootNode={currentMultiRootNode}
+        currentMultiRootTitle={currentMultiRootTitle}
+        handleConnectOneToMany={handleConnectOneToMany}
+        handleConnectSelectedNodes={handleConnectSelectedNodes}
+        handleConnectLoopNodes={handleConnectLoopNodes}
+        showAlignMenu={showAlignMenu}
+        setShowAlignMenu={setShowAlignMenu}
+        handleAlignSelected={handleAlignSelected}
+        nodes={data.nodes}
+        latestDataRef={latestDataRef}
+        setData={setData}
+        pushHistory={pushHistory}
+        handleSpawnConnectedChild={handleSpawnConnectedChild}
+        setSpawnModalState={setSpawnModalState}
+        history={history}
+        handleUndo={handleUndo}
+        handleRedo={handleRedo}
+        handleOpenExtractModal={handleOpenExtractModal}
+        setShowExportModal={setShowExportModal}
+        isPresentationMode={isPresentationMode}
+        handleTogglePresentation={handleTogglePresentation}
+        handleZoom={handleZoom}
+        viewport={viewport}
+        setViewport={setViewport}
+        handleZoomToFit={handleZoomToFit}
+        isFullscreenActive={isFullscreenActive}
+        handleToggleFullscreen={handleToggleFullscreen}
+        onClose={onClose}
+      />
 
       {/* 2. INFINITE CANVAS 2D TRANSFORM VIEWPORT (Hardware accelerated) */}
       <div
@@ -3674,411 +2874,124 @@ export const CanvasView = memo(function CanvasView({
         onNavigate={handleMinimapNavigate}
       />
 
-      {/* 5. MODAL: INSERT NOTE FILE PICKER */}
-      {showFilePicker && (
-        <FilePickerModal
-          chapters={allChapters}
-          searchKeyword={searchKeyword}
-          onSearchChange={setSearchKeyword}
-          theme={theme}
-          colors={colors}
-          onPick={handleAddFileCard}
-          onClose={() => setShowFilePicker(false)}
-        />
-      )}
-
-      {/* 6. MODAL: EXTRACT CANVAS TO ARTICLE PREVIEW */}
-      {showExtractModal && (
-        <ExtractModal
-          markdown={extractedMarkdown}
-          theme={theme}
-          colors={colors}
-          copied={copiedNotification}
-          canSaveAsNote={Boolean(onExtractToNote)}
-          onCopy={handleCopyExtracted}
-          onSaveAsNote={handleSaveAsNote}
-          onClose={() => setShowExtractModal(false)}
-        />
-      )}
-
-      {/* 6.5. MODAL: EXPORT CANVAS AS IMAGE */}
-      {showExportModal && (
-        <ExportModal
-          nodeCount={data.nodes.length}
-          edgeCount={data.edges.length}
-          format={exportFormat}
-          onFormatChange={setExportFormat}
-          background={exportBg}
-          onBackgroundChange={setExportBg}
-          isExporting={isExporting}
-          copyFeedback={exportCopyFeedback}
-          theme={theme}
-          colors={colors}
-          onCopy={handleCopyExport}
-          onDownload={handleDownloadExport}
-          onClose={() => setShowExportModal(false)}
-        />
-      )}
-
-      {/* 6.6. MODAL: BATCH SPAWN BRANCHES */}
-      {spawnModalState && (
-        <SpawnBranchModal
-          count={spawnModalState.count}
-          direction={spawnModalState.direction}
-          onCountChange={(count) =>
-            setSpawnModalState((prev) => (prev ? { ...prev, count } : null))
-          }
-          onDirectionChange={(direction) =>
-            setSpawnModalState((prev) => (prev ? { ...prev, direction } : null))
-          }
-          theme={theme}
-          colors={colors}
-          onConfirm={handleConfirmBatchSpawn}
-          onClose={() => setSpawnModalState(null)}
-        />
-      )}
-
+      {/* 5-9. OVERLAY LAYER — the note-picker / extract / export / spawn
+          modals, the portalled right-click context menu, the toast and the
+          media lightbox (extracted component, wave 4). The overlay state it
+          renders stays up in CanvasView because non-overlay code writes it:
+          the gesture hooks take setContextMenu, the keyboard chains close the
+          modals, the toolbar opens the export modal, showToast writes the
+          toast, openMediaPreview writes the lightbox. */}
+      <CanvasOverlayMenus
+        theme={theme}
+        colors={colors}
+        isDark={isDark}
+        editable={editable}
+        data={data}
+        nodeMap={nodeMap}
+        selectedNodeIds={selectedNodeIds}
+        selectedEdgeIds={selectedEdgeIds}
+        connectedInternalEdges={connectedInternalEdges}
+        batchCustomColor={batchCustomColor}
+        batchEdgeCustomColor={batchEdgeCustomColor}
+        contextMenu={contextMenu}
+        setContextMenu={setContextMenu}
+        contextMenuRef={contextMenuRef}
+        allChapters={allChapters}
+        showFilePicker={showFilePicker}
+        setShowFilePicker={setShowFilePicker}
+        handleAddFileCard={handleAddFileCard}
+        showExtractModal={showExtractModal}
+        setShowExtractModal={setShowExtractModal}
+        extractedMarkdown={extractedMarkdown}
+        copiedNotification={copiedNotification}
+        handleCopyExtracted={handleCopyExtracted}
+        handleSaveAsNote={handleSaveAsNote}
+        onExtractToNote={onExtractToNote}
+        showExportModal={showExportModal}
+        setShowExportModal={setShowExportModal}
+        exportFormat={exportFormat}
+        setExportFormat={setExportFormat}
+        exportBg={exportBg}
+        setExportBg={setExportBg}
+        isExporting={isExporting}
+        exportCopyFeedback={exportCopyFeedback}
+        handleCopyExport={handleCopyExport}
+        handleDownloadExport={handleDownloadExport}
+        spawnModalState={spawnModalState}
+        setSpawnModalState={setSpawnModalState}
+        handleConfirmBatchSpawn={handleConfirmBatchSpawn}
+        handleAddTextCard={handleAddTextCard}
+        handlePasteClipboardAsCard={handlePasteClipboardAsCard}
+        handleTriggerInsertImage={handleTriggerInsertImage}
+        handleTriggerInsertVideo={handleTriggerInsertVideo}
+        handleTriggerInsertAudio={handleTriggerInsertAudio}
+        handleAddGroup={handleAddGroup}
+        isBoxSelectMode={isBoxSelectMode}
+        setIsBoxSelectMode={setIsBoxSelectMode}
+        handleSelectAll={handleSelectAll}
+        handleSelectAllEdges={handleSelectAllEdges}
+        handleAlignToGrid={handleAlignToGrid}
+        handleZoomToFit={handleZoomToFit}
+        setViewport={setViewport}
+        history={history}
+        handleUndo={handleUndo}
+        handleRedo={handleRedo}
+        onSave={onSave}
+        handleSave={handleSave}
+        handleOpenExtractModal={handleOpenExtractModal}
+        handleToggleEdgeStyle={handleToggleEdgeStyle}
+        handleToggleEdgeArrow={handleToggleEdgeArrow}
+        handleToggleEdgeStrokePattern={handleToggleEdgeStrokePattern}
+        handleReverseEdge={handleReverseEdge}
+        handleEdgeColorChange={handleEdgeColorChange}
+        handleEdgeLabelChange={handleEdgeLabelChange}
+        handleEdgeLabelShapeChange={handleEdgeLabelShapeChange}
+        handleSetEdgeAnchorSide={handleSetEdgeAnchorSide}
+        handleDeleteEdge={handleDeleteEdge}
+        handleBatchSetEdgeStyle={handleBatchSetEdgeStyle}
+        handleBatchCycleStrokePattern={handleBatchCycleStrokePattern}
+        handleBatchToggleArrow={handleBatchToggleArrow}
+        handleBatchSetEdgeColor={handleBatchSetEdgeColor}
+        handleBatchDeleteEdges={handleBatchDeleteEdges}
+        handleBatchReverseEdges={handleBatchReverseEdges}
+        previewBatchEdgeColor={previewBatchEdgeColor}
+        previewEdgeColor={previewEdgeColor}
+        debounceCommitColorPick={debounceCommitColorPick}
+        handleAlignSelected={handleAlignSelected}
+        handleSpawnConnectedChild={handleSpawnConnectedChild}
+        handleDisconnectSelectedNodesEdges={handleDisconnectSelectedNodesEdges}
+        handleDisconnectNodeEdges={handleDisconnectNodeEdges}
+        handleCopyNodeText={handleCopyNodeText}
+        handleCopyNodeWikilink={handleCopyNodeWikilink}
+        handleExtractCardToNote={handleExtractCardToNote}
+        handleSelectGroupNodes={handleSelectGroupNodes}
+        handleFitGroupSize={handleFitGroupSize}
+        handleDissolveGroup={handleDissolveGroup}
+        handleDeleteGroupWithContents={handleDeleteGroupWithContents}
+        handleGroupSelectedNodes={handleGroupSelectedNodes}
+        handleResetNodeSize={handleResetNodeSize}
+        handleNodeColorChange={handleNodeColorChange}
+        handleBatchColorChange={handleBatchColorChange}
+        handleDeleteNode={handleDeleteNode}
+        handleDeleteSelected={handleDeleteSelected}
+        handleDuplicateNode={handleDuplicateNode}
+        handleDuplicateSelected={handleDuplicateSelected}
+        handleBringToFront={handleBringToFront}
+        handleSendToBack={handleSendToBack}
+        handleConnectSelectedNodes={handleConnectSelectedNodes}
+        handleConnectOneToMany={handleConnectOneToMany}
+        handleConnectLoopNodes={handleConnectLoopNodes}
+        previewNodeColor={previewNodeColor}
+        previewBatchNodeColor={previewBatchNodeColor}
+        setEditingNodeId={setEditingNodeId}
+        setEditingText={setEditingText}
+        onOpenFile={onOpenFile}
+        toastMessage={toastMessage}
+        lightboxMedia={lightboxMedia}
+        setLightboxMedia={setLightboxMedia}
+      />
       {/* 7. MARQUEE SELECTION BOX */}
       <MarqueeSelectionBox box={selectionBox} viewport={viewport} />
-
-      {/* 8. RIGHT-CLICK CONTEXT MENU (MINDMAP INSPIRED) */}
-      {contextMenu &&
-        typeof document !== "undefined" &&
-        createPortal(
-          <div
-            ref={contextMenuRef}
-            className="canvas-context-menu"
-            style={{
-              position: "fixed",
-              left: contextMenu.x,
-              top: contextMenu.y,
-              zIndex: 10000,
-              backgroundColor: theme === "eink" ? "#f4f1ea" : !isDark ? "#ffffff" : "#1e293b",
-              color: colors.cardText,
-              border: `1px solid ${colors.cardBorder}`,
-              boxShadow: !isDark ? "0 10px 32px rgba(0,0,0,0.14)" : "0 14px 40px rgba(0,0,0,0.55)",
-              borderRadius: 10,
-              padding: "6px 0",
-              minWidth: 230,
-              maxWidth: 300,
-              maxHeight: "calc(100% - 24px)",
-              overflowY: "auto",
-              fontSize: 12.5,
-              userSelect: "none",
-            }}
-            onMouseDown={(e) => e.stopPropagation()}
-            onClick={(e) => e.stopPropagation()}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-            }}
-            // The menu is portalled to `document.body`, so the canvas's wheel
-            // ownership check cannot see it — that check walks up the *DOM* to the
-            // canvas root, and this menu's ancestors are `body` and `html`. The
-            // event still reaches the canvas because React propagates through the
-            // component tree, so without this the menu scrolled and the whiteboard
-            // panned at the same time. `NodeContextMenu` and `EdgeContextMenu` are
-            // rendered inside this element, so this one handler covers all three.
-            onWheel={(e) => e.stopPropagation()}
-          >
-            {contextMenu.targetEdgeId ? (
-              <EdgeContextMenu
-                data={data}
-                nodeMap={nodeMap}
-                contextMenu={contextMenu}
-                selectedEdgeIds={selectedEdgeIds}
-                batchEdgeCustomColor={batchEdgeCustomColor}
-                colors={colors}
-                isDark={isDark}
-                setContextMenu={setContextMenu}
-                handleToggleEdgeStyle={handleToggleEdgeStyle}
-                handleToggleEdgeArrow={handleToggleEdgeArrow}
-                handleToggleEdgeStrokePattern={handleToggleEdgeStrokePattern}
-                handleReverseEdge={handleReverseEdge}
-                handleEdgeColorChange={handleEdgeColorChange}
-                handleEdgeLabelChange={handleEdgeLabelChange}
-                handleEdgeLabelShapeChange={handleEdgeLabelShapeChange}
-                handleSetEdgeAnchorSide={handleSetEdgeAnchorSide}
-                handleDeleteEdge={handleDeleteEdge}
-                handleBatchSetEdgeStyle={handleBatchSetEdgeStyle}
-                handleBatchCycleStrokePattern={handleBatchCycleStrokePattern}
-                handleBatchToggleArrow={handleBatchToggleArrow}
-                handleBatchSetEdgeColor={handleBatchSetEdgeColor}
-                handleBatchDeleteEdges={handleBatchDeleteEdges}
-                handleBatchReverseEdges={handleBatchReverseEdges}
-                previewBatchEdgeColor={previewBatchEdgeColor}
-                previewEdgeColor={previewEdgeColor}
-                debounceCommitColorPick={debounceCommitColorPick}
-              />
-            ) : contextMenu.targetNodeId ? (
-              <NodeContextMenu
-                data={data}
-                contextMenu={contextMenu}
-                selectedNodeIds={selectedNodeIds}
-                connectedInternalEdges={connectedInternalEdges}
-                batchCustomColor={batchCustomColor}
-                colors={colors}
-                setContextMenu={setContextMenu}
-                setSpawnModalState={setSpawnModalState}
-                handleAlignSelected={handleAlignSelected}
-                handleSpawnConnectedChild={handleSpawnConnectedChild}
-                handleDisconnectSelectedNodesEdges={handleDisconnectSelectedNodesEdges}
-                handleDisconnectNodeEdges={handleDisconnectNodeEdges}
-                handleCopyNodeText={handleCopyNodeText}
-                handleCopyNodeWikilink={handleCopyNodeWikilink}
-                handleExtractCardToNote={handleExtractCardToNote}
-                handleSelectGroupNodes={handleSelectGroupNodes}
-                handleFitGroupSize={handleFitGroupSize}
-                handleDissolveGroup={handleDissolveGroup}
-                handleDeleteGroupWithContents={handleDeleteGroupWithContents}
-                handleGroupSelectedNodes={handleGroupSelectedNodes}
-                handleResetNodeSize={handleResetNodeSize}
-                handleNodeColorChange={handleNodeColorChange}
-                handleBatchColorChange={handleBatchColorChange}
-                handleDeleteNode={handleDeleteNode}
-                handleDeleteSelected={handleDeleteSelected}
-                handleDuplicateNode={handleDuplicateNode}
-                handleDuplicateSelected={handleDuplicateSelected}
-                handleBringToFront={handleBringToFront}
-                handleSendToBack={handleSendToBack}
-                handleConnectSelectedNodes={handleConnectSelectedNodes}
-                handleConnectOneToMany={handleConnectOneToMany}
-                handleConnectLoopNodes={handleConnectLoopNodes}
-                previewNodeColor={previewNodeColor}
-                previewBatchNodeColor={previewBatchNodeColor}
-                debounceCommitColorPick={debounceCommitColorPick}
-                editable={editable}
-                setEditingNodeId={setEditingNodeId}
-                setEditingText={setEditingText}
-                onExtractToNote={onExtractToNote}
-                onOpenFile={onOpenFile}
-              />
-            ) : (
-              // 3. Canvas Background Context Menu
-              <>
-                <div
-                  className="canvas-ctx-header"
-                  style={{
-                    padding: "6px 12px 6px",
-                    fontSize: 11,
-                    fontWeight: 600,
-                    color: colors.edgeColor,
-                    borderBottom: `1px solid ${colors.cardHeaderBorder}`,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <span>白板快捷菜单</span>
-                  <button
-                    onClick={() => setContextMenu(null)}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      padding: 0,
-                      cursor: "pointer",
-                      color: colors.cardText,
-                      opacity: 0.6,
-                      display: "flex",
-                      alignItems: "center",
-                    }}
-                    title="关闭菜单"
-                  >
-                    <X size={12} />
-                  </button>
-                </div>
-
-                {editable && (
-                  <>
-                    <div className="canvas-ctx-section-label">🎯 新建与引入</div>
-                    <div
-                      className="canvas-ctx-item"
-                      onClick={() => handleAddTextCard(contextMenu.canvasX, contextMenu.canvasY)}
-                    >
-                      <Plus size={13} />
-                      <span>在此处新建文本卡片</span>
-                    </div>
-                    <div
-                      className="canvas-ctx-item"
-                      onClick={() =>
-                        handlePasteClipboardAsCard(contextMenu.canvasX, contextMenu.canvasY)
-                      }
-                    >
-                      <Clipboard size={13} color="#10b981" />
-                      <span>从剪贴板粘贴为卡片</span>
-                      <span className="canvas-ctx-shortcut">Ctrl+V</span>
-                    </div>
-                    <div
-                      className="canvas-ctx-item"
-                      onClick={() => {
-                        handleTriggerInsertImage(contextMenu.canvasX, contextMenu.canvasY);
-                        setContextMenu(null);
-                      }}
-                    >
-                      <ImageIcon size={13} color="#0284c7" />
-                      <span>插入图片...</span>
-                    </div>
-                    <div
-                      className="canvas-ctx-item"
-                      onClick={() => {
-                        handleTriggerInsertVideo(contextMenu.canvasX, contextMenu.canvasY);
-                        setContextMenu(null);
-                      }}
-                    >
-                      <Video size={13} color="#ef4444" />
-                      <span>插入视频...</span>
-                    </div>
-                    <div
-                      className="canvas-ctx-item"
-                      onClick={() => {
-                        handleTriggerInsertAudio(contextMenu.canvasX, contextMenu.canvasY);
-                        setContextMenu(null);
-                      }}
-                    >
-                      <Music size={13} color="#a855f7" />
-                      <span>插入音频...</span>
-                    </div>
-                    <div
-                      className="canvas-ctx-item"
-                      onClick={() => {
-                        setShowFilePicker(true);
-                        setContextMenu(null);
-                      }}
-                    >
-                      <FileText size={13} />
-                      <span>引入知识库笔记...</span>
-                    </div>
-                    <div
-                      className="canvas-ctx-item"
-                      onClick={() => handleAddGroup(contextMenu.canvasX, contextMenu.canvasY)}
-                    >
-                      <Boxes size={13} />
-                      <span>在此处新建分组容器</span>
-                    </div>
-                    <div className="canvas-ctx-divider" />
-                  </>
-                )}
-
-                <div className="canvas-ctx-section-label">📐 视图与选择</div>
-                <div
-                  className="canvas-ctx-item"
-                  onClick={() => {
-                    setIsBoxSelectMode((prev) => !prev);
-                    setContextMenu(null);
-                  }}
-                >
-                  <BoxSelect size={13} />
-                  <span>{isBoxSelectMode ? "关闭框选模式" : "框选卡片 (Shift+拖动)"}</span>
-                </div>
-
-                <div className="canvas-ctx-item" onClick={handleSelectAll}>
-                  <CheckSquare size={13} />
-                  <span>全选所有卡片</span>
-                  <span className="canvas-ctx-shortcut">Ctrl+A</span>
-                </div>
-
-                {data.edges.length > 0 && (
-                  <div className="canvas-ctx-item" onClick={handleSelectAllEdges}>
-                    <Link size={13} color="#0284c7" />
-                    <span>全选所有连线 ({data.edges.length} 条)</span>
-                  </div>
-                )}
-
-                {editable && (
-                  <div className="canvas-ctx-item" onClick={handleAlignToGrid}>
-                    <Grid size={13} color="#0284c7" />
-                    <span>对齐所有卡片到网格 (20px)</span>
-                  </div>
-                )}
-
-                <div
-                  className="canvas-ctx-item"
-                  onClick={() => {
-                    handleZoomToFit();
-                    setContextMenu(null);
-                  }}
-                >
-                  <Maximize2 size={13} />
-                  <span>自适应全图</span>
-                </div>
-
-                <div
-                  className="canvas-ctx-item"
-                  onClick={() => {
-                    setViewport((prev) => ({ ...prev, zoom: 1.0 }));
-                    setContextMenu(null);
-                  }}
-                >
-                  <ZoomIn size={13} />
-                  <span>重置为 100% 缩放</span>
-                </div>
-
-                <div className="canvas-ctx-divider" />
-                <div className="canvas-ctx-section-label">⚡ 历史与保存</div>
-
-                <div
-                  className="canvas-ctx-item"
-                  onClick={() => {
-                    handleUndo();
-                    setContextMenu(null);
-                  }}
-                  style={{ opacity: history.past.length > 0 ? 1 : 0.4 }}
-                >
-                  <RotateCcw size={13} />
-                  <span>撤销上一步</span>
-                  <span className="canvas-ctx-shortcut">Ctrl+Z</span>
-                </div>
-
-                <div
-                  className="canvas-ctx-item"
-                  onClick={() => {
-                    handleRedo();
-                    setContextMenu(null);
-                  }}
-                  style={{ opacity: history.future.length > 0 ? 1 : 0.4 }}
-                >
-                  <RotateCw size={13} />
-                  <span>重做下一步</span>
-                  <span className="canvas-ctx-shortcut">Ctrl+Y</span>
-                </div>
-
-                {onSave && (
-                  <div className="canvas-ctx-item" onClick={handleSave}>
-                    <Save size={13} />
-                    <span>保存白板</span>
-                    <span className="canvas-ctx-shortcut">Ctrl+S</span>
-                  </div>
-                )}
-
-                <div className="canvas-ctx-divider" />
-                <div className="canvas-ctx-section-label">📦 导出与发布</div>
-
-                <div
-                  className="canvas-ctx-item"
-                  onClick={() => {
-                    handleOpenExtractModal();
-                    setContextMenu(null);
-                  }}
-                >
-                  <BookOpen size={13} color="#10b981" />
-                  <span>萃取为长文专著...</span>
-                </div>
-
-                <div
-                  className="canvas-ctx-item"
-                  onClick={() => {
-                    setShowExportModal(true);
-                    setContextMenu(null);
-                  }}
-                >
-                  <ImageIcon size={13} color="#0284c7" />
-                  <span>📸 导出白板为图片...</span>
-                </div>
-              </>
-            )}
-          </div>,
-          document.body,
-        )}
 
       {/* 8.5 Floating Batch Toolbar for Multiple Selected Edges */}
       {selectedEdgeIds.size > 1 && (
@@ -4126,251 +3039,31 @@ export const CanvasView = memo(function CanvasView({
           document.body,
         )}
 
-      {/* 9. Floating Toast Feedback */}
-      <CanvasToast message={toastMessage} lifted={selectedEdgeIds.size > 1} isDark={isDark} />
-
-      {/* Media preview lightbox (double-click an image / video / audio card) */}
-      <MediaLightbox media={lightboxMedia} onClose={() => setLightboxMedia(null)} />
-
-      {/* 10. Presentation Mode Floating Controls & Slide Drawer */}
-      {isPresentationMode &&
-        presentationSequence.length > 0 &&
-        (() => {
-          const presentationAccent = isDark ? "#818cf8" : isEink ? "#1e293b" : "#6366f1";
-          const presentationAccentBg = isDark
-            ? "rgba(129, 140, 248, 0.22)"
-            : isEink
-              ? "rgba(30, 41, 59, 0.12)"
-              : "rgba(99, 102, 241, 0.15)";
-          return (
-            <>
-              {/* Slide Overview Drawer / Popover */}
-              {showSlideDrawer && (
-                <div
-                  ref={slideDrawerRef}
-                  className="canvas-slide-drawer"
-                  onClick={(e) => e.stopPropagation()}
-                  onMouseDown={(e) => e.stopPropagation()}
-                >
-                  <div className="canvas-slide-drawer-header">
-                    <div className="canvas-slide-drawer-title">
-                      <Film size={14} color={presentationAccent} />
-                      <span>分镜大纲 (共 {presentationSequence.length} 幕)</span>
-                    </div>
-                    <button
-                      type="button"
-                      className="canvas-slide-drawer-close"
-                      onClick={() => setShowSlideDrawer(false)}
-                      title="关闭分镜大纲 (Esc / L)"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                  <div className="canvas-slide-drawer-list">
-                    {presentationSequence.map((nodeId, idx) => {
-                      const n = nodeMap.get(nodeId);
-                      if (!n) return null;
-                      const isActive = idx === currentSlideIndex;
-                      const parentContainer = findContainerForNode(n, data.nodes);
-                      let icon = <FileText size={13} />;
-                      let title = "";
-                      if (n.type === "text") {
-                        icon = (
-                          <FileText
-                            size={13}
-                            color={isActive ? presentationAccent : colors.cardText}
-                          />
-                        );
-                        title = n.text.trim().split("\n")[0] || "文本卡片";
-                      } else if (n.type === "file") {
-                        icon = <ImageIcon size={13} color="#0284c7" />;
-                        title = n.file ? n.file.split(/[/\\]/).pop() || n.file : "文件卡片";
-                      } else if (n.type === "link") {
-                        icon = <ExternalLink size={13} color="#10b981" />;
-                        title = n.url || "网页卡片";
-                      } else if (n.type === "group") {
-                        icon = <Boxes size={13} color="#f59e0b" />;
-                        title = (n as CanvasGroupNode).label || "独立分组帧";
-                      }
-
-                      return (
-                        <button
-                          key={nodeId}
-                          type="button"
-                          className={`canvas-slide-drawer-item ${isActive ? "active" : ""}`}
-                          onClick={() => {
-                            handleJumpToSlide(idx);
-                          }}
-                        >
-                          <span className="canvas-slide-index">
-                            {String(idx + 1).padStart(2, "0")}
-                          </span>
-                          <span className="canvas-slide-icon">{icon}</span>
-                          <span className="canvas-slide-name" title={title}>
-                            {title}
-                          </span>
-                          {parentContainer && parentContainer.label && (
-                            <span
-                              className="canvas-slide-group-tag"
-                              title={`所属分组: ${parentContainer.label}`}
-                            >
-                              {parentContainer.label}
-                            </span>
-                          )}
-                          {isActive && <span className="canvas-slide-playing-badge">演播中</span>}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              <div
-                className="canvas-presentation-bar"
-                style={{
-                  backgroundColor: isDark ? "rgba(15, 23, 42, 0.94)" : "rgba(255, 255, 255, 0.96)",
-                  backdropFilter: "blur(16px)",
-                  border: `1px solid ${isDark ? "rgba(255, 255, 255, 0.15)" : "rgba(0, 0, 0, 0.12)"}`,
-                  color: colors.cardText,
-                }}
-                onClick={(e) => e.stopPropagation()}
-                onMouseDown={(e) => e.stopPropagation()}
-              >
-                <span
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 700,
-                    color: presentationAccent,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 4,
-                  }}
-                >
-                  🪐 演示模式
-                </span>
-
-                <div style={{ width: 1, height: 18, background: colors.cardBorder }} />
-
-                <button
-                  onClick={handlePrevSlide}
-                  title="上一张 (← / PageUp)"
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: colors.cardText,
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    padding: 4,
-                    borderRadius: 6,
-                  }}
-                >
-                  <ChevronLeft size={18} />
-                </button>
-
-                <button
-                  type="button"
-                  className={`canvas-presentation-counter-btn ${showSlideDrawer ? "active" : ""}`}
-                  onClick={() => setShowSlideDrawer((prev) => !prev)}
-                  title="点击展开分镜大纲抽屉 (快捷键 L)"
-                >
-                  <List size={13} style={{ opacity: 0.8 }} />
-                  <span>
-                    {currentSlideIndex + 1} / {presentationSequence.length}
-                  </span>
-                </button>
-
-                <button
-                  onClick={handleNextSlide}
-                  title="下一张 (→ / 空格 / PageDown)"
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: colors.cardText,
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    padding: 4,
-                    borderRadius: 6,
-                  }}
-                >
-                  <ChevronRight size={18} />
-                </button>
-
-                <div style={{ width: 1, height: 18, background: colors.cardBorder }} />
-
-                <button
-                  onClick={() => setIsAutoPlaying((prev) => !prev)}
-                  title={isAutoPlaying ? "暂停自动放映 (P)" : "自动放映 (每 3.5 秒切换, 快捷键 P)"}
-                  style={{
-                    background: isAutoPlaying ? presentationAccentBg : "none",
-                    border: "none",
-                    color: isAutoPlaying ? presentationAccent : colors.cardText,
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 4,
-                    fontSize: 12,
-                    fontWeight: 500,
-                    padding: "4px 8px",
-                    borderRadius: 6,
-                  }}
-                >
-                  {isAutoPlaying ? <Pause size={14} /> : <Play size={14} />}
-                  <span>{isAutoPlaying ? "暂停" : "自动"}</span>
-                </button>
-
-                <button
-                  onClick={handleToggleFullscreen}
-                  title={isFullscreenActive ? "退出全屏 (F / F11)" : "全屏沉浸演示 (F / F11)"}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: isFullscreenActive ? presentationAccent : colors.cardText,
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    padding: 4,
-                    borderRadius: 6,
-                  }}
-                >
-                  {isFullscreenActive ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-                </button>
-
-                <button
-                  onClick={handleTogglePresentation}
-                  title="退出演示模式 (Esc)"
-                  style={{
-                    background: "rgba(239, 68, 68, 0.12)",
-                    border: "none",
-                    color: "#ef4444",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 4,
-                    fontSize: 12,
-                    fontWeight: 600,
-                    padding: "4px 10px",
-                    borderRadius: 16,
-                    marginLeft: 4,
-                  }}
-                >
-                  <X size={13} />
-                  <span>退出</span>
-                </button>
-
-                {isAutoPlaying && (
-                  <div className="canvas-presentation-progress-track">
-                    <div
-                      key={`${currentSlideIndex}-${isAutoPlaying}`}
-                      className="canvas-presentation-progress-bar"
-                    />
-                  </div>
-                )}
-              </div>
-            </>
-          );
-        })()}
+      {/* 10. Presentation Mode Floating Controls & Slide Drawer (extracted
+          component, wave 4; the guard stays here so the chrome only mounts
+          while a presentation with slides is actually running) */}
+      {isPresentationMode && presentationSequence.length > 0 && (
+        <CanvasPresentationChrome
+          nodes={data.nodes}
+          nodeMap={nodeMap}
+          presentationSequence={presentationSequence}
+          currentSlideIndex={currentSlideIndex}
+          isAutoPlaying={isAutoPlaying}
+          setIsAutoPlaying={setIsAutoPlaying}
+          showSlideDrawer={showSlideDrawer}
+          setShowSlideDrawer={setShowSlideDrawer}
+          slideDrawerRef={slideDrawerRef}
+          isFullscreenActive={isFullscreenActive}
+          handleToggleFullscreen={handleToggleFullscreen}
+          handleTogglePresentation={handleTogglePresentation}
+          handlePrevSlide={handlePrevSlide}
+          handleNextSlide={handleNextSlide}
+          handleJumpToSlide={handleJumpToSlide}
+          colors={colors}
+          isDark={isDark}
+          isEink={isEink}
+        />
+      )}
     </div>
   );
 });
