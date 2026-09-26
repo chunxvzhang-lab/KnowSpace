@@ -1,0 +1,47 @@
+name: quality
+
+# The five-gate pipeline, ordered cheapest-failure-first. This is the CI half
+# of the phase-0 machine gate: the same steps run locally via
+# `npm run preflight`, so a local green and a CI green mean the same thing.
+#
+# Steps 2-5 turn the guide's "提交前门禁四条" from a habit into exit codes:
+# typecheck/lint/format, the quality ratchet (type escapes and file size may
+# only shrink), and the test baseline (case counts may only grow, per file
+# too). The full suite runs once; the baseline step reuses its JSON report.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      # Toolchain binaries only are needed for the quality gates; the tests
+      # read the electron scripts as text. Skipping the Electron runtime
+      # download (~100MB) and the Playwright browser download keeps this
+      # pipeline at source-install speed.
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: install
+        run: npm ci
+      - name: typecheck
+        run: npx tsc --noEmit
+      - name: lint
+        run: npm run lint
+      - name: format
+        run: npm run format:check
+      - name: quality ratchet
+        run: node scripts/quality-ratchet.cjs --check
+      - name: test
+        run: npx vitest run --reporter=default --reporter=json --outputFile=test-baseline.json
+      - name: test baseline
+        run: node scripts/capture-test-baseline.cjs --check --report test-baseline.json

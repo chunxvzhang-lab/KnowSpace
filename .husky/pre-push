@@ -1,0 +1,3 @@
+# Type errors block the push, not the commit: tsc costs ~30s and a commit is
+# often a mid-refactor state.
+npx tsc --noEmit

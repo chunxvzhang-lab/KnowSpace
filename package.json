@@ -16,7 +16,24 @@
     "desktop:msi": "npm run build && electron-builder --win msi",
     "test": "vitest run",
     "test:watch": "vitest",
-    "prepare": "husky"
+    "prepare": "husky",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --max-warnings 0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "quality:baseline": "node scripts/quality-ratchet.cjs",
+    "test:baseline": "node scripts/capture-test-baseline.cjs",
+    "test:baseline:check": "node scripts/capture-test-baseline.cjs --check --report test-baseline.json",
+    "preflight": "node scripts/preflight.cjs"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{js,cjs,mjs,json,yml,yaml,css,html}": [
+      "prettier --write"
+    ]
   },
   "build": {
     "appId": "com.knowspace.app",

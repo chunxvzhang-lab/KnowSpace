@@ -1,0 +1,5 @@
+# Staged files only: eslint --fix + prettier, under 5 seconds for a typical
+# commit. Full-suite testing deliberately lives in CI (and preflight.cjs) -
+# a pre-commit hook that takes 200 seconds gets bypassed with --no-verify,
+# and then nothing is enforced at all.
+npx lint-staged

@@ -1,0 +1,22 @@
+# Formatting scope: source and tooling. Everything here either is code or is
+# read by code.
+#
+# docs/ stays unformatted on purpose: the guide, release notes and baselines
+# are hand-maintained prose with deliberate table layout - rewrapping them
+# buries real changes in formatting noise (and TEST_BASELINE.md /
+# QUALITY_BASELINE.md are generated; their tables are parsed by scripts).
+dist/
+release/
+release-next/
+node_modules/
+web/
+docs/
+coverage/
+
+# Generated raw reports (git-ignored anyway, but keep --check from scanning)
+test-baseline.json
+baseline-run.txt
+baseline-capture.log
+
+# Lockfile: npm owns the formatting.
+package-lock.json

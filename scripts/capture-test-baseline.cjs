@@ -8,8 +8,16 @@
  * the machine-readable result and a human-readable table.
  *
  * Usage:  node scripts/capture-test-baseline.cjs
+ *         node scripts/capture-test-baseline.cjs --check [--report test-baseline.json]
  * Output: test-baseline.json          (raw vitest report, git-ignored)
  *         docs/TEST_BASELINE.md       (committed snapshot)
+ *
+ * --check is the CI form of guide rule "3. 重跑基线": instead of writing the
+ * snapshot it compares the fresh numbers against the committed one and exits
+ * non-zero if the case total went down, any per-file count went down, or any
+ * file vanished - the three forms a silent test deletion can take. Pass
+ * --report to reuse a JSON report produced by an earlier `vitest run` in the
+ * same pipeline instead of running the suite a second time.
  */
 
 const { spawnSync } = require("node:child_process");
@@ -25,13 +33,13 @@ function runVitest() {
   const result = spawnSync(
     isWin ? "npx.cmd" : "npx",
     ["vitest", "run", "--reporter=json", `--outputFile=${jsonPath}`],
-    { cwd: root, stdio: "inherit", shell: isWin }
+    { cwd: root, stdio: "inherit", shell: isWin },
   );
 
   if (!fs.existsSync(jsonPath)) {
     console.error(
       "\n[baseline] vitest did not produce a JSON report.\n" +
-        "Re-run with:  npx vitest run --reporter=json --outputFile=test-baseline.json"
+        "Re-run with:  npx vitest run --reporter=json --outputFile=test-baseline.json",
     );
     process.exit(result.status ?? 1);
   }
@@ -156,7 +164,7 @@ function writeDoc({ rows, totals }) {
     "3. 单文件用例数**不得下降**（防止测试被静默删除）",
     "",
     "> 复核方式：改动前后各跑一次 `node scripts/capture-test-baseline.cjs`，对比本文档「按文件分布」表。",
-    ""
+    "",
   );
 
   fs.mkdirSync(path.dirname(docPath), { recursive: true });
@@ -164,17 +172,96 @@ function writeDoc({ rows, totals }) {
 }
 
 function main() {
-  console.log("[baseline] running the full suite ...\n");
-  runVitest();
+  const checkOnly = process.argv.includes("--check");
+  const reportArgIdx = process.argv.indexOf("--report");
+  const reportPath =
+    reportArgIdx !== -1 ? path.resolve(root, process.argv[reportArgIdx + 1]) : null;
+
+  if (checkOnly && reportPath && fs.existsSync(reportPath)) {
+    checkAgainstDoc(JSON.parse(fs.readFileSync(reportPath, "utf8")));
+    return;
+  }
+  if (checkOnly && reportPath) {
+    console.error(`[baseline] --report file not found: ${reportPath}`);
+    process.exit(1);
+  }
+
+  if (!checkOnly || !reportPath) {
+    console.log("[baseline] running the full suite ...\n");
+    runVitest();
+  }
 
   const report = JSON.parse(fs.readFileSync(jsonPath, "utf8"));
   const built = buildReport(report);
+
+  if (checkOnly) {
+    checkAgainstDoc(report);
+    return;
+  }
+
   writeDoc(built);
 
   console.log(
     `\n[baseline] ${built.totals.files} files / ${built.totals.tests} tests ` +
       `(${built.totals.passed} passed, ${built.totals.failed} failed)\n` +
-      `[baseline] snapshot written to ${path.relative(root, docPath)}`
+      `[baseline] snapshot written to ${path.relative(root, docPath)}`,
+  );
+}
+
+/**
+ * The regression rules from the guide, enforced as an exit code:
+ *   1. total cases must not drop
+ *   2. no file may lose cases (a file that vanished counts as losing all)
+ *   3. failed cases must be zero (the suite itself also exits non-zero, but
+ *      --check can run against a stale report, so it re-verifies)
+ */
+function checkAgainstDoc(report) {
+  const built = buildReport(report);
+  const doc = fs.readFileSync(docPath, "utf8");
+  const committedTotal = Number(doc.match(/\| 用例总数 \| \*\*(\d+)\*\*/)?.[1]);
+  if (!Number.isFinite(committedTotal)) {
+    console.error("[baseline] cannot read 用例总数 from docs/TEST_BASELINE.md");
+    process.exit(1);
+  }
+
+  const sectionTwo = doc.split("## 二、")[1]?.split("## 三、")[0] ?? "";
+  const committedPerFile = new Map();
+  for (const m of sectionTwo.matchAll(/^\| `([^`]+)` \| (\d+) \|/gm)) {
+    committedPerFile.set(m[1], Number(m[2]));
+  }
+
+  const currentPerFile = new Map();
+  for (const [file, info] of built.rows) currentPerFile.set(file, info.total);
+
+  const problems = [];
+  if (built.totals.failed > 0) {
+    problems.push(`suite has ${built.totals.failed} failing cases`);
+  }
+  if (built.totals.tests < committedTotal) {
+    problems.push(`total cases went ${committedTotal} -> ${built.totals.tests}`);
+  }
+  for (const [file, count] of committedPerFile) {
+    const now = currentPerFile.get(file);
+    if (now === undefined) {
+      problems.push(`test file disappeared: ${file} (had ${count} cases)`);
+    } else if (now < count) {
+      problems.push(`${file}: ${count} -> ${now} cases`);
+    }
+  }
+
+  if (problems.length > 0) {
+    console.error(
+      `[baseline] REGRESSION against committed TEST_BASELINE.md (captured at ` +
+        `${committedTotal} cases):\n  - ${problems.join("\n  - ")}\n` +
+        `Deleting or weakening tests needs an explicit argument in the PR.`,
+    );
+    process.exit(1);
+  }
+
+  console.log(
+    `[baseline] check OK: ${built.totals.tests} cases >= committed ${committedTotal}, ` +
+      `no per-file drops, 0 failures. ` +
+      `(If case counts changed, refresh the snapshot: node scripts/capture-test-baseline.cjs)`,
   );
 }
 

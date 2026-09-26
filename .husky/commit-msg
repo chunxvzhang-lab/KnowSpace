@@ -1,0 +1,4 @@
+# Conventional Commits is a hard gate, not a convention: the repo's commit
+# log doubles as the engineering record ("why" per guide S1), and the release
+# notes are assembled from it.
+node scripts/check-commit-msg.cjs "$1"
