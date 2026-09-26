@@ -16,27 +16,6 @@ import {
   summarizeParsed,
 } from "../services/fsrsService";
 
-/**
- * 一次性的量测（不是守护测试，跑完即弃）：模拟"当前知识库"来源在真实规模下的代价。
- *
- * 面板在渲染期同步做这些事，而其中 parseFlashcards 被调用了三次 —— 这个文件用来看
- * 这个"三遍"到底值多少毫秒。
- */
-function makeNote(index: number): string {
-  const lines: string[] = [`# 第 ${index} 章`, ""];
-  for (let card = 0; card < 5; card += 1) {
-    lines.push(`Q: 第 ${index} 章的第 ${card} 个问题是什么？`);
-    lines.push(`A: 这是第 ${index} 章第 ${card} 题的回答，用来占一些篇幅。`);
-    lines.push("");
-  }
-  // 一点正文，让每篇不是纯卡片
-  for (let para = 0; para < 12; para += 1) {
-    lines.push(`这是第 ${index} 章的正文段落 ${para}，长度刻意接近真实的笔记内容。`);
-    lines.push("");
-  }
-  return lines.join("\n");
-}
-
 /** 一篇接近真实笔记体量的文档（约 10 KB），而不是几百字节的玩具样本。 */
 function makeRealNote(index: number): string {
   const lines: string[] = [`# 第 ${index} 章`, ""];
@@ -71,11 +50,11 @@ describe.skipIf(!benchEnabled)("知识库来源的解析代价（量测）", () 
 
     const t0 = performance.now();
     for (const note of inputs) parseFlashcards(note.content);
-    const tCards = performance.now() - t0;
+    const _tCards = performance.now() - t0;
 
     const t1 = performance.now();
     for (const note of inputs) parseFsrsMetadata(note.content);
-    const tMeta = performance.now() - t1;
+    const _tMeta = performance.now() - t1;
 
     const t2 = performance.now();
     const queue = buildReviewQueue(inputs);

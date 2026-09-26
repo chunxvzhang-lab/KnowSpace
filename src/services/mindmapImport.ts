@@ -774,6 +774,7 @@ export function importFileName(outline: ImportedOutline, sourceName: string): st
     "导入的大纲";
   // A name that is not a name: either a separator or a control character would
   // make the file it names unreachable on one platform or another.
+  // eslint-disable-next-line no-control-regex -- intentionally strips control characters (\u0000-\u001f) out of imported file names
   const safe = base.replace(/[\\/:*?"<>|\u0000-\u001f]/g, " ").replace(/\s+/g, " ").trim();
   return `${safe || "导入的大纲"}.md`;
 }

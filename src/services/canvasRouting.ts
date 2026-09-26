@@ -223,8 +223,8 @@ export function computeEdgeMidpoint(
       return Math.atan2(oy, ox);
     };
 
-    let a1 = projectAngle(p1);
-    let a2 = projectAngle(p2);
+    const a1 = projectAngle(p1);
+    const a2 = projectAngle(p2);
     let delta = a2 - a1;
     while (delta > Math.PI) delta -= Math.PI * 2;
     while (delta <= -Math.PI) delta += Math.PI * 2;

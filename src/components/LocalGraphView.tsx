@@ -45,9 +45,7 @@ export function LocalGraphView({
     const isEink = theme === "eink";
 
     const currentBg = isEink ? "#000000" : isDark ? "#38bdf8" : "#0284c7";
-    const currentBorder = isEink ? "#000000" : isDark ? "#bae6fd" : "#38bdf8";
     const normalBg = isEink ? "#555555" : isDark ? "#475569" : "#94a3b8";
-    const normalBorder = isEink ? "#000000" : isDark ? "#64748b" : "#cbd5e1";
     const spaceBg = isEink ? "#777777" : "#f59e0b";
     const edgeColor = isEink ? "rgba(0, 0, 0, 0.45)" : isDark ? "rgba(148, 163, 184, 0.3)" : "rgba(100, 116, 139, 0.3)";
     const crossFolderEdgeColor = isEink ? "#000000" : isDark ? "#38bdf8" : "#0284c7";

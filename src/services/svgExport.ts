@@ -3,7 +3,7 @@
  */
 
 export function serializeSvgForExport(svgInput: string | SVGElement | HTMLElement): string {
-  let content = "";
+  let content: string;
   if (typeof svgInput === "string") {
     content = svgInput;
   } else if (svgInput instanceof SVGSVGElement || svgInput instanceof HTMLElement) {

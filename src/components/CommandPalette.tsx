@@ -139,9 +139,8 @@ export const CommandPalette = memo(function CommandPalette({
   }, [isHeadingMode, headingSearchTerm, headings]);
 
   // 3. Filtered Chapters / Documents list
-  const chapters = manifest?.chapters || [];
-
   const filteredDocs = useMemo(() => {
+    const chapters = manifest?.chapters || [];
     if (isActionMode || isHeadingMode) return [];
 
     if (!docSearchTerm) {
@@ -170,7 +169,7 @@ export const CommandPalette = memo(function CommandPalette({
       .filter((item) => item.matched)
       .sort((a, b) => b.score - a.score)
       .map((item) => item.chapter);
-  }, [isActionMode, isHeadingMode, docSearchTerm, chapters, recentChapterIds]);
+  }, [isActionMode, isHeadingMode, docSearchTerm, manifest, recentChapterIds]);
 
   // Unified items count for keyboard navigation
   const currentItemsCount = isActionMode

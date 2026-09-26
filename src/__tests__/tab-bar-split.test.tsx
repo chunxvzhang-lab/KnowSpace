@@ -15,7 +15,7 @@ describe("TabBar Dual Split Context Menu & Indicators", () => {
     const onOpenDualSplit = vi.fn();
     const onCloseDualSplit = vi.fn();
 
-    const { container } = render(
+    render(
       <TabBar
         tabs={mockTabs}
         activeTabId="doc-1"
@@ -51,7 +51,7 @@ describe("TabBar Dual Split Context Menu & Indicators", () => {
     const onOpenDualSplit = vi.fn();
     const onCloseDualSplit = vi.fn();
 
-    const { container } = render(
+    render(
       <TabBar
         tabs={mockTabs}
         activeTabId="doc-1"

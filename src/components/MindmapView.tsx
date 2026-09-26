@@ -105,7 +105,6 @@ import { MindmapSummaries, type SummaryBox } from "./MindmapSummaries";
 import { MindmapBoundaries, type BoundaryBox } from "./MindmapBoundaries";
 import { MindmapFloatingAnnotationMenu } from "./MindmapFloatingAnnotationMenu";
 import { downloadFile } from "../services/fileDownload";
-import { findMindmapIcon } from "../core/mindmapIcons";
 import { numberingFor } from "../core/mindmapNumbering";
 import { parseMindmapLink } from "../core/mindmapLinks";
 import { NodeIcon, NodeLinkMark, NodeMarks, NodeNoteMark, NodeTags } from "./MindmapMarks";
@@ -756,7 +755,6 @@ export const MindmapView = memo(function MindmapView({
     setCollapsedIds(new Set(restored));
     // Deliberately keyed on documentKey alone: re-running when the tree changes
     // would re-apply the stored folds over ones the reader has just made.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [documentKey]);
 
   // Save folds as they change. Folding is a discrete click rather than a

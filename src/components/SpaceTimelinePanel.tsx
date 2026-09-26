@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { Zap, CheckSquare, Clock, Calendar, Search, RotateCw, FolderOpen, FileText, Copy, ArrowDownToLine, Trash2, Tag, Filter } from "lucide-react";
+import { Zap, CheckSquare, Clock, Calendar, Search, RotateCw, FolderOpen, FileText, Copy, ArrowDownToLine, Trash2, Tag } from "lucide-react";
 import { GraduationCap } from "lucide-react";
 import type { FlashNoteSummaryItem, FlashNotesSummaryResult } from "../types/desktop";
 import { DailyReviewPanel } from "./DailyReviewPanel";

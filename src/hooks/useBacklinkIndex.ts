@@ -221,6 +221,12 @@ export function useBacklinkIndex({
         window.clearTimeout(debounceTimer);
       }
     };
+    // The dep set is intentional: this scheduler must re-run only when the
+    // chapter set changes (chaptersSignature exists precisely to avoid re-runs
+    // on manifest identity churn). backlinkIndex is mutated in place and then
+    // written back, so it must not be a dependency; sessionRef/activeChapter
+    // are read at effect time on purpose, and the store setters are stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally keyed on the chapter-set signature only
   }, [chaptersSignature]);
 
   // Real-time incremental update when current session content changes (debounced by 400ms to keep typing silky smooth)
@@ -246,6 +252,11 @@ export function useBacklinkIndex({
       );
     }, 400);
     return () => clearTimeout(timer);
+    // Keyed on the content primitives on purpose: session gets a new identity
+    // as the user types, and only these fields should re-arm the debounce.
+    // backlinkIndex is mutated in place (then written back via setBacklinkIndex),
+    // so adding it would loop; the setters are stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally keyed on session content primitives only
   }, [session?.source, session?.chapterId, activeChapter?.title, session?.fileName, session?.absolutePath]);
 
   const currentDocTitle = activeChapter?.title || session?.fileName?.replace(/\.md$/i, "") || "";
@@ -298,7 +309,7 @@ export function useBacklinkIndex({
         }, 120);
       }
     },
-    [manifest?.chapters, backlinkIndex, selectChapter]
+    [manifest?.chapters, backlinkIndex, selectChapter, editorViewRef, openDesktopMarkdownPathRef]
   );
 
   const handleConvertMention = useCallback(
@@ -329,7 +340,7 @@ export function useBacklinkIndex({
         }
       }
     },
-    [session, manifest?.chapters, updateSource, backlinkIndex]
+    [session, manifest?.chapters, updateSource, backlinkIndex, setBacklinkIndex, setNotice]
   );
   return {
     currentLinkedReferences,

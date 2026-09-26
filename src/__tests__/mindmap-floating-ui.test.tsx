@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MindmapView } from "../components/MindmapView";
 import { parseMarkdownToMindmapTree } from "../services/mindmapService";
-import type { MindmapNode } from "../core/types";
 import {
   addFloatingTopic,
   emptySidecar,

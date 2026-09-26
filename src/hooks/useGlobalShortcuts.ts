@@ -166,7 +166,19 @@ export function useGlobalShortcuts({
       unsubscribeClose?.();
       unsubscribeFlashNote?.();
     };
-  }, [manifest?.rootPath]);
+  }, [
+    manifest?.rootPath,
+    createNewFileRef,
+    guardActionRef,
+    initialHandledRef,
+    openDesktopMarkdownPathRef,
+    openMarkdownDirectoryRef,
+    saveSessionAsRef,
+    saveSessionRef,
+    setManifest,
+    setNotice,
+    toggleFullscreenRef,
+  ]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -350,4 +362,10 @@ export function useGlobalShortcuts({
     tabs,
     toggleFullscreen,
     toggleTypewriterMode,
+    setCommandPaletteOpen,
+    setDirectoryOpen,
+    setLightboxMedia,
+    setVersionHistoryOpen,
+    setViewMode,
+    versionHistoryOpen,
   ]);}

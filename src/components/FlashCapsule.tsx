@@ -200,6 +200,7 @@ export const FlashCapsule: React.FC = () => {
         clearTimeout(persistentSaveTimerRef.current);
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- activeTab/refreshSpaceConfig are read inside one-time IPC handlers; adding them would tear down and re-subscribe all desktop listeners whenever the tab changes
   }, [desktop]);
 
   // 主题设成"跟随系统"时，操作系统在浅色/深色之间切换必须立刻反映到配色上。

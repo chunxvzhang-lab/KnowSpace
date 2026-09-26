@@ -184,7 +184,7 @@ describe("Flash Capsule (闪念胶囊) & Hotkey Customization", () => {
 
     // Persistent note stays retained when instant note is cleared
     let instantNote = "这是需要归档的文字";
-    let persistentNote = "永久保留的 Prompt 模板：请审查架构";
+    const persistentNote = "永久保留的 Prompt 模板：请审查架构";
 
     function archiveInstantNote() {
       instantNote = ""; // Cleared

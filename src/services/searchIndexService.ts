@@ -214,7 +214,7 @@ export function extractTagsFromMarkdown(content: string): string[] {
 
   let inCodeBlock = false;
   let inFrontmatter = false;
-  let frontmatterLines: string[] = [];
+  const frontmatterLines: string[] = [];
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];

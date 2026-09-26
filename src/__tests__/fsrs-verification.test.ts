@@ -19,8 +19,6 @@ import {
  * 结果来写 —— 否则测的只是"它现在这样"，不是"它该这样"。
  */
 
-const Q = "Q: 问题\nA: 答案\n";
-
 /** 一张已经复习过、有历史的卡片进度。 */
 function tracked(overrides: Partial<FsrsProgress> = {}): FsrsProgress {
   return {

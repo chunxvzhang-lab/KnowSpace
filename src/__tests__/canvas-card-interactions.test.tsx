@@ -1,4 +1,4 @@
-import { render, fireEvent, screen, act } from "@testing-library/react";
+import { render, fireEvent, act } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { CanvasView } from "../components/CanvasView";
 import type { CanvasData } from "../types/canvasTypes";

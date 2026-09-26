@@ -32,7 +32,7 @@ describe("editorContextMenu utilities & transformations", () => {
     const multilineSelection = "# 敏捷开发规范\n第一条：每日站会\n第二条：快速交付";
     const defaultTitle = multilineSelection
       .split(/\r?\n/)[0]
-      .replace(/[#*`_\[\]]/g, "")
+      .replace(/[#*`_[\]]/g, "")
       .trim()
       .slice(0, 30);
 

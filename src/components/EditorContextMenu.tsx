@@ -608,7 +608,7 @@ export const EditorContextMenu = memo(function EditorContextMenu({
   // Action: Extract selection to new note (Obsidian flagship)
   const handleExtractToNote = useCallback(() => {
     const defaultTitle = selectedText
-      ? selectedText.split(/\r?\n/)[0].replace(/[#*`_\[\]]/g, "").trim().slice(0, 30)
+      ? selectedText.split(/\r?\n/)[0].replace(/[#*`_[\]]/g, "").trim().slice(0, 30)
       : "新笔记";
     if (onExtractToNote) {
       onExtractToNote(selectedText, defaultTitle || "未命名笔记");
@@ -624,7 +624,7 @@ export const EditorContextMenu = memo(function EditorContextMenu({
     const line = doc.lineAt(selection.from);
     const lineText = line.text;
     const match = lineText.match(/\s\^([a-zA-Z0-9_-]+)$/);
-    let blockId = "";
+    let blockId: string;
 
     if (match) {
       blockId = match[1];

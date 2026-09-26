@@ -173,7 +173,7 @@ export function renderCardMarkdown(source: string): string {
   const cached = cardMarkdownCache.get(source);
   if (cached !== undefined) return cached;
 
-  let result = "";
+  let result: string;
   try {
     const raw = markdown.render(source);
     result = DOMPurify.sanitize(raw, {

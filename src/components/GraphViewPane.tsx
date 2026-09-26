@@ -603,7 +603,7 @@ export function GraphViewPane({
       cyRef.current = null;
     };
   // Only re-init Cytoscape when graph data or visual theme changes — NOT on currentDocId/isSpacePanning
-  }, [filteredData, theme]);
+  }, [filteredData, theme, clusterByFolder]);
 
   // Lightweight effect: update node highlight/data when active document changes
   // This runs WITHOUT destroying Cytoscape — no more vertical-line flicker on nav
@@ -679,7 +679,7 @@ export function GraphViewPane({
   const handleFocusActive = () => {
     if (!cyRef.current) return;
     const cy = cyRef.current;
-    let targetNode = findCurrentNode(cy, currentDocId);
+    const targetNode = findCurrentNode(cy, currentDocId);
 
     if (!targetNode || targetNode.length === 0) {
       if (hideIsolates) setHideIsolates(false);

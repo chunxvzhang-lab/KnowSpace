@@ -177,7 +177,7 @@ describe("CanvasView Component", () => {
   it("invokes onSave callback when clicking Save button and pressing Ctrl+S", () => {
     const onSave = vi.fn();
 
-    const { container } = render(
+    render(
       <CanvasView
         title="保存测试白板"
         source={JSON.stringify(initialCanvasData)}
@@ -2018,7 +2018,7 @@ describe("CanvasView Component", () => {
       ],
     };
 
-    const { container } = render(
+    render(
       <CanvasView
         title="就近开播测试"
         source={JSON.stringify(data)}
@@ -2086,7 +2086,7 @@ describe("CanvasView Component", () => {
 
     // Presentation jumped to slide 3!
     expect(screen.getByText("3 / 3")).toBeDefined();
-    const slide3 = screen.getAllByText("实施路线图").find((el) => el.closest(".canvas-node"))?.closest(".canvas-node")!;
+    const slide3 = screen.getAllByText("实施路线图").find((el) => el.closest(".canvas-node"))!.closest(".canvas-node")!;
     expect(slide3.classList.contains("current-slide")).toBe(true);
   });
 

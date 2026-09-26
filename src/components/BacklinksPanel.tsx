@@ -249,7 +249,7 @@ export function BacklinksPanel({
 /**
  * Highlights [[target...]] in snippet with a subtle link pill.
  */
-function renderSnippetWithWikiLinkHighlight(snippet: string, target: string): React.ReactNode {
+function renderSnippetWithWikiLinkHighlight(snippet: string, _target: string): React.ReactNode {
   const parts: React.ReactNode[] = [];
   const regex = /\[\[([^\]\n|]+)(?:\|([^\]\n]+))?\]\]/g;
   let lastIndex = 0;

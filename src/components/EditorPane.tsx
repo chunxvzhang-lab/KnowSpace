@@ -689,6 +689,7 @@ export const EditorPane = memo(function EditorPane({
       view.destroy();
       viewRef.current = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- editor view is constructed once at mount; value/theme/fontScale/readOnly/typewriterMode changes are applied to the live view by the dedicated follow-up effects below
   }, []);
 
   // Update document content if changed from outside (e.g. reload or undo), preserving cursor position

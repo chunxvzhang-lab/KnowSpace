@@ -184,9 +184,7 @@ export function GlobalGraphDialog({
     const isEink = theme === "eink";
 
     const currentBg = isEink ? "#000000" : isDark ? "#38bdf8" : "#0284c7";
-    const currentBorder = isEink ? "#000000" : isDark ? "#bae6fd" : "#7dd3fc";
     const normalBg = isEink ? "#444444" : isDark ? "#334155" : "#94a3b8";
-    const normalBorder = isEink ? "#000000" : isDark ? "#64748b" : "#cbd5e1";
     const spaceBg = isEink ? "#777777" : "#f59e0b";
     const edgeColor = isEink ? "rgba(0, 0, 0, 0.45)" : isDark ? "rgba(148, 163, 184, 0.28)" : "rgba(100, 116, 139, 0.25)";
     const crossFolderEdgeColor = isEink ? "#000000" : isDark ? "#38bdf8" : "#0284c7";
@@ -563,7 +561,7 @@ export function GlobalGraphDialog({
       cy.destroy();
       cyRef.current = null;
     };
-  }, [isOpen, filteredData, theme]);
+  }, [isOpen, filteredData, theme, clusterByFolder]);
 
   if (!isOpen) return null;
 
@@ -618,7 +616,7 @@ export function GlobalGraphDialog({
   const handleFocusActive = () => {
     if (!cyRef.current) return;
     const cy = cyRef.current;
-    let targetNode = findCurrentNode(cy, currentDocId);
+    const targetNode = findCurrentNode(cy, currentDocId);
 
     // If node is currently filtered out (e.g. by hideIsolates or search), reset filter first
     if (!targetNode || targetNode.length === 0) {

@@ -14,7 +14,6 @@ import {
   addParsedNote,
   buildQueueFromParsed,
   emptyParsedSource,
-  parseFlashcards,
   parseFsrsMetadata,
   parseNote,
   review,

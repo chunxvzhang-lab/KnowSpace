@@ -1195,11 +1195,11 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
     const ringColor = ring[0].color;
 
     // spawnConnectedCard on r1
-    const { newNode, newEdge } = spawnConnectedCard(r1, "right", undefined, undefined, ring, [r1, r2, r3]);
+    const { newEdge } = spawnConnectedCard(r1, "right", undefined, undefined, ring, [r1, r2, r3]);
     expect(newEdge.color).not.toBe(ringColor);
 
     // spawnMultipleBranches on r2
-    const { newNodes, newEdges } = spawnMultipleBranches(r2, 3, "bottom", ring, [r1, r2, r3]);
+    const { newEdges } = spawnMultipleBranches(r2, 3, "bottom", ring, [r1, r2, r3]);
     expect(newEdges).toHaveLength(3);
     expect(newEdges[0].color).not.toBe(ringColor);
     expect(newEdges[1].color).toBe(newEdges[0].color);

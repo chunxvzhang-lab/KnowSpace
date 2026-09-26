@@ -84,8 +84,8 @@ export function computeBezierControlPoints(
   const dy = p2.y - p1.y;
   const dist = Math.sqrt(dx * dx + dy * dy);
 
-  let cp1 = { ...p1 };
-  let cp2 = { ...p2 };
+  const cp1 = { ...p1 };
+  const cp2 = { ...p2 };
 
   const isHoriz1 = side1 === "left" || side1 === "right";
   const isHoriz2 = side2 === "left" || side2 === "right";

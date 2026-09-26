@@ -260,7 +260,6 @@ describe("DailyReviewPanel - 每日复盘视图", () => {
 
     for (let i = 0; i < 3; i += 1) {
       fireEvent.click(screen.getByText("显示答案"));
-      // eslint-disable-next-line no-await-in-loop
       await act(async () => {
         fireEvent.click(screen.getByText("良好"));
       });

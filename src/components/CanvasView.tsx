@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ZoomIn, ZoomOut, Maximize2, Plus, FileText, Boxes, RotateCcw, RotateCw, BookOpen, Copy, ExternalLink, Trash2, Edit2, Check, X, Palette, Link, Save, BoxSelect, CheckSquare, ArrowUpToLine, ArrowDownToLine, GitBranch, AlignLeft, AlignRight, AlignJustify, Image as ImageIcon, Clipboard, Grid, Minimize2, AlignCenter, AlignHorizontalJustifyCenter, AlignVerticalJustifyCenter, Share2, Play, Pause, ChevronLeft, ChevronRight, Music, Video, Film, List, Scan } from "lucide-react";
+import { ZoomIn, ZoomOut, Maximize2, Plus, FileText, Boxes, RotateCcw, RotateCw, BookOpen, Copy, ExternalLink, Trash2, Edit2, Check, X, Link, Save, BoxSelect, CheckSquare, ArrowUpToLine, ArrowDownToLine, GitBranch, AlignLeft, AlignRight, AlignJustify, Image as ImageIcon, Clipboard, Grid, Minimize2, AlignCenter, AlignHorizontalJustifyCenter, AlignVerticalJustifyCenter, Share2, Play, Pause, ChevronLeft, ChevronRight, Music, Video, Film, List, Scan } from "lucide-react";
 import type { ThemeMode } from "../core/types";
 import type { CanvasData, CanvasNode, CanvasEdge, CanvasNodeSide, CanvasTextNode, CanvasFileNode, CanvasGroupNode, CanvasViewport, CanvasEdgeLabelShape, CanvasEdgeLineStyle, CanvasObstacle } from "../types/canvasTypes";
 import { parseCanvasData, serializeCanvasData, createDefaultCanvas, computeBoundingBox, getNodeAnchorPoint, extractCanvasToMarkdown, CANVAS_COLOR_PALETTES, CANVAS_STANDARD_COLOR_IDS, isNodeInsideGroup, toggleChecklistInMarkdown, spawnConnectedCard, connectOneToMany, connectChainNodes, connectLoopNodes, disconnectNodeEdges, spawnMultipleBranches, computeEdgeMidpoint, cycleEdgeArrow, cycleEdgeStyle, cycleEdgeStrokePattern, reverseEdgeDirection, getOptimalAnchorSides, getSourceNodeEdgeColor, computeSourceDisplayColorMap, expandLoopEdgeSelection, syncLoopEdgeGeometry, computeGridLayout, resizeGridSpacing, computeRingSpacingLayout, resizeRingSpacing, isPointInsideNodeHull, alignNodesInCircle, downloadCanvasAsImage, copyCanvasImageToClipboard, CanvasAlignDirection, alignNodes, getMediaFileType, isMediaFile, resolveMediaSrc, buildPresentationSequence, findContainerForNode } from "../services/canvasService";
@@ -21,13 +21,12 @@ import { MarqueeSelectionBox } from "./canvas/MarqueeSelectionBox";
 import { CanvasMinimap } from "./canvas/CanvasMinimap";
 import { CanvasEdgeBatchToolbar } from "./canvas/CanvasEdgeBatchToolbar";
 import { getNodePalette } from "./canvas/canvasPalette";
-import { modalOverlayStyle, modalContentStyle, toolBtnStyle } from "./canvas/canvasModalStyles";
+import { toolBtnStyle } from "./canvas/canvasModalStyles";
 import { CanvasEdgeLabelLayer } from "./canvas/CanvasEdgeLabelLayer";
 import { CanvasEdgeLayer } from "./canvas/CanvasEdgeLayer";
 import { EdgeContextMenu } from "./canvas/EdgeContextMenu";
 import { NodeContextMenu } from "./canvas/NodeContextMenu";
 import { getEdgeRing } from "./canvas/canvasEdgeUtils";
-import { renderEdgeShapeIcon } from "./canvas/canvasEdgeIcons";
 import { ExtractModal } from "./canvas/ExtractModal";
 import { FilePickerModal } from "./canvas/FilePickerModal";
 import { ExportModal } from "./canvas/ExportModal";
@@ -1403,22 +1402,6 @@ export const CanvasView = memo(function CanvasView({
     [editable, selectedEdgeIds, pushHistory, showToast]
   );
 
-  const handleBatchSetEdgeStrokePattern = useCallback(
-    (pattern: "solid" | "dashed" | "dotted") => {
-      if (!editable || selectedEdgeIds.size === 0) return;
-      const currentData = latestDataRef.current;
-      pushHistory({
-        ...currentData,
-        edges: currentData.edges.map((e) =>
-          selectedEdgeIds.has(e.id) ? { ...e, strokePattern: pattern } : e
-        ),
-      });
-      const patName = pattern === "dashed" ? "虚线" : pattern === "dotted" ? "点线" : "实线";
-      showToast(`已将 ${selectedEdgeIds.size} 条连线设为${patName}`);
-    },
-    [editable, selectedEdgeIds, pushHistory, showToast]
-  );
-
   const handleBatchCycleStrokePattern = useCallback(() => {
     if (!editable || selectedEdgeIds.size === 0) return;
     const currentData = latestDataRef.current;
@@ -1445,7 +1428,7 @@ export const CanvasView = memo(function CanvasView({
     const first = currentData.edges.find((e) => selectedEdgeIds.has(e.id));
     let nextFromEnd: "arrow" | undefined = undefined;
     let nextToEnd: "arrow" | undefined = "arrow";
-    let desc = "单向箭头";
+    let desc: string;
 
     if (first?.toEnd === "arrow" && first?.fromEnd !== "arrow") {
       nextFromEnd = "arrow";
@@ -1707,20 +1690,6 @@ export const CanvasView = memo(function CanvasView({
       pushHistory({
         ...currentData,
         edges: currentData.edges.map((e) => (e.id === edgeId ? updated : e)),
-      });
-    },
-    [editable, pushHistory]
-  );
-
-  const handleSetEdgeStyle = useCallback(
-    (edgeId: string, style: CanvasEdgeLineStyle) => {
-      if (!editable) return;
-      const currentData = latestDataRef.current;
-      pushHistory({
-        ...currentData,
-        edges: currentData.edges.map((e) =>
-          e.id === edgeId ? { ...e, style } : e
-        ),
       });
     },
     [editable, pushHistory]
@@ -2742,7 +2711,7 @@ export const CanvasView = memo(function CanvasView({
 
   // Global Clipboard Paste listener for media cards (Ctrl+V / Cmd+V)
   useEffect(() => {
-    const handlePasteEvent = (e: ClipboardEvent) => {
+    const handlePasteEvent = () => {
       if (editingNodeId || editingEdgeId || !editable) return;
       const activeEl = document.activeElement;
       if (

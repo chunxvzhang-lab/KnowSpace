@@ -56,7 +56,6 @@ export function exportCanvasToSvg(
   // matched in any theme.
   const themePalette = getCanvasThemeColors(normalizeExportTheme(options?.theme));
   const isDark = themePalette.isDark;
-  const isEink = themePalette.isEink;
 
   const bbox = computeBoundingBox(data.nodes);
   const pad = options?.padding ?? 48;
@@ -72,8 +71,6 @@ export function exportCanvasToSvg(
       ? "#ffffff"
       : themePalette.canvasBg;
 
-  const cardBg = themePalette.cardBg;
-  const cardText = themePalette.cardText;
   const cardBorder = themePalette.cardBorder;
   const defaultEdgeColor = themePalette.edgeColor;
   const dotColor = themePalette.dotColor;
@@ -250,8 +247,6 @@ export function exportCanvasToSvg(
       const charWidth = 11.5;
       const labelWidth = Math.max(54, edge.label.length * charWidth + 18);
       const labelHeight = 24;
-      const labelX = rawMid.x - labelWidth / 2;
-      const labelY = rawMid.y - labelHeight / 2;
       const labelBg = themePalette.edgeLabelBg;
 
       lines.push(`    <g class="canvas-edge-label" transform="translate(${rawMid.x}, ${rawMid.y})">`);
@@ -340,7 +335,7 @@ export function exportCanvasToSvg(
       }
 
       // Body content
-      let bodyHtml = "";
+      let bodyHtml: string;
       if (card.type === "text") {
         bodyHtml = renderCardMarkdown(card.text);
       } else if (card.type === "file") {
@@ -882,13 +877,13 @@ export async function exportCanvasToPngBlob(
     // an error dialog.
     const stripped = stripSvgImages(safeSvg);
     if (stripped === safeSvg) {
-      throw new Error("白板包含无法内联的外部图片，浏览器安全策略阻止了图片导出");
+      throw new Error("白板包含无法内联的外部图片，浏览器安全策略阻止了图片导出", { cause: err });
     }
     try {
       return await rasterise(stripped);
     } catch (retryErr) {
       if (isTaintedCanvasError(retryErr)) {
-        throw new Error("白板包含无法内联的外部图片，浏览器安全策略阻止了图片导出");
+        throw new Error("白板包含无法内联的外部图片，浏览器安全策略阻止了图片导出", { cause: retryErr });
       }
       throw retryErr;
     }

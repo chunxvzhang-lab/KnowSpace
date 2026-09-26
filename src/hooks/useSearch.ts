@@ -76,7 +76,6 @@ export function useSearch({
   const searchQuery = useVaultStore((s) => s.searchQuery);
   const searchScope = useVaultStore((s) => s.searchScope);
   const vaultSearchIndex = useVaultStore((s) => s.vaultSearchIndex);
-  const setSearchQuery = useVaultStore((s) => s.setSearchQuery);
   const setActiveSearchMatchId = useVaultStore((s) => s.setActiveSearchMatchId);
 
   // Whether the results are on screen at all — the side panel is showing them,
@@ -241,7 +240,7 @@ export function useSearch({
         }
       }
     },
-    [renderedChapter?.headings, session?.source, viewMode]
+    [renderedChapter?.headings, session?.source, viewMode, editorViewRef, navLockUntilRef, readerRef, setActiveHeadingId]
   );
 
   const jumpToRatio = useCallback((ratio: number) => {
@@ -249,7 +248,7 @@ export function useSearch({
     if (!container) return;
     const max = container.scrollHeight - container.clientHeight;
     container.scrollTo({ top: Math.max(0, max * ratio), behavior: "smooth" });
-  }, []);
+  }, [readerRef]);
 
   const clearSearchHighlights = useCallback(() => {
     // 1. Globally remove all search and sync highlight classes across document
@@ -298,7 +297,7 @@ export function useSearch({
       const textLower = text.toLowerCase();
       const fragment = document.createDocumentFragment();
       let lastIndex = 0;
-      let idx = 0;
+      let idx: number;
 
       while ((idx = textLower.indexOf(qLower, lastIndex)) !== -1) {
         if (idx > lastIndex) {
@@ -433,7 +432,7 @@ export function useSearch({
     } else {
       jumpToRatio(result.index / Math.max(1, renderedChapter?.plainText.length ?? 1));
     }
-  }, [clearSearchHighlights, highlightKeywordsInNode, jumpToRatio, renderedChapter, searchQuery, chapterId]);
+  }, [clearSearchHighlights, highlightKeywordsInNode, jumpToRatio, renderedChapter, searchQuery, chapterId, editorViewRef, pendingNavigationRef, readerRef, selectChapterRef, setActiveSearchMatchId, viewMode]);
   return {
     searchResults,
     jumpToHeading,

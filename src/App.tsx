@@ -99,13 +99,10 @@ export function App() {
   const manifest = useVaultStore((s) => s.manifest);
   const setManifest = useVaultStore((s) => s.setManifest);
   const bookmarks = useVaultStore((s) => s.bookmarks);
-  const setBookmarks = useVaultStore((s) => s.setBookmarks);
   const persistBookmarks = useVaultStore((s) => s.persistBookmarks);
   // backlinkIndex stays subscribed here: the graph pane and two later call sites
   // read it directly. Writing it belongs to useBacklinkIndex.
   const backlinkIndex = useVaultStore((s) => s.backlinkIndex);
-  const vaultSearchIndex = useVaultStore((s) => s.vaultSearchIndex);
-  const setVaultSearchIndex = useVaultStore((s) => s.setVaultSearchIndex);
   const searchQuery = useVaultStore((s) => s.searchQuery);
   const setSearchQuery = useVaultStore((s) => s.setSearchQuery);
   const searchScope = useVaultStore((s) => s.searchScope);
@@ -134,7 +131,6 @@ export function App() {
   const setChapterId = useTabStore((s) => s.setActiveTabId);
   const dualSplitTabId = useTabStore((s) => s.dualSplitTabId);
   const setDualSplitTabId = useTabStore((s) => s.setDualSplitTabId);
-  const recentVisitedDocIds = useTabStore((s) => s.recentVisitedDocIds);
   const rememberVisitedDoc = useTabStore((s) => s.rememberVisitedDoc);
 
   const tabsRef = useRef<TabMeta[]>(tabs);
@@ -160,11 +156,8 @@ export function App() {
   const sidebarTab = useUiStore((s) => s.sidebarTab);
   const isFullscreen = useUiStore((s) => s.isFullscreen);
   const typewriterMode = useUiStore((s) => s.typewriterMode);
-  const lightboxMedia = useUiStore((s) => s.lightboxMedia);
   const notice = useUiStore((s) => s.notice);
   const preferences = useUiStore((s) => s.preferences);
-  const commandPaletteOpen = useUiStore((s) => s.commandPaletteOpen);
-  const versionHistoryOpen = useUiStore((s) => s.versionHistoryOpen);
   const isGraphPaneOpen = useUiStore((s) => s.isGraphPaneOpen);
   const isReviewFocus = useUiStore((s) => s.isReviewFocus);
   const directoryWidth = useUiStore((s) => s.directoryWidth);

@@ -148,7 +148,7 @@ describe("useColumnResize", () => {
     it("does nothing when no drag is in progress", () => {
       // The listeners are only attached while resizingType is set, but a stray
       // move must still not move anything.
-      const { result } = renderHook(() => useColumnResize());
+      renderHook(() => useColumnResize());
       useUiStore.getState().setDirectoryWidth(240);
 
       movePointerTo(9999);

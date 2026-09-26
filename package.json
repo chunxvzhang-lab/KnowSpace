@@ -15,7 +15,8 @@
     "desktop:pack:builder": "npm run build && electron-builder --win portable",
     "desktop:msi": "npm run build && electron-builder --win msi",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "prepare": "husky"
   },
   "build": {
     "appId": "com.knowspace.app",
@@ -80,6 +81,7 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.2",
     "@types/js-yaml": "^4.0.9",
@@ -89,9 +91,15 @@
     "@vitejs/plugin-react": "^5.0.4",
     "electron": "^42.5.0",
     "electron-builder": "^26.15.3",
+    "eslint": "^10.11.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "husky": "^9.1.7",
     "jsdom": "^30.0.1",
+    "lint-staged": "^17.6.0",
     "playwright": "^1.63.0",
+    "prettier": "^3.9.9",
     "typescript": "^5.9.3",
+    "typescript-eslint": "^8.70.1",
     "vite": "^7.3.6",
     "vitest": "^4.1.10"
   }

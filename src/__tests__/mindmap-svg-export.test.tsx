@@ -309,7 +309,7 @@ describe("导出菜单里的 SVG", () => {
     const produced: Blob[] = [];
     // jsdom cannot navigate, so the anchor click it is asked to perform is
     // stubbed out rather than left to warn about a download it cannot do.
-    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
     vi.stubGlobal("URL", {
       ...URL,
       createObjectURL: (blob: Blob) => {

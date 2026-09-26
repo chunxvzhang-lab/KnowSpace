@@ -19,7 +19,7 @@ describe("MediaLightbox Component Sub-function Tests", () => {
     };
 
     const onClose = vi.fn();
-    const { container } = render(
+    render(
       <MediaLightbox media={media} onClose={onClose} />
     );
 

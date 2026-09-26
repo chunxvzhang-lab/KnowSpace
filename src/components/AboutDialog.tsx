@@ -16,7 +16,6 @@ import {
   Box,
   History,
   Zap,
-  Wrench,
   ListTree,
   Network,
   Layers,

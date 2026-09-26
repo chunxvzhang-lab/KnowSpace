@@ -277,8 +277,8 @@ export function connectLoopNodes(
       const dx = to.x + to.width / 2 - (from.x + from.width / 2);
       const dy = to.y + to.height / 2 - (from.y + from.height / 2);
 
-      let fromSide: CanvasNodeSide = "right";
-      let toSide: CanvasNodeSide = "left";
+      let fromSide: CanvasNodeSide;
+      let toSide: CanvasNodeSide;
 
       if (Math.abs(dx) >= Math.abs(dy) * 1.3) {
         // Predominantly horizontal movement
@@ -457,8 +457,8 @@ export function cycleEdgeStrokePattern(edge: CanvasEdge): CanvasEdge {
  * Reverses edge direction
  */
 export function reverseEdgeDirection(edge: CanvasEdge): CanvasEdge {
-  let newFromEnd: "none" | "arrow" = "none";
-  let newToEnd: "none" | "arrow" = "arrow";
+  let newFromEnd: "none" | "arrow";
+  let newToEnd: "none" | "arrow";
 
   if (edge.fromEnd === "arrow" && edge.toEnd === "arrow") {
     newFromEnd = "arrow";

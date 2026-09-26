@@ -237,7 +237,7 @@ export function useReviewFolders(enabled = true) {
         return next;
       });
     })();
-  }, [enabled, rememberedPaths, bridge?.listReviewFolder]);
+  }, [enabled, rememberedPaths, bridge?.listReviewFolder, bridge]);
 
   /**
    * Reads the documents of a set of folders.

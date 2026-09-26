@@ -54,7 +54,7 @@ export const DocumentWorkspace = memo(function DocumentWorkspace({
   mermaidTheme,
   onMermaidError,
   onSave,
-  isLargeDocument = false,
+  isLargeDocument: _isLargeDocument = false,
   autoPreviewPaused = false,
   onRefreshPreview,
   readOnly = false,
@@ -151,6 +151,7 @@ export const DocumentWorkspace = memo(function DocumentWorkspace({
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- splitRatio is intentionally captured only at drag start; adding it would tear down and re-add mousemove listeners on every resize tick
   }, [isDragging]);
 
   return (

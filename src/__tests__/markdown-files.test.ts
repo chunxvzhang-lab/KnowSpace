@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 
-// @ts-ignore
+// @ts-ignore: markdown-files.cjs is CommonJS without type declarations
 const markdownFiles = require("../../electron/markdown-files.cjs");
 
 describe("electron/markdown-files.cjs", () => {

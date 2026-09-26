@@ -85,7 +85,6 @@ export function useSyncSelection({
   const lockRef = useRef<"editor" | "preview" | null>(null);
   const lockTimerRef = useRef<number | null>(null);
   const highlightRafRef = useRef<number | null>(null);
-  const lastScrolledLineRef = useRef<number | null>(null);
   const scrollTimeoutRef = useRef<number | null>(null);
 
   const setLock = useCallback((source: "editor" | "preview") => {
@@ -220,6 +219,9 @@ export function useSyncSelection({
         cancelAnimationFrame(highlightRafRef.current);
       }
       if (scrollTimeoutRef.current) {
+        // Not a React-rendered node: the ref holds a timer id, and the cleanup
+        // must read the latest id at unmount to clear whatever is still pending.
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- reading ref.current in cleanup is intentional here
         window.clearTimeout(scrollTimeoutRef.current);
       }
     };

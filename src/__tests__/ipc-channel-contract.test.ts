@@ -80,7 +80,6 @@ function parseElectronDirectory() {
   for (const entry of readdirSync(dir).sort()) {
     if (!entry.endsWith(".cjs")) continue;
     const text = read(join(dir, entry));
-    const rel = `electron/${entry}`;
     for (const [map, re] of [
       [handles, /ipcMain\.handle\(\s*["']([^"']+)["']/g],
       [ons, /ipcMain\.on\(\s*["']([^"']+)["']/g],
@@ -204,14 +203,12 @@ describe("IPC channel contract (preload.cjs ↔ main.cjs ↔ desktop.d.ts)", () 
     // that should be asserted again; a short reason is a waiver nobody can
     // evaluate in review.
     for (const waiver of [...ALLOWED_MAIN_ONLY, ...ALLOWED_DTS_ONLY, ...ALLOWED_PRELOAD_ONLY]) {
-      const key = "channel" in waiver ? waiver.channel : waiver.name;
       expect(waiver.reason.length).toBeGreaterThanOrEqual(20);
       const stillMismatched =
         ("channel" in waiver && main.handles.has(waiver.channel) && !invoke.has(waiver.channel)) ||
         ("name" in waiver && !methods.has(waiver.name) && dtsMethods.has(waiver.name)) ||
         ("name" in waiver && methods.has(waiver.name) && !dtsMethods.has(waiver.name));
       expect(stillMismatched).toBe(true);
-      void key;
     }
   });
 });

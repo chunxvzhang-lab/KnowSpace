@@ -137,6 +137,7 @@ export const DualDocumentWorkspace = memo(function DualDocumentWorkspace({
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- dualRatio is intentionally captured only at drag start; adding it would tear down and re-add mousemove listeners on every resize tick
   }, [isDragging]);
 
   return (

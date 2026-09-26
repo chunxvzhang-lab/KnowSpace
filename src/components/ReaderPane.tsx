@@ -201,7 +201,7 @@ export const ReaderPane = memo(function ReaderPane({
           const svg = mermaidPre.querySelector("svg");
           if (svg) {
             e.stopPropagation();
-            let serializedSvg = "";
+            let serializedSvg: string;
             try {
               serializedSvg = new XMLSerializer().serializeToString(svg);
             } catch {

@@ -70,7 +70,7 @@ afterEach(() => {
 
 type ScrollTarget = { top?: number; left?: number };
 
-function applyScrollStub(target: Element) {
+function applyScrollStub(_target: Element) {
   return function scrollTo(this: Element, arg?: number | ScrollTarget, y?: number) {
     if (typeof arg === "object" && arg !== null) {
       if (typeof arg.top === "number") (this as HTMLElement).scrollTop = arg.top;

@@ -155,7 +155,7 @@ describe("graphService", () => {
     expect(positions.size).toBe(5);
 
     // All nodes have valid numeric positions
-    for (const [id, pos] of positions.entries()) {
+    for (const [, pos] of positions.entries()) {
       expect(Number.isFinite(pos.x)).toBe(true);
       expect(Number.isFinite(pos.y)).toBe(true);
     }

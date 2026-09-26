@@ -218,7 +218,7 @@ export function parseMarkdownToMindmapTree(
     const match = trimmed.match(headingRegex);
     if (match) {
       const level = match[1].length;
-      let rawText = match[2].trim().replace(/\s\^[a-zA-Z0-9_-]+$/, "");
+      const rawText = match[2].trim().replace(/\s\^[a-zA-Z0-9_-]+$/, "");
       const parsed = parseStyleComment(rawText);
       if (level === 1 && parsed.cleanText === rootTitle && rootHeadingFound && subHeadingCount === 0) {
         continue;
@@ -295,7 +295,7 @@ export function parseMarkdownToMindmapTree(
     const match = line.match(headingRegex);
     if (match) {
       const level = match[1].length;
-      let rawText = match[2].trim().replace(/\s\^[a-zA-Z0-9_-]+$/, "");
+      const rawText = match[2].trim().replace(/\s\^[a-zA-Z0-9_-]+$/, "");
       const parsedStyle = parseStyleComment(rawText);
       const text = parsedStyle.cleanText;
       if (level === 1 && text === rootTitle && rootHeadingFound && headings.length === 0) {
