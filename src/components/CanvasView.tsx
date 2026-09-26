@@ -1,37 +1,15 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { ThemeMode } from "../core/types";
-import type {
-  CanvasNode,
-  CanvasEdge,
-  CanvasNodeSide,
-  CanvasTextNode,
-  CanvasFileNode,
-  CanvasGroupNode,
-  CanvasEdgeLabelShape,
-  CanvasEdgeLineStyle,
-  CanvasObstacle,
-} from "../types/canvasTypes";
+import type { CanvasNode, CanvasEdge, CanvasObstacle } from "../types/canvasTypes";
 import {
   computeBoundingBox,
   extractCanvasToMarkdown,
-  isNodeInsideGroup,
-  disconnectNodeEdges,
-  cycleEdgeArrow,
-  cycleEdgeStyle,
-  cycleEdgeStrokePattern,
-  reverseEdgeDirection,
   computeSourceDisplayColorMap,
   expandLoopEdgeSelection,
-  syncLoopEdgeGeometry,
   isPointInsideNodeHull,
   downloadCanvasAsImage,
   copyCanvasImageToClipboard,
-  CanvasAlignDirection,
-  alignNodes,
-  getMediaFileType,
-  isMediaFile,
-  resolveMediaSrc,
 } from "../services/canvasService";
 import { getCanvasThemeColors } from "../services/canvasTheme";
 import {
@@ -58,6 +36,11 @@ import { useCanvasSelection } from "./canvas/useCanvasSelection";
 import { useCanvasNodeDrag } from "./canvas/useCanvasNodeDrag";
 import { useCanvasConnect } from "./canvas/useCanvasConnect";
 import { useCanvasPointer } from "./canvas/useCanvasPointer";
+// Node CRUD, edge mutations and media/clipboard IO domains, extracted during
+// the wave-5 CanvasView decomposition.
+import { useCanvasNodeOps } from "./canvas/useCanvasNodeOps";
+import { useCanvasEdgeOps } from "./canvas/useCanvasEdgeOps";
+import { useCanvasMediaClipboard } from "./canvas/useCanvasMediaClipboard";
 // The node layer (the group hulls and the card chrome), extracted during the
 // wave-3 CanvasView decomposition.
 import { CanvasNodeLayer } from "./canvas/CanvasNodeLayer";
@@ -253,19 +236,9 @@ export const CanvasView = memo(function CanvasView({
   } | null>(null);
   const cardEditorRef = useRef<HTMLTextAreaElement | null>(null);
 
-  // Multimodal media file input ref
-  const mediaFileInputRef = useRef<HTMLInputElement>(null);
-  // Dedicated inputs so the context menu can offer image / video / audio with
-  // a pre-filtered file dialog for each.
-  const imageFileInputRef = useRef<HTMLInputElement>(null);
-  const videoFileInputRef = useRef<HTMLInputElement>(null);
-  const audioFileInputRef = useRef<HTMLInputElement>(null);
-  /**
-   * Drop point for the next media insertion. Set when the user triggers an
-   * insert from the context menu (so the card lands where they right-clicked);
-   * falls back to the viewport centre for toolbar/keyboard paths.
-   */
-  const mediaInsertPosRef = useRef<{ x: number; y: number } | null>(null);
+  // The media file-input refs and the media-insert position ref moved into
+  // useCanvasMediaClipboard (wave 5); this component attaches the returned refs
+  // to the hidden inputs further down.
   /** Media preview opened by double-clicking an image / video / audio card. */
   const [lightboxMedia, setLightboxMedia] = useState<LightboxMedia | null>(null);
 
@@ -597,6 +570,122 @@ export const CanvasView = memo(function CanvasView({
       showToast,
     });
 
+  // Node CRUD / arrangement domain: card, group and clipboard-text operations
+  // (extracted hook, wave 5).
+  const {
+    handleAddTextCard,
+    handleAddFileCard,
+    handleAddGroup,
+    handleDeleteNode,
+    handleDeleteSelected,
+    handleDuplicateNode,
+    handleDuplicateSelected,
+    handleSelectAll,
+    handleBatchColorChange,
+    handleBringToFront,
+    handleSendToBack,
+    handleAlignSelected,
+    handleGroupSelectedNodes,
+    handleResetNodeSize,
+    handleCopyNodeText,
+    handleCopyNodeWikilink,
+    handleExtractCardToNote,
+    handleSelectGroupNodes,
+    handleFitGroupSize,
+    handleDissolveGroup,
+    handleDeleteGroupWithContents,
+    handleAlignToGrid,
+  } = useCanvasNodeOps({
+    editable,
+    viewport,
+    data,
+    latestDataRef,
+    pushHistory,
+    handleSaveNodeEdit,
+    editingNodeIdRef,
+    freshGroupIdsRef,
+    selectedNodeIds,
+    selectedNodeId,
+    setSelectedNodeIds,
+    setSelectedNodeId,
+    setEditingNodeId,
+    setContextMenu,
+    setShowFilePicker,
+    showToast,
+    onExtractToNote,
+  });
+
+  // Single-edge and batch-edge mutation domain (extracted hook, wave 5).
+  const {
+    handleDeleteEdge,
+    handleBatchDeleteEdges,
+    handleBatchSetEdgeStyle,
+    handleBatchCycleStrokePattern,
+    handleBatchToggleArrow,
+    handleBatchSetEdgeColor,
+    handleBatchReverseEdges,
+    handleSelectAllEdges,
+    handleDisconnectSelectedNodesEdges,
+    handleNodeColorChange,
+    handleToggleEdgeStyle,
+    handleToggleEdgeArrow,
+    handleReverseEdge,
+    handleEdgeColorChange,
+    handleEdgeLabelChange,
+    handleEdgeLabelShapeChange,
+    handleSetEdgeAnchorSide,
+    handleCycleEdgeAnchor,
+    handleToggleEdgeStrokePattern,
+    handleDisconnectNodeEdges,
+  } = useCanvasEdgeOps({
+    editable,
+    data,
+    latestDataRef,
+    pushHistory,
+    selectedNodeIds,
+    setSelectedNodeIds,
+    selectedEdgeIds,
+    setSelectedEdgeIds,
+    editingEdgeId,
+    setEditingEdgeId,
+    setContextMenu,
+    showToast,
+  });
+
+  // Multimodal media insertion, clipboard paste and drag-and-drop IO domain
+  // (extracted hook, wave 5). The hidden <input> elements stay in this
+  // component's JSX; their refs come from the hook.
+  const {
+    mediaFileInputRef,
+    imageFileInputRef,
+    videoFileInputRef,
+    audioFileInputRef,
+    handlePasteClipboardAsCard,
+    handleTriggerInsertMedia,
+    handleTriggerInsertImage,
+    handleTriggerInsertVideo,
+    handleTriggerInsertAudio,
+    handleMediaFileInputChange,
+    handleDragOver,
+    handleCanvasDrop,
+    openMediaPreview,
+  } = useCanvasMediaClipboard({
+    editable,
+    viewport,
+    containerRef,
+    viewportRef,
+    latestDataRef,
+    pushHistory,
+    setSelectedNodeIds,
+    setSelectedNodeId,
+    setContextMenu,
+    setLightboxMedia,
+    showToast,
+    currentFilePath,
+    editingNodeId,
+    editingEdgeId,
+  });
+
   // ResizeObserver for canvas container to ensure smooth updates
   useEffect(() => {
     if (!containerRef.current || typeof ResizeObserver === "undefined") return;
@@ -753,1147 +842,6 @@ export const CanvasView = memo(function CanvasView({
     };
   };
 
-  // Node operations
-  const handleAddTextCard = useCallback(
-    (atX?: number, atY?: number) => {
-      if (!editable) return;
-      if (editingNodeIdRef.current) {
-        handleSaveNodeEdit();
-      }
-      const id = `text-${Date.now()}`;
-      const targetX =
-        typeof atX === "number" ? atX : Math.round((-viewport.panX + 300) / viewport.zoom);
-      const targetY =
-        typeof atY === "number" ? atY : Math.round((-viewport.panY + 200) / viewport.zoom);
-      const newNode: CanvasTextNode = {
-        id,
-        type: "text",
-        text: "### 新想法卡片\n双击此处或按 Enter 进行 Markdown 编辑...",
-        x: targetX,
-        y: targetY,
-        width: 280,
-        height: 160,
-        color: undefined,
-      };
-      const currentData = latestDataRef.current;
-      pushHistory({
-        ...currentData,
-        nodes: [...currentData.nodes, newNode],
-      });
-      setSelectedNodeIds(new Set([id]));
-      setEditingNodeId(null);
-      setContextMenu(null);
-    },
-    [editable, viewport, pushHistory, handleSaveNodeEdit],
-  );
-
-  const handleAddFileCard = useCallback(
-    (chapter: { title: string; src: string }, atX?: number, atY?: number) => {
-      if (!editable) return;
-      if (editingNodeIdRef.current) {
-        handleSaveNodeEdit();
-      }
-      const id = `file-${Date.now()}`;
-      const targetX =
-        typeof atX === "number" ? atX : Math.round((-viewport.panX + 320) / viewport.zoom);
-      const targetY =
-        typeof atY === "number" ? atY : Math.round((-viewport.panY + 220) / viewport.zoom);
-      const newNode: CanvasFileNode = {
-        id,
-        type: "file",
-        file: chapter.src,
-        x: targetX,
-        y: targetY,
-        width: 320,
-        height: 220,
-        color: "4",
-      };
-      const currentData = latestDataRef.current;
-      pushHistory({
-        ...currentData,
-        nodes: [...currentData.nodes, newNode],
-      });
-      setSelectedNodeIds(new Set([id]));
-      setShowFilePicker(false);
-      setContextMenu(null);
-    },
-    [editable, viewport, pushHistory, handleSaveNodeEdit],
-  );
-
-  const handleAddGroup = useCallback(
-    (atX?: number, atY?: number) => {
-      if (!editable) return;
-      if (editingNodeIdRef.current) {
-        handleSaveNodeEdit();
-      }
-      const id = `group-${Date.now()}`;
-      const targetX =
-        typeof atX === "number" ? atX : Math.round((-viewport.panX + 250) / viewport.zoom);
-      const targetY =
-        typeof atY === "number" ? atY : Math.round((-viewport.panY + 150) / viewport.zoom);
-      const newGroup: CanvasGroupNode = {
-        id,
-        type: "group",
-        label: "概念分组容器",
-        x: targetX,
-        y: targetY,
-        width: 600,
-        height: 400,
-        color: "5",
-      };
-      const currentData = latestDataRef.current;
-      pushHistory({
-        ...currentData,
-        nodes: [...currentData.nodes, newGroup],
-      });
-      freshGroupIdsRef.current.add(id);
-      setSelectedNodeIds(new Set([id]));
-      setEditingNodeId(null);
-      setContextMenu(null);
-    },
-    [editable, viewport, pushHistory, handleSaveNodeEdit],
-  );
-
-  const handleDeleteNode = useCallback(
-    (nodeId: string) => {
-      if (!editable) return;
-      pushHistory({
-        nodes: data.nodes.filter((n) => n.id !== nodeId),
-        edges: data.edges.filter((e) => e.fromNode !== nodeId && e.toNode !== nodeId),
-      });
-      setSelectedNodeIds((prev) => {
-        const next = new Set(prev);
-        next.delete(nodeId);
-        return next;
-      });
-      setContextMenu(null);
-    },
-    [editable, data, pushHistory],
-  );
-
-  const handleDeleteSelected = useCallback(() => {
-    if (!editable || selectedNodeIds.size === 0) return;
-    pushHistory({
-      nodes: data.nodes.filter((n) => !selectedNodeIds.has(n.id)),
-      edges: data.edges.filter(
-        (e) => !selectedNodeIds.has(e.fromNode) && !selectedNodeIds.has(e.toNode),
-      ),
-    });
-    setSelectedNodeIds(new Set());
-    setContextMenu(null);
-  }, [editable, selectedNodeIds, data, pushHistory]);
-
-  const handleDuplicateNode = useCallback(
-    (nodeId: string) => {
-      if (!editable) return;
-      const node = data.nodes.find((n) => n.id === nodeId);
-      if (!node) return;
-      const newNode: CanvasNode = {
-        ...node,
-        id: `${node.type}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        x: node.x + 30,
-        y: node.y + 30,
-      };
-      pushHistory({
-        ...data,
-        nodes: [...data.nodes, newNode],
-      });
-      setSelectedNodeIds(new Set([newNode.id]));
-      setContextMenu(null);
-    },
-    [editable, data, pushHistory],
-  );
-
-  const handleDuplicateSelected = useCallback(() => {
-    if (!editable || selectedNodeIds.size === 0) return;
-    const idMap = new Map<string, string>();
-    const newNodes: CanvasNode[] = [];
-    for (const node of data.nodes) {
-      if (selectedNodeIds.has(node.id)) {
-        const newId = `${node.type}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-        idMap.set(node.id, newId);
-        newNodes.push({
-          ...node,
-          id: newId,
-          x: node.x + 30,
-          y: node.y + 30,
-        });
-      }
-    }
-    const newEdges: CanvasEdge[] = [];
-    for (const edge of data.edges) {
-      if (idMap.has(edge.fromNode) && idMap.has(edge.toNode)) {
-        newEdges.push({
-          ...edge,
-          id: `edge-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-          fromNode: idMap.get(edge.fromNode)!,
-          toNode: idMap.get(edge.toNode)!,
-        });
-      }
-    }
-    pushHistory({
-      nodes: [...data.nodes, ...newNodes],
-      edges: [...data.edges, ...newEdges],
-    });
-    setSelectedNodeIds(new Set(newNodes.map((n) => n.id)));
-    setContextMenu(null);
-  }, [editable, selectedNodeIds, data, pushHistory]);
-
-  const handleSelectAll = useCallback(() => {
-    setSelectedNodeIds(new Set(data.nodes.map((n) => n.id)));
-    setContextMenu(null);
-  }, [data.nodes]);
-
-  const handleBatchColorChange = useCallback(
-    (color: string) => {
-      if (!editable || selectedNodeIds.size === 0) return;
-      pushHistory({
-        ...data,
-        nodes: data.nodes.map((n) =>
-          selectedNodeIds.has(n.id) ? { ...n, color: color || undefined } : n,
-        ),
-      });
-      // Deliberately does NOT close the context menu here — the caller decides
-      // when. When the colour came from the native picker, closing has to wait
-      // until that dialog has finished dismissing; unmounting the <input> from
-      // onChange tears it down mid-flight and crashes the renderer (闪退).
-    },
-    [editable, selectedNodeIds, data, pushHistory],
-  );
-
-  const handleBringToFront = useCallback(
-    (nodeId: string) => {
-      if (!editable) return;
-      const node = data.nodes.find((n) => n.id === nodeId);
-      if (!node) return;
-      pushHistory({
-        ...data,
-        nodes: [...data.nodes.filter((n) => n.id !== nodeId), node],
-      });
-      setContextMenu(null);
-    },
-    [editable, data, pushHistory],
-  );
-
-  const handleSendToBack = useCallback(
-    (nodeId: string) => {
-      if (!editable) return;
-      const node = data.nodes.find((n) => n.id === nodeId);
-      if (!node) return;
-      pushHistory({
-        ...data,
-        nodes: [node, ...data.nodes.filter((n) => n.id !== nodeId)],
-      });
-      setContextMenu(null);
-    },
-    [editable, data, pushHistory],
-  );
-
-  const handleDeleteEdge = useCallback(
-    (edgeId: string) => {
-      if (!editable) return;
-      const currentData = latestDataRef.current;
-      pushHistory({
-        ...currentData,
-        edges: currentData.edges.filter((e) => e.id !== edgeId),
-      });
-      setSelectedEdgeIds((prev) => {
-        if (!prev.has(edgeId)) return prev;
-        const next = new Set(prev);
-        next.delete(edgeId);
-        return next;
-      });
-      if (editingEdgeId === edgeId) setEditingEdgeId(null);
-      setContextMenu(null);
-    },
-    [editable, editingEdgeId, pushHistory],
-  );
-
-  const handleBatchDeleteEdges = useCallback(() => {
-    if (!editable || selectedEdgeIds.size === 0) return;
-    const currentData = latestDataRef.current;
-    const count = selectedEdgeIds.size;
-    pushHistory({
-      ...currentData,
-      edges: currentData.edges.filter((e) => !selectedEdgeIds.has(e.id)),
-    });
-    setSelectedEdgeIds(new Set());
-    if (editingEdgeId && selectedEdgeIds.has(editingEdgeId)) setEditingEdgeId(null);
-    setContextMenu(null);
-    showToast(`已删除 ${count} 条连线`);
-  }, [editable, selectedEdgeIds, editingEdgeId, pushHistory, showToast]);
-
-  const handleBatchSetEdgeStyle = useCallback(
-    (style: CanvasEdgeLineStyle) => {
-      if (!editable || selectedEdgeIds.size === 0) return;
-      const currentData = latestDataRef.current;
-      pushHistory({
-        ...currentData,
-        edges: currentData.edges.map((e) => (selectedEdgeIds.has(e.id) ? { ...e, style } : e)),
-      });
-      const styleName = style === "bezier" ? "贝塞尔曲线" : style === "step" ? "直角折线" : "直线";
-      showToast(`已将 ${selectedEdgeIds.size} 条连线设为${styleName}`);
-    },
-    [editable, selectedEdgeIds, pushHistory, showToast],
-  );
-
-  const handleBatchCycleStrokePattern = useCallback(() => {
-    if (!editable || selectedEdgeIds.size === 0) return;
-    const currentData = latestDataRef.current;
-    const first = currentData.edges.find((e) => selectedEdgeIds.has(e.id));
-    const nextPattern: "solid" | "dashed" | "dotted" =
-      first?.strokePattern === "dashed"
-        ? "dotted"
-        : first?.strokePattern === "dotted"
-          ? "solid"
-          : "dashed";
-    pushHistory({
-      ...currentData,
-      edges: currentData.edges.map((e) =>
-        selectedEdgeIds.has(e.id) ? { ...e, strokePattern: nextPattern } : e,
-      ),
-    });
-    const patName = nextPattern === "dashed" ? "虚线" : nextPattern === "dotted" ? "点线" : "实线";
-    showToast(`已将 ${selectedEdgeIds.size} 条连线切换为${patName}`);
-  }, [editable, selectedEdgeIds, pushHistory, showToast]);
-
-  const handleBatchToggleArrow = useCallback(() => {
-    if (!editable || selectedEdgeIds.size === 0) return;
-    const currentData = latestDataRef.current;
-    const first = currentData.edges.find((e) => selectedEdgeIds.has(e.id));
-    let nextFromEnd: "arrow" | undefined = undefined;
-    let nextToEnd: "arrow" | undefined = "arrow";
-    let desc: string;
-
-    if (first?.toEnd === "arrow" && first?.fromEnd !== "arrow") {
-      nextFromEnd = "arrow";
-      nextToEnd = "arrow";
-      desc = "双向箭头";
-    } else if (first?.toEnd === "arrow" && first?.fromEnd === "arrow") {
-      nextFromEnd = undefined;
-      nextToEnd = undefined;
-      desc = "无箭头";
-    } else {
-      nextFromEnd = undefined;
-      nextToEnd = "arrow";
-      desc = "单向箭头";
-    }
-
-    pushHistory({
-      ...currentData,
-      edges: currentData.edges.map((e) =>
-        selectedEdgeIds.has(e.id) ? { ...e, fromEnd: nextFromEnd, toEnd: nextToEnd } : e,
-      ),
-    });
-    showToast(`已将 ${selectedEdgeIds.size} 条连线切换为${desc}`);
-  }, [editable, selectedEdgeIds, pushHistory, showToast]);
-
-  const handleBatchSetEdgeColor = useCallback(
-    (colorKey: string) => {
-      if (!editable || selectedEdgeIds.size === 0) return;
-      const currentData = latestDataRef.current;
-      // Selecting a single segment of a closed ring repaints the whole ring,
-      // so the "one ring = one color" invariant is never broken.
-      const affected = expandLoopEdgeSelection(currentData.edges, selectedEdgeIds);
-      pushHistory({
-        ...currentData,
-        edges: currentData.edges.map((e) => (affected.has(e.id) ? { ...e, color: colorKey } : e)),
-      });
-      showToast(`已修改 ${affected.size} 条连线的颜色`);
-    },
-    [editable, selectedEdgeIds, pushHistory, showToast],
-  );
-
-  const handleBatchReverseEdges = useCallback(() => {
-    if (!editable || selectedEdgeIds.size === 0) return;
-    const currentData = latestDataRef.current;
-    const count = selectedEdgeIds.size;
-    pushHistory({
-      ...currentData,
-      edges: currentData.edges.map((e) =>
-        selectedEdgeIds.has(e.id) ? reverseEdgeDirection(e) : e,
-      ),
-    });
-    showToast(`已反转 ${count} 条连线的流向`);
-  }, [editable, selectedEdgeIds, pushHistory, showToast]);
-
-  const handleSelectAllEdges = useCallback(() => {
-    if (data.edges.length === 0) return;
-    setSelectedEdgeIds(new Set(data.edges.map((e) => e.id)));
-    setSelectedNodeIds(new Set());
-    setContextMenu(null);
-    showToast(`已全选 ${data.edges.length} 条连线`);
-  }, [data.edges, showToast]);
-
-  const handleDisconnectSelectedNodesEdges = useCallback(() => {
-    if (!editable || selectedNodeIds.size < 2) return;
-    const currentData = latestDataRef.current;
-    const beforeCount = currentData.edges.length;
-    const remainingEdges = currentData.edges.filter(
-      (e) => !(selectedNodeIds.has(e.fromNode) && selectedNodeIds.has(e.toNode)),
-    );
-    const removedCount = beforeCount - remainingEdges.length;
-    if (removedCount === 0) {
-      showToast("所选卡片之间无内部连线");
-      setContextMenu(null);
-      return;
-    }
-    pushHistory({
-      ...currentData,
-      edges: remainingEdges,
-    });
-    setSelectedEdgeIds(new Set());
-    setContextMenu(null);
-    showToast(`已断开所选卡片间的 ${removedCount} 条内部连线`);
-  }, [editable, selectedNodeIds, pushHistory, showToast]);
-
-  const handleNodeColorChange = useCallback(
-    (nodeId: string, color: string) => {
-      if (!editable) return;
-      const currentData = latestDataRef.current;
-      pushHistory({
-        ...currentData,
-        nodes: currentData.nodes.map((n) =>
-          n.id === nodeId ? { ...n, color: color || undefined } : n,
-        ),
-      });
-    },
-    [editable, pushHistory],
-  );
-
-  const handleToggleEdgeStyle = useCallback(
-    (edgeId: string) => {
-      if (!editable) return;
-      const currentData = latestDataRef.current;
-      const targetEdge = currentData.edges.find((e) => e.id === edgeId);
-      if (!targetEdge) return;
-      const updated = cycleEdgeStyle(targetEdge);
-      pushHistory({
-        ...currentData,
-        edges: currentData.edges.map((e) => (e.id === edgeId ? updated : e)),
-      });
-    },
-    [editable, pushHistory],
-  );
-
-  const handleToggleEdgeArrow = useCallback(
-    (edgeId: string) => {
-      if (!editable) return;
-      const currentData = latestDataRef.current;
-      const targetEdge = currentData.edges.find((e) => e.id === edgeId);
-      if (!targetEdge) return;
-      const updated = cycleEdgeArrow(targetEdge);
-      pushHistory({
-        ...currentData,
-        edges: currentData.edges.map((e) => (e.id === edgeId ? updated : e)),
-      });
-    },
-    [editable, pushHistory],
-  );
-
-  const handleReverseEdge = useCallback(
-    (edgeId: string) => {
-      if (!editable) return;
-      const currentData = latestDataRef.current;
-      const targetEdge = currentData.edges.find((e) => e.id === edgeId);
-      if (!targetEdge) return;
-      const updated = reverseEdgeDirection(targetEdge);
-      pushHistory({
-        ...currentData,
-        edges: currentData.edges.map((e) => (e.id === edgeId ? updated : e)),
-      });
-    },
-    [editable, pushHistory],
-  );
-
-  const handleEdgeColorChange = useCallback(
-    (edgeId: string, color?: string) => {
-      if (!editable) return;
-      const currentData = latestDataRef.current;
-      // A right-click on one segment of a closed ring recolors the entire
-      // ring, keeping its color unified.
-      const affected = expandLoopEdgeSelection(currentData.edges, [edgeId]);
-      pushHistory({
-        ...currentData,
-        edges: currentData.edges.map((e) => (affected.has(e.id) ? { ...e, color } : e)),
-      });
-    },
-    [editable, pushHistory],
-  );
-
-  const handleEdgeLabelChange = useCallback(
-    (edgeId: string, label: string) => {
-      if (!editable) return;
-      const currentData = latestDataRef.current;
-      pushHistory({
-        ...currentData,
-        edges: currentData.edges.map((e) =>
-          e.id === edgeId ? { ...e, label: label.trim() || undefined } : e,
-        ),
-      });
-    },
-    [editable, pushHistory],
-  );
-
-  const handleEdgeLabelShapeChange = useCallback(
-    (edgeId: string, shape: CanvasEdgeLabelShape) => {
-      if (!editable) return;
-      const currentData = latestDataRef.current;
-      pushHistory({
-        ...currentData,
-        edges: currentData.edges.map((e) => (e.id === edgeId ? { ...e, labelShape: shape } : e)),
-      });
-    },
-    [editable, pushHistory],
-  );
-
-  const handleSetEdgeAnchorSide = useCallback(
-    (edgeId: string, sideKey: "fromSide" | "toSide", side: CanvasNodeSide | undefined) => {
-      if (!editable) return;
-      const currentData = latestDataRef.current;
-      pushHistory({
-        ...currentData,
-        edges: currentData.edges.map((e) => (e.id === edgeId ? { ...e, [sideKey]: side } : e)),
-      });
-    },
-    [editable, pushHistory],
-  );
-
-  const handleCycleEdgeAnchor = useCallback(
-    (edgeId: string, sideKey: "fromSide" | "toSide") => {
-      if (!editable) return;
-      const currentEdge = latestDataRef.current.edges.find((e) => e.id === edgeId);
-      if (!currentEdge) return;
-      const current = currentEdge[sideKey];
-      const sequence: (CanvasNodeSide | undefined)[] = [
-        undefined,
-        "top",
-        "right",
-        "bottom",
-        "left",
-      ];
-      const currIdx = sequence.indexOf(current);
-      const nextSide = sequence[(currIdx + 1) % sequence.length];
-      handleSetEdgeAnchorSide(edgeId, sideKey, nextSide);
-    },
-    [editable, handleSetEdgeAnchorSide],
-  );
-
-  const handleToggleEdgeStrokePattern = useCallback(
-    (edgeId: string) => {
-      if (!editable) return;
-      const currentData = latestDataRef.current;
-      const targetEdge = currentData.edges.find((e) => e.id === edgeId);
-      if (!targetEdge) return;
-      const updated = cycleEdgeStrokePattern(targetEdge);
-      pushHistory({
-        ...currentData,
-        edges: currentData.edges.map((e) => (e.id === edgeId ? updated : e)),
-      });
-    },
-    [editable, pushHistory],
-  );
-
-  const handleDisconnectNodeEdges = useCallback(
-    (nodeId: string) => {
-      if (!editable) return;
-      const currentData = latestDataRef.current;
-      const connectedCount = currentData.edges.filter(
-        (e) => e.fromNode === nodeId || e.toNode === nodeId,
-      ).length;
-      if (connectedCount === 0) {
-        showToast("该卡片当前没有任何关联连线");
-        setContextMenu(null);
-        return;
-      }
-      const updatedEdges = disconnectNodeEdges(nodeId, currentData.edges);
-      pushHistory({
-        ...currentData,
-        edges: updatedEdges,
-      });
-      showToast(`已断开该卡片的 ${connectedCount} 条关联连线`);
-      setContextMenu(null);
-    },
-    [editable, pushHistory, showToast],
-  );
-
-  const handleAlignSelected = useCallback(
-    (direction: CanvasAlignDirection) => {
-      if (!editable || selectedNodeIds.size < 2) return;
-      const currentData = latestDataRef.current;
-      const selNodes = currentData.nodes.filter((n) => selectedNodeIds.has(n.id));
-      if (selNodes.length < 2) return;
-
-      const updatedNodes = alignNodes(currentData.nodes, selectedNodeIds, direction);
-      // Keep loop geometry in sync with the new positions: circle alignment
-      // stamps a circular arc onto the loop edges, grid alignment marks them as
-      // orthogonal straight segments so a rectangular layout reads as a clean
-      // frame, and any other alignment clears stale metadata.
-      const updatedEdges = syncLoopEdgeGeometry(updatedNodes, currentData.edges);
-
-      const toastMap: Record<CanvasAlignDirection, string> = {
-        horizontal: "所选卡片已水平中线对齐",
-        vertical: "所选卡片已垂直中线对齐",
-        left: "所选卡片已左对齐",
-        center: "所选卡片已水平居中",
-        right: "所选卡片已右对齐",
-        top: "所选卡片已顶端对齐",
-        middle: "所选卡片已垂直居中",
-        bottom: "所选卡片已底端对齐",
-        "distribute-h": "所选卡片已水平等距分布",
-        "distribute-v": "所选卡片已垂直等距分布",
-        circle: `已将 ${selNodes.length} 张卡片均匀排布为环形`,
-        grid: `已将 ${selNodes.length} 张卡片按矩形网格排布`,
-      };
-
-      pushHistory({ ...currentData, nodes: updatedNodes, edges: updatedEdges });
-      showToast(toastMap[direction] || "所选卡片已对齐");
-      setContextMenu(null);
-    },
-    [editable, selectedNodeIds, pushHistory, showToast],
-  );
-
-  const handleGroupSelectedNodes = useCallback(() => {
-    if (!editable || selectedNodeIds.size === 0) return;
-    const currentData = latestDataRef.current;
-    const selNodes = currentData.nodes.filter((n) => selectedNodeIds.has(n.id));
-    if (selNodes.length === 0) return;
-
-    const bbox = computeBoundingBox(selNodes);
-    const padX = 30;
-    const padTop = 45;
-    const padBottom = 30;
-
-    const newGroup: CanvasGroupNode = {
-      id: `group-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      type: "group",
-      label: "新建分组容器",
-      x: bbox.minX - padX,
-      y: bbox.minY - padTop,
-      width: bbox.width + padX * 2,
-      height: bbox.height + padTop + padBottom,
-      color: "6",
-    };
-
-    pushHistory({
-      ...currentData,
-      nodes: [newGroup, ...currentData.nodes],
-    });
-    setSelectedNodeIds(new Set([newGroup.id]));
-    setSelectedNodeId(newGroup.id);
-    showToast(`已将 ${selNodes.length} 张卡片打包进新分组`);
-    setContextMenu(null);
-  }, [editable, selectedNodeIds, pushHistory, showToast]);
-
-  const handleResetNodeSize = useCallback(
-    (nodeId: string) => {
-      if (!editable) return;
-      const currentData = latestDataRef.current;
-      const target = currentData.nodes.find((n) => n.id === nodeId);
-      if (!target) return;
-
-      let defaultW = 280;
-      let defaultH = 160;
-      if (target.type === "file") {
-        defaultW = 320;
-        defaultH = 240;
-      } else if (target.type === "group") {
-        defaultW = 400;
-        defaultH = 300;
-      } else if (target.type === "link") {
-        defaultW = 280;
-        defaultH = 100;
-      }
-
-      pushHistory({
-        ...currentData,
-        nodes: currentData.nodes.map((n) =>
-          n.id === nodeId ? { ...n, width: defaultW, height: defaultH } : n,
-        ),
-      });
-      showToast("已重置卡片为标准尺寸");
-      setContextMenu(null);
-    },
-    [editable, pushHistory, showToast],
-  );
-
-  const handleCopyNodeText = useCallback(
-    (node: CanvasNode) => {
-      let textToCopy = "";
-      if (node.type === "text") {
-        textToCopy = node.text;
-      } else if (node.type === "file") {
-        textToCopy = node.file;
-      } else if (node.type === "link") {
-        textToCopy = node.url;
-      } else if (node.type === "group") {
-        textToCopy = node.label || "未命名分组";
-      }
-
-      if (navigator?.clipboard?.writeText) {
-        navigator.clipboard.writeText(textToCopy).catch(() => {});
-        showToast("卡片文本已复制到剪贴板");
-      }
-      setContextMenu(null);
-    },
-    [showToast],
-  );
-
-  const handleCopyNodeWikilink = useCallback(
-    (node: CanvasNode) => {
-      let wikilink = "";
-      if (node.type === "file") {
-        wikilink = `[[${node.file.replace(/\.md$/i, "")}]]`;
-      } else if (node.type === "text") {
-        const firstLine = node.text
-          .split("\n")[0]
-          .replace(/^[#\s\-*]+/, "")
-          .trim();
-        wikilink = `[[${firstLine || "卡片"}]]`;
-      } else if (node.type === "group") {
-        wikilink = `[[${node.label || "分组"}]]`;
-      } else if (node.type === "link") {
-        wikilink = `[${node.url}](${node.url})`;
-      }
-
-      if (navigator?.clipboard?.writeText) {
-        navigator.clipboard.writeText(wikilink).catch(() => {});
-        showToast(`双链已复制: ${wikilink}`);
-      }
-      setContextMenu(null);
-    },
-    [showToast],
-  );
-
-  const handleExtractCardToNote = useCallback(
-    (node: CanvasTextNode) => {
-      if (!onExtractToNote) return;
-      const lines = node.text.split("\n");
-      const firstLine = lines[0].replace(/^[#\s\-*]+/, "").trim();
-      const title = firstLine || "未命名卡片笔记";
-      const content = node.text;
-      onExtractToNote(title, content);
-      showToast(`已提取为新笔记: ${title}`);
-      setContextMenu(null);
-    },
-    [onExtractToNote, showToast],
-  );
-
-  const handleSelectGroupNodes = useCallback(
-    (groupNode: CanvasGroupNode) => {
-      const currentData = latestDataRef.current;
-      const insideNodes = currentData.nodes.filter(
-        (n) => n.id !== groupNode.id && isNodeInsideGroup(n, groupNode),
-      );
-      if (insideNodes.length > 0) {
-        setSelectedNodeIds(new Set(insideNodes.map((n) => n.id)));
-        setSelectedNodeId(insideNodes[0].id);
-        showToast(`已选中组内 ${insideNodes.length} 张卡片`);
-      } else {
-        showToast("该分组内暂无卡片");
-      }
-      setContextMenu(null);
-    },
-    [showToast],
-  );
-
-  const handleFitGroupSize = useCallback(
-    (groupNode: CanvasGroupNode) => {
-      if (!editable) return;
-      const currentData = latestDataRef.current;
-      const insideNodes = currentData.nodes.filter(
-        (n) => n.id !== groupNode.id && isNodeInsideGroup(n, groupNode),
-      );
-      if (insideNodes.length === 0) {
-        showToast("分组内暂无卡片，无需调整");
-        setContextMenu(null);
-        return;
-      }
-
-      const bbox = computeBoundingBox(insideNodes);
-      const padX = 24;
-      const padTop = 38;
-      const padBottom = 24;
-
-      pushHistory({
-        ...currentData,
-        nodes: currentData.nodes.map((n) =>
-          n.id === groupNode.id
-            ? {
-                ...n,
-                x: bbox.minX - padX,
-                y: bbox.minY - padTop,
-                width: bbox.width + padX * 2,
-                height: bbox.height + padTop + padBottom,
-              }
-            : n,
-        ),
-      });
-      showToast("分组尺寸已贴合内部卡片");
-      setContextMenu(null);
-    },
-    [editable, pushHistory, showToast],
-  );
-
-  const handleDissolveGroup = useCallback(
-    (groupNodeId: string) => {
-      if (!editable) return;
-      const currentData = latestDataRef.current;
-      pushHistory({
-        ...currentData,
-        nodes: currentData.nodes.filter((n) => n.id !== groupNodeId),
-        edges: currentData.edges.filter(
-          (e) => e.fromNode !== groupNodeId && e.toNode !== groupNodeId,
-        ),
-      });
-      if (selectedNodeId === groupNodeId) setSelectedNodeId(null);
-      if (selectedNodeIds.has(groupNodeId)) {
-        const nextSet = new Set(selectedNodeIds);
-        nextSet.delete(groupNodeId);
-        setSelectedNodeIds(nextSet);
-      }
-      showToast("已解散分组（保留内部卡片）");
-      setContextMenu(null);
-    },
-    [editable, selectedNodeId, selectedNodeIds, pushHistory, showToast],
-  );
-
-  const handleDeleteGroupWithContents = useCallback(
-    (groupNode: CanvasGroupNode) => {
-      if (!editable) return;
-      const currentData = latestDataRef.current;
-      const insideNodeIds = new Set(
-        currentData.nodes
-          .filter((n) => n.id === groupNode.id || isNodeInsideGroup(n, groupNode))
-          .map((n) => n.id),
-      );
-
-      pushHistory({
-        ...currentData,
-        nodes: currentData.nodes.filter((n) => !insideNodeIds.has(n.id)),
-        edges: currentData.edges.filter(
-          (e) => !insideNodeIds.has(e.fromNode) && !insideNodeIds.has(e.toNode),
-        ),
-      });
-      setSelectedNodeIds(new Set());
-      setSelectedNodeId(null);
-      showToast(`已删除分组容器及内部 ${insideNodeIds.size - 1} 张卡片`);
-      setContextMenu(null);
-    },
-    [editable, pushHistory, showToast],
-  );
-
-  const handlePasteClipboardAsCard = useCallback(
-    async (canvasX: number, canvasY: number) => {
-      if (!editable) return;
-      let text = "";
-      let imageBlob: Blob | null = null;
-      try {
-        if (navigator?.clipboard?.read) {
-          const items = await navigator.clipboard.read();
-          for (const item of items) {
-            const imgType = item.types.find((t) => t.startsWith("image/"));
-            if (imgType) {
-              imageBlob = await item.getType(imgType);
-              break;
-            }
-          }
-        }
-      } catch {
-        // clipboard permission fallback
-      }
-
-      if (imageBlob) {
-        try {
-          const reader = new FileReader();
-          const base64 = await new Promise<string>((resolve, reject) => {
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = reject;
-            reader.readAsDataURL(imageBlob!);
-          });
-
-          let finalFilePath = base64;
-          const desktop =
-            typeof window !== "undefined"
-              ? window.knowSpaceDesktop || window.bookMDDesktop
-              : undefined;
-          if (desktop?.savePastedImage) {
-            const res = await desktop.savePastedImage({
-              currentFilePath,
-              bufferBase64: base64,
-              originalName: "pasted_image",
-              ext: imageBlob.type.replace("image/", "") || "png",
-            });
-            if (res?.success && res.relativePath) {
-              finalFilePath = res.relativePath;
-            }
-          }
-
-          const newCard: CanvasFileNode = {
-            id: `file-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-            type: "file",
-            file: finalFilePath,
-            x: Math.round(canvasX - 180),
-            y: Math.round(canvasY - 130),
-            width: 360,
-            height: 260,
-          };
-
-          const currentData = latestDataRef.current;
-          pushHistory({
-            ...currentData,
-            nodes: [...currentData.nodes, newCard],
-          });
-          setSelectedNodeIds(new Set([newCard.id]));
-          setSelectedNodeId(newCard.id);
-          showToast("已从剪贴板粘贴为图片卡片");
-          setContextMenu(null);
-          return;
-        } catch {
-          // fallback to text
-        }
-      }
-
-      try {
-        if (navigator?.clipboard?.readText) {
-          text = await navigator.clipboard.readText();
-        }
-      } catch {
-        // clipboard permission fallback
-      }
-      if (!text || !text.trim()) {
-        text = "从剪贴板粘贴的卡片";
-      }
-
-      const newCard: CanvasTextNode = {
-        id: `text-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        type: "text",
-        text: text.trim(),
-        x: Math.round(canvasX),
-        y: Math.round(canvasY),
-        width: 280,
-        height: 180,
-      };
-
-      const currentData = latestDataRef.current;
-      pushHistory({
-        ...currentData,
-        nodes: [...currentData.nodes, newCard],
-      });
-      setSelectedNodeIds(new Set([newCard.id]));
-      setSelectedNodeId(newCard.id);
-      showToast("已从剪贴板粘贴为新卡片");
-      setContextMenu(null);
-    },
-    [editable, currentFilePath, pushHistory, showToast],
-  );
-
-  const handleTriggerInsertMedia = useCallback(() => {
-    if (!editable) return;
-    mediaFileInputRef.current?.click();
-  }, [editable]);
-
-  /**
-   * Context-menu insert helpers. Each pre-filters its file dialog to one
-   * modality and remembers the click point so the card lands exactly where
-   * the user right-clicked.
-   */
-  const handleTriggerInsertImage = useCallback(
-    (canvasX: number, canvasY: number) => {
-      if (!editable) return;
-      mediaInsertPosRef.current = { x: canvasX, y: canvasY };
-      imageFileInputRef.current?.click();
-    },
-    [editable],
-  );
-
-  const handleTriggerInsertVideo = useCallback(
-    (canvasX: number, canvasY: number) => {
-      if (!editable) return;
-      mediaInsertPosRef.current = { x: canvasX, y: canvasY };
-      videoFileInputRef.current?.click();
-    },
-    [editable],
-  );
-
-  const handleTriggerInsertAudio = useCallback(
-    (canvasX: number, canvasY: number) => {
-      if (!editable) return;
-      mediaInsertPosRef.current = { x: canvasX, y: canvasY };
-      audioFileInputRef.current?.click();
-    },
-    [editable],
-  );
-
-  const handleMediaFileInputChange = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const files = Array.from(e.target.files || []);
-      if (files.length === 0 || !editable) return;
-
-      const desktop =
-        typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
-      const newNodes: CanvasNode[] = [];
-
-      // Right-click inserts land exactly where the user clicked; toolbar /
-      // keyboard paths fall back to the viewport centre.
-      const insertPos = mediaInsertPosRef.current;
-      const centerX = insertPos
-        ? insertPos.x
-        : -viewport.panX / viewport.zoom +
-          (containerRef.current?.clientWidth || 800) / (2 * viewport.zoom);
-      const centerY = insertPos
-        ? insertPos.y
-        : -viewport.panY / viewport.zoom +
-          (containerRef.current?.clientHeight || 600) / (2 * viewport.zoom);
-      mediaInsertPosRef.current = null;
-
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const offsetX = i * 28;
-        const offsetY = i * 28;
-
-        try {
-          const reader = new FileReader();
-          const base64 = await new Promise<string>((resolve, reject) => {
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-          });
-
-          let finalFilePath = base64;
-          if (desktop?.savePastedImage) {
-            const res = await desktop.savePastedImage({
-              currentFilePath,
-              bufferBase64: base64,
-              originalName: file.name,
-              ext: file.name.split(".").pop() || "png",
-            });
-            if (res?.success && res.relativePath) {
-              finalFilePath = res.relativePath;
-            }
-          }
-
-          newNodes.push({
-            id: `file-${Date.now()}-${Math.random().toString(36).slice(2, 6)}-${i}`,
-            type: "file",
-            file: finalFilePath,
-            x: Math.round(centerX + offsetX - 180),
-            y: Math.round(centerY + offsetY - 130),
-            width: 360,
-            height: 260,
-          });
-        } catch {
-          // fallback
-        }
-      }
-
-      if (newNodes.length > 0) {
-        const currentData = latestDataRef.current;
-        pushHistory({
-          ...currentData,
-          nodes: [...currentData.nodes, ...newNodes],
-        });
-        setSelectedNodeIds(new Set(newNodes.map((n) => n.id)));
-        setSelectedNodeId(newNodes[0].id);
-        showToast(`已插入 ${newNodes.length} 张媒体卡片`);
-      }
-
-      e.target.value = "";
-    },
-    [editable, viewport, currentFilePath, pushHistory, showToast],
-  );
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    e.dataTransfer.dropEffect = "copy";
-  }, []);
-
-  const handleCanvasDrop = useCallback(
-    async (e: React.DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (!editable || !containerRef.current) return;
-
-      const rect = containerRef.current.getBoundingClientRect();
-      const localX = e.clientX - rect.left;
-      const localY = e.clientY - rect.top;
-      const canvasX = Math.round((localX - viewportRef.current.panX) / viewportRef.current.zoom);
-      const canvasY = Math.round((localY - viewportRef.current.panY) / viewportRef.current.zoom);
-
-      const files = Array.from(e.dataTransfer.files || []);
-      if (files.length === 0) return;
-
-      const desktop =
-        typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
-      const newNodes: CanvasNode[] = [];
-
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const offsetX = i * 28;
-        const offsetY = i * 28;
-
-        if (isMediaFile(file.name) || file.type.startsWith("image/")) {
-          try {
-            const reader = new FileReader();
-            const base64 = await new Promise<string>((resolve, reject) => {
-              reader.onload = () => resolve(reader.result as string);
-              reader.onerror = reject;
-              reader.readAsDataURL(file);
-            });
-
-            let finalFilePath = base64;
-            if (desktop?.savePastedImage) {
-              const res = await desktop.savePastedImage({
-                currentFilePath,
-                bufferBase64: base64,
-                originalName: file.name,
-                ext: file.name.split(".").pop() || "png",
-              });
-              if (res?.success && res.relativePath) {
-                finalFilePath = res.relativePath;
-              }
-            }
-
-            newNodes.push({
-              id: `file-${Date.now()}-${Math.random().toString(36).slice(2, 6)}-${i}`,
-              type: "file",
-              file: finalFilePath,
-              x: Math.round(canvasX + offsetX - 180),
-              y: Math.round(canvasY + offsetY - 130),
-              width: 360,
-              height: 260,
-            });
-          } catch {
-            // fallback
-          }
-        } else if (file.name.endsWith(".md") || file.name.endsWith(".canvas")) {
-          newNodes.push({
-            id: `file-${Date.now()}-${Math.random().toString(36).slice(2, 6)}-${i}`,
-            type: "file",
-            file: file.name,
-            x: Math.round(canvasX + offsetX - 140),
-            y: Math.round(canvasY + offsetY - 90),
-            width: 280,
-            height: 180,
-          });
-        }
-      }
-
-      if (newNodes.length > 0) {
-        const currentData = latestDataRef.current;
-        pushHistory({
-          ...currentData,
-          nodes: [...currentData.nodes, ...newNodes],
-        });
-        setSelectedNodeIds(new Set(newNodes.map((n) => n.id)));
-        setSelectedNodeId(newNodes[0].id);
-        showToast(`已将 ${newNodes.length} 个文件添加为画布卡片`);
-      }
-    },
-    [editable, currentFilePath, pushHistory, showToast],
-  );
-
   // Node lookups & relationship maps (nodeMap moved up next to the
   // presentation hook, which consumes it).
   const canvasObstacles = useMemo<CanvasObstacle[]>(
@@ -1907,56 +855,6 @@ export const CanvasView = memo(function CanvasView({
       })),
     [data.nodes],
   );
-
-  // Global Clipboard Paste listener for media cards (Ctrl+V / Cmd+V)
-  useEffect(() => {
-    const handlePasteEvent = () => {
-      if (editingNodeId || editingEdgeId || !editable) return;
-      const activeEl = document.activeElement;
-      if (
-        activeEl &&
-        (activeEl.tagName === "INPUT" ||
-          activeEl.tagName === "TEXTAREA" ||
-          activeEl.getAttribute("contenteditable") === "true")
-      ) {
-        return;
-      }
-      const centerX =
-        -viewport.panX / viewport.zoom +
-        (containerRef.current?.clientWidth || 800) / (2 * viewport.zoom);
-      const centerY =
-        -viewport.panY / viewport.zoom +
-        (containerRef.current?.clientHeight || 600) / (2 * viewport.zoom);
-      handlePasteClipboardAsCard(centerX, centerY);
-    };
-
-    window.addEventListener("paste", handlePasteEvent);
-    return () => window.removeEventListener("paste", handlePasteEvent);
-  }, [
-    editingNodeId,
-    editingEdgeId,
-    editable,
-    viewport.panX,
-    viewport.panY,
-    viewport.zoom,
-    handlePasteClipboardAsCard,
-  ]);
-
-  const handleAlignToGrid = useCallback(() => {
-    if (!editable) return;
-    const currentData = latestDataRef.current;
-    const GRID = 20;
-    pushHistory({
-      ...currentData,
-      nodes: currentData.nodes.map((n) => ({
-        ...n,
-        x: Math.round(n.x / GRID) * GRID,
-        y: Math.round(n.y / GRID) * GRID,
-      })),
-    });
-    showToast("已将所有卡片对齐到 20px 网格");
-    setContextMenu(null);
-  }, [editable, pushHistory, showToast]);
 
   const handleContextMenuCanvas = useCallback(
     (e: React.MouseEvent) => {
@@ -2593,26 +1491,6 @@ export const CanvasView = memo(function CanvasView({
     );
     return (withHex?.color as string | undefined) ?? "#3b82f6";
   }, [data.edges, selectedEdgeIds]);
-
-  /**
-   * Opens the lightbox preview for an image / video / audio media card
-   * (double-click). The preview window closes via its own ✕ button or Esc.
-   */
-  const openMediaPreview = useCallback(
-    (node: CanvasFileNode) => {
-      const mType = getMediaFileType(node.file);
-      if (mType !== "image" && mType !== "video" && mType !== "audio") return;
-      const src = resolveMediaSrc(node.file, currentFilePath);
-      const title = node.file.split(/[\\/]/).pop() || "媒体预览";
-      setLightboxMedia({
-        type: mType === "video" ? "video" : mType === "audio" ? "audio" : "image",
-        src,
-        title,
-        alt: title,
-      });
-    },
-    [currentFilePath],
-  );
 
   return (
     <div

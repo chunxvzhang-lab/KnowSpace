@@ -17,7 +17,7 @@
 | `as-any` | 10 | 只减不增（`as any`） |
 | `files-over-1000-lines` | 15 | 只减不增（src 非测试代码，> 1000 行） |
 | `max-file-lines` | 3586 | 只减不增（最大单文件行数） |
-| `src-lines` | 61575 | 记录趋势，不设闸 |
+| `src-lines` | 62068 | 记录趋势，不设闸 |
 | `test-cases` | 见 `TEST_BASELINE.md` | 只增不减——由测试基线守护，本文件不重复设闸 |
 
 ---
@@ -27,7 +27,7 @@
 | 文件 | 行数 |
 | :--- | ---: |
 | `src/components/MindmapView.tsx` | 3586 |
-| `src/components/CanvasView.tsx` | 3088 |
+| `src/components/CanvasView.tsx` | 1968 |
 | `src/services/mindmapLayout.ts` | 1266 |
 | `src/components/DailyReviewPanel.tsx` | 1237 |
 | `src/services/mindmapSidecar.ts` | 1215 |
