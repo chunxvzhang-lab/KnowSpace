@@ -1,28 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FilePlus2, FileText, FolderOpen, Zap, X, ListTree, Boxes } from "lucide-react";
 
 import { ActivityBar } from "./components/ActivityBar";
-import { BookmarkPanel } from "./components/BookmarkPanel";
-import { BacklinksPanel } from "./components/BacklinksPanel";
 import { ChapterList } from "./components/ChapterList";
-import { DocumentWorkspace } from "./components/DocumentWorkspace";
-import { DualDocumentWorkspace } from "./components/DualDocumentWorkspace";
-import type { WikiLinkTarget } from "./components/EditorPane";
-import { GraphWorkspaceLayout } from "./components/GraphWorkspaceLayout";
 import { AppOverlays } from "./components/AppOverlays";
-import {
-  updateDocumentInIndex,
-  getLinkedReferences,
-  refactorWikiLinksInContent,
-} from "./services/backlinkIndex";
-import { MindmapView } from "./components/MindmapView";
-import { CanvasView } from "./components/CanvasView";
-import { SearchPanel } from "./components/SearchPanel";
-import { SpaceTimelinePanel } from "./components/SpaceTimelinePanel";
+import { SidebarPanel } from "./components/SidebarPanel";
 import { StatusBar } from "./components/StatusBar";
 import { TabBar } from "./components/TabBar";
-import { TocPanel } from "./components/TocPanel";
 import { Toolbar } from "./components/Toolbar";
+import { WorkspaceRouter } from "./components/WorkspaceRouter";
 import type { CommandAction } from "./components/CommandPalette";
 import type {
   BookManifest,
@@ -34,7 +19,10 @@ import type {
   ThemeMode,
 } from "./core/types";
 import { EditorView } from "@codemirror/view";
+import { useChapterLoading } from "./hooks/useChapterLoading";
+import { useChapterRename } from "./hooks/useChapterRename";
 import { useColumnResize } from "./hooks/useColumnResize";
+import { useDocumentAuthoring } from "./hooks/useDocumentAuthoring";
 import { useDocumentCreation } from "./hooks/useDocumentCreation";
 import { useVaultOpening } from "./hooks/useVaultOpening";
 import { useSearch } from "./hooks/useSearch";
@@ -44,46 +32,18 @@ import { useCommandRegistrations } from "./hooks/useCommandRegistrations";
 import { commandBus } from "./services/commandBus";
 import { listPaletteCommands } from "./core/commands";
 import { useBookmarks } from "./hooks/useBookmarks";
-import { useDocumentSession, renderedCacheKey } from "./hooks/useDocumentSession";
+import { useDocumentSession } from "./hooks/useDocumentSession";
+import { useReadingPersistence } from "./hooks/useReadingPersistence";
 import { useReadingTracker } from "./hooks/useReadingTracker";
-import { resolveBookmark } from "./services/bookmarks";
-import { loadPackagedChapterMarkdown } from "./services/bookSource";
-import { type MermaidTheme } from "./services/mermaid";
-import { extractHeadingsFromSource, renderMarkdown } from "./services/markdown";
-import {
-  annotationsForDocument,
-  bytesFromBase64,
-  planOutlineImport,
-} from "./services/mindmapImport";
-import {
-  applyImportedAnnotations,
-  emptySidecar,
-  saveSidecar,
-  sidecarIsEmpty,
-} from "./services/mindmapSidecar";
+import { useTabActions } from "./hooks/useTabActions";
+import { useUnsavedGuard } from "./hooks/useUnsavedGuard";
+import { useWikiLinkNavigation } from "./hooks/useWikiLinkNavigation";
 
-import { loadPreferences, loadReadingPosition, saveReadingPosition } from "./services/storage";
 import { useUiStore } from "./store/useUiStore";
-import {
-  useTabStore,
-  tabsWithDirtyFlags,
-  tabsWithNewDocument,
-  nextActiveAfterClose,
-  tabsAfterClosingRight,
-  type TabMeta,
-} from "./store/useTabStore";
-import { chapterForFile, listingWithNewChapter, useVaultStore } from "./store/useVaultStore";
+import { useReviewStore } from "./store/useReviewStore";
+import { useTabStore, tabsWithDirtyFlags, type TabMeta } from "./store/useTabStore";
+import { useVaultStore } from "./store/useVaultStore";
 import { samePath } from "./core/paths";
-
-type PendingAction =
-  | { type: "select-chapter"; chapterId: string }
-  | { type: "open-file"; file: File }
-  | { type: "open-desktop-file"; absolutePath: string; preloadedSource?: ChapterSource | null }
-  | { type: "open-directory" }
-  | { type: "new-file" }
-  | { type: "new-mindmap" }
-  | { type: "new-canvas" }
-  | { type: "close-window"; requestId: number };
 
 export function App() {
   const readerRef = useRef<HTMLElement | null>(null);
@@ -96,9 +56,7 @@ export function App() {
     searchResult?: SearchResult;
   } | null>(null);
   const activeHeadingRef = useRef<string | undefined>(undefined);
-  const preferencesRef = useRef(loadPreferences());
   const scrollRatioRef = useRef(0);
-  const pendingActionRef = useRef<PendingAction | null>(null);
   const activeLoadedChapterIdRef = useRef<string>("");
   const restoredChapterIdRef = useRef<string | null>(null);
   const navLockUntilRef = useRef<number>(0);
@@ -112,9 +70,6 @@ export function App() {
   const setManifest = useVaultStore((s) => s.setManifest);
   const bookmarks = useVaultStore((s) => s.bookmarks);
   const persistBookmarks = useVaultStore((s) => s.persistBookmarks);
-  // backlinkIndex stays subscribed here: the graph pane and two later call sites
-  // read it directly. Writing it belongs to useBacklinkIndex.
-  const backlinkIndex = useVaultStore((s) => s.backlinkIndex);
   const searchQuery = useVaultStore((s) => s.searchQuery);
   const setSearchQuery = useVaultStore((s) => s.setSearchQuery);
   const searchScope = useVaultStore((s) => s.searchScope);
@@ -137,12 +92,9 @@ export function App() {
   // which used to mirror `isDirty` into this array, and with it the last path
   // by which a keystroke reached tab state.
   const tabs = useTabStore((s) => s.tabs);
-  const setTabs = useTabStore((s) => s.setTabs);
   const ensureTab = useTabStore((s) => s.ensureTab);
   const chapterId = useTabStore((s) => s.activeTabId);
-  const setChapterId = useTabStore((s) => s.setActiveTabId);
   const dualSplitTabId = useTabStore((s) => s.dualSplitTabId);
-  const setDualSplitTabId = useTabStore((s) => s.setDualSplitTabId);
   const rememberVisitedDoc = useTabStore((s) => s.rememberVisitedDoc);
 
   const tabsRef = useRef<TabMeta[]>(tabs);
@@ -175,7 +127,6 @@ export function App() {
   const isGraphPaneOpen = useUiStore((s) => s.isGraphPaneOpen);
   const isReviewFocus = useUiStore((s) => s.isReviewFocus);
   const directoryWidth = useUiStore((s) => s.directoryWidth);
-  const sidebarWidth = useUiStore((s) => s.sidebarWidth);
   const resizingType = useUiStore((s) => s.resizingType);
 
   const setSidebarOpen = useUiStore((s) => s.setSidebarOpen);
@@ -185,11 +136,9 @@ export function App() {
   // call sites reading naturally.
   const setIsFullscreen = useUiStore((s) => s.setFullscreen);
   const setTypewriterMode = useUiStore((s) => s.setTypewriterMode);
-  const setLightboxMedia = useUiStore((s) => s.setLightboxMedia);
   const setNotice = useUiStore((s) => s.setNotice);
   const setPreferences = useUiStore((s) => s.setPreferences);
   const patchPreferences = useUiStore((s) => s.patchPreferences);
-  const setUnsavedDialogOpen = useUiStore((s) => s.setUnsavedDialogOpen);
   const setAboutOpen = useUiStore((s) => s.setAboutOpen);
   const setCommandPaletteOpen = useUiStore((s) => s.setCommandPaletteOpen);
   const setVersionHistoryOpen = useUiStore((s) => s.setVersionHistoryOpen);
@@ -274,6 +223,16 @@ export function App() {
   );
 
   /**
+   * A counter for "start a review", bumped by the command palette.
+   *
+   * The review lives behind the Space panel's own tab, which the workspace does not
+   * otherwise control — so the request travels as a changing number it can watch,
+   * rather than as a flag it might already be showing.
+   */
+  const reviewRequest = useReviewStore((s) => s.reviewRequest);
+  const requestReview = useReviewStore((s) => s.requestReview);
+
+  /**
    * The open document as the review can use it, or null.
    *
    * Null for anything that is not Markdown: the review's progress is a comment block
@@ -284,15 +243,6 @@ export function App() {
    * document has unsaved changes — see DailyReviewPanel, which explains why that is a
    * rule rather than a warning.
    */
-  /**
-   * A counter for "start a review", bumped by the command palette.
-   *
-   * The review lives behind the Space panel's own tab, which the workspace does not
-   * otherwise control — so the request travels as a changing number it can watch,
-   * rather than as a flag it might already be showing.
-   */
-  const [reviewRequest, setReviewRequest] = useState(0);
-
   const reviewableDocument = useMemo(() => {
     if (!session?.absolutePath) return null;
     const fileName = session.fileName.toLowerCase();
@@ -329,10 +279,6 @@ export function App() {
   // apart: the write needs the manifest id, so it has to read the same state
   // the replacement does.
 
-  const handleMermaidError = useCallback(() => {
-    setNotice("Mermaid 图表渲染失败，请检查语法。");
-  }, []);
-
   // ── Column dragging and fitting (R1 batch B3b) ────────────────────────────
   //
   // The first hook out of App.tsx. Its four handlers keep the names the JSX
@@ -363,111 +309,40 @@ export function App() {
       pendingNavigationRef,
     });
 
-  const executeAction = useCallback(async (action: PendingAction) => {
-    switch (action.type) {
-      case "select-chapter": {
-        setChapterId(action.chapterId);
-        setSearchQuery("");
-        const targetChap = manifestRef.current?.chapters.find((c) => c.id === action.chapterId);
-        const targetTab = tabsRef.current?.find((t) => t.id === action.chapterId);
-        const targetSrc =
-          targetChap?.src || targetTab?.relativePath || targetChap?.title || targetTab?.title || "";
-        const isTargetCanvas = targetSrc.toLowerCase().endsWith(".canvas");
-        if (isTargetCanvas) {
-          setViewMode("canvas");
-          setDirectoryOpen(false);
-          setSidebarOpen(false);
-        } else {
-          setSidebarTab("toc");
-        }
-        if (targetChap) {
-          setTabs((prev) => tabsWithNewDocument(prev, targetChap, targetChap.absolutePath));
-        }
-        break;
-      }
-      case "open-file": {
-        await doOpenMarkdownFile(action.file);
-        break;
-      }
-      case "open-desktop-file": {
-        await doOpenDesktopMarkdownPath(action.absolutePath, action.preloadedSource);
-        break;
-      }
-      case "open-directory": {
-        await doOpenMarkdownDirectory();
-        break;
-      }
-      case "new-file": {
-        await doCreateNewFile();
-        break;
-      }
-      case "new-mindmap": {
-        await doCreateNewMindmap();
-        break;
-      }
-      case "new-canvas": {
-        await doCreateNewCanvas();
-        break;
-      }
-      case "close-window": {
-        if (window.bookMDDesktop?.resolveBeforeClose) {
-          window.bookMDDesktop.resolveBeforeClose({
-            requestId: action.requestId,
-            action: "proceed",
-          });
-        }
-        break;
-      }
-    }
-  }, []);
+  const { doOpenMarkdownFile, doOpenDesktopMarkdownPath, doOpenMarkdownDirectory } =
+    useVaultOpening({
+      openSession,
+      setViewMode,
+      activeLoadedChapterIdRef,
+      pendingBookmarkRef,
+    });
 
-  // Unsaved guard interceptor
-  const guardAction = useCallback(
-    (action: PendingAction) => {
-      if (isDirty) {
-        pendingActionRef.current = action;
-        setUnsavedDialogOpen(true);
-      } else {
-        executeAction(action);
-      }
-    },
-    [isDirty, executeAction],
-  );
+  const { doCreateNewFile, doCreateNewMindmap, doCreateNewCanvas } = useDocumentCreation({
+    openSession,
+    setViewMode,
+    activeLoadedChapterIdRef,
+  });
 
-  const handleDialogSave = useCallback(async () => {
-    const res = await saveSession();
-    if (res.success) {
-      setUnsavedDialogOpen(false);
-      const action = pendingActionRef.current;
-      pendingActionRef.current = null;
-      if (action) {
-        executeAction(action);
-      }
-    } else {
-      setNotice(res.message || "保存文件失败。");
-    }
-  }, [saveSession, executeAction]);
-
-  const handleDialogDiscard = useCallback(() => {
-    discardChanges();
-    setUnsavedDialogOpen(false);
-    const action = pendingActionRef.current;
-    pendingActionRef.current = null;
-    if (action) {
-      executeAction(action);
-    }
-  }, [discardChanges, executeAction]);
-
-  const handleDialogCancel = useCallback(() => {
-    if (pendingActionRef.current?.type === "close-window") {
-      window.bookMDDesktop?.resolveBeforeClose?.({
-        requestId: pendingActionRef.current.requestId,
-        action: "cancel",
-      });
-    }
-    pendingActionRef.current = null;
-    setUnsavedDialogOpen(false);
-  }, []);
+  // ── The unsaved-changes guard (R1 batch) ──────────────────────────────────
+  //
+  // Every mutating navigation funnels through guardAction: with unsaved changes
+  // the action is parked and the dialog raised, without them it executes at
+  // once. The dialog's three answers are wired to AppOverlays below.
+  const { guardAction, handleDialogSave, handleDialogDiscard, handleDialogCancel } =
+    useUnsavedGuard({
+      isDirty,
+      saveSession,
+      discardChanges,
+      setViewMode,
+      manifestRef,
+      tabsRef,
+      doOpenMarkdownFile,
+      doOpenDesktopMarkdownPath,
+      doOpenMarkdownDirectory,
+      doCreateNewFile,
+      doCreateNewMindmap,
+      doCreateNewCanvas,
+    });
 
   const selectChapter = useCallback(
     (nextChapterId: string) => {
@@ -510,123 +385,10 @@ export function App() {
     });
   }, [activeChapter, ensureTab]);
 
-  const handleOpenDualSplit = useCallback(
-    (tabId: string) => {
-      if (tabId === chapterId && tabs.length < 2) return;
-      setDualSplitTabId(tabId);
-      setNotice("已开启双文档分屏对比模式（按 Esc 或点击右上角退出）。");
-    },
-    [chapterId, tabs.length],
-  );
-
-  const handleCloseDualSplit = useCallback(() => {
-    setDualSplitTabId(null);
-  }, []);
-
-  const handleCloseTab = useCallback(
-    (tabId: string) => {
-      if (tabId === dualSplitTabId) {
-        setDualSplitTabId(null);
-      }
-      const nextActiveId = nextActiveAfterClose(tabs, tabId);
-      setTabs((prev) => prev.filter((t) => t.id !== tabId));
-
-      if (nextActiveId === null) {
-        // The last tab closed, so the editing session goes with it.
-        setChapterId("");
-        activeLoadedChapterIdRef.current = "";
-        closeSession();
-        return;
-      }
-
-      if (tabId === chapterId) {
-        selectChapter(nextActiveId);
-      }
-    },
-    [tabs, chapterId, dualSplitTabId, selectChapter, closeSession, setChapterId, setDualSplitTabId],
-  );
-
-  const handleDetachTab = useCallback(
-    async (tabId: string) => {
-      const targetTab = tabs.find((t) => t.id === tabId);
-      const targetChap = manifest?.chapters.find((c) => c.id === tabId);
-      const absPath = targetTab?.absolutePath || targetChap?.absolutePath;
-
-      if (absPath && window.bookMDDesktop?.openInNewWindow) {
-        try {
-          await window.bookMDDesktop.openInNewWindow(absPath);
-          setNotice(`已将文档「${targetTab?.title ?? "Markdown"}」分离至独立新窗口。`);
-          if (tabs.length > 1) {
-            handleCloseTab(tabId);
-          }
-        } catch (err: unknown) {
-          setNotice(err instanceof Error ? err.message : "无法分离到新窗口。");
-        }
-      } else {
-        try {
-          window.open(window.location.href, "_blank");
-          setNotice(`已在独立新窗口打开。`);
-        } catch {
-          setNotice("浏览器拦截了新窗口弹出。");
-        }
-      }
-    },
-    [handleCloseTab, manifest?.chapters, tabs],
-  );
-
-  const handleCloseOtherTabs = useCallback(
-    (tabId: string) => {
-      if (dualSplitTabId && dualSplitTabId !== tabId) {
-        setDualSplitTabId(null);
-      }
-      setTabs((prev) => prev.filter((t) => t.id === tabId));
-      if (chapterId !== tabId) {
-        selectChapter(tabId);
-      }
-    },
-    [chapterId, dualSplitTabId, selectChapter],
-  );
-
-  const handleCloseRightTabs = useCallback(
-    (tabId: string) => {
-      const next = tabsAfterClosingRight(tabs, tabId);
-      // A tab that is not open has nothing to its right. The inline version
-      // returned early here too, so neither of the checks below ran.
-      if (!next) return;
-      setTabs(next);
-
-      // These two used to live inside the setTabs updater, which StrictMode
-      // invokes twice in development to surface impure updaters — so the
-      // navigation below (and the unsaved-changes guard it can raise) could
-      // fire twice. Reacting to the return value keeps it to once.
-      if (dualSplitTabId && !next.some((t) => t.id === dualSplitTabId)) {
-        setDualSplitTabId(null);
-      }
-      if (!next.some((t) => t.id === chapterId)) {
-        selectChapter(tabId);
-      }
-    },
-    [tabs, chapterId, dualSplitTabId, selectChapter, setDualSplitTabId],
-  );
-
   // The store persists the flag when it changes, so this callback does not.
   const toggleTypewriterMode = useCallback(() => {
     setTypewriterMode((prev) => !prev);
   }, [setTypewriterMode]);
-
-  const { doOpenMarkdownFile, doOpenDesktopMarkdownPath, doOpenMarkdownDirectory } =
-    useVaultOpening({
-      openSession,
-      setViewMode,
-      activeLoadedChapterIdRef,
-      pendingBookmarkRef,
-    });
-
-  const { doCreateNewFile, doCreateNewMindmap, doCreateNewCanvas } = useDocumentCreation({
-    openSession,
-    setViewMode,
-    activeLoadedChapterIdRef,
-  });
 
   const openMarkdownFile = useCallback(
     (file: File) => {
@@ -661,186 +423,47 @@ export function App() {
     guardAction({ type: "new-canvas" });
   }, [guardAction]);
 
-  /**
-   * Writes a new document holding this content, and opens it.
-   *
-   * One place does it, because two features now produce a document rather than
-   * edit one — extracting a note from a canvas, and importing an outline another
-   * app wrote — and both need the same three things afterwards: the file on disk,
-   * the listing refreshed so it appears there, and a session opened on it. A copy
-   * of that sequence per feature is a copy that has to keep agreeing with the
-   * manifest's shape.
-   *
-   * Answers with what was created, or null when it was not: the import writes the
-   * document's annotations afterwards, and needs to know where it landed. Failure
-   * is reported as a notice rather than thrown — this is called from a click, and
-   * a document that could not be created should say so rather than vanish.
-   */
-  const createDocumentFromContent = useCallback(
-    async (options: {
-      content: string;
-      defaultName: string;
-      /** What to say when it worked. `{title}` is the document's own title. */
-      notice: string;
-      /** What to say when it did not, in the same shape. */
-      failureNotice: string;
-    }): Promise<{
-      absolutePath: string;
-      markdown: string;
-      chapterId: string;
-      title: string;
-    } | null> => {
-      const desktop = window.bookMDDesktop;
-      if (!desktop) return null;
+  const openDesktopMarkdownPathRef = useRef(openDesktopMarkdownPath);
+  const guardActionRef = useRef(guardAction);
 
-      try {
-        const rootPath = manifest?.rootPath;
-        const result = await desktop.createMarkdownFile({
-          rootPath,
-          defaultName: options.defaultName,
-          initialContent: options.content,
-        });
-        if (result.canceled || !result.success) {
-          if (!result.canceled && result.message) setNotice(result.message);
-          return null;
-        }
+  useEffect(() => {
+    openDesktopMarkdownPathRef.current = openDesktopMarkdownPath;
+    guardActionRef.current = guardAction;
+  });
 
-        // Re-read the folder when there is one — the disk is the authority on what is
-        // in it — and otherwise assemble the listing around the new file. Both rules
-        // live with the listing, not here: see listingWithNewChapter.
-        const nextManifest =
-          rootPath && desktop.refreshDirectory
-            ? await desktop.refreshDirectory(rootPath)
-            : listingWithNewChapter(manifest, result.chapter, result.absolutePath);
+  // ── Tab-bar actions (R1 batch) ────────────────────────────────────────────
+  //
+  // The six handlers the tab bar binds: dual split open/close and the four
+  // kinds of close. What a close implies for the active tab and the editing
+  // session lives in the hook; the store owns the array transforms.
+  const {
+    handleOpenDualSplit,
+    handleCloseDualSplit,
+    handleCloseTab,
+    handleDetachTab,
+    handleCloseOtherTabs,
+    handleCloseRightTabs,
+  } = useTabActions({ selectChapter, closeSession, activeLoadedChapterIdRef });
 
-        // The listing is the authority on what the file became when it knows the
-        // path; the write's own answer is when it does not.
-        const activeChap = chapterForFile(nextManifest, result.absolutePath) ?? result.chapter;
+  // ── Wiki-link navigation (R1 batch) ──────────────────────────────────────
+  //
+  // Resolving a `[[wiki link]]` click and the completion list the editor offers
+  // — one navigation domain, one hook.
+  const { wikiLinkTargets, handleWikiLinkClick } = useWikiLinkNavigation({
+    selectChapter,
+    jumpToHeading,
+    openDesktopMarkdownPathRef,
+    pendingNavigationRef,
+  });
 
-        setManifest(nextManifest);
-        setChapterId(activeChap.id);
-        // Opening the document the reader already has in front of them does not grow
-        // a second tab for it — see tabsWithNewDocument, which is also where the file
-        // that a command palette jump opens goes through.
-        setTabs((prev) => tabsWithNewDocument(prev, activeChap, result.absolutePath));
-        setViewMode("split");
-        activeLoadedChapterIdRef.current = activeChap.id;
+  // ── Rename, and the features that produce a document (R1 batch) ──────────
+  const { handleRenameChapter } = useChapterRename({ session, updateSource, openSession });
 
-        openSession({
-          chapterId: activeChap.id,
-          absolutePath: result.absolutePath,
-          fileName: activeChap.src.split("/").pop() ?? activeChap.title,
-          baseUrl: result.source.baseUrl,
-          source: result.source.markdown,
-          diskVersion: result.source.diskVersion ?? null,
-          writable: true,
-          hasBom: result.source.hasBom,
-          lineEnding: result.source.lineEnding,
-        });
-        setNotice(options.notice.split("{title}").join(activeChap.title));
-        return {
-          absolutePath: result.absolutePath,
-          markdown: result.source.markdown,
-          chapterId: activeChap.id,
-          title: activeChap.title,
-        };
-      } catch (err: any) {
-        setNotice(options.failureNotice.split("{message}").join(err.message || String(err)));
-        return null;
-      }
-    },
-    [manifest, openSession],
-  );
-
-  const handleCreateCanvasExtractNote = useCallback(
-    async (extractedMarkdown: string, defaultDocTitle?: string) => {
-      if (!window.bookMDDesktop) {
-        navigator.clipboard?.writeText(extractedMarkdown);
-        setNotice("专著内容已复制到剪贴板。");
-        return;
-      }
-
-      await createDocumentFromContent({
-        content: extractedMarkdown,
-        defaultName: defaultDocTitle ? `${defaultDocTitle}.md` : "白板萃取专著.md",
-        notice: "已生成并打开萃取专著：{title}",
-        failureNotice: "生成萃取专著失败：{message}",
-      });
-    },
-    [createDocumentFromContent],
-  );
-
-  /**
-   * Imports an outline another app wrote, as a new document.
-   *
-   * As a new document rather than into the one on screen, and that is the decision
-   * this feature rests on: a document is a file, and merging two outlines into one
-   * would leave every later question about it — which structure is the real one,
-   * which parts came from where — without an answer.
-   *
-   * The imported file is read once and never consulted again; the Markdown this
-   * writes becomes the source of truth like any other document's, which is why the
-   * translation is the whole of the import.
-   */
-  const handleImportOutline = useCallback(async () => {
-    const desktop = window.bookMDDesktop;
-    if (!desktop?.pickOutlineFile) {
-      setNotice("导入大纲需要桌面版。");
-      return;
-    }
-
-    const picked = await desktop.pickOutlineFile();
-    if (picked.canceled) return;
-    if (!picked.success || typeof picked.contentBase64 !== "string") {
-      setNotice(picked.message || "无法读取这个文件。");
-      return;
-    }
-
-    // What the bytes mean is decided in one place with no screen around it — see
-    // planOutlineImport, which is where an import's three judgements live. What is
-    // left here is what only this component can do: ask for a file, report a
-    // sentence, and open what was created.
-    const plan = planOutlineImport(bytesFromBase64(picked.contentBase64), picked.fileName ?? "");
-    if (plan.kind === "refuse") {
-      setNotice(plan.message);
-      return;
-    }
-
-    const created = await createDocumentFromContent({
-      content: plan.markdown,
-      defaultName: plan.defaultName,
-      notice: "已导入为新文档：{title}",
-      failureNotice: "导入大纲失败：{message}",
-    });
-    if (!created) return;
-
-    // What was not imported, said out loud: a file can hold several sheets and a
-    // document is one tree, so "imported" without that would be a half-truth.
-    if (plan.warning) {
-      setNotice(`已导入为新文档：${created.title} —— ${plan.warning}`);
-    }
-
-    // What the file carried besides its shape — notes, links, tags, markers, the
-    // lines and spans between topics — belongs in the document's companion file,
-    // keyed by the ids the document just produced. Written after the document
-    // exists and not before: a sidecar with no document beside it is a file nothing
-    // would ever read.
-    //
-    // Read against a tree built from the document's own Markdown and title, so the
-    // ids are the ones the map will use when it opens the file.
-    const sidecar = applyImportedAnnotations(
-      emptySidecar(),
-      annotationsForDocument(plan.outline, created.markdown, created.title),
-    );
-    if (sidecarIsEmpty(sidecar)) return;
-
-    if (!(await saveSidecar(created.absolutePath, sidecar))) {
-      // The document was created; what it carried was not. Saying so is the point:
-      // a reader who is told can write the notes again, and a reader who is not
-      // will find the outline intact and the notes gone with no explanation.
-      setNotice(`已导入为新文档：${created.title}，但它的备注与链接没能写入。`);
-    }
-  }, [createDocumentFromContent]);
+  const { handleCreateCanvasExtractNote, handleImportOutline } = useDocumentAuthoring({
+    openSession,
+    setViewMode,
+    activeLoadedChapterIdRef,
+  });
 
   // ── Bookmarks (R1 batch B3b-7) ────────────────────────────────────────────
   //
@@ -867,18 +490,6 @@ export function App() {
     });
   }, []);
 
-  const saveCurrentReadingPosition = useCallback(() => {
-    if (!manifest || !chapterId) return;
-    saveReadingPosition({
-      bookId: manifest.id,
-      chapterId,
-      chapterSrc: activeChapter?.src,
-      headingId: activeHeadingRef.current,
-      scrollRatio: scrollRatioRef.current,
-      updatedAt: new Date().toISOString(),
-    });
-  }, [activeChapter?.src, chapterId, manifest]);
-
   const goPrevious = useCallback(() => {
     if (!manifest || activeIndex <= 0) return;
     selectChapter(manifest.chapters[activeIndex - 1].id);
@@ -889,6 +500,29 @@ export function App() {
     selectChapter(manifest.chapters[activeIndex + 1].id);
   }, [activeIndex, manifest, selectChapter]);
 
+  // ── Reading-position persistence (R1 batch) ──────────────────────────────
+  //
+  // Saving the position as the reader settles, restoring it (or a queued
+  // bookmark / cross-document navigation) when a document renders, and
+  // pre-rendering the neighbours. Must sit before useReadingTracker, which
+  // reports the scroll idle that drives the save.
+  const { saveCurrentReadingPosition } = useReadingPersistence({
+    chapterId,
+    renderedChapter,
+    activeHeadingId,
+    readerRef,
+    editorViewRef,
+    activeHeadingRef,
+    scrollRatioRef,
+    pendingBookmarkRef,
+    pendingNavigationRef,
+    restoredChapterIdRef,
+    jumpToHeading,
+    jumpToRatio,
+    handleSearchJump,
+    primeRenderedCache,
+  });
+
   useReadingTracker({
     containerRef: readerRef,
     headings: renderedChapter?.headings ?? [],
@@ -897,14 +531,6 @@ export function App() {
     onActiveHeadingChange: setActiveHeadingId,
     onScrollIdle: saveCurrentReadingPosition,
     navLockUntilRef,
-  });
-
-  const openDesktopMarkdownPathRef = useRef(openDesktopMarkdownPath);
-  const guardActionRef = useRef(guardAction);
-
-  useEffect(() => {
-    openDesktopMarkdownPathRef.current = openDesktopMarkdownPath;
-    guardActionRef.current = guardAction;
   });
 
   const toggleFullscreen = useCallback(async () => {
@@ -944,307 +570,26 @@ export function App() {
 
   // Handle launch path once on startup and register global event listeners
   const initialHandledRef = useRef(false);
-  // Load chapter content when chapterId changes
-  useEffect(() => {
-    if (!chapterId) return;
 
-    const targetChapter = manifest?.chapters.find((item) => item.id === chapterId);
-    const targetTab = tabs.find((item) => item.id === chapterId);
-    if (!targetChapter && !targetTab) return;
-
-    const targetTitle = targetChapter?.title || targetTab?.title || "文档";
-    const targetSrc = targetChapter?.src || targetTab?.relativePath || targetTitle;
-    const fileName = targetSrc.split(/[\\/]/).pop() ?? targetTitle;
-    const isCanvas = fileName.toLowerCase().endsWith(".canvas");
-    const isMindmap = fileName.toLowerCase().endsWith(".mindmap.md");
-
-    if (isCanvas) {
-      setViewMode("canvas");
-      setDirectoryOpen(false);
-      setSidebarOpen(false);
-    } else if (isMindmap) {
-      setViewMode("mindmap");
-    }
-
-    // If this chapter is already the actively loaded session, skip redundant re-fetching
-    if (activeLoadedChapterIdRef.current === chapterId) return;
-    if (session?.chapterId === chapterId) {
-      activeLoadedChapterIdRef.current = chapterId;
-      return;
-    }
-
-    let cancelled = false;
-    const targetAbsPath = targetChapter?.absolutePath || targetTab?.absolutePath;
-
-    if (samePath(session?.absolutePath, targetAbsPath)) {
-      activeLoadedChapterIdRef.current = chapterId;
-      return;
-    }
-
-    activeLoadedChapterIdRef.current = chapterId;
-
-    const loadPromise =
-      targetAbsPath && window.bookMDDesktop
-        ? window.bookMDDesktop.readMarkdownFile(targetAbsPath)
-        : manifest
-          ? loadPackagedChapterMarkdown(manifest, chapterId)
-          : Promise.reject(new Error("无法加载章节内容。"));
-
-    loadPromise
-      .then((source) => {
-        if (cancelled) return;
-        if (isCanvas) {
-          setViewMode("canvas");
-          setDirectoryOpen(false);
-          setSidebarOpen(false);
-        } else if (isMindmap) {
-          setViewMode("mindmap");
-        } else {
-          setViewMode((prev) => (prev === "canvas" || prev === "mindmap" ? "split" : prev));
-        }
-
-        openSession({
-          chapterId,
-          absolutePath: targetAbsPath ?? null,
-          fileName,
-          baseUrl: source.baseUrl,
-          source: source.markdown,
-          diskVersion: source.diskVersion ?? null,
-          writable: Boolean(targetAbsPath && window.bookMDDesktop),
-          hasBom: source.hasBom,
-          lineEnding: source.lineEnding,
-        });
-      })
-      .catch((cause: unknown) => {
-        if (!cancelled) {
-          setNotice(cause instanceof Error ? cause.message : "无法加载章节内容。");
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [chapterId, manifest, tabs, openSession, session?.chapterId, session?.absolutePath]);
-
-  /**
-   * Renders the documents either side of the open one, while nothing else needs
-   * the thread.
-   *
-   * The other half of making a document switch instant. The render cache only
-   * helps a document that has been opened before, and the common case is moving
-   * forward through a folder in order — so the next document is rendered before
-   * it is asked for, and opening it hits the cache and swaps in one commit.
-   *
-   * Deliberately narrow: two neighbours, not a window, and only on an idle
-   * callback. Pre-loading more than the reader is likely to reach for would be
-   * reading files off disk and rendering them to save a wait that most of them
-   * never have.
-   */
-  const preloadedPathsRef = useRef(new Set<string>());
-  useEffect(() => {
-    if (!manifest?.chapters?.length || !chapterId) return;
-    const index = manifest.chapters.findIndex((chapter) => chapter.id === chapterId);
-    if (index < 0) return;
-
-    const neighbours = [manifest.chapters[index + 1], manifest.chapters[index - 1]].filter(
-      (chapter): chapter is (typeof manifest.chapters)[number] =>
-        Boolean(chapter?.absolutePath) && !chapter.src.toLowerCase().endsWith(".canvas"),
-    );
-    if (neighbours.length === 0) return;
-
-    let cancelled = false;
-
-    const run = async () => {
-      for (const chapter of neighbours) {
-        if (cancelled) return;
-        const absolutePath = chapter.absolutePath;
-        if (!absolutePath) continue;
-        // Asked once per session per file: re-rendering a neighbour every time
-        // the reader steps between two documents would undo the saving.
-        const seenKey = absolutePath.toLowerCase();
-        if (preloadedPathsRef.current.has(seenKey)) continue;
-        preloadedPathsRef.current.add(seenKey);
-
-        try {
-          const source = await window.bookMDDesktop?.readMarkdownFile(absolutePath);
-          if (cancelled || !source?.markdown) continue;
-          const rendered = await renderMarkdown(source.markdown, source.baseUrl);
-          if (cancelled) continue;
-          primeRenderedCache(
-            renderedCacheKey({
-              absolutePath,
-              chapterId: chapter.id,
-              sourceLength: source.markdown.length,
-              diskVersion: source.diskVersion ?? null,
-            }),
-            rendered,
-          );
-        } catch {
-          // A neighbour that cannot be read is not a problem: it is a
-          // pre-load, and the reader will get the normal error if they open it.
-        }
-      }
-    };
-
-    const handle =
-      typeof window.requestIdleCallback === "function"
-        ? window.requestIdleCallback(() => void run(), { timeout: 3000 })
-        : window.setTimeout(() => void run(), 1200);
-
-    return () => {
-      cancelled = true;
-      if (typeof window.cancelIdleCallback === "function" && typeof handle === "number") {
-        window.cancelIdleCallback(handle);
-      } else {
-        window.clearTimeout(handle as number);
-      }
-    };
-  }, [manifest, chapterId, primeRenderedCache]);
-
-  // Close directory and outline whenever a canvas file/mode is active
-  useEffect(() => {
-    if (viewMode === "canvas" || session?.fileName?.toLowerCase().endsWith(".canvas")) {
-      setDirectoryOpen(false);
-      setSidebarOpen(false);
-    }
-  }, [viewMode, session?.fileName]);
-
-  // Load secondary chapter for dual split mode
-  useEffect(() => {
-    if (!dualSplitTabId) {
-      setSecondaryRenderedChapter(null);
-      return;
-    }
-
-    let cancelled = false;
-    const targetTab = tabs.find((t) => t.id === dualSplitTabId);
-    const targetChap = manifest?.chapters.find((c) => c.id === dualSplitTabId);
-
-    const targetAbsPath = targetTab?.absolutePath || targetChap?.absolutePath;
-
-    const loadPromise =
-      targetAbsPath && window.bookMDDesktop
-        ? window.bookMDDesktop.readMarkdownFile(targetAbsPath)
-        : manifest
-          ? loadPackagedChapterMarkdown(manifest, dualSplitTabId)
-          : null;
-
-    if (!loadPromise) return;
-
-    loadPromise
-      .then(async (source) => {
-        if (cancelled) return;
-        const rendered = await renderMarkdown(source.markdown, source.baseUrl);
-        if (!cancelled) {
-          setSecondaryRenderedChapter(rendered);
-        }
-      })
-      .catch((cause: unknown) => {
-        if (!cancelled) {
-          setNotice(cause instanceof Error ? cause.message : "无法加载分屏文档内容。");
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [dualSplitTabId, manifest, tabs]);
-
-  // Restore reading position or bookmark position
-  useEffect(() => {
-    if (!manifest || !renderedChapter || !chapterId) return;
-
-    // Only restore once per chapter load/switch, unless a bookmark or navigation was queued
-    if (
-      restoredChapterIdRef.current === chapterId &&
-      !pendingBookmarkRef.current &&
-      !pendingNavigationRef.current
-    )
-      return;
-    restoredChapterIdRef.current = chapterId;
-
-    const pendingNav = pendingNavigationRef.current;
-    if (pendingNav) {
-      pendingNavigationRef.current = null;
-      requestAnimationFrame(() => {
-        if (pendingNav.searchResult) {
-          handleSearchJump({ ...pendingNav.searchResult, chapterId: undefined });
-        } else if (pendingNav.headingId) {
-          jumpToHeading(pendingNav.headingId, "smooth", pendingNav.highlight ?? true);
-        } else if (pendingNav.lineNumber && editorViewRef.current) {
-          const editor = editorViewRef.current;
-          const totalLines = editor.state.doc.lines;
-          const safeLineNum = Math.min(Math.max(1, pendingNav.lineNumber), totalLines);
-          const line = editor.state.doc.line(safeLineNum);
-          editor.dispatch({
-            selection: { anchor: line.from, head: line.from },
-            effects: EditorView.scrollIntoView(line.from, { y: "start", yMargin: 40 }),
-          });
-        }
-      });
-      return;
-    }
-
-    const pending = pendingBookmarkRef.current;
-    if (pending) {
-      pendingBookmarkRef.current = null;
-      const resolution = resolveBookmark(
-        pending,
-        renderedChapter.headings,
-        renderedChapter.checksum,
-      );
-      if (resolution.message) setNotice(resolution.message);
-      requestAnimationFrame(() => {
-        if (resolution.targetHeadingId) {
-          jumpToHeading(resolution.targetHeadingId, "smooth", true);
-        } else {
-          jumpToRatio(resolution.scrollRatio);
-        }
-      });
-      return;
-    }
-
-    const saved = loadReadingPosition(manifest.id, manifest.chapters);
-    if (saved?.chapterId === chapterId) {
-      requestAnimationFrame(() => {
-        if (
-          saved.headingId &&
-          renderedChapter.headings.some((heading) => heading.id === saved.headingId)
-        ) {
-          jumpToHeading(saved.headingId, "auto", false);
-        } else {
-          jumpToRatio(saved.scrollRatio);
-        }
-      });
-    } else {
-      // New chapter with no saved position: cleanly reset scroll to the very top
-      requestAnimationFrame(() => {
-        readerRef.current?.scrollTo({ top: 0, behavior: "auto" });
-        if (editorViewRef.current) {
-          editorViewRef.current.dispatch({
-            selection: { anchor: 0, head: 0 },
-            effects: EditorView.scrollIntoView(0, { y: "start" }),
-          });
-        }
-      });
-    }
-  }, [renderedChapter, chapterId, jumpToHeading, jumpToRatio, manifest]);
-
-  // Periodic position save
-  useEffect(() => {
-    if (!manifest || !chapterId) return;
-    const handle = window.setTimeout(() => {
-      saveCurrentReadingPosition();
-    }, 650);
-    return () => window.clearTimeout(handle);
-  }, [activeHeadingId, chapterId, manifest, saveCurrentReadingPosition]);
+  // ── Chapter loading and view sync (R1 batch) ──────────────────────────────
+  //
+  // Turning "the active tab is chapter X" into "the session holds chapter X":
+  // the loader with its already-loaded short-circuits, the canvas-closes-panels
+  // rule, and the dual-split pane's independent load.
+  useChapterLoading({
+    session,
+    viewMode,
+    openSession,
+    setViewMode,
+    activeLoadedChapterIdRef,
+    setSecondaryRenderedChapter,
+  });
 
   // Apply the theme to the document and the native window frame.
   //
   // Persisting preferences is no longer part of this effect — the store writes
   // them when they change — so only the DOM and Electron side effects remain.
   useEffect(() => {
-    preferencesRef.current = preferences;
     document.documentElement.dataset.theme = preferences.theme;
     window.bookMDDesktop?.setNativeTheme?.(preferences.theme);
   }, [preferences]);
@@ -1403,7 +748,7 @@ export function App() {
       // sidebar's own toggle would not do.
       setSidebarTab("space");
       setSidebarOpen(true);
-      setReviewRequest((n) => n + 1);
+      requestReview();
     },
     "document.print": handlePrintDocument,
     "document.newFile": createNewFile,
@@ -1497,130 +842,6 @@ export function App() {
     [session, updateSource],
   );
 
-  const wikiLinkTargets = useMemo(() => {
-    const list: WikiLinkTarget[] = [];
-    if (manifest?.chapters) {
-      for (const ch of manifest.chapters) {
-        list.push({
-          id: ch.id,
-          title: ch.title,
-          relativePath: ch.src,
-          absolutePath: ch.absolutePath,
-        });
-      }
-    }
-    return list;
-  }, [manifest?.chapters]);
-
-  const handleWikiLinkClick = useCallback(
-    async (target: string) => {
-      if (!target.trim()) return;
-      const [docPart, anchorPart] = target.split("#");
-      const cleanTarget = (docPart || "").trim().replace(/\.md$/i, "");
-      if (!cleanTarget) {
-        if (anchorPart) {
-          jumpToHeading(anchorPart.trim(), "smooth", true);
-          setNotice(
-            anchorPart.startsWith("^")
-              ? "已跳转至指定段落引用"
-              : `已跳转至章节锚点：#${anchorPart.trim()}`,
-          );
-        }
-        return;
-      }
-
-      // 1. Search in current workspace chapters
-      if (manifest?.chapters && manifest.chapters.length > 0) {
-        const found = manifest.chapters.find((c) => {
-          const cTitle = c.title.trim().toLowerCase();
-          const cFileName = (c.src.split("/").pop() ?? "").replace(/\.md$/i, "").toLowerCase();
-          const targetLower = cleanTarget.toLowerCase();
-          return cTitle === targetLower || cFileName === targetLower;
-        });
-
-        if (found) {
-          if (found.id === chapterId) {
-            if (anchorPart) {
-              jumpToHeading(anchorPart.trim(), "smooth", true);
-            }
-          } else {
-            if (anchorPart) {
-              pendingNavigationRef.current = {
-                headingId: anchorPart.trim(),
-                highlight: true,
-              };
-            }
-            selectChapter(found.id);
-          }
-          const anchorLabel = anchorPart
-            ? anchorPart.startsWith("^")
-              ? " (段落引用)"
-              : ` #${anchorPart}`
-            : "";
-          setNotice(`已跳转至双链文档：${found.title}${anchorLabel}`);
-          return;
-        }
-      }
-
-      // 2. Check in Space flash notes
-      const desktop = window.bookMDDesktop;
-      if (desktop?.getFlashNotesSummary) {
-        try {
-          const summary = await desktop.getFlashNotesSummary();
-          if (summary?.success && summary.notes) {
-            const foundNote = summary.notes.find((n) => {
-              const baseName = n.fileName.replace(/\.md$/i, "").toLowerCase();
-              return (
-                baseName === cleanTarget.toLowerCase() ||
-                n.content.toLowerCase().includes(cleanTarget.toLowerCase())
-              );
-            });
-            if (foundNote && openDesktopMarkdownPathRef.current) {
-              openDesktopMarkdownPathRef.current(foundNote.filePath);
-              setNotice(`已跳转至 Space 闪念文档：${foundNote.fileName}`);
-              return;
-            }
-          }
-        } catch {}
-      }
-
-      // 3. Document not found: ask user to create in current workspace
-      const rootPath = manifest?.rootPath;
-      if (rootPath && desktop?.createMarkdownFile) {
-        const confirmCreate = window.confirm(
-          `双链文档「${cleanTarget}」尚未创建。\n\n是否立即在当前知识库新建「${cleanTarget}.md」？`,
-        );
-        if (confirmCreate) {
-          try {
-            const newRes = await desktop.createMarkdownFile({
-              rootPath,
-              defaultName: `${cleanTarget}.md`,
-            });
-            if (!newRes.canceled && newRes.success) {
-              let nextManifest = manifest;
-              if (desktop.refreshDirectory) {
-                nextManifest = await desktop.refreshDirectory(rootPath);
-              } else {
-                nextManifest = {
-                  ...manifest,
-                  chapters: [...manifest.chapters, newRes.chapter],
-                };
-              }
-              setManifest(nextManifest);
-              selectChapter(newRes.chapter.id);
-              setNotice(`已为您创建并打开双链新文档：${cleanTarget}.md`);
-            }
-          } catch (err: any) {
-            setNotice(err?.message || "创建双链新文档失败");
-          }
-        }
-      } else {
-        setNotice(`未找到匹配的双链目标「${cleanTarget}」`);
-      }
-    },
-    [manifest, selectChapter, jumpToHeading],
-  );
-
   // Backlink Index & Mentions
   // backlinkIndex and the vault search index live in useVaultStore alongside the
   // manifest they are derived from.
@@ -1630,8 +851,7 @@ export function App() {
   // ── Backlinks and the graph (R1 batch B3b-5) ─────────────────────────────
   //
   // Seven names come back out: the side panel and the graph pane read five of
-  // them, and two are needed again further down. backlinkIndex itself stays
-  // subscribed here because three later call sites read it directly.
+  // them, and two are needed again further down.
   const {
     currentLinkedReferences,
     currentUnlinkedMentions,
@@ -1649,150 +869,6 @@ export function App() {
     openDesktopMarkdownPathRef,
     updateSource,
   });
-
-  const handleRenameChapter = useCallback(
-    async (chapter: any) => {
-      const desktop = window.bookMDDesktop;
-      if (!desktop?.renameMarkdownFile || !chapter.absolutePath) {
-        setNotice("当前环境不支持文件重命名");
-        return;
-      }
-
-      const oldTitle = chapter.title || chapter.src.replace(/\.md$/i, "");
-      const input = window.prompt(`请输入「${oldTitle}」的新文档名称：`, oldTitle);
-      if (!input || !input.trim() || input.trim() === oldTitle.trim()) {
-        return;
-      }
-      const newTitle = input.trim().replace(/\.md$/i, "");
-
-      // 1. Scan backlink index for references to oldTitle
-      const linkedRefs = getLinkedReferences(backlinkIndex, oldTitle, chapter.src);
-      let shouldRefactor = false;
-      if (linkedRefs.length > 0) {
-        const uniqueDocCount = new Set(linkedRefs.map((r) => r.sourceId)).size;
-        shouldRefactor = window.confirm(
-          `检测到知识库中有 ${uniqueDocCount} 篇笔记包含共 ${linkedRefs.length} 处双向引用「[[${oldTitle}]]」。\n\n` +
-            `是否自动将所有引用重构更新为「[[${newTitle}]]」？\n\n` +
-            `· 点击【确定】：重命名文件并批量自动重构所有双向链接（防断链）\n` +
-            `· 点击【取消】：仅重命名文件，保留原有引用文本`,
-        );
-      }
-
-      // 2. Perform native file rename
-      const renameRes = await desktop.renameMarkdownFile({
-        oldPath: chapter.absolutePath,
-        newTitle,
-      });
-
-      if (!renameRes.success || !renameRes.newPath) {
-        setNotice(renameRes.error || "重命名失败");
-        return;
-      }
-
-      // 3. Batch refactor references in other files if confirmed
-      let refactoredTotal = 0;
-      if (shouldRefactor && linkedRefs.length > 0) {
-        const affectedSourceIds = Array.from(new Set(linkedRefs.map((r) => r.sourceId)));
-        for (const sourceId of affectedSourceIds) {
-          // If it's the currently open session
-          if (session && session.chapterId === sourceId) {
-            const { newContent, changedCount } = refactorWikiLinksInContent(
-              session.source,
-              oldTitle,
-              newTitle,
-            );
-            if (changedCount > 0) {
-              updateSource(newContent);
-              refactoredTotal += changedCount;
-            }
-            continue;
-          }
-
-          // If it's another chapter on disk
-          const otherCh = manifest?.chapters.find((c) => c.id === sourceId);
-          if (otherCh?.absolutePath && desktop.readMarkdownFile && desktop.saveMarkdownFile) {
-            try {
-              const fileRes = await desktop.readMarkdownFile(otherCh.absolutePath);
-              if (fileRes?.markdown) {
-                const { newContent, changedCount } = refactorWikiLinksInContent(
-                  fileRes.markdown,
-                  oldTitle,
-                  newTitle,
-                );
-                if (changedCount > 0) {
-                  await desktop.saveMarkdownFile({
-                    absolutePath: otherCh.absolutePath,
-                    content: newContent,
-                  });
-                  updateDocumentInIndex(
-                    backlinkIndex,
-                    otherCh.id,
-                    otherCh.title,
-                    newContent,
-                    otherCh.src,
-                  );
-                  refactoredTotal += changedCount;
-                }
-              }
-            } catch (err) {
-              console.error(`Failed to refactor links in ${otherCh.src}:`, err);
-            }
-          }
-        }
-      }
-
-      // 4. Refresh directory manifest
-      if (manifest?.rootPath && desktop.refreshDirectory) {
-        try {
-          const nextManifest = await desktop.refreshDirectory(manifest.rootPath);
-          setManifest(nextManifest);
-        } catch {}
-      }
-
-      // 5. Update tabs
-      setTabs((prev) =>
-        prev.map((t) => {
-          if (t.id === chapter.id || samePath(t.absolutePath, chapter.absolutePath)) {
-            return {
-              ...t,
-              title: newTitle,
-              relativePath: renameRes.fileName || `${newTitle}.md`,
-              absolutePath: renameRes.newPath || t.absolutePath,
-            };
-          }
-          return t;
-        }),
-      );
-
-      // 6. Update active session if the renamed chapter is currently open
-      if (
-        session &&
-        session.chapterId === chapter.id &&
-        renameRes.newPath &&
-        desktop.readMarkdownFile
-      ) {
-        try {
-          const nextSource = await desktop.readMarkdownFile(renameRes.newPath);
-          openSession({
-            chapterId: chapter.id,
-            absolutePath: renameRes.newPath,
-            fileName: renameRes.fileName || `${newTitle}.md`,
-            baseUrl: nextSource.baseUrl,
-            source: nextSource.markdown,
-            diskVersion: nextSource.diskVersion ?? null,
-            writable: true,
-            hasBom: nextSource.hasBom,
-            lineEnding: nextSource.lineEnding,
-          });
-        } catch {}
-      }
-
-      setNotice(
-        `已成功重命名为「${newTitle}」${refactoredTotal > 0 ? `，并同步更新了 ${refactoredTotal} 处双链引用` : ""}`,
-      );
-    },
-    [session, manifest, backlinkIndex, updateSource, openSession],
-  );
 
   const isCanvasActive = Boolean(
     (viewMode === "canvas" || session?.fileName?.toLowerCase().endsWith(".canvas")) && session,
@@ -1920,135 +996,47 @@ export function App() {
           !isCanvasFullscreen &&
           sidebarOpen &&
           (manifest || sidebarTab === "space") ? (
-            <>
-              <aside
-                className="side-panel"
-                style={{ width: sidebarWidth, flex: `0 0 ${sidebarWidth}px` }}
-              >
-                {sidebarTab === "space" ? (
-                  <section id="space-panel" role="tabpanel" aria-labelledby="space-tab">
-                    <div className="space-standalone-header">
-                      <div className="space-standalone-title">
-                        <Zap size={15} style={{ color: "#f59e0b" }} />
-                        <span>闪念 Space</span>
-                      </div>
-                      {manifest && (
-                        <button
-                          type="button"
-                          className="space-standalone-close-btn"
-                          onClick={() => setSidebarTab("toc")}
-                          title="返回大纲目录"
-                          aria-label="返回大纲目录"
-                        >
-                          <X size={14} />
-                        </button>
-                      )}
-                    </div>
-                    <SpaceTimelinePanel
-                      onOpenNoteFile={(filePath) => {
-                        if (openDesktopMarkdownPathRef.current) {
-                          openDesktopMarkdownPathRef.current(filePath);
-                        }
-                      }}
-                      onReviewActiveChange={handleReviewActiveChange}
-                      onMergeIntoDocument={handleMergeFlashNote}
-                      currentDocument={reviewableDocument}
-                      openReviewRequest={reviewRequest}
-                    />
-                  </section>
-                ) : (
-                  <>
-                    <div className="tabs" role="tablist" aria-label="侧栏区域">
-                      {(["toc", "bookmarks", "search"] as SidebarTab[]).map((tab) => (
-                        <button
-                          key={tab}
-                          id={`${tab}-tab`}
-                          role="tab"
-                          aria-selected={sidebarTab === tab}
-                          aria-controls={`${tab}-panel`}
-                          className={sidebarTab === tab ? "active" : ""}
-                          onClick={() => setSidebarTab(tab)}
-                        >
-                          {tabLabels[tab]}
-                        </button>
-                      ))}
-                    </div>
-                    {sidebarTab === "toc" && manifest ? (
-                      <section id="toc-panel" role="tabpanel" aria-labelledby="toc-tab">
-                        <TocPanel
-                          headings={
-                            renderedChapter?.headings?.length
-                              ? renderedChapter.headings
-                              : session?.source
-                                ? extractHeadingsFromSource(session.source)
-                                : []
-                          }
-                          activeHeadingId={activeHeadingId}
-                          bookmarkedHeadingIds={bookmarkedHeadingIds}
-                          onJump={jumpToHeading}
-                        />
-                      </section>
-                    ) : null}
-                    {sidebarTab === "bookmarks" && manifest ? (
-                      <section id="bookmarks-panel" role="tabpanel" aria-labelledby="bookmarks-tab">
-                        <BookmarkPanel
-                          bookmarks={bookmarks}
-                          manifest={manifest}
-                          onJump={jumpBookmark}
-                          onDelete={(bookmarkId) =>
-                            persistBookmarks(bookmarks.filter((item) => item.id !== bookmarkId))
-                          }
-                        />
-                      </section>
-                    ) : null}
-                    {sidebarTab === "search" && manifest ? (
-                      <section id="search-panel" role="tabpanel" aria-labelledby="search-tab">
-                        <SearchPanel
-                          query={searchQuery}
-                          results={searchResults}
-                          activeResultId={activeSearchMatchId}
-                          scope={searchScope}
-                          onScopeChange={setSearchScope}
-                          vaultDocCount={manifest?.chapters?.length}
-                          onQueryChange={(q) => {
-                            setSearchQuery(q);
-                            setActiveSearchMatchId(null);
-                            if (!q.trim()) {
-                              clearSearchHighlights();
-                            }
-                          }}
-                          onJump={handleSearchJump}
-                        />
-                      </section>
-                    ) : null}
-                    {sidebarTab === "backlinks" ? (
-                      <section id="backlinks-panel" role="tabpanel" aria-labelledby="backlinks-tab">
-                        <BacklinksPanel
-                          currentTitle={currentDocTitle}
-                          currentPath={session?.absolutePath || session?.fileName}
-                          currentDocId={session?.chapterId}
-                          linkedReferences={currentLinkedReferences}
-                          unlinkedMentions={currentUnlinkedMentions}
-                          onJumpToSource={handleJumpToBacklink}
-                          onConvertMention={handleConvertMention}
-                          graphData={graphData}
-                          theme={preferences.theme}
-                          onOpenGlobalGraph={() => setIsGraphPaneOpen(true)}
-                        />
-                      </section>
-                    ) : null}
-                  </>
-                )}
-              </aside>
-              <div
-                className={`layout-resizer ${resizingType === "sidebar" ? "is-active" : ""}`}
-                onMouseDown={handleSidebarResizeMouseDown}
-                onDoubleClick={handleSidebarDoubleClick}
-                role="separator"
-                aria-orientation="vertical"
-                title="拖拽调整大纲侧栏宽度（双击自适应最佳宽度）"
-              />
-            </>
+            <SidebarPanel
+              manifest={manifest}
+              session={session}
+              renderedChapter={renderedChapter}
+              activeHeadingId={activeHeadingId}
+              bookmarkedHeadingIds={bookmarkedHeadingIds}
+              jumpToHeading={jumpToHeading}
+              jumpBookmark={jumpBookmark}
+              bookmarks={bookmarks}
+              persistBookmarks={persistBookmarks}
+              searchQuery={searchQuery}
+              searchResults={searchResults}
+              activeSearchMatchId={activeSearchMatchId}
+              searchScope={searchScope}
+              onQueryChange={(q) => {
+                setSearchQuery(q);
+                setActiveSearchMatchId(null);
+                if (!q.trim()) {
+                  clearSearchHighlights();
+                }
+              }}
+              onScopeChange={setSearchScope}
+              handleSearchJump={handleSearchJump}
+              reviewableDocument={reviewableDocument}
+              openReviewRequest={reviewRequest}
+              onOpenNoteFile={(filePath) => openDesktopMarkdownPathRef.current?.(filePath)}
+              handleReviewActiveChange={handleReviewActiveChange}
+              handleMergeFlashNote={handleMergeFlashNote}
+              handleSidebarResizeMouseDown={handleSidebarResizeMouseDown}
+              handleSidebarDoubleClick={handleSidebarDoubleClick}
+              backlinks={{
+                currentDocTitle,
+                currentLinkedReferences,
+                currentUnlinkedMentions,
+                handleJumpToBacklink,
+                handleConvertMention,
+                graphData,
+              }}
+              theme={preferences.theme}
+              onOpenGlobalGraph={() => setIsGraphPaneOpen(true)}
+            />
           ) : null}
 
           <section className="reader-frame">
@@ -2068,219 +1056,51 @@ export function App() {
                 onToggleGraphPane={handleToggleGraphPane}
               />
             )}
-            {(() => {
-              const innerWorkspace =
-                isDualSplitMode && secondaryRenderedChapter ? (
-                  <DualDocumentWorkspace
-                    primaryTitle={activeChapter?.title ?? session?.fileName ?? "主文档"}
-                    viewMode={viewMode}
-                    source={session?.source ?? ""}
-                    onSourceChange={updateSource}
-                    renderedChapter={renderedChapter}
-                    primaryContainerRef={readerRef}
-                    theme={preferences.theme}
-                    fontScale={preferences.fontScale}
-                    mermaidTheme={resolveMermaidTheme(preferences.theme)}
-                    onMermaidError={handleMermaidError}
-                    onSave={() => saveSession()}
-                    isLargeDocument={isLargeDocument}
-                    autoPreviewPaused={autoPreviewPaused}
-                    onRefreshPreview={renderPreviewNow}
-                    readOnly={!session?.writable}
-                    showLineNumbers={preferences.showLineNumbers}
-                    typewriterMode={typewriterMode}
-                    currentFilePath={session?.absolutePath || undefined}
-                    onOpenLightbox={(media) => setLightboxMedia(media)}
-                    onEditorViewReady={(view) => {
-                      editorViewRef.current = view;
-                    }}
-                    secondaryTitle={tabs.find((t) => t.id === dualSplitTabId)?.title ?? "对照文档"}
-                    secondaryRenderedChapter={secondaryRenderedChapter}
-                    secondaryContainerRef={secondaryReaderRef}
-                    onCloseSecondary={handleCloseDualSplit}
-                    wikiLinkTargets={wikiLinkTargets}
-                    onWikiLinkClick={handleWikiLinkClick}
-                    backlinksCount={currentLinkedReferences.length}
-                    onOpenBacklinks={() => {
-                      setSidebarTab("backlinks");
-                      setSidebarOpen(true);
-                    }}
-                    onExtractToNote={handleExtractSelectionToNote}
-                    onSendToFlash={handleSendSelectionToFlash}
-                    onPrint={handlePrintDocument}
-                    onToggleMindmap={handleToggleMindmap}
-                    onRevealInToc={handleRevealInToc}
-                  />
-                ) : viewMode === "mindmap" && session ? (
-                  <MindmapView
-                    title={activeChapter?.title ?? session?.fileName ?? "知识思维导图"}
-                    headings={renderedChapter?.headings ?? []}
-                    source={session.source}
-                    onSourceChange={updateSource}
-                    editable={session.writable}
-                    theme={preferences.theme}
-                    // Identifies the document whose folds are being remembered.
-                    // The absolute path is preferred because two chapters can
-                    // share a title; `src` and the file name cover the cases
-                    // where there is no path to hand.
-                    documentKey={session.absolutePath || activeChapter?.src || session.fileName}
-                    onJumpToHeading={(headingId, _line) => {
-                      setViewMode("split");
-                      window.setTimeout(() => {
-                        jumpToHeading(headingId, "smooth", true);
-                      }, 80);
-                    }}
-                    // The same resolver the reader uses when a `[[wiki link]]` in
-                    // the text is clicked: one answer to "which file is this name",
-                    // not a second one that could disagree with it.
-                    onWikiLinkClick={handleWikiLinkClick}
-                    onClose={() => setViewMode("split")}
-                  />
-                ) : (viewMode === "canvas" ||
-                    session?.fileName?.toLowerCase().endsWith(".canvas")) &&
-                  session ? (
-                  <CanvasView
-                    key={session.chapterId || session.absolutePath || "canvas-session"}
-                    title={activeChapter?.title ?? session.fileName ?? "空间白板"}
-                    source={session.source}
-                    onSourceChange={updateSource}
-                    editable={session.writable}
-                    theme={preferences.theme}
-                    allChapters={manifest?.chapters}
-                    onOpenFile={(docPath) => {
-                      if (openDesktopMarkdownPathRef.current) {
-                        openDesktopMarkdownPathRef.current(docPath);
-                      }
-                    }}
-                    onExtractToNote={(docTitle, content) =>
-                      handleCreateCanvasExtractNote(content, docTitle)
-                    }
-                    onClose={() => setViewMode("split")}
-                    onSave={() => saveSession()}
-                    isDirty={isDirty}
-                    isSaving={isSaving}
-                    currentFilePath={session.absolutePath || session.fileName}
-                    isFullscreen={isFullscreen}
-                    onToggleFullscreen={toggleFullscreen}
-                  />
-                ) : session ? (
-                  <DocumentWorkspace
-                    viewMode={viewMode}
-                    source={session.source}
-                    onSourceChange={updateSource}
-                    renderedChapter={renderedChapter}
-                    containerRef={readerRef}
-                    theme={preferences.theme}
-                    fontScale={preferences.fontScale}
-                    mermaidTheme={resolveMermaidTheme(preferences.theme)}
-                    onMermaidError={handleMermaidError}
-                    onSave={() => saveSession()}
-                    isLargeDocument={isLargeDocument}
-                    autoPreviewPaused={autoPreviewPaused}
-                    onRefreshPreview={renderPreviewNow}
-                    readOnly={!session.writable}
-                    showLineNumbers={preferences.showLineNumbers}
-                    typewriterMode={typewriterMode}
-                    currentFilePath={session.absolutePath || undefined}
-                    onOpenLightbox={(media) => setLightboxMedia(media)}
-                    onEditorViewReady={(view) => {
-                      editorViewRef.current = view;
-                    }}
-                    navLockUntilRef={navLockUntilRef}
-                    wikiLinkTargets={wikiLinkTargets}
-                    onWikiLinkClick={handleWikiLinkClick}
-                    backlinksCount={currentLinkedReferences.length}
-                    onOpenBacklinks={() => {
-                      setSidebarTab("backlinks");
-                      setSidebarOpen(true);
-                    }}
-                    onExtractToNote={handleExtractSelectionToNote}
-                    onSendToFlash={handleSendSelectionToFlash}
-                    onPrint={handlePrintDocument}
-                    onToggleMindmap={handleToggleMindmap}
-                    onRevealInToc={handleRevealInToc}
-                  />
-                ) : (
-                  <main className="empty-reader" ref={readerRef}>
-                    <div className="empty-reader-card">
-                      <h1 className="empty-reader-title">选择或新建 Markdown 文档</h1>
-                      <p className="empty-reader-desc">
-                        体验现代化本地优先的 Markdown
-                        阅读与极客编辑。支持双向同步滚动、选择联动高亮、多级大纲与原子物理落盘。
-                      </p>
-                      <div className="empty-actions-grid">
-                        {window.bookMDDesktop ? (
-                          <button
-                            type="button"
-                            className="empty-action-card"
-                            onClick={createNewFile}
-                          >
-                            <FilePlus2 size={22} className="about-icon text-orange" />
-                            <span>新建 Markdown</span>
-                          </button>
-                        ) : null}
-                        {window.bookMDDesktop ? (
-                          <button
-                            type="button"
-                            className="empty-action-card"
-                            onClick={createNewMindmap}
-                          >
-                            <ListTree size={22} className="about-icon text-cyan" />
-                            <span>新建思维导图</span>
-                          </button>
-                        ) : null}
-                        {window.bookMDDesktop ? (
-                          <button
-                            type="button"
-                            className="empty-action-card"
-                            onClick={createNewCanvas}
-                          >
-                            <Boxes size={22} className="about-icon text-emerald" />
-                            <span>新建空间白板</span>
-                          </button>
-                        ) : null}
-                        <button
-                          type="button"
-                          className="empty-action-card"
-                          onClick={() => {
-                            document.querySelector<HTMLInputElement>("input[type='file']")?.click();
-                          }}
-                        >
-                          <FileText size={22} className="about-icon text-blue" />
-                          <span>打开单文件</span>
-                        </button>
-                        {window.bookMDDesktop ? (
-                          <button
-                            type="button"
-                            className="empty-action-card"
-                            onClick={openMarkdownDirectory}
-                          >
-                            <FolderOpen size={22} className="about-icon text-purple" />
-                            <span>打开文档目录</span>
-                          </button>
-                        ) : null}
-                      </div>
-                    </div>
-                  </main>
-                );
-
-              if (isGraphPaneOpen) {
-                return (
-                  <GraphWorkspaceLayout
-                    viewMode={viewMode}
-                    graphData={graphData}
-                    currentDocId={currentActiveId}
-                    theme={preferences.theme}
-                    onSelectNode={handleJumpToBacklink}
-                    onCloseGraph={handleCloseGraphPane}
-                  >
-                    {innerWorkspace}
-                  </GraphWorkspaceLayout>
-                );
-              }
-
-              return innerWorkspace;
-            })()}
+            <WorkspaceRouter
+              session={session}
+              activeChapter={activeChapter}
+              renderedChapter={renderedChapter}
+              secondaryRenderedChapter={secondaryRenderedChapter}
+              viewMode={viewMode}
+              isDirty={isDirty}
+              isSaving={isSaving}
+              isLargeDocument={isLargeDocument}
+              autoPreviewPaused={autoPreviewPaused}
+              isDualSplitMode={isDualSplitMode}
+              readerRef={readerRef}
+              secondaryReaderRef={secondaryReaderRef}
+              editorViewRef={editorViewRef}
+              navLockUntilRef={navLockUntilRef}
+              updateSource={updateSource}
+              renderPreviewNow={renderPreviewNow}
+              saveSession={saveSession}
+              setViewMode={setViewMode}
+              toggleFullscreen={toggleFullscreen}
+              isFullscreen={isFullscreen}
+              handleCloseDualSplit={handleCloseDualSplit}
+              handlePrintDocument={handlePrintDocument}
+              handleExtractSelectionToNote={handleExtractSelectionToNote}
+              handleSendSelectionToFlash={handleSendSelectionToFlash}
+              handleCreateCanvasExtractNote={handleCreateCanvasExtractNote}
+              handleWikiLinkClick={handleWikiLinkClick}
+              handleJumpToBacklink={handleJumpToBacklink}
+              handleToggleMindmap={handleToggleMindmap}
+              handleRevealInToc={handleRevealInToc}
+              handleOpenBacklinks={() => {
+                setSidebarTab("backlinks");
+                setSidebarOpen(true);
+              }}
+              wikiLinkTargets={wikiLinkTargets}
+              backlinksCount={currentLinkedReferences.length}
+              graph={{ graphData, currentActiveId }}
+              handleCloseGraphPane={handleCloseGraphPane}
+              onOpenDesktopMarkdownPath={(p) => openDesktopMarkdownPathRef.current?.(p)}
+              jumpToHeading={jumpToHeading}
+              createNewFile={createNewFile}
+              createNewMindmap={createNewMindmap}
+              createNewCanvas={createNewCanvas}
+              openMarkdownDirectory={openMarkdownDirectory}
+            />
           </section>
         </div>
 
@@ -2329,21 +1149,3 @@ export function App() {
 }
 
 export default App;
-
-const tabLabels: Record<SidebarTab, string> = {
-  toc: "大纲",
-  bookmarks: "书签",
-  search: "搜索",
-  space: "闪念 Space",
-  backlinks: "反向链接",
-};
-
-function resolveMermaidTheme(theme: ThemeMode): MermaidTheme {
-  if (theme === "twitter") return "dark";
-  if (theme === "eink") return "neutral";
-  if (theme === "light") return "default";
-  return typeof window !== "undefined" &&
-    window.matchMedia?.("(prefers-color-scheme: dark)").matches
-    ? "dark"
-    : "default";
-}
