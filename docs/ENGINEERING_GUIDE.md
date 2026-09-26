@@ -393,6 +393,19 @@ node scripts/capture-test-baseline.cjs            # 3. 改了用例数就重跑�
 git diff --stat docs/TEST_BASELINE.md             # 4. 确认用例数没有下降
 ```
 
+**机器执行（2026-09-26 起）**：这四条**不再依赖人记得跑**——
+
+- `pre-commit` hook 跑 lint-staged（eslint + prettier，只碰暂存文件，秒级）；
+- `pre-push` hook 跑 `tsc --noEmit`；
+- `commit-msg` hook 强制 Conventional Commits（`scripts/check-commit-msg.cjs`）；
+- CI（`.github/workflows/quality.yml`）与本地 `npm run preflight` 依次执行：
+  typecheck → lint → format → **质量棘轮**（`docs/QUALITY_BASELINE.md`：类型逃逸与文件
+  体量只减不增）→ 全量测试 → **基线比对**（`capture-test-baseline.cjs --check`：用例数
+  只增不减，含单文件口径）。
+
+人的职责只剩一个：**理解失败原因并修掉它**。「忘了跑」从此不是可能的失败模式——
+这条规则的来历正是 `TEST_BASELINE.md` 在 v2.6.5 发布后停留在 v2.6.4 那次无声漂移。
+
 **回归判定基线**（摘自 `docs/TEST_BASELINE.md`）：
 
 1. 用例总数**不得低于**当前基线（删除测试必须在 PR 里论证）

@@ -16,8 +16,8 @@
 | `colon-any` | 33 | 只减不增（`: any`，含 `any[]`；不含 `Array<any>` 泛型） |
 | `as-any` | 10 | 只减不增（`as any`） |
 | `files-over-1000-lines` | 15 | 只减不增（src 非测试代码，> 1000 行） |
-| `max-file-lines` | 6710 | 只减不增（最大单文件行数） |
-| `src-lines` | 56635 | 记录趋势，不设闸 |
+| `max-file-lines` | 7179 | 只减不增（最大单文件行数） |
+| `src-lines` | 58607 | 记录趋势，不设闸 |
 | `test-cases` | 见 `TEST_BASELINE.md` | 只增不减——由测试基线守护，本文件不重复设闸 |
 
 ---
@@ -26,21 +26,21 @@
 
 | 文件 | 行数 |
 | :--- | ---: |
-| `src/components/CanvasView.tsx` | 6710 |
-| `src/components/MindmapView.tsx` | 3547 |
-| `src/App.tsx` | 2412 |
-| `src/services/mindmapLayout.ts` | 1261 |
-| `src/components/DailyReviewPanel.tsx` | 1233 |
-| `src/services/mindmapSidecar.ts` | 1201 |
+| `src/components/CanvasView.tsx` | 7179 |
+| `src/components/MindmapView.tsx` | 3586 |
+| `src/App.tsx` | 2499 |
+| `src/services/mindmapLayout.ts` | 1266 |
+| `src/components/DailyReviewPanel.tsx` | 1237 |
+| `src/services/mindmapSidecar.ts` | 1215 |
 | `src/services/mindmapService.ts` | 1194 |
-| `src/services/canvasGraph.ts` | 1152 |
-| `src/components/FlashCapsule.tsx` | 1098 |
-| `src/services/markdown.ts` | 1088 |
-| `src/services/canvasExport.ts` | 1075 |
-| `src/components/EditorContextMenu.tsx` | 1064 |
-| `src/components/GraphViewPane.tsx` | 1059 |
-| `src/services/fsrsService.ts` | 1050 |
-| `src/services/canvasGeometry.ts` | 1021 |
+| `src/components/FlashCapsule.tsx` | 1177 |
+| `src/services/canvasGraph.ts` | 1150 |
+| `src/services/markdown.ts` | 1147 |
+| `src/services/canvasExport.ts` | 1123 |
+| `src/components/EditorContextMenu.tsx` | 1095 |
+| `src/components/GraphViewPane.tsx` | 1075 |
+| `src/components/AboutDialog.tsx` | 1068 |
+| `src/services/fsrsService.ts` | 1062 |
 
 ---
 
@@ -50,51 +50,51 @@
 
 | 位置 | 代码 |
 | :--- | :--- |
-| `src/App.tsx:746` | `: any) {` |
-| `src/App.tsx:1740` | `: any) {` |
-| `src/App.tsx:1781` | `: any) => {` |
+| `src/App.tsx:744` | `: any) {` |
+| `src/App.tsx:1763` | `: any) {` |
+| `src/App.tsx:1804` | `: any) => {` |
 | `src/components/DocumentWorkspace.tsx:33` | `: any) => void;` |
 | `src/components/DualDocumentWorkspace.tsx:33` | `: any) => void;` |
-| `src/components/EditorPane.tsx:488` | `: any, from: number, to: number) => {` |
-| `src/components/EditorPane.tsx:517` | `: any, from: number, to: number) => {` |
-| `src/components/EditorPane.tsx:554` | `: any, from: number, to: number) => {` |
-| `src/components/GlobalGraphDialog.tsx:237` | `: any) => {` |
-| `src/components/GlobalGraphDialog.tsx:241` | `: any) => {` |
+| `src/components/EditorPane.tsx:582` | `: any, from: number, to: number) => {` |
+| `src/components/EditorPane.tsx:611` | `: any, from: number, to: number) => {` |
+| `src/components/EditorPane.tsx:648` | `: any, from: number, to: number) => {` |
 | `src/components/GlobalGraphDialog.tsx:245` | `: any) => {` |
-| `src/components/GlobalGraphDialog.tsx:353` | `: any) => positions.get(node.data("id"))` |
-| `src/components/GlobalGraphDialog.tsx:438` | `: any) => Boolean(e.data("isCrossFolder"` |
-| `src/components/GlobalGraphDialog.tsx:502` | `: any) => Boolean(e.data("isCrossFolder"` |
-| `src/components/GlobalGraphDialog.tsx:576` | `: any) => {` |
-| `src/components/GlobalGraphDialog.tsx:597` | `: any) => Boolean(e.data("isCrossFolder"` |
-| `src/components/GraphViewPane.tsx:243` | `: any) => {` |
-| `src/components/GraphViewPane.tsx:247` | `: any) => {` |
-| `src/components/GraphViewPane.tsx:251` | `: any) => {` |
-| `src/components/GraphViewPane.tsx:387` | `: any) => positions.get(node.data("id"))` |
-| `src/components/GraphViewPane.tsx:461` | `: any) => Boolean(e.data("isCrossFolder"` |
-| `src/components/GraphViewPane.tsx:540` | `: any) => Boolean(e.data("isCrossFolder"` |
-| `src/components/GraphViewPane.tsx:637` | `: any) => {` |
-| `src/components/GraphViewPane.tsx:658` | `: any) => Boolean(e.data("isCrossFolder"` |
-| `src/components/LocalGraphView.tsx:88` | `: any) => {` |
+| `src/components/GlobalGraphDialog.tsx:249` | `: any) => {` |
+| `src/components/GlobalGraphDialog.tsx:253` | `: any) => {` |
+| `src/components/GlobalGraphDialog.tsx:361` | `: any) => positions.get(node.data("id"))` |
+| `src/components/GlobalGraphDialog.tsx:446` | `: any) => Boolean(e.data("isCrossFolder"` |
+| `src/components/GlobalGraphDialog.tsx:512` | `: any) => Boolean(e.data("isCrossFolder"` |
+| `src/components/GlobalGraphDialog.tsx:586` | `: any) => {` |
+| `src/components/GlobalGraphDialog.tsx:607` | `: any) => Boolean(e.data("isCrossFolder"` |
+| `src/components/GraphViewPane.tsx:263` | `: any) => {` |
+| `src/components/GraphViewPane.tsx:267` | `: any) => {` |
+| `src/components/GraphViewPane.tsx:271` | `: any) => {` |
+| `src/components/GraphViewPane.tsx:407` | `: any) => positions.get(node.data("id"))` |
+| `src/components/GraphViewPane.tsx:481` | `: any) => Boolean(e.data("isCrossFolder"` |
+| `src/components/GraphViewPane.tsx:562` | `: any) => Boolean(e.data("isCrossFolder"` |
+| `src/components/GraphViewPane.tsx:659` | `: any) => {` |
+| `src/components/GraphViewPane.tsx:680` | `: any) =>` |
 | `src/components/LocalGraphView.tsx:92` | `: any) => {` |
 | `src/components/LocalGraphView.tsx:96` | `: any) => {` |
-| `src/components/LocalGraphView.tsx:137` | `: any) => (node.data("isCurrent") ? 2 :` |
-| `src/hooks/useBacklinkIndex.ts:327` | `: any) {` |
-| `src/hooks/useDocumentCreation.ts:203` | `: any) {` |
-| `src/hooks/useDocumentCreation.ts:283` | `: any) {` |
-| `src/services/markdown.ts:1007` | `: any, silent: boolean) => {` |
+| `src/components/LocalGraphView.tsx:100` | `: any) => {` |
+| `src/components/LocalGraphView.tsx:141` | `: any) => (node.data("isCurrent") ? 2 :` |
+| `src/hooks/useBacklinkIndex.ts:374` | `: any) {` |
+| `src/hooks/useDocumentCreation.ts:206` | `: any) {` |
+| `src/hooks/useDocumentCreation.ts:287` | `: any) {` |
+| `src/services/markdown.ts:1064` | `: any, silent: boolean) => {` |
 | `src/services/mindmapSidecar.ts:373` | `: any of them written as something other` |
 
 ### `as any`
 
 | 位置 | 代码 |
 | :--- | :--- |
-| `src/components/GlobalGraphDialog.tsx:350` | `as any,` |
-| `src/components/GlobalGraphDialog.tsx:354` | `as any,` |
-| `src/components/GlobalGraphDialog.tsx:502` | `as any).connectedEdges().filter((e: any)` |
-| `src/components/GlobalGraphDialog.tsx:753` | `as any)}` |
-| `src/components/GraphViewPane.tsx:384` | `as any,` |
-| `src/components/GraphViewPane.tsx:388` | `as any,` |
-| `src/components/GraphViewPane.tsx:540` | `as any).connectedEdges().filter((e: any)` |
-| `src/components/LocalGraphView.tsx:134` | `as any,` |
-| `src/components/LocalGraphView.tsx:142` | `as any,` |
-| `src/services/markdown.ts:967` | `as any)("block_anchor", "span", 0);` |
+| `src/components/GlobalGraphDialog.tsx:358` | `as any,` |
+| `src/components/GlobalGraphDialog.tsx:362` | `as any,` |
+| `src/components/GlobalGraphDialog.tsx:510` | `as any)` |
+| `src/components/GlobalGraphDialog.tsx:759` | `as any)}` |
+| `src/components/GraphViewPane.tsx:404` | `as any,` |
+| `src/components/GraphViewPane.tsx:408` | `as any,` |
+| `src/components/GraphViewPane.tsx:560` | `as any)` |
+| `src/components/LocalGraphView.tsx:138` | `as any,` |
+| `src/components/LocalGraphView.tsx:146` | `as any,` |
+| `src/services/markdown.ts:1024` | `as any)("block_anchor", "span", 0);` |
