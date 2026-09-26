@@ -46,7 +46,6 @@ import {
 } from "lucide-react";
 import type { ThemeMode } from "../core/types";
 import type {
-  CanvasData,
   CanvasNode,
   CanvasEdge,
   CanvasNodeSide,
@@ -59,9 +58,6 @@ import type {
   CanvasObstacle,
 } from "../types/canvasTypes";
 import {
-  parseCanvasData,
-  serializeCanvasData,
-  createDefaultCanvas,
   computeBoundingBox,
   getNodeAnchorPoint,
   extractCanvasToMarkdown,
@@ -109,7 +105,6 @@ import {
   matchSlashCommands,
   type SlashCommand,
 } from "../services/slashCommands";
-import { wheelBelongsToInnerScroller } from "../services/wheelScrollGuard";
 import { MediaLightbox, type LightboxMedia } from "./MediaLightbox";
 // Extracted during the R2 split (batch B2).
 import { CanvasToast } from "./canvas/CanvasToast";
@@ -128,6 +123,10 @@ import { ExtractModal } from "./canvas/ExtractModal";
 import { FilePickerModal } from "./canvas/FilePickerModal";
 import { ExportModal } from "./canvas/ExportModal";
 import { SpawnBranchModal } from "./canvas/SpawnBranchModal";
+// Document (data/history/save) and camera (viewport/wheel) state domains,
+// extracted during the wave-1 CanvasView decomposition.
+import { useCanvasDocument } from "./canvas/useCanvasDocument";
+import { useCanvasViewport } from "./canvas/useCanvasViewport";
 
 export type CanvasViewProps = {
   title: string;
@@ -147,8 +146,6 @@ export type CanvasViewProps = {
   onToggleFullscreen?: () => void;
 };
 
-const MIN_ZOOM = 0.15;
-const MAX_ZOOM = 3.0;
 const SIDES: CanvasNodeSide[] = ["top", "right", "bottom", "left"];
 
 /**
@@ -356,38 +353,90 @@ export const CanvasView = memo(function CanvasView({
     return () => observer.disconnect();
   }, []);
 
-  // Initialize canvas data
-  const [data, setData] = useState<CanvasData>(() => {
-    const parsed = parseCanvasData(source);
-    if (parsed.nodes.length > 0) return parsed;
-    return createDefaultCanvas(title);
+  // Dragging card or canvas refs
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const isDraggingCanvasRef = useRef(false);
+  const canvasDragStartRef = useRef<{
+    x: number;
+    y: number;
+    panX: number;
+    panY: number;
+    hasMoved?: boolean;
+  }>({
+    x: 0,
+    y: 0,
+    panX: 0,
+    panY: 0,
+    hasMoved: false,
   });
 
-  const lastEmittedSourceRef = useRef(source);
+  // Card text editing — the draft lives here, mirrored into refs so the
+  // document hook's save paths can commit it without re-subscribing on
+  // every keystroke.
+  const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState("");
+  const editingNodeIdRef = useRef<string | null>(null);
+  editingNodeIdRef.current = editingNodeId;
+  const editingTextRef = useRef<string>("");
+  editingTextRef.current = editingText;
 
-  // Synchronize external source changes into internal canvas state
-  useEffect(() => {
-    if (source && source !== lastEmittedSourceRef.current) {
-      const parsed = parseCanvasData(source);
-      if (parsed.nodes.length > 0 || parsed.edges.length > 0) {
-        setData(parsed);
-      }
-      lastEmittedSourceRef.current = source;
-    }
-  }, [source]);
+  // Right-click context menu state
+  // `x`/`y` are viewport coordinates (pageX/pageY) used to render the menu via
+  // a fixed-positioned portal. The menu is intentionally rendered at the
+  // document body level so it can never be clipped by the canvas container's
+  // `overflow: hidden` or any ancestor that would otherwise occlude it.
+  const [showAlignMenu, setShowAlignMenu] = useState(false);
+  // Non-null while the ring radius slider is being dragged; holds the radius
+  // being previewed so the label and the board stay in step.
+  const [ringRadiusDraft, setRingRadiusDraft] = useState<number | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    canvasX: number;
+    canvasY: number;
+    targetNodeId?: string;
+    targetEdgeId?: string;
+  } | null>(null);
+  const contextMenuRef = useRef<HTMLDivElement | null>(null);
 
-  // History stack for Undo/Redo
-  const [history, setHistory] = useState<{ past: CanvasData[]; future: CanvasData[] }>({
-    past: [],
-    future: [],
+  // Document domain: board state, source sync, history, save paths and the
+  // colour-picker snapshot/commit trio (extracted hook).
+  const {
+    data,
+    setData,
+    latestDataRef,
+    history,
+    emitChange,
+    pushHistory,
+    handleUndo,
+    handleRedo,
+    handleSaveNodeEdit,
+    handleSave,
+    captureColorSnapshot,
+    debounceCommitColorPick,
+  } = useCanvasDocument({
+    source,
+    title,
+    onSourceChange,
+    onSave,
+    editingNodeIdRef,
+    editingTextRef,
+    setEditingNodeId,
+    setContextMenu,
   });
 
-  // Viewport transformation
-  const [viewport, setViewport] = useState<CanvasViewport>({
-    panX: 80,
-    panY: 80,
-    zoom: 1.0,
-  });
+  // Camera domain: viewport state and the zoom/wheel/minimap handlers
+  // (extracted hook).
+  const {
+    viewport,
+    setViewport,
+    viewportRef,
+    rafWheelIdRef,
+    handleZoom,
+    handleZoomToFit,
+    handleMinimapNavigate,
+    handleWheel,
+  } = useCanvasViewport({ containerRef, nodes: data.nodes });
 
   // Multi-node selection & interaction state
   const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set());
@@ -415,8 +464,6 @@ export const CanvasView = memo(function CanvasView({
     );
   }, [data.edges, selectedNodeIds]);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
-  const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
-  const [editingText, setEditingText] = useState("");
 
   /**
    * The suggestion popup inside a card's textarea.
@@ -442,10 +489,6 @@ export const CanvasView = memo(function CanvasView({
     y: number;
   } | null>(null);
   const cardEditorRef = useRef<HTMLTextAreaElement | null>(null);
-  const editingNodeIdRef = useRef<string | null>(null);
-  editingNodeIdRef.current = editingNodeId;
-  const editingTextRef = useRef<string>("");
-  editingTextRef.current = editingText;
 
   // Multimodal media file input ref
   const mediaFileInputRef = useRef<HTMLInputElement>(null);
@@ -499,44 +542,6 @@ export const CanvasView = memo(function CanvasView({
     initialOffset: number;
     orientation: "horizontal" | "vertical";
   } | null>(null);
-
-  // Right-click context menu state
-  // `x`/`y` are viewport coordinates (pageX/pageY) used to render the menu via
-  // a fixed-positioned portal. The menu is intentionally rendered at the
-  // document body level so it can never be clipped by the canvas container's
-  // `overflow: hidden` or any ancestor that would otherwise occlude it.
-  const [showAlignMenu, setShowAlignMenu] = useState(false);
-  // Non-null while the ring radius slider is being dragged; holds the radius
-  // being previewed so the label and the board stay in step.
-  const [ringRadiusDraft, setRingRadiusDraft] = useState<number | null>(null);
-  const [contextMenu, setContextMenu] = useState<{
-    x: number;
-    y: number;
-    canvasX: number;
-    canvasY: number;
-    targetNodeId?: string;
-    targetEdgeId?: string;
-  } | null>(null);
-  const contextMenuRef = useRef<HTMLDivElement | null>(null);
-  /** Pending debounce timer for committing colour pick history. */
-  const colorCommitTimerRef = useRef<number | null>(null);
-  /**
-   * Board state captured the moment a colour drag began. Dragging inside the
-   * native chooser only previews against this baseline; the history entry is
-   * committed once, from here, when the pick settles.
-   */
-  const colorPickStartRef = useRef<CanvasData | null>(null);
-
-  // Never leave a timer behind that would touch state after unmount.
-  useEffect(
-    () => () => {
-      if (colorCommitTimerRef.current !== null) {
-        window.clearTimeout(colorCommitTimerRef.current);
-        colorCommitTimerRef.current = null;
-      }
-    },
-    [],
-  );
 
   // Dynamically clamp context menu position against the actual viewport so
   // the menu never spills off-screen, even when the canvas is nested in a
@@ -659,23 +664,6 @@ export const CanvasView = memo(function CanvasView({
   const connectingStateRef = useRef(connectingState);
   connectingStateRef.current = connectingState;
 
-  // Dragging card or canvas refs
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const isDraggingCanvasRef = useRef(false);
-  const canvasDragStartRef = useRef<{
-    x: number;
-    y: number;
-    panX: number;
-    panY: number;
-    hasMoved?: boolean;
-  }>({
-    x: 0,
-    y: 0,
-    panX: 0,
-    panY: 0,
-    hasMoved: false,
-  });
-
   const nodeDragRef = useRef<{
     nodeId: string;
     startNodeX: number;
@@ -732,10 +720,6 @@ export const CanvasView = memo(function CanvasView({
   const rafGroupDragIdRef = useRef<number | null>(null);
   const latestGroupDragPosRef = useRef<{ dx: number; dy: number } | null>(null);
 
-  const latestDataRef = useRef(data);
-  latestDataRef.current = data;
-  const viewportRef = useRef(viewport);
-  viewportRef.current = viewport;
   const rafDragIdRef = useRef<number | null>(null);
   const rafResizeIdRef = useRef<number | null>(null);
   const latestDragPosRef = useRef<{
@@ -765,12 +749,6 @@ export const CanvasView = memo(function CanvasView({
   // High-frequency event rAF throttling & batching refs to achieve native high refresh rates (120Hz/144Hz+) with minimal CPU load
   const rafPanIdRef = useRef<number | null>(null);
   const latestPanPosRef = useRef<{ dx: number; dy: number } | null>(null);
-  const rafWheelIdRef = useRef<number | null>(null);
-  const wheelAccumulatorRef = useRef<{
-    deltaX: number;
-    deltaY: number;
-    zoomEvents: Array<{ factor: number; clientX: number; clientY: number }>;
-  }>({ deltaX: 0, deltaY: 0, zoomEvents: [] });
   const rafBoxSelectIdRef = useRef<number | null>(null);
   const latestBoxSelectPosRef = useRef<{
     clientX: number;
@@ -794,85 +772,6 @@ export const CanvasView = memo(function CanvasView({
     ro.observe(containerRef.current);
     return () => ro.disconnect();
   }, []);
-
-  // Synchronize internal data changes to parent
-  // Kept in a ref so `emitChange` (and everything built on it, such as the
-  // global mousemove/mouseup listeners) stays referentially stable even when
-  // the parent passes a fresh inline callback on every render. Previously that
-  // identity churn made React detach and re-attach the window listeners after
-  // every single render.
-  const onSourceChangeRef = useRef(onSourceChange);
-  onSourceChangeRef.current = onSourceChange;
-
-  const emitChange = useCallback((newData: CanvasData) => {
-    setData(newData);
-    latestDataRef.current = newData;
-    const handler = onSourceChangeRef.current;
-    if (handler) {
-      const serialized = serializeCanvasData(newData);
-      lastEmittedSourceRef.current = serialized;
-      handler(serialized);
-    }
-  }, []);
-
-  // Push history snapshot
-  const pushHistory = useCallback(
-    (newData: CanvasData) => {
-      setHistory((prev) => ({
-        past: [...prev.past.slice(-25), latestDataRef.current],
-        future: [],
-      }));
-      emitChange(newData);
-    },
-    [emitChange],
-  );
-
-  // ── Colour-picker preview & commit ───────────────────────────────────────
-  // Dragging inside the native OS colour chooser fires onChange dozens of
-  // times a second. Committing each of those through pushHistory (with its
-  // whole-board JSON serialisation) is what used to crash the app mid-drag —
-  // so the drag only *previews* against the baseline below, and exactly one
-  // history entry is written once the pick settles.
-
-  /** Records the pre-pick baseline the first time a colour drag fires. */
-  const captureColorSnapshot = useCallback(() => {
-    if (!colorPickStartRef.current) {
-      colorPickStartRef.current = latestDataRef.current;
-    }
-  }, []);
-
-  /**
-   * Writes ONE history entry for a whole colour-drag gesture, from the
-   * baseline captured when it began.
-   */
-  const commitColorPick = useCallback(() => {
-    const before = colorPickStartRef.current;
-    colorPickStartRef.current = null;
-    if (!before || before === latestDataRef.current) return;
-    setHistory((prev) => ({
-      past: [...prev.past.slice(-25), before],
-      future: [],
-    }));
-    emitChange(latestDataRef.current);
-  }, [emitChange]);
-
-  const debounceCommitColorPick = useCallback(() => {
-    // A real debounce for history commit: while the user drags inside the chooser,
-    // onChange fires repeatedly, and each call pushes the commit further out.
-    // The history entry is therefore written exactly once, from the baseline
-    // captured at drag start.
-    //
-    // The context menu stays open on purpose so the user can freely compare and
-    // continue operations without any unexpected auto-dismiss. Only the history
-    // snapshot persistence is delayed by 500ms after the interaction settles.
-    if (colorCommitTimerRef.current !== null) {
-      window.clearTimeout(colorCommitTimerRef.current);
-    }
-    colorCommitTimerRef.current = window.setTimeout(() => {
-      colorCommitTimerRef.current = null;
-      commitColorPick();
-    }, 500);
-  }, [commitColorPick]);
 
   /**
    * Applies a colour to the board WITHOUT writing history — the live preview
@@ -950,202 +849,6 @@ export const CanvasView = memo(function CanvasView({
     },
     [editable, captureColorSnapshot],
   );
-
-  const handleUndo = useCallback(() => {
-    if (history.past.length === 0) return;
-    const previous = history.past[history.past.length - 1];
-    setHistory((prev) => ({
-      past: prev.past.slice(0, -1),
-      future: [latestDataRef.current, ...prev.future],
-    }));
-    emitChange(previous);
-  }, [history, emitChange]);
-
-  const handleRedo = useCallback(() => {
-    if (history.future.length === 0) return;
-    const next = history.future[0];
-    setHistory((prev) => ({
-      past: [...prev.past, latestDataRef.current],
-      future: prev.future.slice(1),
-    }));
-    emitChange(next);
-  }, [history, emitChange]);
-
-  const handleSaveNodeEdit = useCallback(() => {
-    const currentId = editingNodeIdRef.current;
-    if (!currentId) return;
-    const currentText = editingTextRef.current;
-    pushHistory({
-      ...data,
-      nodes: data.nodes.map((n) => {
-        if (n.id === currentId) {
-          if (n.type === "text") return { ...n, text: currentText };
-          if (n.type === "group") return { ...n, label: currentText };
-        }
-        return n;
-      }),
-    });
-    setEditingNodeId(null);
-  }, [data, pushHistory]);
-
-  const handleSave = useCallback(() => {
-    let currentData = data;
-    if (editingNodeIdRef.current) {
-      const currentId = editingNodeIdRef.current;
-      const currentText = editingTextRef.current;
-      currentData = {
-        ...data,
-        nodes: data.nodes.map((n) => {
-          if (n.id === currentId) {
-            if (n.type === "text") return { ...n, text: currentText };
-            if (n.type === "group") return { ...n, label: currentText };
-          }
-          return n;
-        }),
-      };
-      setData(currentData);
-      setEditingNodeId(null);
-    }
-    const serialized = serializeCanvasData(currentData);
-    lastEmittedSourceRef.current = serialized;
-    if (onSourceChange) {
-      onSourceChange(serialized);
-    }
-    if (onSave) {
-      onSave();
-    }
-    setContextMenu(null);
-  }, [data, onSourceChange, onSave]);
-
-  // Viewport Zooming
-  const handleZoom = useCallback((deltaZoom: number, clientX?: number, clientY?: number) => {
-    setViewport((prev) => {
-      const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, prev.zoom * deltaZoom));
-      if (!containerRef.current || clientX === undefined || clientY === undefined) {
-        return { ...prev, zoom: newZoom };
-      }
-      const rect = containerRef.current.getBoundingClientRect();
-      const cursorX = clientX - rect.left;
-      const cursorY = clientY - rect.top;
-      const factor = newZoom / prev.zoom;
-      return {
-        zoom: newZoom,
-        panX: cursorX - (cursorX - prev.panX) * factor,
-        panY: cursorY - (cursorY - prev.panY) * factor,
-      };
-    });
-  }, []);
-
-  // Zoom to fit bounding box
-  const handleZoomToFit = useCallback(() => {
-    if (data.nodes.length === 0) {
-      setViewport({ panX: 100, panY: 100, zoom: 1.0 });
-      return;
-    }
-    const bbox = computeBoundingBox(data.nodes);
-    if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const padding = 80;
-    const scaleX = (rect.width - padding * 2) / bbox.width;
-    const scaleY = (rect.height - padding * 2) / bbox.height;
-    const fitZoom = Math.min(1.2, Math.max(MIN_ZOOM, Math.min(scaleX, scaleY)));
-    const centerX = bbox.minX + bbox.width / 2;
-    const centerY = bbox.minY + bbox.height / 2;
-    setViewport({
-      zoom: fitZoom,
-      panX: rect.width / 2 - centerX * fitZoom,
-      panY: rect.height / 2 - centerY * fitZoom,
-    });
-  }, [data.nodes]);
-
-  /**
-   * Recentres the board on a point picked from the minimap.
-   *
-   * The minimap reports canvas-space coordinates and the viewport lives here,
-   * so the camera maths stays with the rest of the viewport handlers.
-   */
-  const handleMinimapNavigate = useCallback((canvasX: number, canvasY: number) => {
-    const el = containerRef.current;
-    if (!el) return;
-    const viewW = el.clientWidth;
-    const viewH = el.clientHeight;
-    setViewport((prev) => ({
-      ...prev,
-      panX: viewW / 2 - canvasX * prev.zoom,
-      panY: viewH / 2 - canvasY * prev.zoom,
-    }));
-  }, []);
-
-  // Mouse wheel zoom and pan with requestAnimationFrame batching
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    // A wheel over something that can still scroll belongs to that something —
-    // a card body — and the canvas must leave it alone. Without this the wheel
-    // reached the card, scrolled it, and bubbled up here as well, so scrolling a
-    // checklist dragged the whole whiteboard with it. Once the inner region is
-    // pinned at its edge the canvas takes the wheel back, so a wheel over a card
-    // is never a dead zone. Ctrl+wheel is a zoom gesture and always belongs to
-    // the canvas.
-    //
-    // This only sees what is inside the canvas. A popup portalled to
-    // `document.body` — the card editor's suggestion list — is not on the walk
-    // (its ancestors are body and html, not this container), so it stops the
-    // wheel itself; see `canvas/CanvasCardSuggestMenu`.
-    if (
-      !e.ctrlKey &&
-      !e.metaKey &&
-      wheelBelongsToInnerScroller(e.target, e.deltaX, e.deltaY, containerRef.current)
-    ) {
-      return;
-    }
-
-    e.preventDefault();
-    if (e.ctrlKey || e.metaKey) {
-      const delta = e.deltaY < 0 ? 1.15 : 0.85;
-      wheelAccumulatorRef.current.zoomEvents.push({
-        factor: delta,
-        clientX: e.clientX,
-        clientY: e.clientY,
-      });
-    } else {
-      wheelAccumulatorRef.current.deltaX += e.deltaX;
-      wheelAccumulatorRef.current.deltaY += e.deltaY;
-    }
-
-    if (!rafWheelIdRef.current) {
-      rafWheelIdRef.current = requestAnimationFrame(() => {
-        rafWheelIdRef.current = null;
-        const { deltaX, deltaY, zoomEvents } = wheelAccumulatorRef.current;
-        wheelAccumulatorRef.current = { deltaX: 0, deltaY: 0, zoomEvents: [] };
-
-        if (deltaX !== 0 || deltaY !== 0 || zoomEvents.length > 0) {
-          setViewport((prev) => {
-            let nextPanX = prev.panX - deltaX;
-            let nextPanY = prev.panY - deltaY;
-            let nextZoom = prev.zoom;
-
-            if (containerRef.current && zoomEvents.length > 0) {
-              const rect = containerRef.current.getBoundingClientRect();
-              for (const zEvent of zoomEvents) {
-                const targetZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, nextZoom * zEvent.factor));
-                const cursorX = zEvent.clientX - rect.left;
-                const cursorY = zEvent.clientY - rect.top;
-                const factor = targetZoom / nextZoom;
-                nextPanX = cursorX - (cursorX - nextPanX) * factor;
-                nextPanY = cursorY - (cursorY - nextPanY) * factor;
-                nextZoom = targetZoom;
-              }
-            }
-
-            return {
-              panX: nextPanX,
-              panY: nextPanY,
-              zoom: nextZoom,
-            };
-          });
-        }
-      });
-    }
-  }, []);
 
   // Marquee box selection starter
   const handleStartBoxSelection = useCallback(
