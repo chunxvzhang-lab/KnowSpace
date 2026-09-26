@@ -18,7 +18,7 @@ type CanvasThemeColors = ReturnType<typeof getCanvasThemeColors>;
  * Edge label badges, rendered above the cards so a connector's caption is never
  * buried under node content.
  *
- * Extracted from CanvasView (R2 batch B3) — see docs/CANVAS_SPLIT_DESIGN.md.
+ * Extracted from CanvasView (R2 batch B3).
  * Labels are positioned at the geometric midpoint of the path (the line runs
  * through the badge centre), which is why this layer recomputes the midpoint
  * rather than reading it from the edge layer.

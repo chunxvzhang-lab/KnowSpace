@@ -2,7 +2,7 @@
  * Canvas colour: palette resolution and per-source edge colour assignment.
  *
  * Extracted from canvasService during the R2 split — see
- * docs/CANVAS_SPLIT_DESIGN.md. Code is byte-identical to the original.
+ * the R2 canvas split. Code is byte-identical to the original.
  */
 
 import type { CanvasNode, CanvasEdge, CanvasGroupNode } from "../types/canvasTypes";

@@ -23,7 +23,7 @@ type CanvasThemeColors = ReturnType<typeof getCanvasThemeColors>;
 /**
  * The SVG layer that draws every connector, plus the selected-edge handles.
  *
- * Extracted from CanvasView (R2 batch B3) — see docs/CANVAS_SPLIT_DESIGN.md.
+ * Extracted from CanvasView (R2 batch B3).
  *
  * This layer carries the widest prop surface in the split: it both renders the
  * paths and hosts the interactive affordances (anchor cycling, the step-bend

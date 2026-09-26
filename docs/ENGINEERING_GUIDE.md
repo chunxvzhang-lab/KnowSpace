@@ -670,8 +670,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/push.ps1
 | :---: | :--- | :--- | :--- |
 | 高 | 白板视图单文件过大 | `src/components/CanvasView.tsx` **6710 行**（`docs/TEST_BASELINE.md` 的口径，仍在增长） | 继续按 R2 拆分，目标各模块 < 2500 行 |
 | 高 | 主组件过大 | `src/App.tsx` **2295 行** | R1 目标 < 500 行，未达标 |
-| 中 | 中文操作手册停留在 v2.3.0 | `docs/操作手册.md`（9/13，徽章写 v2.3.0、正文残留 v2.1.0）。**v2.6.4 起已移出发布包**（`PORTABLE_DOC_ENTRIES`、第 4 步复制、`docs/README.txt` 三处同步改过），源文件保留并加了停止维护提示 | 二选一收口：同步到当前版本后恢复分发；或归档到 `docs/archive/`——仓库里并存两份手册，迟早有人读错那一份 |
-| 中 | 规划文档基线落后 | `docs/PROJECT_PLANNING_OVERVIEW.md` 仍写 v2.4.0 | 更新到当前版本 |
+| 中 | 规划文档基线落后（已修） | 二十余份实施计划、路线图、推广方案与一次性校验报告各自停在不同的旧版本：`PROJECT_PLANNING_OVERVIEW.md` 写 v2.4.0、`docs/操作手册.md` 停在 v2.3.0（正文还残留 v2.1.0）、`walkthrough.md` 停在 v1.8.0。仓库里并存多套口径，读者无从判断哪份是当前事实 | 2026-09-26 一次性删除，`docs/` 只保留**跟着版本走**的用户手册与工程规范（外加发布脚本要读的 `RELEASE_NOTES_*` 与 `TEST_BASELINE.md`）。其中三份（推广方案、两份 roadmap）原本**随便携包分发**，已同步移出 `PORTABLE_DOC_ENTRIES` 与第 4 步复制。历史版本从 git 历史取，不要再放回白名单 |
 | 中 | 更新元数据是死文件 | `release/latest.yml`（停在 2.6.3）与 `resources/app-update.yml` **无人消费**：`electron/`、`src/` 里没有 `autoUpdater`，依赖里没有 `electron-updater`，`publish_github_release.py` 也不上传它们 | 要么接上自动更新（并把 `latest.yml` 加入上传清单），要么删掉这两个文件，别再让它们每版误导人 |
 | 低 | 发布目录膨胀 | `release/` 曾累积 **3.0G**（历史版本产物 + `asar-staging` 14550 文件）。2026-09-21 已清理到 **2.1G**，保留当前版与上一版安装包、便携目录、便携 zip、`win-unpacked` | 每次发版后按同一口径清一次：删 `asar-staging`、`__msi-x64`、`*.nsis.7z`、旧于上一版的 msi/Setup，以及全部 `*.blockmap`（没有自动更新，它们是死文件） |
 | 低 | 发布清理脚本已失效 | `scripts/organize-release.cjs` **0 处**引用 KnowSpace，整篇指向改名前的 `BookMD-Reader-win-x64` / `BookMD Reader.exe`，且只搬 MSI、不清理历史版本 | 建议直接删掉——留着比没有更危险，会让人以为清理过了。清理口径见上一条 |

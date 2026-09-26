@@ -5,7 +5,7 @@
  * what lets the other canvas modules be tested without a browser.
  *
  * Extracted from canvasService during the R2 split — see
- * docs/CANVAS_SPLIT_DESIGN.md. Code is byte-identical to the original.
+ * the R2 canvas split. Code is byte-identical to the original.
  */
 
 import type { CanvasData, CanvasGroupNode, CanvasNode } from "../types/canvasTypes";

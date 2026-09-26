@@ -4,7 +4,7 @@
  * Historically this file held every canvas helper — 5000+ lines of parsing,
  * geometry, routing, colour, topology and export logic. It is now a thin
  * re-export surface: the implementation lives in the canvas* modules beside it
- * (see docs/CANVAS_SPLIT_DESIGN.md).
+ * (R2 canvas split).
  *
  * The facade forwards every symbol that this module exported before the split,
  * so no call site changed. Private helpers that were never exported — path

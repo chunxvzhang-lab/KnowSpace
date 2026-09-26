@@ -41,7 +41,7 @@ type CanvasThemeColors = ReturnType<typeof getCanvasThemeColors>;
 /**
  * Right-click menu for a card or a group container.
  *
- * Extracted from CanvasView (R2 batch B4) — see docs/CANVAS_SPLIT_DESIGN.md.
+ * Extracted from CanvasView (R2 batch B4).
  *
  * Renders three variants: group-specific actions, a batch panel when several
  * cards are selected, and a single-card panel otherwise. Nothing is mutated in

@@ -2,7 +2,7 @@
  * JSON Canvas 1.0 serialization: parsing, writing and the default board.
  *
  * Extracted from canvasService during the R2 split — see
- * docs/CANVAS_SPLIT_DESIGN.md. Code is byte-identical to the original.
+ * the R2 canvas split. Code is byte-identical to the original.
  */
 
 import type {

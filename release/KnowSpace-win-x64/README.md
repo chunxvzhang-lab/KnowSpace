@@ -44,7 +44,7 @@
   <a href="https://github.com/chunxvzhang-lab/KnowSpace/releases">🚀 下载最新版本 (Releases)</a> •
   <a href="docs/PICTURE_MANUAL.md">🖼️ 全功能高清图片手册 (Picture Manual)</a> •
   <a href="docs/USER_MANUAL.md">📖 操作手册 (User Manual)</a> •
-  <a href="docs/knowspace-roadmap-v2.0-v3.0.md">🪐 演进路线图 (Roadmap)</a> •
+  <a href="docs/ENGINEERING_GUIDE.md">🔧 工程规范 (Engineering Guide)</a> •
   <a href="#-核心能力体系">核心体系</a> •
   <a href="#-核心功能特性">功能特性</a> •
   <a href="#-键盘快捷键">快捷键</a> •

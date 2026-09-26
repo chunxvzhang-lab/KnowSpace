@@ -8,7 +8,7 @@ import { CANVAS_COLOR_PALETTES } from "../../services/canvasService";
 /**
  * Floating toolbar shown when two or more edges are selected.
  *
- * Extracted from CanvasView (R2 batch B2) — see docs/CANVAS_SPLIT_DESIGN.md.
+ * Extracted from CanvasView (R2 batch B2).
  * Every action is reported through a callback; this component mutates nothing,
  * which is what lets it live outside the gesture/state machinery of the parent.
  */

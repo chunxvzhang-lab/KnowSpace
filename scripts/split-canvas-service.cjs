@@ -1,6 +1,6 @@
 /**
  * Splits services/canvasService.ts into its R2 modules (design:
- * docs/CANVAS_SPLIT_DESIGN.md) in a single pass.
+ * the R2 canvas split) in a single pass.
  *
  * Why one pass: each extraction shifts the line numbers of everything below it,
  * so doing this module-by-module would require re-deriving every range after
@@ -153,7 +153,7 @@ const MODULE_HEADERS = {
  * JSON Canvas 1.0 serialization: parsing, writing and the default board.
  *
  * Extracted from canvasService during the R2 split — see
- * docs/CANVAS_SPLIT_DESIGN.md. Code is byte-identical to the original.
+ * the R2 canvas split. Code is byte-identical to the original.
  */
 
 import type {
@@ -170,7 +170,7 @@ import type {
  *
  * Pure computation — no DOM access — so this module runs (and is testable) in a
  * plain Node environment. Extracted from canvasService during the R2 split; see
- * docs/CANVAS_SPLIT_DESIGN.md. Code is byte-identical to the original.
+ * the R2 canvas split. Code is byte-identical to the original.
  */
 
 import type {
@@ -186,7 +186,7 @@ import type {
  * Edge routing: AABB obstacle avoidance and orthogonal step paths.
  *
  * Extracted from canvasService during the R2 split — see
- * docs/CANVAS_SPLIT_DESIGN.md. Code is byte-identical to the original.
+ * the R2 canvas split. Code is byte-identical to the original.
  */
 
 import type { CanvasNode, CanvasNodeSide } from "../types/canvasTypes";
@@ -202,7 +202,7 @@ import { computeBezierControlPoints, projectPointOntoRing } from "./canvasGeomet
  * colour module that also consults it, so the dependency stays one-way.
  *
  * Extracted from canvasService during the R2 split — see
- * docs/CANVAS_SPLIT_DESIGN.md. Code is byte-identical to the original.
+ * the R2 canvas split. Code is byte-identical to the original.
  */
 
 import type { CanvasData, CanvasNode, CanvasEdge, CanvasGroupNode } from "../types/canvasTypes";
@@ -214,7 +214,7 @@ import { computeGridLayout, computeRingLayout } from "./canvasGeometry";
  * Canvas colour: palette resolution and per-source edge colour assignment.
  *
  * Extracted from canvasService during the R2 split — see
- * docs/CANVAS_SPLIT_DESIGN.md. Code is byte-identical to the original.
+ * the R2 canvas split. Code is byte-identical to the original.
  */
 
 import type { CanvasNode, CanvasEdge, CanvasGroupNode } from "../types/canvasTypes";
@@ -230,7 +230,7 @@ import { getLoopEdgeIdsCached } from "./canvasGraph";
  * Canvas edge mutations: creating, connecting, spawning and reversing edges.
  *
  * Extracted from canvasService during the R2 split — see
- * docs/CANVAS_SPLIT_DESIGN.md. Code is byte-identical to the original.
+ * the R2 canvas split. Code is byte-identical to the original.
  */
 
 import type {
@@ -252,7 +252,7 @@ import { getSourceNodeEdgeColor } from "./canvasColor";
  * what lets the other canvas modules be tested without a browser.
  *
  * Extracted from canvasService during the R2 split — see
- * docs/CANVAS_SPLIT_DESIGN.md. Code is byte-identical to the original.
+ * the R2 canvas split. Code is byte-identical to the original.
  */
 
 import type {
@@ -438,7 +438,7 @@ function main() {
  * Historically this file held every canvas helper — 5000+ lines of parsing,
  * geometry, routing, colour, topology and export logic. It is now a thin
  * re-export surface: the implementation lives in the canvas* modules beside it
- * (see docs/CANVAS_SPLIT_DESIGN.md).
+ * (R2 canvas split).
  *
  * The facade deliberately forwards *every* symbol, including ones only used
  * internally by sibling modules, so no call site had to change during the split.

@@ -4,7 +4,7 @@ import { memo } from "react";
 /**
  * Floating confirmation toast shown over the canvas.
  *
- * Extracted from CanvasView (R2 batch B2) — see docs/CANVAS_SPLIT_DESIGN.md.
+ * Extracted from CanvasView (R2 batch B2).
  * Presentational only: it owns no state and reacts to nothing.
  */
 type CanvasToastProps = {

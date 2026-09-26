@@ -3,7 +3,7 @@ import { memo } from "react";
 /**
  * The rubber-band rectangle drawn while box-selecting cards.
  *
- * Extracted from CanvasView (R2 batch B2) — see docs/CANVAS_SPLIT_DESIGN.md.
+ * Extracted from CanvasView (R2 batch B2).
  * The box is stored in canvas coordinates, so it is converted to screen space
  * with the viewport transform here rather than keeping a second, screen-space
  * copy in the parent.

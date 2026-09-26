@@ -20,7 +20,7 @@
 | 研发团队 | KnowSpace Lab · 摸鱼Lab |
 
 > [!IMPORTANT]
-> 本手册所有功能描述均以 **v2.6.5 实际实现** 为准。项目中早期的 `USER_MANUAL.md` / `操作手册.md` 与根 `README.md` 中部分条目（例如 `F10` 专注模式、`Ctrl+Shift+C` 白板快捷键、`Inbox/` 归档目录、`Ctrl+G` 打包分组容器、版本快照存放于 `.knowspace/snapshots/`）属于历史版本口径，请以本手册与下表「口径校正」为准。
+> 本手册所有功能描述均以 **v2.6.5 实际实现** 为准。项目中早期的 `操作手册.md`（已于 2026-09-26 删除，可从 git 历史取）与根 `README.md` 中部分条目（例如 `F10` 专注模式、`Ctrl+Shift+C` 白板快捷键、`Inbox/` 归档目录、`Ctrl+G` 打包分组容器、版本快照存放于 `.knowspace/snapshots/`）属于历史版本口径，请以本手册与下表「口径校正」为准。
 
 ---
 

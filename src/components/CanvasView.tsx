@@ -14,7 +14,7 @@ import {
 } from "../services/slashCommands";
 import { wheelBelongsToInnerScroller } from "../services/wheelScrollGuard";
 import { MediaLightbox, type LightboxMedia } from "./MediaLightbox";
-// Extracted during the R2 split (docs/CANVAS_SPLIT_DESIGN.md, batch B2).
+// Extracted during the R2 split (batch B2).
 import { CanvasToast } from "./canvas/CanvasToast";
 import { CanvasCardSuggestMenu, type CanvasCardSuggestItem } from "./canvas/CanvasCardSuggestMenu";
 import { MarqueeSelectionBox } from "./canvas/MarqueeSelectionBox";

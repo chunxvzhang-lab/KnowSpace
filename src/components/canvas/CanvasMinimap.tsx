@@ -6,7 +6,7 @@ import { getNodePalette } from "./canvasPalette";
 /**
  * Bottom-right radar map with a live viewport camera box.
  *
- * Extracted from CanvasView (R2 batch B2) — see docs/CANVAS_SPLIT_DESIGN.md.
+ * Extracted from CanvasView (R2 batch B2).
  * Clicking recentres the board; the parent owns the viewport, so that is
  * reported through `onNavigate` rather than mutating state in here.
  */

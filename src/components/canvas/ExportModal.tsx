@@ -10,7 +10,7 @@ export type CanvasExportBackground = "theme" | "white" | "transparent";
 /**
  * Export-as-image dialog.
  *
- * Extracted from CanvasView (R2 batch B2) — see docs/CANVAS_SPLIT_DESIGN.md.
+ * Extracted from CanvasView (R2 batch B2).
  * The parent keeps the selected format/background so the dialog remembers the
  * previous choice, and performs the export; this only renders and reports.
  */

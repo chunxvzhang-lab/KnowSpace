@@ -9,7 +9,7 @@ export type SpawnDirection = "right" | "bottom";
 /**
  * One-to-many branch spawn dialog.
  *
- * Extracted from CanvasView (R2 batch B2) — see docs/CANVAS_SPLIT_DESIGN.md.
+ * Extracted from CanvasView (R2 batch B2).
  * The parent holds count and direction, so the dialog reopens on the previous
  * values exactly as it did before the split.
  */

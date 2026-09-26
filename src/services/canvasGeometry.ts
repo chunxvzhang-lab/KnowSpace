@@ -3,7 +3,7 @@
  *
  * Pure computation — no DOM access — so this module runs (and is testable) in a
  * plain Node environment. Extracted from canvasService during the R2 split; see
- * docs/CANVAS_SPLIT_DESIGN.md. Code is byte-identical to the original.
+ * the R2 canvas split. Code is byte-identical to the original.
  */
 
 import type { CanvasNode, CanvasNodeSide } from "../types/canvasTypes";

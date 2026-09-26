@@ -7,7 +7,7 @@ import { modalContentStyle, modalOverlayStyle, toolBtnStyle } from "./canvasModa
 /**
  * "Extract the board into a long-form note" dialog.
  *
- * Extracted from CanvasView (R2 batch B2) — see docs/CANVAS_SPLIT_DESIGN.md.
+ * Extracted from CanvasView (R2 batch B2).
  * The caller owns the extracted text and the copy/save actions; this renders
  * the preview and reports clicks.
  */

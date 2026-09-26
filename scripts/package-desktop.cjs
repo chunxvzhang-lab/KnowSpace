@@ -17,16 +17,16 @@ const appVersion = require("../package.json").version || "1.5.0";
 
 // 便携目录里 docs/ 该有的顶层条目（第 4 步复制的那几份 + 它自己写的 README.txt）。
 // 第 3 步据此清掉上一届留下、这一届不再生成的文档。**加了新的发布文档，这里要一起加**；
-// 反过来，不再分发的文档（如停在 v2.3.0 的 操作手册.md）要一起删，否则它会被当成
-// "这一届该有的"而留下来。
+// 反过来，不再分发的文档要一起删，否则它会被当成"这一届该有的"而留下来。
+//
+// 现在只有两份手册、图片、许可证与 manual-images。2026-09-26 把规划与路线图类文档
+// （推广方案、两份 roadmap）从这个白名单里去掉，同时从仓库删除了源文件 —— 它们不是
+// 给用户看的，而且基线都停在旧版本。
 const PORTABLE_DOC_ENTRIES = [
   "LICENSE",
   "USER_MANUAL.md",
   "PICTURE_MANUAL.md",
   "全功能高清图片手册.md",
-  "PROMOTIONAL_WEBSITE_PLAN.md",
-  "knowspace-roadmap-v2.0-v3.0.md",
-  "knowspace-roadmap-v1.9-v2.5.md",
   "README.txt",
   "manual-images",
 ];
@@ -181,23 +181,15 @@ async function main() {
   try {
     await fs.copyFile(path.join(root, "docs", "USER_MANUAL.md"), path.join(appDocsDir, "USER_MANUAL.md"));
   } catch (e) {}
-  // `docs/操作手册.md` 不进发布包：它停在 v2.3.0（正文还残留 v2.1.0），而 USER_MANUAL.md 是
-  // 跟着版本走的。两份手册并列摆给用户，用户会读到过时的那份。源文件留在仓库里（还有参考
-  // 价值），只是不再随包分发；要恢复分发，先把它同步到当前版本，并加回 PORTABLE_DOC_ENTRIES。
+  // 规划与路线图类文档不再随包分发，也不再留在仓库里：`docs/` 只保留跟着版本走的
+  // 用户手册与工程规范。2026-09-26 一次性清掉了二十余份实施计划、路线图、推广方案与
+  // 一次性校验报告 —— 它们的基线都停在某个旧版本，留着只会让读者读到过时的口径。
+  // 需要历史版本时从 git 历史里取，不要再把它们放回这个白名单。
   try {
     await fs.copyFile(path.join(root, "docs", "PICTURE_MANUAL.md"), path.join(appDocsDir, "PICTURE_MANUAL.md"));
   } catch (e) {}
   try {
     await fs.copyFile(path.join(root, "docs", "全功能高清图片手册.md"), path.join(appDocsDir, "全功能高清图片手册.md"));
-  } catch (e) {}
-  try {
-    await fs.copyFile(path.join(root, "docs", "PROMOTIONAL_WEBSITE_PLAN.md"), path.join(appDocsDir, "PROMOTIONAL_WEBSITE_PLAN.md"));
-  } catch (e) {}
-  try {
-    await fs.copyFile(path.join(root, "docs", "knowspace-roadmap-v2.0-v3.0.md"), path.join(appDocsDir, "knowspace-roadmap-v2.0-v3.0.md"));
-  } catch (e) {}
-  try {
-    await fs.copyFile(path.join(root, "docs", "knowspace-roadmap-v1.9-v2.5.md"), path.join(appDocsDir, "knowspace-roadmap-v1.9-v2.5.md"));
   } catch (e) {}
   try {
     await copyDirectory(path.join(root, "docs", "manual-images"), path.join(appDocsDir, "manual-images"));

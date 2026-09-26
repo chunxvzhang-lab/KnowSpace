@@ -7,7 +7,7 @@ import { modalContentStyle, modalOverlayStyle } from "./canvasModalStyles";
 /**
  * Picker for pulling a vault note onto the board as a file card.
  *
- * Extracted from CanvasView (R2 batch B2) — see docs/CANVAS_SPLIT_DESIGN.md.
+ * Extracted from CanvasView (R2 batch B2).
  * Filtering is local to the search box; the parent keeps ownership of the
  * keyword so the modal reopens with the previous query intact.
  */

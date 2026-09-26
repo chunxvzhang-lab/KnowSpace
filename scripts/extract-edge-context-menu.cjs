@@ -33,7 +33,7 @@ type CanvasThemeColors = ReturnType<typeof getCanvasThemeColors>;
 /**
  * Right-click menu for one or more selected connectors.
  *
- * Extracted from CanvasView (R2 batch B3) — see docs/CANVAS_SPLIT_DESIGN.md.
+ * Extracted from CanvasView (R2 batch B3).
  *
  * This is the largest branch of the context menu. It renders two variants: a
  * batch panel when several edges are selected, and a single-edge panel

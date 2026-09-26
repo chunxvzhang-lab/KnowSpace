@@ -6,7 +6,7 @@
  * `services/canvas*` and is imported by every layer above it. Keeping it free of
  * DOM access means it can be exercised directly in tests.
  *
- * Part of the canvasService split (see docs/CANVAS_SPLIT_DESIGN.md). Code here
+ * Part of the canvasService split (R2 canvas split). Code here
  * was moved verbatim; behaviour is unchanged.
  */
 
