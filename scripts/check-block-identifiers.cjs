@@ -21,7 +21,9 @@ function main() {
   const end = Number(endArg);
 
   if (!start || !end || names.length === 0) {
-    console.error("Usage: node scripts/check-block-identifiers.cjs <startLine> <endLine> <name...>");
+    console.error(
+      "Usage: node scripts/check-block-identifiers.cjs <startLine> <endLine> <name...>",
+    );
     process.exit(1);
   }
 

@@ -76,12 +76,12 @@ export function createDesktopMock() {
     readMarkdownFile: vi
       .fn()
       .mockImplementation((absolutePath: string) =>
-        Promise.resolve(sampleSource(`# loaded ${absolutePath}`, absolutePath))
+        Promise.resolve(sampleSource(`# loaded ${absolutePath}`, absolutePath)),
       ),
     readMarkdownBatch: vi
       .fn()
       .mockImplementation((paths: string[]) =>
-        Promise.resolve(paths.map((p) => sampleSource(`# batch ${p}`, p)))
+        Promise.resolve(paths.map((p) => sampleSource(`# batch ${p}`, p))),
       ),
     // A folder to revise from: cancelled by default, so a test that does not care
     // about it sees the same thing as a reader who closed the dialog.
@@ -99,7 +99,7 @@ export function createDesktopMock() {
           baseUrl: `file:///${request.absolutePath}/`,
           cacheKey: request.absolutePath,
           diskVersion: { size: request.content.length, mtimeMs: 2 },
-        })
+        }),
       ),
     renameMarkdownFile: vi.fn().mockResolvedValue({ success: true }),
 

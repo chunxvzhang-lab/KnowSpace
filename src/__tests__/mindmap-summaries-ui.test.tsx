@@ -3,7 +3,12 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { MindmapView } from "../components/MindmapView";
 import { parseMarkdownToMindmapTree } from "../services/mindmapService";
 import type { MindmapNode } from "../core/types";
-import { addSummary, emptySidecar, parseSidecar, serializeSidecar } from "../services/mindmapSidecar";
+import {
+  addSummary,
+  emptySidecar,
+  parseSidecar,
+  serializeSidecar,
+} from "../services/mindmapSidecar";
 import { buildStandaloneMindmapSvg } from "../services/mindmapSvgExport";
 import { layoutMindmap } from "../services/mindmapLayout";
 
@@ -116,7 +121,7 @@ describe("概要", () => {
     const { sidecar } = addSummary(
       emptySidecar(),
       [nodeIdOf("子节点甲"), nodeIdOf("子节点乙")],
-      "两种走法"
+      "两种走法",
     );
     api.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
@@ -139,7 +144,7 @@ describe("概要", () => {
     const { sidecar } = addSummary(
       emptySidecar(),
       [nodeIdOf("子节点甲"), nodeIdOf("子节点乙")],
-      "原名"
+      "原名",
     );
     api.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
@@ -168,7 +173,7 @@ describe("概要", () => {
     const { sidecar } = addSummary(
       emptySidecar(),
       [nodeIdOf("子节点甲"), nodeIdOf("子节点乙")],
-      "要删掉的"
+      "要删掉的",
     );
     api.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
@@ -205,7 +210,7 @@ describe("概要", () => {
     const { sidecar } = addSummary(
       emptySidecar(),
       [nodeIdOf("子节点甲"), nodeIdOf("子节点乙")],
-      "两种走法"
+      "两种走法",
     );
     api.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
@@ -225,7 +230,7 @@ describe("概要", () => {
 
     const built = buildStandaloneMindmapSvg(
       document.querySelector(".mindmap-svg-canvas") as SVGSVGElement,
-      { bounds: layoutMindmap(parseMarkdownToMindmapTree(SOURCE, "测试")).bounds, dark: true }
+      { bounds: layoutMindmap(parseMarkdownToMindmapTree(SOURCE, "测试")).bounds, dark: true },
     )!;
     const doc = new DOMParser().parseFromString(built.svg, "image/svg+xml");
 

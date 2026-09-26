@@ -119,7 +119,7 @@ describe("思维导图主题", () => {
       const appearance = resolveNodeAppearance(
         { shape: "capsule", fontSize: 22, fontWeight: "bold" },
         theme,
-        false
+        false,
       );
 
       expect(appearance.shape).toBe("capsule");
@@ -151,7 +151,11 @@ describe("思维导图主题", () => {
     });
 
     it("根节点自身设置的样式仍然优先", () => {
-      const appearance = resolveNodeAppearance({ fill: undefined, color: "#00ff00" } as never, theme, true);
+      const appearance = resolveNodeAppearance(
+        { fill: undefined, color: "#00ff00" } as never,
+        theme,
+        true,
+      );
 
       expect(appearance.fill).toBe("#00ff00");
     });

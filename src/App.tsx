@@ -24,7 +24,15 @@ import { TabBar } from "./components/TabBar";
 import { TocPanel } from "./components/TocPanel";
 import { Toolbar } from "./components/Toolbar";
 import type { CommandAction } from "./components/CommandPalette";
-import type { BookManifest, Bookmark, ChapterSource, RenderedChapter, SearchResult, SidebarTab, ThemeMode } from "./core/types";
+import type {
+  BookManifest,
+  Bookmark,
+  ChapterSource,
+  RenderedChapter,
+  SearchResult,
+  SidebarTab,
+  ThemeMode,
+} from "./core/types";
 import { EditorView } from "@codemirror/view";
 import { useColumnResize } from "./hooks/useColumnResize";
 import { useDocumentCreation } from "./hooks/useDocumentCreation";
@@ -51,11 +59,7 @@ import {
   sidecarIsEmpty,
 } from "./services/mindmapSidecar";
 
-import {
-  loadPreferences,
-  loadReadingPosition,
-  saveReadingPosition,
-} from "./services/storage";
+import { loadPreferences, loadReadingPosition, saveReadingPosition } from "./services/storage";
 import { useUiStore } from "./store/useUiStore";
 import {
   useTabStore,
@@ -82,7 +86,12 @@ export function App() {
   const readerRef = useRef<HTMLElement | null>(null);
   const editorViewRef = useRef<EditorView | null>(null);
   const pendingBookmarkRef = useRef<Bookmark | null>(null);
-  const pendingNavigationRef = useRef<{ headingId?: string; lineNumber?: number; highlight?: boolean; searchResult?: SearchResult } | null>(null);
+  const pendingNavigationRef = useRef<{
+    headingId?: string;
+    lineNumber?: number;
+    highlight?: boolean;
+    searchResult?: SearchResult;
+  } | null>(null);
   const activeHeadingRef = useRef<string | undefined>(undefined);
   const preferencesRef = useRef(loadPreferences());
   const scrollRatioRef = useRef(0);
@@ -137,7 +146,9 @@ export function App() {
   tabsRef.current = tabs;
   // The comparison pane's rendered content stays here: it is a view artefact
   // produced by loading a second document, not part of what tabs are.
-  const [secondaryRenderedChapter, setSecondaryRenderedChapter] = useState<RenderedChapter | null>(null);
+  const [secondaryRenderedChapter, setSecondaryRenderedChapter] = useState<RenderedChapter | null>(
+    null,
+  );
   const secondaryReaderRef = useRef<HTMLElement | null>(null);
   const isDualSplitMode = Boolean(dualSplitTabId && tabs.some((t) => t.id === dualSplitTabId));
 
@@ -218,7 +229,7 @@ export function App() {
       setReviewFocus(active);
       if (active) setDirectoryOpen(false);
     },
-    [setReviewFocus, setDirectoryOpen]
+    [setReviewFocus, setDirectoryOpen],
   );
 
   // Pane widths and the "a divider is being dragged" flag come from the store,
@@ -256,7 +267,7 @@ export function App() {
   // second render pass to settle the tab bar.
   const tabsForDisplay = useMemo(
     () => tabsWithDirtyFlags(tabs, chapterId, isDirty),
-    [tabs, chapterId, isDirty]
+    [tabs, chapterId, isDirty],
   );
 
   /**
@@ -336,83 +347,76 @@ export function App() {
   // The five names the rest of the file uses come back out of the hook: the
   // bookmark jump calls jumpToHeading and jumpToRatio, three effects call them,
   // and SearchPanel takes searchResults and handleSearchJump as props.
-  const {
-    searchResults,
-    jumpToHeading,
-    jumpToRatio,
-    clearSearchHighlights,
-    handleSearchJump,
-  } = useSearch({
-    renderedChapter,
-    session,
-    viewMode,
-    editorViewRef,
-    readerRef,
-    selectChapterRef,
-    setActiveHeadingId,
-    navLockUntilRef,
-    pendingNavigationRef,
-  });
+  const { searchResults, jumpToHeading, jumpToRatio, clearSearchHighlights, handleSearchJump } =
+    useSearch({
+      renderedChapter,
+      session,
+      viewMode,
+      editorViewRef,
+      readerRef,
+      selectChapterRef,
+      setActiveHeadingId,
+      navLockUntilRef,
+      pendingNavigationRef,
+    });
 
-  const executeAction = useCallback(
-    async (action: PendingAction) => {
-      switch (action.type) {
-        case "select-chapter": {
-          setChapterId(action.chapterId);
-          setSearchQuery("");
-          const targetChap = manifestRef.current?.chapters.find((c) => c.id === action.chapterId);
-          const targetTab = tabsRef.current?.find((t) => t.id === action.chapterId);
-          const targetSrc = targetChap?.src || targetTab?.relativePath || targetChap?.title || targetTab?.title || "";
-          const isTargetCanvas = targetSrc.toLowerCase().endsWith(".canvas");
-          if (isTargetCanvas) {
-            setViewMode("canvas");
-            setDirectoryOpen(false);
-            setSidebarOpen(false);
-          } else {
-            setSidebarTab("toc");
-          }
-          if (targetChap) {
-            setTabs((prev) => tabsWithNewDocument(prev, targetChap, targetChap.absolutePath));
-          }
-          break;
+  const executeAction = useCallback(async (action: PendingAction) => {
+    switch (action.type) {
+      case "select-chapter": {
+        setChapterId(action.chapterId);
+        setSearchQuery("");
+        const targetChap = manifestRef.current?.chapters.find((c) => c.id === action.chapterId);
+        const targetTab = tabsRef.current?.find((t) => t.id === action.chapterId);
+        const targetSrc =
+          targetChap?.src || targetTab?.relativePath || targetChap?.title || targetTab?.title || "";
+        const isTargetCanvas = targetSrc.toLowerCase().endsWith(".canvas");
+        if (isTargetCanvas) {
+          setViewMode("canvas");
+          setDirectoryOpen(false);
+          setSidebarOpen(false);
+        } else {
+          setSidebarTab("toc");
         }
-        case "open-file": {
-          await doOpenMarkdownFile(action.file);
-          break;
+        if (targetChap) {
+          setTabs((prev) => tabsWithNewDocument(prev, targetChap, targetChap.absolutePath));
         }
-        case "open-desktop-file": {
-          await doOpenDesktopMarkdownPath(action.absolutePath, action.preloadedSource);
-          break;
-        }
-        case "open-directory": {
-          await doOpenMarkdownDirectory();
-          break;
-        }
-        case "new-file": {
-          await doCreateNewFile();
-          break;
-        }
-        case "new-mindmap": {
-          await doCreateNewMindmap();
-          break;
-        }
-        case "new-canvas": {
-          await doCreateNewCanvas();
-          break;
-        }
-        case "close-window": {
-          if (window.bookMDDesktop?.resolveBeforeClose) {
-            window.bookMDDesktop.resolveBeforeClose({
-              requestId: action.requestId,
-              action: "proceed",
-            });
-          }
-          break;
-        }
+        break;
       }
-    },
-    []
-  );
+      case "open-file": {
+        await doOpenMarkdownFile(action.file);
+        break;
+      }
+      case "open-desktop-file": {
+        await doOpenDesktopMarkdownPath(action.absolutePath, action.preloadedSource);
+        break;
+      }
+      case "open-directory": {
+        await doOpenMarkdownDirectory();
+        break;
+      }
+      case "new-file": {
+        await doCreateNewFile();
+        break;
+      }
+      case "new-mindmap": {
+        await doCreateNewMindmap();
+        break;
+      }
+      case "new-canvas": {
+        await doCreateNewCanvas();
+        break;
+      }
+      case "close-window": {
+        if (window.bookMDDesktop?.resolveBeforeClose) {
+          window.bookMDDesktop.resolveBeforeClose({
+            requestId: action.requestId,
+            action: "proceed",
+          });
+        }
+        break;
+      }
+    }
+  }, []);
 
   // Unsaved guard interceptor
   const guardAction = useCallback(
@@ -424,7 +428,7 @@ export function App() {
         executeAction(action);
       }
     },
-    [isDirty, executeAction]
+    [isDirty, executeAction],
   );
 
   const handleDialogSave = useCallback(async () => {
@@ -466,7 +470,8 @@ export function App() {
     (nextChapterId: string) => {
       const targetChap = manifestRef.current?.chapters.find((c) => c.id === nextChapterId);
       const targetTab = tabsRef.current?.find((t) => t.id === nextChapterId);
-      const targetSrc = targetChap?.src || targetTab?.relativePath || targetChap?.title || targetTab?.title || "";
+      const targetSrc =
+        targetChap?.src || targetTab?.relativePath || targetChap?.title || targetTab?.title || "";
       const isCanvas = targetSrc.toLowerCase().endsWith(".canvas");
       if (isCanvas) {
         setDirectoryOpen(false);
@@ -476,7 +481,7 @@ export function App() {
       if (nextChapterId === chapterId) return;
       guardAction({ type: "select-chapter", chapterId: nextChapterId });
     },
-    [chapterId, guardAction]
+    [chapterId, guardAction],
   );
   selectChapterRef.current = selectChapter;
 
@@ -508,7 +513,7 @@ export function App() {
       setDualSplitTabId(tabId);
       setNotice("已开启双文档分屏对比模式（按 Esc 或点击右上角退出）。");
     },
-    [chapterId, tabs.length]
+    [chapterId, tabs.length],
   );
 
   const handleCloseDualSplit = useCallback(() => {
@@ -535,7 +540,7 @@ export function App() {
         selectChapter(nextActiveId);
       }
     },
-    [tabs, chapterId, dualSplitTabId, selectChapter, closeSession, setChapterId, setDualSplitTabId]
+    [tabs, chapterId, dualSplitTabId, selectChapter, closeSession, setChapterId, setDualSplitTabId],
   );
 
   const handleDetachTab = useCallback(
@@ -563,7 +568,7 @@ export function App() {
         }
       }
     },
-    [handleCloseTab, manifest?.chapters, tabs]
+    [handleCloseTab, manifest?.chapters, tabs],
   );
 
   const handleCloseOtherTabs = useCallback(
@@ -576,7 +581,7 @@ export function App() {
         selectChapter(tabId);
       }
     },
-    [chapterId, dualSplitTabId, selectChapter]
+    [chapterId, dualSplitTabId, selectChapter],
   );
 
   const handleCloseRightTabs = useCallback(
@@ -598,7 +603,7 @@ export function App() {
         selectChapter(tabId);
       }
     },
-    [tabs, chapterId, dualSplitTabId, selectChapter, setDualSplitTabId]
+    [tabs, chapterId, dualSplitTabId, selectChapter, setDualSplitTabId],
   );
 
   // The store persists the flag when it changes, so this callback does not.
@@ -624,7 +629,7 @@ export function App() {
     (file: File) => {
       guardAction({ type: "open-file", file });
     },
-    [guardAction]
+    [guardAction],
   );
 
   const openDesktopMarkdownPath = useCallback(
@@ -634,7 +639,7 @@ export function App() {
       }
       guardAction({ type: "open-desktop-file", absolutePath, preloadedSource });
     },
-    [session?.absolutePath, guardAction]
+    [session?.absolutePath, guardAction],
   );
 
   const openMarkdownDirectory = useCallback(() => {
@@ -741,7 +746,7 @@ export function App() {
         return null;
       }
     },
-    [manifest, openSession]
+    [manifest, openSession],
   );
 
   const handleCreateCanvasExtractNote = useCallback(
@@ -759,7 +764,7 @@ export function App() {
         failureNotice: "生成萃取专著失败：{message}",
       });
     },
-    [createDocumentFromContent]
+    [createDocumentFromContent],
   );
 
   /**
@@ -822,7 +827,7 @@ export function App() {
     // ids are the ones the map will use when it opens the file.
     const sidecar = applyImportedAnnotations(
       emptySidecar(),
-      annotationsForDocument(plan.outline, created.markdown, created.title)
+      annotationsForDocument(plan.outline, created.markdown, created.title),
     );
     if (sidecarIsEmpty(sidecar)) return;
 
@@ -990,8 +995,8 @@ export function App() {
       targetAbsPath && window.bookMDDesktop
         ? window.bookMDDesktop.readMarkdownFile(targetAbsPath)
         : manifest
-        ? loadPackagedChapterMarkdown(manifest, chapterId)
-        : Promise.reject(new Error("无法加载章节内容。"));
+          ? loadPackagedChapterMarkdown(manifest, chapterId)
+          : Promise.reject(new Error("无法加载章节内容。"));
 
     loadPromise
       .then((source) => {
@@ -1051,7 +1056,7 @@ export function App() {
 
     const neighbours = [manifest.chapters[index + 1], manifest.chapters[index - 1]].filter(
       (chapter): chapter is (typeof manifest.chapters)[number] =>
-        Boolean(chapter?.absolutePath) && !chapter.src.toLowerCase().endsWith(".canvas")
+        Boolean(chapter?.absolutePath) && !chapter.src.toLowerCase().endsWith(".canvas"),
     );
     if (neighbours.length === 0) return;
 
@@ -1080,7 +1085,7 @@ export function App() {
               sourceLength: source.markdown.length,
               diskVersion: source.diskVersion ?? null,
             }),
-            rendered
+            rendered,
           );
         } catch {
           // A neighbour that cannot be read is not a problem: it is a
@@ -1191,7 +1196,11 @@ export function App() {
     const pending = pendingBookmarkRef.current;
     if (pending) {
       pendingBookmarkRef.current = null;
-      const resolution = resolveBookmark(pending, renderedChapter.headings, renderedChapter.checksum);
+      const resolution = resolveBookmark(
+        pending,
+        renderedChapter.headings,
+        renderedChapter.checksum,
+      );
       if (resolution.message) setNotice(resolution.message);
       requestAnimationFrame(() => {
         if (resolution.targetHeadingId) {
@@ -1206,7 +1215,10 @@ export function App() {
     const saved = loadReadingPosition(manifest.id, manifest.chapters);
     if (saved?.chapterId === chapterId) {
       requestAnimationFrame(() => {
-        if (saved.headingId && renderedChapter.headings.some((heading) => heading.id === saved.headingId)) {
+        if (
+          saved.headingId &&
+          renderedChapter.headings.some((heading) => heading.id === saved.headingId)
+        ) {
           jumpToHeading(saved.headingId, "auto", false);
         } else {
           jumpToRatio(saved.scrollRatio);
@@ -1289,7 +1301,8 @@ export function App() {
         // ignore
       }
     }
-    const desktop = typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
+    const desktop =
+      typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
     const title = activeChapter?.title || session?.fileName || "KnowSpace_文档";
     if (desktop?.printToPdf) {
       try {
@@ -1305,7 +1318,8 @@ export function App() {
   const handleExtractSelectionToNote = useCallback(
     async (selectedText: string, suggestedTitle: string) => {
       if (!session) return;
-      const desktop = typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
+      const desktop =
+        typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
       const cleanTitle = suggestedTitle.replace(/[\\/:*?"<>|]/g, "").trim() || "未命名笔记";
 
       if (desktop?.createMarkdownFile && session.absolutePath) {
@@ -1342,11 +1356,12 @@ export function App() {
         });
       }
     },
-    [manifest?.rootPath, session]
+    [manifest?.rootPath, session],
   );
 
   const handleSendSelectionToFlash = useCallback(async (text: string) => {
-    const desktop = typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
+    const desktop =
+      typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
     if (desktop?.saveFlashNote && text.trim()) {
       try {
         await desktop.saveFlashNote({
@@ -1559,7 +1574,7 @@ export function App() {
       openMarkdownDirectory,
       toggleFullscreen,
       toggleTypewriterMode,
-    ]
+    ],
   );
 
   // Global keybindings
@@ -1601,29 +1616,36 @@ export function App() {
     return () => clearTimeout(timer);
   }, [notice]);
 
-  const handleSelectSidebarTab = useCallback((tab: SidebarTab) => {
-    if (sidebarOpen && sidebarTab === tab) {
-      setSidebarOpen(false);
-    } else {
-      setSidebarTab(tab);
-      setSidebarOpen(true);
-    }
-  }, [sidebarOpen, sidebarTab]);
+  const handleSelectSidebarTab = useCallback(
+    (tab: SidebarTab) => {
+      if (sidebarOpen && sidebarTab === tab) {
+        setSidebarOpen(false);
+      } else {
+        setSidebarTab(tab);
+        setSidebarOpen(true);
+      }
+    },
+    [sidebarOpen, sidebarTab],
+  );
 
-  const handleMergeFlashNote = useCallback((content: string, fileName: string) => {
-    const formatted = `\n\n> 📥 来自闪念 [${fileName}]\n\n${content.trim()}\n\n`;
-    if (editorViewRef.current) {
-      const view = editorViewRef.current;
-      const selection = view.state.selection.main;
-      const insertPos = selection.empty && selection.from > 0 ? selection.from : view.state.doc.length;
-      view.dispatch({
-        changes: { from: insertPos, to: insertPos, insert: formatted },
-        selection: { anchor: insertPos + formatted.length },
-      });
-    } else if (session) {
-      updateSource(session.source + formatted);
-    }
-  }, [session, updateSource]);
+  const handleMergeFlashNote = useCallback(
+    (content: string, fileName: string) => {
+      const formatted = `\n\n> 📥 来自闪念 [${fileName}]\n\n${content.trim()}\n\n`;
+      if (editorViewRef.current) {
+        const view = editorViewRef.current;
+        const selection = view.state.selection.main;
+        const insertPos =
+          selection.empty && selection.from > 0 ? selection.from : view.state.doc.length;
+        view.dispatch({
+          changes: { from: insertPos, to: insertPos, insert: formatted },
+          selection: { anchor: insertPos + formatted.length },
+        });
+      } else if (session) {
+        updateSource(session.source + formatted);
+      }
+    },
+    [session, updateSource],
+  );
 
   const wikiLinkTargets = useMemo(() => {
     const list: WikiLinkTarget[] = [];
@@ -1648,7 +1670,11 @@ export function App() {
       if (!cleanTarget) {
         if (anchorPart) {
           jumpToHeading(anchorPart.trim(), "smooth", true);
-          setNotice(anchorPart.startsWith("^") ? "已跳转至指定段落引用" : `已跳转至章节锚点：#${anchorPart.trim()}`);
+          setNotice(
+            anchorPart.startsWith("^")
+              ? "已跳转至指定段落引用"
+              : `已跳转至章节锚点：#${anchorPart.trim()}`,
+          );
         }
         return;
       }
@@ -1676,7 +1702,11 @@ export function App() {
             }
             selectChapter(found.id);
           }
-          const anchorLabel = anchorPart ? (anchorPart.startsWith("^") ? " (段落引用)" : ` #${anchorPart}`) : "";
+          const anchorLabel = anchorPart
+            ? anchorPart.startsWith("^")
+              ? " (段落引用)"
+              : ` #${anchorPart}`
+            : "";
           setNotice(`已跳转至双链文档：${found.title}${anchorLabel}`);
           return;
         }
@@ -1708,7 +1738,7 @@ export function App() {
       const rootPath = manifest?.rootPath;
       if (rootPath && desktop?.createMarkdownFile) {
         const confirmCreate = window.confirm(
-          `双链文档「${cleanTarget}」尚未创建。\n\n是否立即在当前知识库新建「${cleanTarget}.md」？`
+          `双链文档「${cleanTarget}」尚未创建。\n\n是否立即在当前知识库新建「${cleanTarget}.md」？`,
         );
         if (confirmCreate) {
           try {
@@ -1738,7 +1768,7 @@ export function App() {
         setNotice(`未找到匹配的双链目标「${cleanTarget}」`);
       }
     },
-    [manifest, selectChapter, jumpToHeading]
+    [manifest, selectChapter, jumpToHeading],
   );
 
   // Backlink Index & Mentions
@@ -1792,9 +1822,9 @@ export function App() {
         const uniqueDocCount = new Set(linkedRefs.map((r) => r.sourceId)).size;
         shouldRefactor = window.confirm(
           `检测到知识库中有 ${uniqueDocCount} 篇笔记包含共 ${linkedRefs.length} 处双向引用「[[${oldTitle}]]」。\n\n` +
-          `是否自动将所有引用重构更新为「[[${newTitle}]]」？\n\n` +
-          `· 点击【确定】：重命名文件并批量自动重构所有双向链接（防断链）\n` +
-          `· 点击【取消】：仅重命名文件，保留原有引用文本`
+            `是否自动将所有引用重构更新为「[[${newTitle}]]」？\n\n` +
+            `· 点击【确定】：重命名文件并批量自动重构所有双向链接（防断链）\n` +
+            `· 点击【取消】：仅重命名文件，保留原有引用文本`,
         );
       }
 
@@ -1816,7 +1846,11 @@ export function App() {
         for (const sourceId of affectedSourceIds) {
           // If it's the currently open session
           if (session && session.chapterId === sourceId) {
-            const { newContent, changedCount } = refactorWikiLinksInContent(session.source, oldTitle, newTitle);
+            const { newContent, changedCount } = refactorWikiLinksInContent(
+              session.source,
+              oldTitle,
+              newTitle,
+            );
             if (changedCount > 0) {
               updateSource(newContent);
               refactoredTotal += changedCount;
@@ -1830,13 +1864,23 @@ export function App() {
             try {
               const fileRes = await desktop.readMarkdownFile(otherCh.absolutePath);
               if (fileRes?.markdown) {
-                const { newContent, changedCount } = refactorWikiLinksInContent(fileRes.markdown, oldTitle, newTitle);
+                const { newContent, changedCount } = refactorWikiLinksInContent(
+                  fileRes.markdown,
+                  oldTitle,
+                  newTitle,
+                );
                 if (changedCount > 0) {
                   await desktop.saveMarkdownFile({
                     absolutePath: otherCh.absolutePath,
                     content: newContent,
                   });
-                  updateDocumentInIndex(backlinkIndex, otherCh.id, otherCh.title, newContent, otherCh.src);
+                  updateDocumentInIndex(
+                    backlinkIndex,
+                    otherCh.id,
+                    otherCh.title,
+                    newContent,
+                    otherCh.src,
+                  );
                   refactoredTotal += changedCount;
                 }
               }
@@ -1867,11 +1911,16 @@ export function App() {
             };
           }
           return t;
-        })
+        }),
       );
 
       // 6. Update active session if the renamed chapter is currently open
-      if (session && session.chapterId === chapter.id && renameRes.newPath && desktop.readMarkdownFile) {
+      if (
+        session &&
+        session.chapterId === chapter.id &&
+        renameRes.newPath &&
+        desktop.readMarkdownFile
+      ) {
         try {
           const nextSource = await desktop.readMarkdownFile(renameRes.newPath);
           openSession({
@@ -1889,13 +1938,15 @@ export function App() {
       }
 
       setNotice(
-        `已成功重命名为「${newTitle}」${refactoredTotal > 0 ? `，并同步更新了 ${refactoredTotal} 处双链引用` : ""}`
+        `已成功重命名为「${newTitle}」${refactoredTotal > 0 ? `，并同步更新了 ${refactoredTotal} 处双链引用` : ""}`,
       );
     },
-    [session, manifest, backlinkIndex, updateSource, openSession]
+    [session, manifest, backlinkIndex, updateSource, openSession],
   );
 
-  const isCanvasActive = Boolean((viewMode === "canvas" || session?.fileName?.toLowerCase().endsWith(".canvas")) && session);
+  const isCanvasActive = Boolean(
+    (viewMode === "canvas" || session?.fileName?.toLowerCase().endsWith(".canvas")) && session,
+  );
   const isCanvasFullscreen = isCanvasActive && isFullscreen;
 
   return (
@@ -1935,7 +1986,9 @@ export function App() {
             viewMode={viewMode}
             onViewModeChange={setViewMode}
             canGoPrevious={activeIndex > 0}
-            canGoNext={Boolean(manifest && activeIndex >= 0 && activeIndex < manifest.chapters.length - 1)}
+            canGoNext={Boolean(
+              manifest && activeIndex >= 0 && activeIndex < manifest.chapters.length - 1,
+            )}
             sidebarOpen={sidebarOpen}
             directoryOpen={directoryOpen}
             theme={preferences.theme}
@@ -1970,391 +2023,430 @@ export function App() {
           />
         )}
 
-      <div className="workspace">
-        {!isDualSplitMode && !isCanvasFullscreen && directoryOpen ? (
-          manifest ? (
-            <div style={{ width: directoryWidth, flex: `0 0 ${directoryWidth}px` }} className="chapter-list-container">
-              <ChapterList
-                manifest={manifest}
-                activeChapterId={chapterId}
-                isDirty={isDirty}
-                onSelectChapter={selectChapter}
-                onRenameChapter={handleRenameChapter}
-                onNewMindmap={window.bookMDDesktop ? createNewMindmap : undefined}
-                onNewCanvas={window.bookMDDesktop ? createNewCanvas : undefined}
-                onImportOutline={window.bookMDDesktop?.pickOutlineFile ? handleImportOutline : undefined}
-              />
-            </div>
-          ) : (
-            <aside className="chapter-list empty-library" style={{ width: directoryWidth, flex: `0 0 ${directoryWidth}px` }} aria-label="文档目录">
-              <div className="tree-heading">DOCUMENT</div>
-              <p>打开一个 Markdown 文件，新建文件，或在桌面版中打开文件目录。</p>
-            </aside>
-          )
-        ) : null}
+        <div className="workspace">
+          {!isDualSplitMode && !isCanvasFullscreen && directoryOpen ? (
+            manifest ? (
+              <div
+                style={{ width: directoryWidth, flex: `0 0 ${directoryWidth}px` }}
+                className="chapter-list-container"
+              >
+                <ChapterList
+                  manifest={manifest}
+                  activeChapterId={chapterId}
+                  isDirty={isDirty}
+                  onSelectChapter={selectChapter}
+                  onRenameChapter={handleRenameChapter}
+                  onNewMindmap={window.bookMDDesktop ? createNewMindmap : undefined}
+                  onNewCanvas={window.bookMDDesktop ? createNewCanvas : undefined}
+                  onImportOutline={
+                    window.bookMDDesktop?.pickOutlineFile ? handleImportOutline : undefined
+                  }
+                />
+              </div>
+            ) : (
+              <aside
+                className="chapter-list empty-library"
+                style={{ width: directoryWidth, flex: `0 0 ${directoryWidth}px` }}
+                aria-label="文档目录"
+              >
+                <div className="tree-heading">DOCUMENT</div>
+                <p>打开一个 Markdown 文件，新建文件，或在桌面版中打开文件目录。</p>
+              </aside>
+            )
+          ) : null}
 
-        {!isDualSplitMode && !isCanvasFullscreen && directoryOpen && (
-          <div
-            className={`layout-resizer ${resizingType === "dir" ? "is-active" : ""}`}
-            onMouseDown={handleDirResizeMouseDown}
-            onDoubleClick={handleDirDoubleClick}
-            role="separator"
-            aria-orientation="vertical"
-            title="拖拽调整文档目录栏宽度（双击自适应最佳宽度）"
-          />
-        )}
-
-        {!isDualSplitMode && !isCanvasFullscreen && sidebarOpen && (manifest || sidebarTab === "space") ? (
-          <>
-            <aside className="side-panel" style={{ width: sidebarWidth, flex: `0 0 ${sidebarWidth}px` }}>
-              {sidebarTab === "space" ? (
-                <section id="space-panel" role="tabpanel" aria-labelledby="space-tab">
-                  <div className="space-standalone-header">
-                    <div className="space-standalone-title">
-                      <Zap size={15} style={{ color: "#f59e0b" }} />
-                      <span>闪念 Space</span>
-                    </div>
-                    {manifest && (
-                      <button
-                        type="button"
-                        className="space-standalone-close-btn"
-                        onClick={() => setSidebarTab("toc")}
-                        title="返回大纲目录"
-                        aria-label="返回大纲目录"
-                      >
-                        <X size={14} />
-                      </button>
-                    )}
-                  </div>
-                  <SpaceTimelinePanel
-                    onOpenNoteFile={(filePath) => {
-                      if (openDesktopMarkdownPathRef.current) {
-                        openDesktopMarkdownPathRef.current(filePath);
-                      }
-                    }}
-                    onReviewActiveChange={handleReviewActiveChange}
-                    onMergeIntoDocument={handleMergeFlashNote}
-                    currentDocument={reviewableDocument}
-                    openReviewRequest={reviewRequest}
-                  />
-                </section>
-              ) : (
-                <>
-                  <div className="tabs" role="tablist" aria-label="侧栏区域">
-                    {(["toc", "bookmarks", "search"] as SidebarTab[]).map((tab) => (
-                      <button
-                        key={tab}
-                        id={`${tab}-tab`}
-                        role="tab"
-                        aria-selected={sidebarTab === tab}
-                        aria-controls={`${tab}-panel`}
-                        className={sidebarTab === tab ? "active" : ""}
-                        onClick={() => setSidebarTab(tab)}
-                      >
-                        {tabLabels[tab]}
-                      </button>
-                    ))}
-                  </div>
-                  {sidebarTab === "toc" && manifest ? (
-                    <section id="toc-panel" role="tabpanel" aria-labelledby="toc-tab">
-                      <TocPanel
-                        headings={
-                          renderedChapter?.headings?.length
-                            ? renderedChapter.headings
-                            : session?.source
-                              ? extractHeadingsFromSource(session.source)
-                              : []
-                        }
-                        activeHeadingId={activeHeadingId}
-                        bookmarkedHeadingIds={bookmarkedHeadingIds}
-                        onJump={jumpToHeading}
-                      />
-                    </section>
-                  ) : null}
-                  {sidebarTab === "bookmarks" && manifest ? (
-                    <section id="bookmarks-panel" role="tabpanel" aria-labelledby="bookmarks-tab">
-                      <BookmarkPanel
-                        bookmarks={bookmarks}
-                        manifest={manifest}
-                        onJump={jumpBookmark}
-                        onDelete={(bookmarkId) => persistBookmarks(bookmarks.filter((item) => item.id !== bookmarkId))}
-                      />
-                    </section>
-                  ) : null}
-                  {sidebarTab === "search" && manifest ? (
-                    <section id="search-panel" role="tabpanel" aria-labelledby="search-tab">
-                      <SearchPanel
-                        query={searchQuery}
-                        results={searchResults}
-                        activeResultId={activeSearchMatchId}
-                        scope={searchScope}
-                        onScopeChange={setSearchScope}
-                        vaultDocCount={manifest?.chapters?.length}
-                        onQueryChange={(q) => {
-                          setSearchQuery(q);
-                          setActiveSearchMatchId(null);
-                          if (!q.trim()) {
-                            clearSearchHighlights();
-                          }
-                        }}
-                        onJump={handleSearchJump}
-                      />
-                    </section>
-                  ) : null}
-                  {sidebarTab === "backlinks" ? (
-                    <section id="backlinks-panel" role="tabpanel" aria-labelledby="backlinks-tab">
-                      <BacklinksPanel
-                        currentTitle={currentDocTitle}
-                        currentPath={session?.absolutePath || session?.fileName}
-                        currentDocId={session?.chapterId}
-                        linkedReferences={currentLinkedReferences}
-                        unlinkedMentions={currentUnlinkedMentions}
-                        onJumpToSource={handleJumpToBacklink}
-                        onConvertMention={handleConvertMention}
-                        graphData={graphData}
-                        theme={preferences.theme}
-                        onOpenGlobalGraph={() => setIsGraphPaneOpen(true)}
-                      />
-                    </section>
-                  ) : null}
-                </>
-              )}
-            </aside>
+          {!isDualSplitMode && !isCanvasFullscreen && directoryOpen && (
             <div
-              className={`layout-resizer ${resizingType === "sidebar" ? "is-active" : ""}`}
-              onMouseDown={handleSidebarResizeMouseDown}
-              onDoubleClick={handleSidebarDoubleClick}
+              className={`layout-resizer ${resizingType === "dir" ? "is-active" : ""}`}
+              onMouseDown={handleDirResizeMouseDown}
+              onDoubleClick={handleDirDoubleClick}
               role="separator"
               aria-orientation="vertical"
-              title="拖拽调整大纲侧栏宽度（双击自适应最佳宽度）"
-            />
-          </>
-        ) : null}
-
-        <section className="reader-frame">
-          {!isCanvasFullscreen && tabs.length > 0 && (
-            <TabBar
-              tabs={tabsForDisplay}
-              activeTabId={chapterId}
-              dualSplitTabId={dualSplitTabId}
-              onSelectTab={selectChapter}
-              onCloseTab={handleCloseTab}
-              onCloseOtherTabs={handleCloseOtherTabs}
-              onCloseRightTabs={handleCloseRightTabs}
-              onOpenDualSplit={handleOpenDualSplit}
-              onCloseDualSplit={handleCloseDualSplit}
-              onDetachTab={handleDetachTab}
-              isGraphPaneOpen={isGraphPaneOpen}
-              onToggleGraphPane={handleToggleGraphPane}
+              title="拖拽调整文档目录栏宽度（双击自适应最佳宽度）"
             />
           )}
-          {(() => {
-            const innerWorkspace = isDualSplitMode && secondaryRenderedChapter ? (
-              <DualDocumentWorkspace
-                primaryTitle={activeChapter?.title ?? session?.fileName ?? "主文档"}
-                viewMode={viewMode}
-                source={session?.source ?? ""}
-                onSourceChange={updateSource}
-                renderedChapter={renderedChapter}
-                primaryContainerRef={readerRef}
-                theme={preferences.theme}
-                fontScale={preferences.fontScale}
-                mermaidTheme={resolveMermaidTheme(preferences.theme)}
-                onMermaidError={handleMermaidError}
-                onSave={() => saveSession()}
-                isLargeDocument={isLargeDocument}
-                autoPreviewPaused={autoPreviewPaused}
-                onRefreshPreview={renderPreviewNow}
-                readOnly={!session?.writable}
-                showLineNumbers={preferences.showLineNumbers}
-                typewriterMode={typewriterMode}
-                currentFilePath={session?.absolutePath || undefined}
-                onOpenLightbox={(media) => setLightboxMedia(media)}
-                onEditorViewReady={(view) => {
-                  editorViewRef.current = view;
-                }}
-                secondaryTitle={tabs.find((t) => t.id === dualSplitTabId)?.title ?? "对照文档"}
-                secondaryRenderedChapter={secondaryRenderedChapter}
-                secondaryContainerRef={secondaryReaderRef}
-                onCloseSecondary={handleCloseDualSplit}
-                wikiLinkTargets={wikiLinkTargets}
-                onWikiLinkClick={handleWikiLinkClick}
-                backlinksCount={currentLinkedReferences.length}
-                onOpenBacklinks={() => {
-                  setSidebarTab("backlinks");
-                  setSidebarOpen(true);
-                }}
-                onExtractToNote={handleExtractSelectionToNote}
-                onSendToFlash={handleSendSelectionToFlash}
-                onPrint={handlePrintDocument}
-                onToggleMindmap={handleToggleMindmap}
-                onRevealInToc={handleRevealInToc}
-              />
-            ) : viewMode === "mindmap" && session ? (
-              <MindmapView
-                title={activeChapter?.title ?? session?.fileName ?? "知识思维导图"}
-                headings={renderedChapter?.headings ?? []}
-                source={session.source}
-                onSourceChange={updateSource}
-                editable={session.writable}
-                theme={preferences.theme}
-                // Identifies the document whose folds are being remembered.
-                // The absolute path is preferred because two chapters can
-                // share a title; `src` and the file name cover the cases
-                // where there is no path to hand.
-                documentKey={session.absolutePath || activeChapter?.src || session.fileName}
-                onJumpToHeading={(headingId, _line) => {
-                  setViewMode("split");
-                  window.setTimeout(() => {
-                    jumpToHeading(headingId, "smooth", true);
-                  }, 80);
-                }}
-                // The same resolver the reader uses when a `[[wiki link]]` in
-                // the text is clicked: one answer to "which file is this name",
-                // not a second one that could disagree with it.
-                onWikiLinkClick={handleWikiLinkClick}
-                onClose={() => setViewMode("split")}
-              />
-            ) : (viewMode === "canvas" || session?.fileName?.toLowerCase().endsWith(".canvas")) && session ? (
-              <CanvasView
-                key={session.chapterId || session.absolutePath || "canvas-session"}
-                title={activeChapter?.title ?? session.fileName ?? "空间白板"}
-                source={session.source}
-                onSourceChange={updateSource}
-                editable={session.writable}
-                theme={preferences.theme}
-                allChapters={manifest?.chapters}
-                onOpenFile={(docPath) => {
-                  if (openDesktopMarkdownPathRef.current) {
-                    openDesktopMarkdownPathRef.current(docPath);
-                  }
-                }}
-                onExtractToNote={(docTitle, content) => handleCreateCanvasExtractNote(content, docTitle)}
-                onClose={() => setViewMode("split")}
-                onSave={() => saveSession()}
-                isDirty={isDirty}
-                isSaving={isSaving}
-                currentFilePath={session.absolutePath || session.fileName}
-                isFullscreen={isFullscreen}
-                onToggleFullscreen={toggleFullscreen}
-              />
-            ) : session ? (
-              <DocumentWorkspace
-                viewMode={viewMode}
-                source={session.source}
-                onSourceChange={updateSource}
-                renderedChapter={renderedChapter}
-                containerRef={readerRef}
-                theme={preferences.theme}
-                fontScale={preferences.fontScale}
-                mermaidTheme={resolveMermaidTheme(preferences.theme)}
-                onMermaidError={handleMermaidError}
-                onSave={() => saveSession()}
-                isLargeDocument={isLargeDocument}
-                autoPreviewPaused={autoPreviewPaused}
-                onRefreshPreview={renderPreviewNow}
-                readOnly={!session.writable}
-                showLineNumbers={preferences.showLineNumbers}
-                typewriterMode={typewriterMode}
-                currentFilePath={session.absolutePath || undefined}
-                onOpenLightbox={(media) => setLightboxMedia(media)}
-                onEditorViewReady={(view) => {
-                  editorViewRef.current = view;
-                }}
-                navLockUntilRef={navLockUntilRef}
-                wikiLinkTargets={wikiLinkTargets}
-                onWikiLinkClick={handleWikiLinkClick}
-                backlinksCount={currentLinkedReferences.length}
-                onOpenBacklinks={() => {
-                  setSidebarTab("backlinks");
-                  setSidebarOpen(true);
-                }}
-                onExtractToNote={handleExtractSelectionToNote}
-                onSendToFlash={handleSendSelectionToFlash}
-                onPrint={handlePrintDocument}
-                onToggleMindmap={handleToggleMindmap}
-                onRevealInToc={handleRevealInToc}
-              />
-            ) : (
-              <main className="empty-reader" ref={readerRef}>
-                <div className="empty-reader-card">
-                  <h1 className="empty-reader-title">选择或新建 Markdown 文档</h1>
-                  <p className="empty-reader-desc">
-                    体验现代化本地优先的 Markdown 阅读与极客编辑。支持双向同步滚动、选择联动高亮、多级大纲与原子物理落盘。
-                  </p>
-                  <div className="empty-actions-grid">
-                    {window.bookMDDesktop ? (
-                      <button type="button" className="empty-action-card" onClick={createNewFile}>
-                        <FilePlus2 size={22} className="about-icon text-orange" />
-                        <span>新建 Markdown</span>
-                      </button>
-                    ) : null}
-                    {window.bookMDDesktop ? (
-                      <button type="button" className="empty-action-card" onClick={createNewMindmap}>
-                        <ListTree size={22} className="about-icon text-cyan" />
-                        <span>新建思维导图</span>
-                      </button>
-                    ) : null}
-                    {window.bookMDDesktop ? (
-                      <button type="button" className="empty-action-card" onClick={createNewCanvas}>
-                        <Boxes size={22} className="about-icon text-emerald" />
-                        <span>新建空间白板</span>
-                      </button>
-                    ) : null}
-                    <button
-                      type="button"
-                      className="empty-action-card"
-                      onClick={() => {
-                        document.querySelector<HTMLInputElement>("input[type='file']")?.click();
+
+          {!isDualSplitMode &&
+          !isCanvasFullscreen &&
+          sidebarOpen &&
+          (manifest || sidebarTab === "space") ? (
+            <>
+              <aside
+                className="side-panel"
+                style={{ width: sidebarWidth, flex: `0 0 ${sidebarWidth}px` }}
+              >
+                {sidebarTab === "space" ? (
+                  <section id="space-panel" role="tabpanel" aria-labelledby="space-tab">
+                    <div className="space-standalone-header">
+                      <div className="space-standalone-title">
+                        <Zap size={15} style={{ color: "#f59e0b" }} />
+                        <span>闪念 Space</span>
+                      </div>
+                      {manifest && (
+                        <button
+                          type="button"
+                          className="space-standalone-close-btn"
+                          onClick={() => setSidebarTab("toc")}
+                          title="返回大纲目录"
+                          aria-label="返回大纲目录"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+                    <SpaceTimelinePanel
+                      onOpenNoteFile={(filePath) => {
+                        if (openDesktopMarkdownPathRef.current) {
+                          openDesktopMarkdownPathRef.current(filePath);
+                        }
                       }}
-                    >
-                      <FileText size={22} className="about-icon text-blue" />
-                      <span>打开单文件</span>
-                    </button>
-                    {window.bookMDDesktop ? (
-                      <button type="button" className="empty-action-card" onClick={openMarkdownDirectory}>
-                        <FolderOpen size={22} className="about-icon text-purple" />
-                        <span>打开文档目录</span>
-                      </button>
+                      onReviewActiveChange={handleReviewActiveChange}
+                      onMergeIntoDocument={handleMergeFlashNote}
+                      currentDocument={reviewableDocument}
+                      openReviewRequest={reviewRequest}
+                    />
+                  </section>
+                ) : (
+                  <>
+                    <div className="tabs" role="tablist" aria-label="侧栏区域">
+                      {(["toc", "bookmarks", "search"] as SidebarTab[]).map((tab) => (
+                        <button
+                          key={tab}
+                          id={`${tab}-tab`}
+                          role="tab"
+                          aria-selected={sidebarTab === tab}
+                          aria-controls={`${tab}-panel`}
+                          className={sidebarTab === tab ? "active" : ""}
+                          onClick={() => setSidebarTab(tab)}
+                        >
+                          {tabLabels[tab]}
+                        </button>
+                      ))}
+                    </div>
+                    {sidebarTab === "toc" && manifest ? (
+                      <section id="toc-panel" role="tabpanel" aria-labelledby="toc-tab">
+                        <TocPanel
+                          headings={
+                            renderedChapter?.headings?.length
+                              ? renderedChapter.headings
+                              : session?.source
+                                ? extractHeadingsFromSource(session.source)
+                                : []
+                          }
+                          activeHeadingId={activeHeadingId}
+                          bookmarkedHeadingIds={bookmarkedHeadingIds}
+                          onJump={jumpToHeading}
+                        />
+                      </section>
                     ) : null}
-                  </div>
-                </div>
-              </main>
-            );
+                    {sidebarTab === "bookmarks" && manifest ? (
+                      <section id="bookmarks-panel" role="tabpanel" aria-labelledby="bookmarks-tab">
+                        <BookmarkPanel
+                          bookmarks={bookmarks}
+                          manifest={manifest}
+                          onJump={jumpBookmark}
+                          onDelete={(bookmarkId) =>
+                            persistBookmarks(bookmarks.filter((item) => item.id !== bookmarkId))
+                          }
+                        />
+                      </section>
+                    ) : null}
+                    {sidebarTab === "search" && manifest ? (
+                      <section id="search-panel" role="tabpanel" aria-labelledby="search-tab">
+                        <SearchPanel
+                          query={searchQuery}
+                          results={searchResults}
+                          activeResultId={activeSearchMatchId}
+                          scope={searchScope}
+                          onScopeChange={setSearchScope}
+                          vaultDocCount={manifest?.chapters?.length}
+                          onQueryChange={(q) => {
+                            setSearchQuery(q);
+                            setActiveSearchMatchId(null);
+                            if (!q.trim()) {
+                              clearSearchHighlights();
+                            }
+                          }}
+                          onJump={handleSearchJump}
+                        />
+                      </section>
+                    ) : null}
+                    {sidebarTab === "backlinks" ? (
+                      <section id="backlinks-panel" role="tabpanel" aria-labelledby="backlinks-tab">
+                        <BacklinksPanel
+                          currentTitle={currentDocTitle}
+                          currentPath={session?.absolutePath || session?.fileName}
+                          currentDocId={session?.chapterId}
+                          linkedReferences={currentLinkedReferences}
+                          unlinkedMentions={currentUnlinkedMentions}
+                          onJumpToSource={handleJumpToBacklink}
+                          onConvertMention={handleConvertMention}
+                          graphData={graphData}
+                          theme={preferences.theme}
+                          onOpenGlobalGraph={() => setIsGraphPaneOpen(true)}
+                        />
+                      </section>
+                    ) : null}
+                  </>
+                )}
+              </aside>
+              <div
+                className={`layout-resizer ${resizingType === "sidebar" ? "is-active" : ""}`}
+                onMouseDown={handleSidebarResizeMouseDown}
+                onDoubleClick={handleSidebarDoubleClick}
+                role="separator"
+                aria-orientation="vertical"
+                title="拖拽调整大纲侧栏宽度（双击自适应最佳宽度）"
+              />
+            </>
+          ) : null}
 
-            if (isGraphPaneOpen) {
-              return (
-                <GraphWorkspaceLayout
-                  viewMode={viewMode}
-                  graphData={graphData}
-                  currentDocId={currentActiveId}
-                  theme={preferences.theme}
-                  onSelectNode={handleJumpToBacklink}
-                  onCloseGraph={handleCloseGraphPane}
-                >
-                  {innerWorkspace}
-                </GraphWorkspaceLayout>
-              );
-            }
+          <section className="reader-frame">
+            {!isCanvasFullscreen && tabs.length > 0 && (
+              <TabBar
+                tabs={tabsForDisplay}
+                activeTabId={chapterId}
+                dualSplitTabId={dualSplitTabId}
+                onSelectTab={selectChapter}
+                onCloseTab={handleCloseTab}
+                onCloseOtherTabs={handleCloseOtherTabs}
+                onCloseRightTabs={handleCloseRightTabs}
+                onOpenDualSplit={handleOpenDualSplit}
+                onCloseDualSplit={handleCloseDualSplit}
+                onDetachTab={handleDetachTab}
+                isGraphPaneOpen={isGraphPaneOpen}
+                onToggleGraphPane={handleToggleGraphPane}
+              />
+            )}
+            {(() => {
+              const innerWorkspace =
+                isDualSplitMode && secondaryRenderedChapter ? (
+                  <DualDocumentWorkspace
+                    primaryTitle={activeChapter?.title ?? session?.fileName ?? "主文档"}
+                    viewMode={viewMode}
+                    source={session?.source ?? ""}
+                    onSourceChange={updateSource}
+                    renderedChapter={renderedChapter}
+                    primaryContainerRef={readerRef}
+                    theme={preferences.theme}
+                    fontScale={preferences.fontScale}
+                    mermaidTheme={resolveMermaidTheme(preferences.theme)}
+                    onMermaidError={handleMermaidError}
+                    onSave={() => saveSession()}
+                    isLargeDocument={isLargeDocument}
+                    autoPreviewPaused={autoPreviewPaused}
+                    onRefreshPreview={renderPreviewNow}
+                    readOnly={!session?.writable}
+                    showLineNumbers={preferences.showLineNumbers}
+                    typewriterMode={typewriterMode}
+                    currentFilePath={session?.absolutePath || undefined}
+                    onOpenLightbox={(media) => setLightboxMedia(media)}
+                    onEditorViewReady={(view) => {
+                      editorViewRef.current = view;
+                    }}
+                    secondaryTitle={tabs.find((t) => t.id === dualSplitTabId)?.title ?? "对照文档"}
+                    secondaryRenderedChapter={secondaryRenderedChapter}
+                    secondaryContainerRef={secondaryReaderRef}
+                    onCloseSecondary={handleCloseDualSplit}
+                    wikiLinkTargets={wikiLinkTargets}
+                    onWikiLinkClick={handleWikiLinkClick}
+                    backlinksCount={currentLinkedReferences.length}
+                    onOpenBacklinks={() => {
+                      setSidebarTab("backlinks");
+                      setSidebarOpen(true);
+                    }}
+                    onExtractToNote={handleExtractSelectionToNote}
+                    onSendToFlash={handleSendSelectionToFlash}
+                    onPrint={handlePrintDocument}
+                    onToggleMindmap={handleToggleMindmap}
+                    onRevealInToc={handleRevealInToc}
+                  />
+                ) : viewMode === "mindmap" && session ? (
+                  <MindmapView
+                    title={activeChapter?.title ?? session?.fileName ?? "知识思维导图"}
+                    headings={renderedChapter?.headings ?? []}
+                    source={session.source}
+                    onSourceChange={updateSource}
+                    editable={session.writable}
+                    theme={preferences.theme}
+                    // Identifies the document whose folds are being remembered.
+                    // The absolute path is preferred because two chapters can
+                    // share a title; `src` and the file name cover the cases
+                    // where there is no path to hand.
+                    documentKey={session.absolutePath || activeChapter?.src || session.fileName}
+                    onJumpToHeading={(headingId, _line) => {
+                      setViewMode("split");
+                      window.setTimeout(() => {
+                        jumpToHeading(headingId, "smooth", true);
+                      }, 80);
+                    }}
+                    // The same resolver the reader uses when a `[[wiki link]]` in
+                    // the text is clicked: one answer to "which file is this name",
+                    // not a second one that could disagree with it.
+                    onWikiLinkClick={handleWikiLinkClick}
+                    onClose={() => setViewMode("split")}
+                  />
+                ) : (viewMode === "canvas" ||
+                    session?.fileName?.toLowerCase().endsWith(".canvas")) &&
+                  session ? (
+                  <CanvasView
+                    key={session.chapterId || session.absolutePath || "canvas-session"}
+                    title={activeChapter?.title ?? session.fileName ?? "空间白板"}
+                    source={session.source}
+                    onSourceChange={updateSource}
+                    editable={session.writable}
+                    theme={preferences.theme}
+                    allChapters={manifest?.chapters}
+                    onOpenFile={(docPath) => {
+                      if (openDesktopMarkdownPathRef.current) {
+                        openDesktopMarkdownPathRef.current(docPath);
+                      }
+                    }}
+                    onExtractToNote={(docTitle, content) =>
+                      handleCreateCanvasExtractNote(content, docTitle)
+                    }
+                    onClose={() => setViewMode("split")}
+                    onSave={() => saveSession()}
+                    isDirty={isDirty}
+                    isSaving={isSaving}
+                    currentFilePath={session.absolutePath || session.fileName}
+                    isFullscreen={isFullscreen}
+                    onToggleFullscreen={toggleFullscreen}
+                  />
+                ) : session ? (
+                  <DocumentWorkspace
+                    viewMode={viewMode}
+                    source={session.source}
+                    onSourceChange={updateSource}
+                    renderedChapter={renderedChapter}
+                    containerRef={readerRef}
+                    theme={preferences.theme}
+                    fontScale={preferences.fontScale}
+                    mermaidTheme={resolveMermaidTheme(preferences.theme)}
+                    onMermaidError={handleMermaidError}
+                    onSave={() => saveSession()}
+                    isLargeDocument={isLargeDocument}
+                    autoPreviewPaused={autoPreviewPaused}
+                    onRefreshPreview={renderPreviewNow}
+                    readOnly={!session.writable}
+                    showLineNumbers={preferences.showLineNumbers}
+                    typewriterMode={typewriterMode}
+                    currentFilePath={session.absolutePath || undefined}
+                    onOpenLightbox={(media) => setLightboxMedia(media)}
+                    onEditorViewReady={(view) => {
+                      editorViewRef.current = view;
+                    }}
+                    navLockUntilRef={navLockUntilRef}
+                    wikiLinkTargets={wikiLinkTargets}
+                    onWikiLinkClick={handleWikiLinkClick}
+                    backlinksCount={currentLinkedReferences.length}
+                    onOpenBacklinks={() => {
+                      setSidebarTab("backlinks");
+                      setSidebarOpen(true);
+                    }}
+                    onExtractToNote={handleExtractSelectionToNote}
+                    onSendToFlash={handleSendSelectionToFlash}
+                    onPrint={handlePrintDocument}
+                    onToggleMindmap={handleToggleMindmap}
+                    onRevealInToc={handleRevealInToc}
+                  />
+                ) : (
+                  <main className="empty-reader" ref={readerRef}>
+                    <div className="empty-reader-card">
+                      <h1 className="empty-reader-title">选择或新建 Markdown 文档</h1>
+                      <p className="empty-reader-desc">
+                        体验现代化本地优先的 Markdown
+                        阅读与极客编辑。支持双向同步滚动、选择联动高亮、多级大纲与原子物理落盘。
+                      </p>
+                      <div className="empty-actions-grid">
+                        {window.bookMDDesktop ? (
+                          <button
+                            type="button"
+                            className="empty-action-card"
+                            onClick={createNewFile}
+                          >
+                            <FilePlus2 size={22} className="about-icon text-orange" />
+                            <span>新建 Markdown</span>
+                          </button>
+                        ) : null}
+                        {window.bookMDDesktop ? (
+                          <button
+                            type="button"
+                            className="empty-action-card"
+                            onClick={createNewMindmap}
+                          >
+                            <ListTree size={22} className="about-icon text-cyan" />
+                            <span>新建思维导图</span>
+                          </button>
+                        ) : null}
+                        {window.bookMDDesktop ? (
+                          <button
+                            type="button"
+                            className="empty-action-card"
+                            onClick={createNewCanvas}
+                          >
+                            <Boxes size={22} className="about-icon text-emerald" />
+                            <span>新建空间白板</span>
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          className="empty-action-card"
+                          onClick={() => {
+                            document.querySelector<HTMLInputElement>("input[type='file']")?.click();
+                          }}
+                        >
+                          <FileText size={22} className="about-icon text-blue" />
+                          <span>打开单文件</span>
+                        </button>
+                        {window.bookMDDesktop ? (
+                          <button
+                            type="button"
+                            className="empty-action-card"
+                            onClick={openMarkdownDirectory}
+                          >
+                            <FolderOpen size={22} className="about-icon text-purple" />
+                            <span>打开文档目录</span>
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  </main>
+                );
 
-            return innerWorkspace;
-          })()}
-        </section>
+              if (isGraphPaneOpen) {
+                return (
+                  <GraphWorkspaceLayout
+                    viewMode={viewMode}
+                    graphData={graphData}
+                    currentDocId={currentActiveId}
+                    theme={preferences.theme}
+                    onSelectNode={handleJumpToBacklink}
+                    onCloseGraph={handleCloseGraphPane}
+                  >
+                    {innerWorkspace}
+                  </GraphWorkspaceLayout>
+                );
+              }
+
+              return innerWorkspace;
+            })()}
+          </section>
+        </div>
+
+        {!isCanvasFullscreen && (
+          <StatusBar
+            fileName={session?.fileName}
+            chapterTitle={activeChapter?.title}
+            source={session?.source}
+            isDirty={isDirty}
+            writable={session?.writable}
+            lineEnding={session?.lineEnding}
+            viewMode={viewMode}
+            isLargeDocument={isLargeDocument}
+          />
+        )}
       </div>
-
-      {!isCanvasFullscreen && (
-        <StatusBar
-          fileName={session?.fileName}
-          chapterTitle={activeChapter?.title}
-          source={session?.source}
-          isDirty={isDirty}
-          writable={session?.writable}
-          lineEnding={session?.lineEnding}
-          viewMode={viewMode}
-          isLargeDocument={isLargeDocument}
-        />
-      )}
-    </div>
 
       {/* Floating surfaces — lightbox, guard dialogs, palette, history, about, toast.
           They read the lightbox, open flags, notice and preferences from the
@@ -2382,7 +2474,6 @@ export function App() {
           return true;
         }}
       />
-
     </div>
   );
 }
@@ -2401,5 +2492,8 @@ function resolveMermaidTheme(theme: ThemeMode): MermaidTheme {
   if (theme === "twitter") return "dark";
   if (theme === "eink") return "neutral";
   if (theme === "light") return "default";
-  return typeof window !== "undefined" && window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "default";
+  return typeof window !== "undefined" &&
+    window.matchMedia?.("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "default";
 }

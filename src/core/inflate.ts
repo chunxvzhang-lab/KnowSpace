@@ -199,7 +199,7 @@ function inflateBlock(
   reader: BitReader,
   output: Output,
   literalTree: Huffman,
-  distanceTree: Huffman
+  distanceTree: Huffman,
 ): void {
   for (;;) {
     const symbol = literalTree.decode(reader);
@@ -312,7 +312,10 @@ export function inflateRaw(bytes: Uint8Array): InflateResult {
     }
   } catch (error) {
     if (error instanceof InflateError) return { ok: false, message: error.message };
-    return { ok: false, message: `解压失败：${error instanceof Error ? error.message : String(error)}` };
+    return {
+      ok: false,
+      message: `解压失败：${error instanceof Error ? error.message : String(error)}`,
+    };
   }
 
   return { ok: true, bytes: output.take() };

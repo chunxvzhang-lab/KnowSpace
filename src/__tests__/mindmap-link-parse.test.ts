@@ -81,7 +81,7 @@ describe("链接形式", () => {
     expect(describeMindmapLink({ kind: "external", target: "https://x" })).toBe("外部链接");
     expect(describeMindmapLink({ kind: "wiki", target: "产品设计" })).toBe("文档「产品设计」");
     expect(describeMindmapLink({ kind: "wiki", target: "产品设计", anchor: "验收" })).toBe(
-      "文档「产品设计」的 #验收"
+      "文档「产品设计」的 #验收",
     );
     expect(describeMindmapLink({ kind: "anchor", target: "验收" })).toBe("本文档的 #验收");
   });

@@ -9,7 +9,12 @@ type TocPanelProps = {
   onJump: (headingId: string) => void;
 };
 
-export function TocPanel({ headings, activeHeadingId, bookmarkedHeadingIds, onJump }: TocPanelProps) {
+export function TocPanel({
+  headings,
+  activeHeadingId,
+  bookmarkedHeadingIds,
+  onJump,
+}: TocPanelProps) {
   const navRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -23,7 +28,8 @@ export function TocPanel({ headings, activeHeadingId, bookmarkedHeadingIds, onJu
       const navRect = nav.getBoundingClientRect();
       const btnRect = activeButton.getBoundingClientRect();
       if (btnRect.top < navRect.top || btnRect.bottom > navRect.bottom) {
-        const offset = activeButton.offsetTop - nav.clientHeight / 2 + activeButton.clientHeight / 2;
+        const offset =
+          activeButton.offsetTop - nav.clientHeight / 2 + activeButton.clientHeight / 2;
         nav.scrollTo({ top: Math.max(0, offset), behavior: "smooth" });
       }
     }

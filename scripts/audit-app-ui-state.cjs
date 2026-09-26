@@ -58,13 +58,15 @@ function main() {
 
       // Functional form: setter( (prev) => … or setter( prev => …
       if (new RegExp(`\\b${setterName}\\(\\s*\\(`).test(line)) {
-        functionalSites.push(`  ${setterName}  line ${lines.indexOf(line) + 1}: ${line.trim().slice(0, 90)}`);
+        functionalSites.push(
+          `  ${setterName}  line ${lines.indexOf(line) + 1}: ${line.trim().slice(0, 90)}`,
+        );
         totalFunctional += 1;
       }
     });
 
     console.log(
-      `${stateName.padEnd(22)}${String(stateCount).padStart(4)}  ${String(setterCount).padStart(6)}`
+      `${stateName.padEnd(22)}${String(stateCount).padStart(4)}  ${String(setterCount).padStart(6)}`,
     );
   }
 

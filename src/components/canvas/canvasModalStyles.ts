@@ -24,7 +24,7 @@ export const modalOverlayStyle: CSSProperties = {
 
 export function modalContentStyle(
   theme: ThemeMode,
-  colors: ReturnType<typeof getCanvasThemeColors>
+  colors: ReturnType<typeof getCanvasThemeColors>,
 ): CSSProperties {
   return {
     width: 440,
@@ -40,7 +40,7 @@ export function modalContentStyle(
 /** Neutral icon-button treatment used across the toolbar and modals. */
 export function toolBtnStyle(
   theme: ThemeMode,
-  colors: ReturnType<typeof getCanvasThemeColors>
+  colors: ReturnType<typeof getCanvasThemeColors>,
 ): CSSProperties {
   return {
     display: "inline-flex",

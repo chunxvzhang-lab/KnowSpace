@@ -1,5 +1,18 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { Zap, CheckSquare, Clock, Calendar, Search, RotateCw, FolderOpen, FileText, Copy, ArrowDownToLine, Trash2, Tag } from "lucide-react";
+import {
+  Zap,
+  CheckSquare,
+  Clock,
+  Calendar,
+  Search,
+  RotateCw,
+  FolderOpen,
+  FileText,
+  Copy,
+  ArrowDownToLine,
+  Trash2,
+  Tag,
+} from "lucide-react";
 import { GraduationCap } from "lucide-react";
 import type { FlashNoteSummaryItem, FlashNotesSummaryResult } from "../types/desktop";
 import { DailyReviewPanel } from "./DailyReviewPanel";
@@ -63,7 +76,8 @@ export const SpaceTimelinePanel: React.FC<SpaceTimelinePanelProps> = ({
   const [todoFilter, setTodoFilter] = useState<"all" | "pending" | "done">("pending");
   const [feedback, setFeedback] = useState<string>("");
 
-  const desktop = typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
+  const desktop =
+    typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
 
   const loadSummary = useCallback(async () => {
     if (!desktop?.getFlashNotesSummary) {
@@ -104,7 +118,11 @@ export const SpaceTimelinePanel: React.FC<SpaceTimelinePanelProps> = ({
     setTimeout(() => setFeedback(""), 1800);
   };
 
-  const handleToggleTodo = async (filePath: string, lineIndex: number, currentCompleted: boolean) => {
+  const handleToggleTodo = async (
+    filePath: string,
+    lineIndex: number,
+    currentCompleted: boolean,
+  ) => {
     if (!desktop?.toggleFlashTodo) return;
     const nextCompleted = !currentCompleted;
 
@@ -119,7 +137,7 @@ export const SpaceTimelinePanel: React.FC<SpaceTimelinePanelProps> = ({
             return { ...todo, completed: nextCompleted };
           }),
         };
-      })
+      }),
     );
 
     try {
@@ -216,10 +234,7 @@ export const SpaceTimelinePanel: React.FC<SpaceTimelinePanelProps> = ({
   }, [notes]);
 
   const completedTodoCount = useMemo(() => {
-    return notes.reduce(
-      (acc, curr) => acc + curr.todos.filter((t) => t.completed).length,
-      0
-    );
+    return notes.reduce((acc, curr) => acc + curr.todos.filter((t) => t.completed).length, 0);
   }, [notes]);
 
   // Group notes by relative date
@@ -266,7 +281,9 @@ export const SpaceTimelinePanel: React.FC<SpaceTimelinePanelProps> = ({
         onClick={() => setActiveTab("todos")}
       >
         <CheckSquare size={12} />
-        <span>待办 ({completedTodoCount}/{totalTodoCount})</span>
+        <span>
+          待办 ({completedTodoCount}/{totalTodoCount})
+        </span>
       </button>
       <button
         type="button"
@@ -335,7 +352,9 @@ export const SpaceTimelinePanel: React.FC<SpaceTimelinePanelProps> = ({
               <input
                 type="text"
                 className="space-search-input"
-                placeholder={activeTab === "timeline" ? "搜索闪念内容、标签、时间..." : "筛选待办清单..."}
+                placeholder={
+                  activeTab === "timeline" ? "搜索闪念内容、标签、时间..." : "筛选待办清单..."
+                }
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -394,7 +413,9 @@ export const SpaceTimelinePanel: React.FC<SpaceTimelinePanelProps> = ({
                               <span className="space-card-time" title={note.fileName}>
                                 <Clock size={11} />
                                 <strong>{note.timeDisplay}</strong>
-                                <span className="space-file-tag">{note.fileName.replace(/\.md$/, "")}</span>
+                                <span className="space-file-tag">
+                                  {note.fileName.replace(/\.md$/, "")}
+                                </span>
                               </span>
 
                               <div className="space-card-actions">
@@ -447,7 +468,11 @@ export const SpaceTimelinePanel: React.FC<SpaceTimelinePanelProps> = ({
                                       type="checkbox"
                                       checked={todo.completed}
                                       onChange={() =>
-                                        handleToggleTodo(note.filePath, todo.lineIndex, todo.completed)
+                                        handleToggleTodo(
+                                          note.filePath,
+                                          todo.lineIndex,
+                                          todo.completed,
+                                        )
                                       }
                                     />
                                     <span>{todo.text}</span>
@@ -515,7 +540,9 @@ export const SpaceTimelinePanel: React.FC<SpaceTimelinePanelProps> = ({
                 {allTodos.length === 0 ? (
                   <div className="space-empty-todos">
                     <CheckSquare size={24} className="text-muted" />
-                    <p>{todoFilter === "pending" ? "全部待办已完成！太棒了！" : "暂无匹配的待办事项"}</p>
+                    <p>
+                      {todoFilter === "pending" ? "全部待办已完成！太棒了！" : "暂无匹配的待办事项"}
+                    </p>
                   </div>
                 ) : (
                   <div className="space-todos-list">
@@ -542,7 +569,9 @@ export const SpaceTimelinePanel: React.FC<SpaceTimelinePanelProps> = ({
                             title="打开所属闪念文件"
                           >
                             <Clock size={10} />
-                            <span>{item.dateStr} {item.timeDisplay}</span>
+                            <span>
+                              {item.dateStr} {item.timeDisplay}
+                            </span>
                           </button>
                         </div>
                       </div>

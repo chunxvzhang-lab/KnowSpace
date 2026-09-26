@@ -58,7 +58,12 @@ export const ExtractModal = memo(function ExtractModal({
           </h3>
           <button
             onClick={onClose}
-            style={{ background: "none", border: "none", color: colors.cardText, cursor: "pointer" }}
+            style={{
+              background: "none",
+              border: "none",
+              color: colors.cardText,
+              cursor: "pointer",
+            }}
           >
             <X size={16} />
           </button>

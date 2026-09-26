@@ -27,7 +27,7 @@ describe("VersionHistoryDialog Component", () => {
         currentContent={newContent}
         theme="twitter"
         onRevertToContent={onRevert}
-      />
+      />,
     );
 
     // Title
@@ -65,7 +65,7 @@ describe("VersionHistoryDialog Component", () => {
         currentContent={newContent}
         theme="twitter"
         onRevertToContent={onRevert}
-      />
+      />,
     );
 
     // Switch to unified diff

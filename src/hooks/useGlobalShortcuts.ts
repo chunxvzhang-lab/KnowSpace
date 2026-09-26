@@ -65,7 +65,7 @@ type UseGlobalShortcutsParams = {
   setViewMode: (
     mode:
       | DocumentSessionState["viewMode"]
-      | ((prev: DocumentSessionState["viewMode"]) => DocumentSessionState["viewMode"])
+      | ((prev: DocumentSessionState["viewMode"]) => DocumentSessionState["viewMode"]),
   ) => void;
 };
 
@@ -142,7 +142,8 @@ export function useGlobalShortcuts({
       else if (command === "open-directory") openMarkdownDirectoryRef.current();
       else if (command === "save") saveSessionRef.current();
       else if (command === "save-as") saveSessionAsRef.current();
-      else if (command === "toggle-fullscreen" || command === "togglefullscreen") toggleFullscreenRef.current();
+      else if (command === "toggle-fullscreen" || command === "togglefullscreen")
+        toggleFullscreenRef.current();
     });
 
     const unsubscribeClose = window.bookMDDesktop.onBeforeClose?.(({ requestId }) => {
@@ -151,11 +152,14 @@ export function useGlobalShortcuts({
 
     const unsubscribeFlashNote = window.bookMDDesktop.onFlashNoteSaved?.(() => {
       if (manifest?.rootPath && window.bookMDDesktop?.refreshDirectory) {
-        window.bookMDDesktop.refreshDirectory(manifest.rootPath).then((nextManifest) => {
-          if (nextManifest) {
-            setManifest(nextManifest);
-          }
-        }).catch(() => {});
+        window.bookMDDesktop
+          .refreshDirectory(manifest.rootPath)
+          .then((nextManifest) => {
+            if (nextManifest) {
+              setManifest(nextManifest);
+            }
+          })
+          .catch(() => {});
       }
     });
 
@@ -368,4 +372,5 @@ export function useGlobalShortcuts({
     setVersionHistoryOpen,
     setViewMode,
     versionHistoryOpen,
-  ]);}
+  ]);
+}

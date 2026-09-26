@@ -186,80 +186,86 @@ async function saveBoth(page, name) {
   });
 
   // Inject desktop mock into the page
-  await context.addInitScript(({ s1, s2, s3 }) => {
-    const chapters = [
-      {
-        id: "doc-1",
-        title: "01-架构设计与核心技术",
-        src: "01-架构设计与核心技术.md",
-        absolutePath: "C:\\\\Docs\\\\01-架构设计与核心技术.md",
-      },
-      {
-        id: "doc-2",
-        title: "02-AST双向零延迟同步",
-        src: "02-AST双向零延迟同步.md",
-        absolutePath: "C:\\\\Docs\\\\02-AST双向零延迟同步.md",
-      },
-      {
-        id: "doc-3",
-        title: "03-闪念胶囊与原子落盘",
-        src: "03-闪念胶囊与原子落盘.md",
-        absolutePath: "C:\\\\Docs\\\\03-闪念胶囊与原子落盘.md",
-      },
-    ];
+  await context.addInitScript(
+    ({ s1, s2, s3 }) => {
+      const chapters = [
+        {
+          id: "doc-1",
+          title: "01-架构设计与核心技术",
+          src: "01-架构设计与核心技术.md",
+          absolutePath: "C:\\\\Docs\\\\01-架构设计与核心技术.md",
+        },
+        {
+          id: "doc-2",
+          title: "02-AST双向零延迟同步",
+          src: "02-AST双向零延迟同步.md",
+          absolutePath: "C:\\\\Docs\\\\02-AST双向零延迟同步.md",
+        },
+        {
+          id: "doc-3",
+          title: "03-闪念胶囊与原子落盘",
+          src: "03-闪念胶囊与原子落盘.md",
+          absolutePath: "C:\\\\Docs\\\\03-闪念胶囊与原子落盘.md",
+        },
+      ];
 
-    const contentMap = {
-      "C:\\\\Docs\\\\01-架构设计与核心技术.md": s1,
-      "C:\\\\Docs\\\\02-AST双向零延迟同步.md": s2,
-      "C:\\\\Docs\\\\03-闪念胶囊与原子落盘.md": s3,
-      "doc-1": s1,
-      "doc-2": s2,
-      "doc-3": s3,
-    };
+      const contentMap = {
+        "C:\\\\Docs\\\\01-架构设计与核心技术.md": s1,
+        "C:\\\\Docs\\\\02-AST双向零延迟同步.md": s2,
+        "C:\\\\Docs\\\\03-闪念胶囊与原子落盘.md": s3,
+        "doc-1": s1,
+        "doc-2": s2,
+        "doc-3": s3,
+      };
 
-    const mockDesktop = {
-      getInitialSyncData: () => ({
-        filePath: "C:\\\\Docs\\\\01-架构设计与核心技术.md",
-        source: {
-          markdown: s1,
+      const mockDesktop = {
+        getInitialSyncData: () => ({
+          filePath: "C:\\\\Docs\\\\01-架构设计与核心技术.md",
+          source: {
+            markdown: s1,
+            baseUrl: "file:///C:/Docs/",
+            diskVersion: "v1",
+            writable: true,
+            hasBom: false,
+            lineEnding: "LF",
+          },
+        }),
+        getLaunchFilePath: async () => "C:\\\\Docs\\\\01-架构设计与核心技术.md",
+        getDirectoryForFile: async () => ({
+          directory: {
+            id: "knowspace-library",
+            title: "KnowSpace 核心知识库",
+            rootPath: "C:\\\\Docs",
+            chapters,
+          },
+        }),
+        readMarkdownFile: async (filePath) => ({
+          markdown: contentMap[filePath] || s1,
           baseUrl: "file:///C:/Docs/",
           diskVersion: "v1",
           writable: true,
           hasBom: false,
           lineEnding: "LF",
-        },
-      }),
-      getLaunchFilePath: async () => "C:\\\\Docs\\\\01-架构设计与核心技术.md",
-      getDirectoryForFile: async () => ({
-        directory: {
-          id: "knowspace-library",
-          title: "KnowSpace 核心知识库",
-          rootPath: "C:\\\\Docs",
-          chapters,
-        },
-      }),
-      readMarkdownFile: async (filePath) => ({
-        markdown: contentMap[filePath] || s1,
-        baseUrl: "file:///C:/Docs/",
-        diskVersion: "v1",
-        writable: true,
-        hasBom: false,
-        lineEnding: "LF",
-      }),
-      saveMarkdownFile: async () => ({ success: true }),
-      saveMarkdownFileAs: async () => ({ success: true }),
-      setNativeTheme: async () => {},
-      onOpenFilePath: () => () => {},
-      onMenuCommand: () => () => {},
-      onBeforeClose: () => () => {},
-      onFlashNoteSaved: () => () => {},
-      exportSvgAsPng: async () => ({ success: true }),
-      savePngData: async () => ({ success: true, filePath: "C:\\\\Exports\\\\mermaid-diagram.png" }),
-    };
+        }),
+        saveMarkdownFile: async () => ({ success: true }),
+        saveMarkdownFileAs: async () => ({ success: true }),
+        setNativeTheme: async () => {},
+        onOpenFilePath: () => () => {},
+        onMenuCommand: () => () => {},
+        onBeforeClose: () => () => {},
+        onFlashNoteSaved: () => () => {},
+        exportSvgAsPng: async () => ({ success: true }),
+        savePngData: async () => ({
+          success: true,
+          filePath: "C:\\\\Exports\\\\mermaid-diagram.png",
+        }),
+      };
 
-    window.knowSpaceDesktop = mockDesktop;
-    window.bookMDDesktop = mockDesktop;
-  }, { s1: sampleDoc1, s2: sampleDoc2, s3: sampleDoc3 });
+      window.knowSpaceDesktop = mockDesktop;
+      window.bookMDDesktop = mockDesktop;
+    },
+    { s1: sampleDoc1, s2: sampleDoc2, s3: sampleDoc3 },
+  );
 
   const page = await context.newPage();
 
@@ -280,7 +286,7 @@ async function saveBoth(page, name) {
   // 02: Light Theme (Warm Amber-Orange)
   console.log("Capturing 02-theme-light.png...");
   const lightBtn = page.locator('button[aria-label="日光浅色"]');
-  if (await lightBtn.count() > 0) {
+  if ((await lightBtn.count()) > 0) {
     await lightBtn.click();
   } else {
     await page.evaluate(() => document.documentElement.setAttribute("data-theme", "light"));
@@ -291,7 +297,7 @@ async function saveBoth(page, name) {
   // 03: E-ink Paper Theme
   console.log("Capturing 03-theme-eink.png...");
   const einkBtn = page.locator('button[aria-label="仿电子墨水屏"]');
-  if (await einkBtn.count() > 0) {
+  if ((await einkBtn.count()) > 0) {
     await einkBtn.click();
   } else {
     await page.evaluate(() => document.documentElement.setAttribute("data-theme", "eink"));
@@ -302,7 +308,7 @@ async function saveBoth(page, name) {
   // 04: Geek Dark Theme
   console.log("Capturing 04-theme-dark.png...");
   const darkBtn = page.locator('button[aria-label="极客暗黑"]');
-  if (await darkBtn.count() > 0) {
+  if ((await darkBtn.count()) > 0) {
     await darkBtn.click();
   } else {
     await page.evaluate(() => document.documentElement.setAttribute("data-theme", "twitter"));
@@ -313,7 +319,7 @@ async function saveBoth(page, name) {
   // 05: Split View Mode
   console.log("Capturing 05-mode-split.png...");
   const splitBtn = page.locator('.view-mode-control button:has-text("分屏")');
-  if (await splitBtn.count() > 0) {
+  if ((await splitBtn.count()) > 0) {
     await splitBtn.click();
   }
   await page.waitForTimeout(600);
@@ -322,7 +328,7 @@ async function saveBoth(page, name) {
   // 06: Source View Mode
   console.log("Capturing 06-mode-source.png...");
   const sourceBtn = page.locator('.view-mode-control button:has-text("源码")');
-  if (await sourceBtn.count() > 0) {
+  if ((await sourceBtn.count()) > 0) {
     await sourceBtn.click();
   }
   await page.waitForTimeout(600);
@@ -331,7 +337,7 @@ async function saveBoth(page, name) {
   // 07: Read View Mode
   console.log("Capturing 07-mode-read.png...");
   const readBtn = page.locator('.view-mode-control button:has-text("阅读")');
-  if (await readBtn.count() > 0) {
+  if ((await readBtn.count()) > 0) {
     await readBtn.click();
   }
   await page.waitForTimeout(600);
@@ -340,7 +346,8 @@ async function saveBoth(page, name) {
   // 08: Rich Markdown (KaTeX, Mermaid, Code with Badge)
   console.log("Capturing 08-rich-markdown.png...");
   await page.evaluate(() => {
-    const reader = document.querySelector(".reader-scroll-container") || document.querySelector(".reader-pane");
+    const reader =
+      document.querySelector(".reader-scroll-container") || document.querySelector(".reader-pane");
     if (reader) reader.scrollTop = 160;
   });
   await page.waitForTimeout(800);
@@ -348,18 +355,19 @@ async function saveBoth(page, name) {
 
   // Reset scroll
   await page.evaluate(() => {
-    const reader = document.querySelector(".reader-scroll-container") || document.querySelector(".reader-pane");
+    const reader =
+      document.querySelector(".reader-scroll-container") || document.querySelector(".reader-pane");
     if (reader) reader.scrollTop = 0;
   });
 
   // Switch back to split mode
-  if (await splitBtn.count() > 0) await splitBtn.click();
+  if ((await splitBtn.count()) > 0) await splitBtn.click();
   await page.waitForTimeout(500);
 
   // Click second chapter in tree to open it as a tab
   console.log("Opening second chapter to populate multi-tabs...");
   const chapterItems = page.locator(".tree-item-content");
-  if (await chapterItems.count() >= 2) {
+  if ((await chapterItems.count()) >= 2) {
     await chapterItems.nth(1).click();
     await page.waitForTimeout(800);
   }
@@ -367,7 +375,7 @@ async function saveBoth(page, name) {
   // 09: Multi-tabs Bar & Context Menu
   console.log("Capturing 09-multi-tabs.png...");
   const tabs = page.locator(".tab-item");
-  if (await tabs.count() >= 2) {
+  if ((await tabs.count()) >= 2) {
     // Right-click the inactive tab (doc-1)
     await tabs.nth(0).click({ button: "right" });
     await page.waitForTimeout(500);
@@ -376,14 +384,14 @@ async function saveBoth(page, name) {
     // 10: Dual Split Compare View
     console.log("Capturing 10-dual-split-compare.png...");
     const splitOption = page.locator('.tab-context-menu button:has-text("分屏对比")');
-    if (await splitOption.count() > 0) {
+    if ((await splitOption.count()) > 0) {
       await splitOption.click();
       await page.waitForTimeout(1000);
       await saveBoth(page, "10-dual-split-compare.png");
 
       // Exit dual split
       const exitBtn = page.locator(".tab-exit-split-btn");
-      if (await exitBtn.count() > 0) {
+      if ((await exitBtn.count()) > 0) {
         await exitBtn.click();
         await page.waitForTimeout(600);
       }
@@ -393,7 +401,7 @@ async function saveBoth(page, name) {
   }
 
   // Switch to doc-1 again
-  if (await tabs.count() >= 1) {
+  if ((await tabs.count()) >= 1) {
     await tabs.nth(0).click();
     await page.waitForTimeout(600);
   }
@@ -401,7 +409,7 @@ async function saveBoth(page, name) {
   // 11: Navigation Outline (TOC)
   console.log("Capturing 11-navigation-toc.png...");
   const tocNavBtn = page.locator('button[aria-label="大纲目录"]');
-  if (await tocNavBtn.count() > 0) {
+  if ((await tocNavBtn.count()) > 0) {
     await tocNavBtn.click();
     await page.waitForTimeout(600);
     await saveBoth(page, "11-navigation-toc.png");
@@ -410,15 +418,15 @@ async function saveBoth(page, name) {
   // 12: Fulltext Search Panel
   console.log("Capturing 12-fulltext-search.png...");
   const searchNavBtn = page.locator('button[aria-label="全文搜索"]');
-  if (await searchNavBtn.count() > 0) {
+  if ((await searchNavBtn.count()) > 0) {
     await searchNavBtn.click();
     await page.waitForTimeout(500);
     const searchInput = page.locator(".search-box input");
-    if (await searchInput.count() > 0) {
+    if ((await searchInput.count()) > 0) {
       await searchInput.fill("AST");
       await page.waitForTimeout(800);
       const firstCard = page.locator(".search-card").first();
-      if (await firstCard.count() > 0) {
+      if ((await firstCard.count()) > 0) {
         await firstCard.click();
         await page.waitForTimeout(600);
       }
@@ -429,12 +437,12 @@ async function saveBoth(page, name) {
   // 13: Bookmarks Panel
   console.log("Capturing 13-bookmarks.png...");
   const addBookmarkBtn = page.locator('button[title*="添加书签"]');
-  if (await addBookmarkBtn.count() > 0) {
+  if ((await addBookmarkBtn.count()) > 0) {
     await addBookmarkBtn.click();
     await page.waitForTimeout(500);
   }
   const bookmarksNavBtn = page.locator('button[aria-label="书签列表"]');
-  if (await bookmarksNavBtn.count() > 0) {
+  if ((await bookmarksNavBtn.count()) > 0) {
     await bookmarksNavBtn.click();
     await page.waitForTimeout(600);
     await saveBoth(page, "13-bookmarks.png");
@@ -444,7 +452,7 @@ async function saveBoth(page, name) {
   console.log("Capturing 14-media-lightbox.png...");
   // Find rendered Mermaid SVG or pre.mermaid
   const mermaidElem = page.locator("pre.mermaid, .mermaid-container svg").first();
-  if (await mermaidElem.count() > 0) {
+  if ((await mermaidElem.count()) > 0) {
     await mermaidElem.click();
     await page.waitForTimeout(800);
     await saveBoth(page, "14-media-lightbox.png");
@@ -461,8 +469,10 @@ async function saveBoth(page, name) {
   await flashPage.goto(`${BASE_URL}/?mode=flash`);
   await flashPage.waitForTimeout(1000);
   const flashTextarea = flashPage.locator(".flash-textarea");
-  if (await flashTextarea.count() > 0) {
-    await flashTextarea.fill("- [x] 梳理 KnowSpace 知识库核心功能\n> 💡 明天下午 14:00 摸鱼Lab 架构评审会\n[[01-架构设计与核心技术]]");
+  if ((await flashTextarea.count()) > 0) {
+    await flashTextarea.fill(
+      "- [x] 梳理 KnowSpace 知识库核心功能\n> 💡 明天下午 14:00 摸鱼Lab 架构评审会\n[[01-架构设计与核心技术]]",
+    );
   }
   await flashPage.waitForTimeout(500);
   await saveBoth(flashPage, "15-flash-capsule.png");
@@ -470,7 +480,7 @@ async function saveBoth(page, name) {
   // Also show flash settings open
   console.log("Capturing 15-flash-capsule-settings.png...");
   const flashSettingsBtn = flashPage.locator('button[title*="设置全局热键"]');
-  if (await flashSettingsBtn.count() > 0) {
+  if ((await flashSettingsBtn.count()) > 0) {
     await flashSettingsBtn.click();
     await flashPage.waitForTimeout(500);
     await saveBoth(flashPage, "15-flash-capsule-settings.png");
@@ -480,7 +490,7 @@ async function saveBoth(page, name) {
   // 16: About Dialog
   console.log("Capturing 16-about-dialog.png...");
   const aboutBtn = page.locator('button[aria-label="关于应用"]');
-  if (await aboutBtn.count() > 0) {
+  if ((await aboutBtn.count()) > 0) {
     await aboutBtn.click();
     await page.waitForTimeout(600);
     await saveBoth(page, "16-about-dialog.png");

@@ -57,7 +57,7 @@ export function extractFolderGroup(path?: string, type?: GraphNodeType): string 
 export function buildGraphDataFromIndex(
   manifest: BookManifest | null,
   index: BacklinkIndexData,
-  currentDocId?: string | null
+  currentDocId?: string | null,
 ): GraphData {
   const nodesMap = new Map<string, GraphNodeData>();
   const normTitleToId = new Map<string, string>();
@@ -137,8 +137,10 @@ export function buildGraphDataFromIndex(
 
       const norm = stripDocExt(ch.title.trim().toLowerCase());
       const isSpace = Boolean(
-        (ch.src && (ch.src.toLowerCase().startsWith("space/") || ch.src.toLowerCase().startsWith("space\\"))) ||
-        ch.id.startsWith("space-")
+        (ch.src &&
+          (ch.src.toLowerCase().startsWith("space/") ||
+            ch.src.toLowerCase().startsWith("space\\"))) ||
+        ch.id.startsWith("space-"),
       );
       const folder = extractFolderGroup(ch.src, isSpace ? "space" : "chapter");
       const node: GraphNodeData = {
@@ -171,9 +173,11 @@ export function buildGraphDataFromIndex(
     }
 
     const isSpace = Boolean(
-      (doc.path && (doc.path.toLowerCase().includes("space/") || doc.path.toLowerCase().includes("space\\"))) ||
+      (doc.path &&
+        (doc.path.toLowerCase().includes("space/") ||
+          doc.path.toLowerCase().includes("space\\"))) ||
       doc.path?.includes(".space") ||
-      docId.startsWith("space-")
+      docId.startsWith("space-"),
     );
     const norm = stripDocExt(doc.title.trim().toLowerCase());
     const folder = extractFolderGroup(doc.path, isSpace ? "space" : "chapter");
@@ -207,9 +211,14 @@ export function buildGraphDataFromIndex(
       if (!edgeSet.has(edgeKey)) {
         edgeSet.add(edgeKey);
         const targetNode = nodesMap.get(canonicalTargetId);
-        const sourceFolder = sourceNode.folderGroup || extractFolderGroup(sourceNode.path, sourceNode.type);
-        const targetFolder = targetNode ? (targetNode.folderGroup || extractFolderGroup(targetNode.path, targetNode.type)) : undefined;
-        const isCrossFolder = Boolean(sourceFolder && targetFolder && sourceFolder !== targetFolder);
+        const sourceFolder =
+          sourceNode.folderGroup || extractFolderGroup(sourceNode.path, sourceNode.type);
+        const targetFolder = targetNode
+          ? targetNode.folderGroup || extractFolderGroup(targetNode.path, targetNode.type)
+          : undefined;
+        const isCrossFolder = Boolean(
+          sourceFolder && targetFolder && sourceFolder !== targetFolder,
+        );
 
         edges.push({
           id: edgeKey,
@@ -237,7 +246,7 @@ export function buildGraphDataFromIndex(
 export function extractLocalSubgraph(
   graphData: GraphData,
   centerDocId: string,
-  depth = 1
+  depth = 1,
 ): GraphData {
   // Resiliently resolve the exact node ID in graphData
   let resolvedCenterId = centerDocId;
@@ -289,7 +298,7 @@ export function extractLocalSubgraph(
     }));
 
   const subEdges = graphData.edges.filter(
-    (e) => visitedNodeIds.has(e.source) && visitedNodeIds.has(e.target)
+    (e) => visitedNodeIds.has(e.source) && visitedNodeIds.has(e.target),
   );
 
   return {
@@ -345,7 +354,7 @@ export function filterGraphData(
     viewFilter?: "all" | "hubs" | "orphans";
     clusterByFolder?: boolean;
     crossFolderOnly?: boolean;
-  }
+  },
 ): GraphData {
   const {
     hideIsolates = false,
@@ -380,7 +389,7 @@ export function filterGraphData(
   const q = query.trim().toLowerCase();
   if (q) {
     filteredNodes = filteredNodes.filter(
-      (n) => n.label.toLowerCase().includes(q) || (n.path && n.path.toLowerCase().includes(q))
+      (n) => n.label.toLowerCase().includes(q) || (n.path && n.path.toLowerCase().includes(q)),
     );
   }
 
@@ -398,7 +407,7 @@ export function filterGraphData(
 
   const allowedIds = new Set(filteredNodes.map((n) => n.id));
   let filteredEdges = baseData.edges.filter(
-    (e) => allowedIds.has(e.source) && allowedIds.has(e.target)
+    (e) => allowedIds.has(e.source) && allowedIds.has(e.target),
   );
 
   if (crossFolderOnly) {
@@ -446,7 +455,7 @@ export function toCytoscapeElements(graphData: GraphData): CytoscapeElement[] {
  * 4. Runs synchronously in < 3ms for zero-latency, buttery-smooth initialization.
  */
 export function computeOrganicGraphPositions(
-  graphData: GraphData
+  graphData: GraphData,
 ): Map<string, { x: number; y: number }> {
   const positions = new Map<string, { x: number; y: number }>();
   const n = graphData.nodes.length;
@@ -510,7 +519,7 @@ export function computeOrganicGraphPositions(
         const dist = Math.sqrt(distSq);
         let repForce = (kRepulsion / (distSq + 200)) * alpha;
         if (distSq < minDistanceSq) {
-          repForce += ((minDistance - dist) * 0.8) * alpha;
+          repForce += (minDistance - dist) * 0.8 * alpha;
         }
 
         const fx = (dx / dist) * repForce;

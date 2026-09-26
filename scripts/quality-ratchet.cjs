@@ -47,7 +47,9 @@ function countLines(filePath) {
 function listSources(dir) {
   const out = [];
   const walk = (d) => {
-    for (const entry of fs.readdirSync(d, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+    for (const entry of fs
+      .readdirSync(d, { withFileTypes: true })
+      .sort((a, b) => a.name.localeCompare(b.name))) {
       const p = path.join(d, entry.name);
       if (entry.isDirectory()) walk(p);
       else if (/\.(ts|tsx)$/.test(entry.name)) out.push(p);
@@ -74,7 +76,11 @@ function measure() {
     // changing the methodology must be a reviewed decision (it re-baselines).
     for (const m of text.matchAll(/:\s*\bany\b/g)) {
       const line = text.slice(0, m.index).split(/\r?\n/).length;
-      colonAny.push({ file: rel, line, snippet: text.slice(m.index, m.index + 40).split(/\r?\n/)[0] });
+      colonAny.push({
+        file: rel,
+        line,
+        snippet: text.slice(m.index, m.index + 40).split(/\r?\n/)[0],
+      });
     }
     for (const m of text.matchAll(/\bas\s+any\b/g)) {
       const line = text.slice(0, m.index).split(/\r?\n/).length;
@@ -102,7 +108,7 @@ function parseCommittedBaseline() {
   if (!fs.existsSync(docPath)) {
     console.error(
       "[ratchet] docs/QUALITY_BASELINE.md not found.\n" +
-        "Generate it first:  node scripts/quality-ratchet.cjs"
+        "Generate it first:  node scripts/quality-ratchet.cjs",
     );
     process.exit(1);
   }
@@ -135,9 +141,13 @@ function generate(metrics) {
     "",
     "| 指标 | 基线值 | 规则 |",
     "| :--- | ---: | :--- |",
-    "| `colon-any` | " + metrics["colon-any"] + " | 只减不增（`: any`，含 `any[]`；不含 `Array<any>` 泛型） |",
+    "| `colon-any` | " +
+      metrics["colon-any"] +
+      " | 只减不增（`: any`，含 `any[]`；不含 `Array<any>` 泛型） |",
     "| `as-any` | " + metrics["as-any"] + " | 只减不增（`as any`） |",
-    "| `files-over-1000-lines` | " + metrics["files-over-1000-lines"] + " | 只减不增（src 非测试代码，> 1000 行） |",
+    "| `files-over-1000-lines` | " +
+      metrics["files-over-1000-lines"] +
+      " | 只减不增（src 非测试代码，> 1000 行） |",
     "| `max-file-lines` | " + metrics["max-file-lines"] + " | 只减不增（最大单文件行数） |",
     "| `src-lines` | " + metrics["src-lines"] + " | 记录趋势，不设闸 |",
     "| `test-cases` | 见 `TEST_BASELINE.md` | 只增不减——由测试基线守护，本文件不重复设闸 |",
@@ -185,12 +195,14 @@ function check(metrics) {
       continue;
     }
     if (now > base) {
-      console.error(`[ratchet] REGRESSION: \`${key}\` went ${base} -> ${now} (only decreases allowed).`);
+      console.error(
+        `[ratchet] REGRESSION: \`${key}\` went ${base} -> ${now} (only decreases allowed).`,
+      );
       failed = true;
     } else if (now < base) {
       console.log(
         `[ratchet] \`${key}\` improved ${base} -> ${now}. Tighten the ratchet: ` +
-          `run \`node scripts/quality-ratchet.cjs\` and commit the refreshed baseline.`
+          `run \`node scripts/quality-ratchet.cjs\` and commit the refreshed baseline.`,
       );
     } else {
       console.log(`[ratchet] \`${key}\` steady at ${base}.`);
@@ -201,7 +213,7 @@ function check(metrics) {
   if (failed) {
     console.error(
       "\n[ratchet] If this regression is intentional, it needs a reviewed decision:\n" +
-        "fix the code, or change the methodology in scripts/quality-ratchet.cjs - never this doc."
+        "fix the code, or change the methodology in scripts/quality-ratchet.cjs - never this doc.",
     );
     process.exit(1);
   }
@@ -216,7 +228,7 @@ function main() {
     console.log(
       `[ratchet] baseline written to ${path.relative(root, docPath)}: ` +
         `colon-any ${metrics["colon-any"]}, as-any ${metrics["as-any"]}, ` +
-        `files>1000 ${metrics["files-over-1000-lines"]}, max ${metrics["max-file-lines"]}`
+        `files>1000 ${metrics["files-over-1000-lines"]}, max ${metrics["max-file-lines"]}`,
     );
   }
 }

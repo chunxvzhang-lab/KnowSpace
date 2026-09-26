@@ -9,7 +9,7 @@ import { CANVAS_COLOR_PALETTES } from "../../services/canvasService";
  * minimap's whole job is to mirror what the cards look like.
  */
 export function getNodePalette(
-  color?: string
+  color?: string,
 ): { label: string; stroke: string; bg: string } | undefined {
   if (!color) return undefined;
   if (CANVAS_COLOR_PALETTES[color]) return CANVAS_COLOR_PALETTES[color];

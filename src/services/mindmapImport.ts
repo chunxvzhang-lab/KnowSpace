@@ -92,9 +92,7 @@ export interface ImportedOutline {
   warning?: string;
 }
 
-export type ImportResult =
-  | { ok: true; outline: ImportedOutline }
-  | { ok: false; message: string };
+export type ImportResult = { ok: true; outline: ImportedOutline } | { ok: false; message: string };
 
 /** What a topic with no text is called. Not empty: an empty list item is not a list item. */
 const UNNAMED = "未命名";
@@ -195,11 +193,14 @@ export function parseXmindOutline(bytes: Uint8Array): ImportResult {
   const entry = readZipEntry(
     bytes,
     (name) => name === "content.json" || name.endsWith("/content.json"),
-    "content.json"
+    "content.json",
   );
 
   if (!entry.ok) {
-    return { ok: false, message: `${entry.message}（XMind 8 及更早版本用的是 content.xml，尚未支持。）` };
+    return {
+      ok: false,
+      message: `${entry.message}（XMind 8 及更早版本用的是 content.xml，尚未支持。）`,
+    };
   }
 
   let parsed: unknown;
@@ -268,11 +269,11 @@ function referenceList(value: unknown): Record<string, unknown>[] {
  */
 function readXmindTopic(
   topic: Record<string, unknown>,
-  references: ImportedReferences
+  references: ImportedReferences,
 ): ImportedTopic {
   const children = isRecord(topic.children) ? topic.children : {};
   const attached = referenceList(children.attached).map((child) =>
-    readXmindTopic(child, references)
+    readXmindTopic(child, references),
   );
 
   // A span is written as the pair of topics it runs between, in the file's own
@@ -349,7 +350,9 @@ const XMIND_MARKER_TABLE: Record<string, { priority?: number; progress?: number 
   "task-done": { progress: 8 },
 };
 
-function xmindMarkers(topic: Record<string, unknown>): { priority?: number; progress?: number } | null {
+function xmindMarkers(
+  topic: Record<string, unknown>,
+): { priority?: number; progress?: number } | null {
   const ids = referenceList(topic.markers)
     .map((marker) => text(marker.markerId))
     .filter(Boolean);
@@ -454,9 +457,12 @@ export function planOutlineImport(bytes: Uint8Array, sourceName: string): Import
 export function annotationsForDocument(
   outline: ImportedOutline,
   documentMarkdown: string,
-  documentTitle: string
+  documentTitle: string,
 ): ImportedAnnotations {
-  return annotationsFromOutline(outline, parseMarkdownToMindmapTree(documentMarkdown, documentTitle));
+  return annotationsFromOutline(
+    outline,
+    parseMarkdownToMindmapTree(documentMarkdown, documentTitle),
+  );
 }
 
 /**
@@ -484,7 +490,13 @@ export function bytesFromBase64(base64: string): Uint8Array {
  */
 export function parseOutlineBytes(bytes: Uint8Array): ImportResult {
   // A ZIP always begins with this, and nothing else this app reads does.
-  if (bytes.length >= 4 && bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 0x03 && bytes[3] === 0x04) {
+  if (
+    bytes.length >= 4 &&
+    bytes[0] === 0x50 &&
+    bytes[1] === 0x4b &&
+    bytes[2] === 0x03 &&
+    bytes[3] === 0x04
+  ) {
     return parseXmindOutline(bytes);
   }
 
@@ -525,7 +537,9 @@ export function parseOutlineFile(xml: string): ImportResult {
  * A parse error is not thrown: the browser hands back a document containing
  * `<parsererror>`, which is why it has to be looked for rather than caught.
  */
-function parseXmlDocument(xml: string): { ok: true; document: Document } | { ok: false; message: string } {
+function parseXmlDocument(
+  xml: string,
+): { ok: true; document: Document } | { ok: false; message: string } {
   if (!xml.trim()) return { ok: false, message: "文件是空的。" };
 
   let document: Document;
@@ -547,16 +561,13 @@ function readOpmlTopic(element: Element): ImportedTopic {
   // `text` is OPML 2.0's own; `title` is what some exporters write instead, and
   // the element's text content is the last place a label can be hiding.
   const label =
-    element.getAttribute("text") ??
-    element.getAttribute("title") ??
-    element.textContent ??
-    "";
+    element.getAttribute("text") ?? element.getAttribute("title") ?? element.textContent ?? "";
 
   return topicFrom(
     label,
     element.getAttribute("_note") ?? element.getAttribute("note") ?? "",
     element.getAttribute("url") ?? "",
-    directChildren(element, "outline").map(readOpmlTopic)
+    directChildren(element, "outline").map(readOpmlTopic),
   );
 }
 
@@ -566,7 +577,7 @@ function readFreemindTopic(element: Element): ImportedTopic {
     element.getAttribute("TEXT") ?? element.getAttribute("text") ?? "",
     richNoteText(element),
     element.getAttribute("LINK") ?? "",
-    directChildren(element, "node").map(readFreemindTopic)
+    directChildren(element, "node").map(readFreemindTopic),
   );
 }
 
@@ -601,7 +612,7 @@ function richNoteText(node: Element): string {
   const rich = Array.from(node.children).find(
     (child) =>
       child.tagName.toLowerCase() === "richcontent" &&
-      (child.getAttribute("TYPE") ?? child.getAttribute("type") ?? "").toUpperCase() === "NOTE"
+      (child.getAttribute("TYPE") ?? child.getAttribute("type") ?? "").toUpperCase() === "NOTE",
   );
   if (!rich) return "";
 
@@ -616,7 +627,7 @@ function topicFrom(
   label: string,
   note: string,
   link: string,
-  children: ImportedTopic[]
+  children: ImportedTopic[],
 ): ImportedTopic {
   return {
     text: oneLine(label) || UNNAMED,
@@ -668,7 +679,7 @@ function topicsOf(outline: ImportedOutline): ImportedTopic[] {
  */
 export function annotationsFromOutline(
   outline: ImportedOutline,
-  root: MindmapNode
+  root: MindmapNode,
 ): ImportedAnnotations {
   const notes: Record<string, string> = {};
   const links: Record<string, string> = {};
@@ -681,7 +692,7 @@ export function annotationsFromOutline(
   const walk = (
     tree: MindmapNode | undefined,
     topic: ImportedTopic | undefined,
-    parent?: MindmapNode
+    parent?: MindmapNode,
   ) => {
     if (!tree || !topic) return;
     if (topic.note) notes[tree.id] = topic.note;
@@ -745,7 +756,7 @@ export function annotationsFromOutline(
       return { fromId, toId, ...(relation.label ? { label: relation.label } : {}) };
     })
     .filter(
-      (relation): relation is { fromId: string; toId: string; label?: string } => relation !== null
+      (relation): relation is { fromId: string; toId: string; label?: string } => relation !== null,
     );
 
   const spans = (list: { nodeIds: string[]; text: string }[] | undefined) =>
@@ -768,13 +779,11 @@ export function annotationsFromOutline(
 export function importFileName(outline: ImportedOutline, sourceName: string): string {
   const extensions = /\.(opml|xml|mm|xmind)$/i;
   const base =
-    outline.title ||
-    outline.root?.text ||
-    sourceName.replace(extensions, "") ||
-    "导入的大纲";
+    outline.title || outline.root?.text || sourceName.replace(extensions, "") || "导入的大纲";
   // A name that is not a name: either a separator or a control character would
   // make the file it names unreachable on one platform or another.
   // eslint-disable-next-line no-control-regex -- intentionally strips control characters (\u0000-\u001f) out of imported file names
-  const safe = base.replace(/[\\/:*?"<>|\u0000-\u001f]/g, " ").replace(/\s+/g, " ").trim();
+  const illegalInFileName = /[\\/:*?"<>|\u0000-\u001f]/g;
+  const safe = base.replace(illegalInFileName, " ").replace(/\s+/g, " ").trim();
   return `${safe || "导入的大纲"}.md`;
 }

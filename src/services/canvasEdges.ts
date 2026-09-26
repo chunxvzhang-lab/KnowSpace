@@ -26,7 +26,7 @@ export function createEdgeBetweenNodes(
   label?: string,
   style: CanvasEdgeLineStyle = "bezier",
   existingEdges: CanvasEdge[] = [],
-  allNodes?: CanvasNode[]
+  allNodes?: CanvasNode[],
 ): CanvasEdge {
   const { fromSide, toSide } = getOptimalAnchorSides(fromNode, toNode);
   const color = getSourceNodeEdgeColor(fromNode, existingEdges, allNodes, toNode);
@@ -54,7 +54,7 @@ export function spawnConnectedCard(
   initialText?: string,
   label?: string,
   existingEdges: CanvasEdge[] = [],
-  allNodes?: CanvasNode[]
+  allNodes?: CanvasNode[],
 ): { newNode: CanvasTextNode; newEdge: CanvasEdge } {
   const newId = `text-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
   const gap = 120;
@@ -98,7 +98,7 @@ export function connectOneToMany(
   targetNodes: CanvasNode[],
   existingEdges: CanvasEdge[],
   style: CanvasEdgeLineStyle = "bezier",
-  allNodes?: CanvasNode[]
+  allNodes?: CanvasNode[],
 ): CanvasEdge[] {
   // All lines originating from the same card share the identical color
   const edgeColor = getSourceNodeEdgeColor(rootNode, existingEdges, allNodes);
@@ -109,12 +109,12 @@ export function connectOneToMany(
       existingEdges.some(
         (e) =>
           (e.fromNode === rootNode.id && e.toNode === target.id) ||
-          (e.fromNode === target.id && e.toNode === rootNode.id)
+          (e.fromNode === target.id && e.toNode === rootNode.id),
       ) ||
       newEdges.some(
         (e) =>
           (e.fromNode === rootNode.id && e.toNode === target.id) ||
-          (e.fromNode === target.id && e.toNode === rootNode.id)
+          (e.fromNode === target.id && e.toNode === rootNode.id),
       );
     if (!exists) {
       const edge = createEdgeBetweenNodes(rootNode, target, undefined, style);
@@ -134,7 +134,7 @@ export function connectChainNodes(
   existingEdges: CanvasEdge[],
   style: CanvasEdgeLineStyle = "bezier",
   spatiallySort: boolean = true,
-  allNodes?: CanvasNode[]
+  allNodes?: CanvasNode[],
 ): CanvasEdge[] {
   if (nodes.length < 2) return [];
   const orderedNodes = spatiallySort
@@ -154,16 +154,20 @@ export function connectChainNodes(
       existingEdges.some(
         (e) =>
           (e.fromNode === from.id && e.toNode === to.id) ||
-          (e.fromNode === to.id && e.toNode === from.id)
+          (e.fromNode === to.id && e.toNode === from.id),
       ) ||
       newEdges.some(
         (e) =>
           (e.fromNode === from.id && e.toNode === to.id) ||
-          (e.fromNode === to.id && e.toNode === from.id)
+          (e.fromNode === to.id && e.toNode === from.id),
       );
     if (!exists) {
       const edge = createEdgeBetweenNodes(from, to, undefined, style);
-      const edgeColor = getSourceNodeEdgeColor(from, [...existingEdges, ...newEdges], allNodes || nodes);
+      const edgeColor = getSourceNodeEdgeColor(
+        from,
+        [...existingEdges, ...newEdges],
+        allNodes || nodes,
+      );
       newEdges.push({ ...edge, color: edgeColor });
     }
   }
@@ -187,9 +191,10 @@ export function connectLoopNodes(
   existingEdges: CanvasEdge[],
   style: CanvasEdgeLineStyle = "bezier",
   spatiallySort: boolean = true,
-  allNodes?: CanvasNode[]
+  allNodes?: CanvasNode[],
 ): CanvasEdge[] {
-  if (nodes.length < 3) return connectChainNodes(nodes, existingEdges, style, spatiallySort, allNodes);
+  if (nodes.length < 3)
+    return connectChainNodes(nodes, existingEdges, style, spatiallySort, allNodes);
 
   const cx = nodes.reduce((sum, n) => sum + (n.x + n.width / 2), 0) / nodes.length;
   const cy = nodes.reduce((sum, n) => sum + (n.y + n.height / 2), 0) / nodes.length;
@@ -230,7 +235,7 @@ export function connectLoopNodes(
   const preferredLoopColor = getSourceNodeEdgeColor(
     orderedNodes[0],
     existingEdges,
-    allNodes || nodes
+    allNodes || nodes,
   );
   const loopUsedColors = getLoopEdgeColors(existingEdges);
   const paletteKeys = Object.keys(CANVAS_COLOR_PALETTES);
@@ -265,12 +270,12 @@ export function connectLoopNodes(
       existingEdges.some(
         (e) =>
           (e.fromNode === from.id && e.toNode === to.id) ||
-          (e.fromNode === to.id && e.toNode === from.id)
+          (e.fromNode === to.id && e.toNode === from.id),
       ) ||
       newEdges.some(
         (e) =>
           (e.fromNode === from.id && e.toNode === to.id) ||
-          (e.fromNode === to.id && e.toNode === from.id)
+          (e.fromNode === to.id && e.toNode === from.id),
       );
     if (!exists) {
       // Relative movement vector between consecutive nodes in the ring:
@@ -338,9 +343,7 @@ export function connectLoopNodes(
         style,
         // When the cards already sit on a common circle, connect them with a
         // true circular arc so the closed loop reads as a perfectly round ring.
-        ...(ringLayout
-          ? { ringCenter: ringLayout.center, ringRadius: ringLayout.radius }
-          : {}),
+        ...(ringLayout ? { ringCenter: ringLayout.center, ringRadius: ringLayout.radius } : {}),
         // Likewise, a rectangular grid gets straight orthogonal segments.
         ...(gridLayout ? { gridPath: true } : {}),
       });
@@ -365,7 +368,7 @@ export function spawnMultipleBranches(
   count: number = 3,
   direction: "right" | "bottom" = "right",
   existingEdges: CanvasEdge[] = [],
-  allNodes?: CanvasNode[]
+  allNodes?: CanvasNode[],
 ): { newNodes: CanvasTextNode[]; newEdges: CanvasEdge[] } {
   const newNodes: CanvasTextNode[] = [];
   const newEdges: CanvasEdge[] = [];
@@ -409,7 +412,7 @@ export function spawnMultipleBranches(
       undefined,
       "bezier",
       [...existingEdges, ...newEdges],
-      allNodes
+      allNodes,
     );
 
     newNodes.push(newNode);

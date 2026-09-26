@@ -87,7 +87,8 @@
 ## 🌟 核心功能特性
 
 ### 1. ⚡ 闪念胶囊与 Space 沉淀看板 (Flash Capsule & Space Hub)
-*无论处于任何工作、游戏或编码窗口，灵感与待办随叫随到，打通从捕捉到沉淀成文的完整闭环。*
+
+_无论处于任何工作、游戏或编码窗口，灵感与待办随叫随到，打通从捕捉到沉淀成文的完整闭环。_
 
 <p align="center">
   <img src="docs/manual-images/15-flash-capsule.png" alt="闪念胶囊与常驻模板" width="90%" style="border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);" />
@@ -125,7 +126,8 @@
 ---
 
 ### 2. 🎯 全能全局命令中枢 (Command Palette & Quick Switcher · `Ctrl + K`)
-*现代化 IDE 级全键盘控制中枢，手不离键盘，毫秒级调度全系统功能、穿梭十万字知识库。*
+
+_现代化 IDE 级全键盘控制中枢，手不离键盘，毫秒级调度全系统功能、穿梭十万字知识库。_
 
 <p align="center">
   <img src="docs/manual-images/27-command-palette.png" alt="全局命令中枢与快速切换器" width="90%" style="border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);" />
@@ -140,7 +142,8 @@
 ---
 
 ### 3. ✍️ 现代化极客编辑、斜杠命令与上下文菜单 (Modern Editor & Smart Interactions)
-*基于 CodeMirror 6 深度打造，毫秒级实时防抖渲染，融入全键盘斜杠命令与情境感知上下文操作。*
+
+_基于 CodeMirror 6 深度打造，毫秒级实时防抖渲染，融入全键盘斜杠命令与情境感知上下文操作。_
 
 <p align="center">
   <img src="docs/manual-images/28-slash-commands.png" alt="全键盘斜杠指令菜单" width="48%" style="border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35); display: inline-block; margin-right: 2%;" />
@@ -166,7 +169,8 @@
 ---
 
 ### 4. 📖 沉浸排版阅读、科学渲染与专业 PDF 打印 (Reader, Rendering & PDF Print)
-*专为中文与西文混合长篇知识阅读打磨的排版艺术，兼具科学工程制图与印刷级导出能力。*
+
+_专为中文与西文混合长篇知识阅读打磨的排版艺术，兼具科学工程制图与印刷级导出能力。_
 
 <p align="center">
   <img src="docs/manual-images/14-media-lightbox.png" alt="媒体与架构图全屏灯箱" width="90%" style="border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);" />
@@ -182,10 +186,11 @@
 ---
 
 ### 5. 🎨 三大沉浸式专属调优主题 (Three Immersive Themes)
-*覆盖日光、纸质与夜间多场景，左侧活动栏底部三态控制组一键直达。*
 
-| ☀️ 日光浅色 (Warm Amber Light) | 📖 仿电子墨水屏 (E-ink Paper) | ✨ 极客暗黑 (Geek Dark) |
-| :---: | :---: | :---: |
+_覆盖日光、纸质与夜间多场景，左侧活动栏底部三态控制组一键直达。_
+
+|           ☀️ 日光浅色 (Warm Amber Light)           |            📖 仿电子墨水屏 (E-ink Paper)            |              ✨ 极客暗黑 (Geek Dark)              |
+| :------------------------------------------------: | :-------------------------------------------------: | :-----------------------------------------------: |
 | ![日光浅色](docs/manual-images/02-theme-light.png) | ![墨水屏纸质](docs/manual-images/03-theme-eink.png) | ![极客暗黑](docs/manual-images/04-theme-dark.png) |
 
 - **☀️ 日光浅色主题 (Warm Amber Light)**：自然柔白底色（`#ffffff` / `#f5f5f7`）与雅致暖橙黄强调色（`#D97706` / `#F59E0B`），温润柔和，长时间写作不刺眼。
@@ -195,7 +200,8 @@
 ---
 
 ### 6. 🪟 多文档协同、左右分屏与独立新窗口 (Multi-tabs & Window Management)
-*支持多任务并行协作，多屏办公极度高效。*
+
+_支持多任务并行协作，多屏办公极度高效。_
 
 <p align="center">
   <img src="docs/manual-images/10-dual-split-compare.png" alt="双文档左右分屏对比模式" width="90%" style="border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);" />
@@ -210,7 +216,8 @@
 ---
 
 ### 7. 🔍 知识大纲导航与全文段落卡片检索 (Search & Navigation)
-*结构化组织与秒级定位你的所有文档。*
+
+_结构化组织与秒级定位你的所有文档。_
 
 <p align="center">
   <img src="docs/manual-images/12-fulltext-search.png" alt="知识大纲导航与全文段落卡片检索" width="90%" style="border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);" />
@@ -224,7 +231,8 @@
 ---
 
 ### 8. 🛡️ 工业级数据安全体系与系统深度集成 (Desktop System & Security)
-*本地优先，保护你的每一份心血不被丢失。*
+
+_本地优先，保护你的每一份心血不被丢失。_
 
 <p align="center">
   <img src="docs/manual-images/17-dialog-unsaved.png" alt="工业级数据安全与未保存拦截保护" width="90%" style="border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);" />
@@ -240,7 +248,8 @@
 ---
 
 ### 9. 🌐 知识网络全景拓扑图谱、局部视野与双链漫游 (Knowledge Graph & Bi-directional Links)
-*打造网状立体认知，从零散碎片笔记升维为互联互通的个人数字脑神经网络。*
+
+_打造网状立体认知，从零散碎片笔记升维为互联互通的个人数字脑神经网络。_
 
 <p align="center">
   <img src="docs/manual-images/31-graph-depth-clustering.png" alt="知识图谱局部深度与目录色彩聚类" width="90%" style="border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);" />
@@ -272,7 +281,8 @@
 ---
 
 ### 10. 🧠 交互式思维导图、双端无损同步与多格式生态 (Mind Map & Non-Destructive Sync)
-*结构化思维重构，将单线性文本升维为动态树状与原子块网，无缝打通外部主流脑图生态。*
+
+_结构化思维重构，将单线性文本升维为动态树状与原子块网，无缝打通外部主流脑图生态。_
 
 <p align="center">
   <img src="docs/manual-images/30-mindmap-export-modal.png" alt="思维导图多格式生态导出" width="90%" style="border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);" />
@@ -326,7 +336,8 @@
 ---
 
 ### 11. 🎨 空间多模态无限可视化白板 (Infinite Canvas 2.3 · JSON Canvas 1.0 兼容 · `Ctrl + Shift + C`)
-*标准开放的二维空间思维白板，融合多模态媒体、AABB 避障连线与 F5 拓扑分镜演示 2.3，打通从灵感卡片、拓扑因果到专著产出的完整飞跃。*
+
+_标准开放的二维空间思维白板，融合多模态媒体、AABB 避障连线与 F5 拓扑分镜演示 2.3，打通从灵感卡片、拓扑因果到专著产出的完整飞跃。_
 
 <p align="center">
   <img src="docs/manual-images/32-infinite-canvas.png" alt="无限空间可视化白板与多模态卡片" width="90%" style="border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);" />
@@ -413,7 +424,8 @@
 ---
 
 ### 12. ⏳ 本地时间旅行与版本快照历史 (Local Version History · `Ctrl + Shift + H`)
-*每一次知识创作的修改都应被忠实记录。完全运行在用户本地、安全防丢的本地时间旅行系统。*
+
+_每一次知识创作的修改都应被忠实记录。完全运行在用户本地、安全防丢的本地时间旅行系统。_
 
 <p align="center">
   <img src="docs/manual-images/34-version-history.png" alt="本地版本快照历史与双栏差异对比" width="90%" style="border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);" />
@@ -429,7 +441,8 @@
 ---
 
 ### 13. 🔍 全库毫秒级混合检索引擎与结构化语法 (Hybrid Vault Search · `Ctrl + F`)
-*全新文档级与段落级高性能倒排索引，十万字知识库键入即出（< 15ms）。*
+
+_全新文档级与段落级高性能倒排索引，十万字知识库键入即出（< 15ms）。_
 
 <p align="center">
   <img src="docs/manual-images/35-hybrid-vault-search.png" alt="全库毫秒级混合检索与语法芯片" width="90%" style="border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);" />
@@ -450,7 +463,8 @@
 ---
 
 ### 14. 🚀 极速秒开与 120FPS 工业级高刷引擎 (Instant Load & High-FPS Engine)
-*打开包含海量笔记的文件夹、打开单个文件或软件冷启动实现瞬间响应（< 50ms），主线程零冻结，丝滑高刷无掉帧。*
+
+_打开包含海量笔记的文件夹、打开单个文件或软件冷启动实现瞬间响应（< 50ms），主线程零冻结，丝滑高刷无掉帧。_
 
 - **⚡ 协作式空闲时间片调度器 (Cooperative Idle-Sliced Background Indexer)**：
   - **活动文档 0ms 秒级就绪**：打开文件夹或新文档时，利用内存中已有源码直接在 <1ms 内建立当前文档的反向链接与检索索引，开箱立即可用；
@@ -464,7 +478,8 @@
 ---
 
 ### 15. 🧪 交互子功能与端到端稳定性保障体系 (Sub-function Ecosystem & 100% Test Coverage)
-*高阶空间功能与底层每个交互细节并驾齐驱，构筑 1276 项全量自动化测试 100% 绿灯守卫的坚实壁垒。*
+
+_高阶空间功能与底层每个交互细节并驾齐驱，构筑 1276 项全量自动化测试 100% 绿灯守卫的坚实壁垒。_
 
 <p align="center">
   <img src="docs/manual-images/22-backlinks-panel.png" alt="双向链接与未链接提及面板" width="48%" style="border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35); display: inline-block; margin-right: 2%;" />
@@ -487,49 +502,49 @@
 
 ## ⌨️ 键盘快捷键
 
-| 快捷键 | 功能 | 说明 |
-| :--- | :--- | :--- |
-| `Alt + Space` | **呼出/隐藏闪念胶囊** | 全局秒级唤起毛玻璃速记微窗（可在软件内自由自定义） |
-| `Ctrl + K` | **全局命令面板与快速切换器** | 呼出全能中枢：快速切换笔记 (MRU)、执行系统命令 (`>`)、大纲小节秒级直达 (`#`)（编辑区免失焦直接穿透） |
-| `Ctrl + P` | **打印 / 导出 PDF** | 呼出 Chromium 原生高保真打印与 A4 矢量 PDF 导出（跨页防截断，编辑区免失焦直接穿透） |
-| `/` | **斜杠命令补全菜单** | (编辑器行首或空格后) 呼出 20+ 项排版、表格、代码、公式与 Callout 模板 |
-| `右键` | **情境感知右键菜单** | (编辑器选区/正文) 提取为新笔记、生成块引用、存入闪念、富文本排版转换 |
-| `Ctrl + Shift + H` | **版本快照历史与双栏对比** | 呼出本地时间旅行面板，支持 Side-by-Side 逐行与行内对比、一键无损还原 |
-| `Ctrl + Shift + C` | **空间可视化白板** | 切换至无限空间白板视图，挂载多模态卡片并进行空间组织与连线 |
-| `F5` | **(白板中) 全屏分镜演示模式** | 一键进入/退出电影级全屏分镜演示，自动沿因果 DAG 拓扑链路平滑运镜聚焦 |
-| `Ctrl + V` | **(白板中) 剪贴板一键粘贴卡片/图片** | 直接粘贴剪贴板截图或文本，自动落盘存入 `assets/` 并在当前视口挂载卡片 |
-| `拖拽媒体文件` | **(白板中) 拖拽投放多模态卡片** | 从桌面/文件夹直接拖拽图片、视频、音频到白板，在鼠标落点批量生成媒体卡片 |
-| `R` | **(白板连线选中时) 反转连线流向** | 一键对调连线两端起止卡片与箭头指向，伴有 Toast 反馈 |
-| `Shift + 点击 / 框选` | **(白板中) 连线/卡片批量多选** | 批量多选连线呼出底部批量工具栏（一键批量改色、箭头、线型、虚实形态、反向与删除） |
-| `双击折线拐点手柄` | **(白板折线选中时) 复位折线拐点** | 双击正交折线中心调整手柄，快速将折线弯折位置复位至几何中位线 |
-| `Shift + 1` | **(白板中) 适应画布内容** | 一键平滑缩放平移至最适全景视口 (Zoom to Fit) |
-| `Ctrl + 0` | **(白板中) 重置缩放 100%** | 恢复白板视口为标准 100% 原始比例 |
-| `Ctrl + G` | **(白板多选时) 打包为分组容器** | 一键将多选卡片智能计算包围盒并打包为分组容器 |
-| `Ctrl + M` | **思维导图视图** | 一键在 Markdown 读写与交互式思维导图间切换（编辑区免失焦直接穿透） |
-| `Tab` / `Insert` | **(导图中) 添加子主题** | 为当前选中的脑图节点创建下一级子分支并就地命名 |
-| `Enter` | **(导图中) 添加同级主题** | 为当前选中的脑图节点创建同级分支 |
-| `Delete` | **(导图中) 删除主题** | 删除选中的脑图分支及其子节点（受保护根节点除外） |
-| `F2` / `Space` | **(导图中) 重命名主题** | 就地呼出悬浮输入框修改节点名称（支持双击编辑） |
-| `↑ ↓ ← →` | **(导图中) 方向键导航** | 在父子主题与兄弟主题之间键盘快速漫游定位 |
-| `Ctrl + G` | **打开/收起知识网络图谱** | 开启或收起右侧关联图谱，支持 1-Hop/2-Hop 局部视野与目录色彩聚类（编辑区免失焦直接穿透） |
-| `Ctrl + Enter` | **保存归档闪念** | 在闪念微窗内一键原子追加写入 `Inbox/YYYY-MM-DD.md` 收集箱 |
-| `Esc` | **隐匿微窗 / 退出全屏 / 退出灯箱** | 随时隐藏闪念胶囊、退出全屏演示、退出灯箱或思维导图模式 |
-| `Ctrl + N` | **新建文件** | 打开保存对话框创建新 Markdown 文件并进入编辑 |
-| `Ctrl + S` | **保存文件** | 保存当前文档修改（未保存时顶部与底部指示灯高亮） |
-| `Ctrl + Shift + S` | **另存为** | 将当前编辑内容另存为新路径 |
-| `Ctrl + O` | **打开文件** | 快速打开本地单个 Markdown 文件 |
-| `Ctrl + Shift + O` | **打开目录** | 选择并载入 Markdown 文档文件夹 |
-| `Ctrl + W` | **关闭标签页** | 关闭当前文档标签页（未保存时触发确认弹窗） |
-| `Ctrl + Tab` | **下一标签页** | 循环切换到下一个文档标签页 |
-| `Ctrl + Shift + Tab` | **上一标签页** | 循环切换到上一个文档标签页 |
-| `F10` | **专注模式 (Zen)** | 切换专注极简全宽阅读写作模式 |
-| `Alt + T` | **打字机居中滚动** | 开启/关闭活动光标行视口居中模式 |
-| `F11` | **全屏模式** | 切换沉浸式全屏阅读/写作（支持 `Esc` 退出） |
-| `Ctrl + \` | **折叠/展开目录栏** | 快捷切换左侧文件目录树显示状态（编辑区免失焦直接穿透） |
-| `Ctrl + F` | **搜索内容** | 呼出搜索面板（支持 tag:#、link:[[、"短语"、-排除、全库切换） |
-| `Ctrl + B` | **添加书签** | 快速记录当前小节与阅读百分比 |
-| `Alt + ←` | **上一篇** | 切换到上一章节（未保存修改时自动拦截提醒） |
-| `Alt + →` | **下一篇** | 切换到下一章节（未保存修改时自动拦截提醒） |
+| 快捷键                | 功能                                 | 说明                                                                                                 |
+| :-------------------- | :----------------------------------- | :--------------------------------------------------------------------------------------------------- |
+| `Alt + Space`         | **呼出/隐藏闪念胶囊**                | 全局秒级唤起毛玻璃速记微窗（可在软件内自由自定义）                                                   |
+| `Ctrl + K`            | **全局命令面板与快速切换器**         | 呼出全能中枢：快速切换笔记 (MRU)、执行系统命令 (`>`)、大纲小节秒级直达 (`#`)（编辑区免失焦直接穿透） |
+| `Ctrl + P`            | **打印 / 导出 PDF**                  | 呼出 Chromium 原生高保真打印与 A4 矢量 PDF 导出（跨页防截断，编辑区免失焦直接穿透）                  |
+| `/`                   | **斜杠命令补全菜单**                 | (编辑器行首或空格后) 呼出 20+ 项排版、表格、代码、公式与 Callout 模板                                |
+| `右键`                | **情境感知右键菜单**                 | (编辑器选区/正文) 提取为新笔记、生成块引用、存入闪念、富文本排版转换                                 |
+| `Ctrl + Shift + H`    | **版本快照历史与双栏对比**           | 呼出本地时间旅行面板，支持 Side-by-Side 逐行与行内对比、一键无损还原                                 |
+| `Ctrl + Shift + C`    | **空间可视化白板**                   | 切换至无限空间白板视图，挂载多模态卡片并进行空间组织与连线                                           |
+| `F5`                  | **(白板中) 全屏分镜演示模式**        | 一键进入/退出电影级全屏分镜演示，自动沿因果 DAG 拓扑链路平滑运镜聚焦                                 |
+| `Ctrl + V`            | **(白板中) 剪贴板一键粘贴卡片/图片** | 直接粘贴剪贴板截图或文本，自动落盘存入 `assets/` 并在当前视口挂载卡片                                |
+| `拖拽媒体文件`        | **(白板中) 拖拽投放多模态卡片**      | 从桌面/文件夹直接拖拽图片、视频、音频到白板，在鼠标落点批量生成媒体卡片                              |
+| `R`                   | **(白板连线选中时) 反转连线流向**    | 一键对调连线两端起止卡片与箭头指向，伴有 Toast 反馈                                                  |
+| `Shift + 点击 / 框选` | **(白板中) 连线/卡片批量多选**       | 批量多选连线呼出底部批量工具栏（一键批量改色、箭头、线型、虚实形态、反向与删除）                     |
+| `双击折线拐点手柄`    | **(白板折线选中时) 复位折线拐点**    | 双击正交折线中心调整手柄，快速将折线弯折位置复位至几何中位线                                         |
+| `Shift + 1`           | **(白板中) 适应画布内容**            | 一键平滑缩放平移至最适全景视口 (Zoom to Fit)                                                         |
+| `Ctrl + 0`            | **(白板中) 重置缩放 100%**           | 恢复白板视口为标准 100% 原始比例                                                                     |
+| `Ctrl + G`            | **(白板多选时) 打包为分组容器**      | 一键将多选卡片智能计算包围盒并打包为分组容器                                                         |
+| `Ctrl + M`            | **思维导图视图**                     | 一键在 Markdown 读写与交互式思维导图间切换（编辑区免失焦直接穿透）                                   |
+| `Tab` / `Insert`      | **(导图中) 添加子主题**              | 为当前选中的脑图节点创建下一级子分支并就地命名                                                       |
+| `Enter`               | **(导图中) 添加同级主题**            | 为当前选中的脑图节点创建同级分支                                                                     |
+| `Delete`              | **(导图中) 删除主题**                | 删除选中的脑图分支及其子节点（受保护根节点除外）                                                     |
+| `F2` / `Space`        | **(导图中) 重命名主题**              | 就地呼出悬浮输入框修改节点名称（支持双击编辑）                                                       |
+| `↑ ↓ ← →`             | **(导图中) 方向键导航**              | 在父子主题与兄弟主题之间键盘快速漫游定位                                                             |
+| `Ctrl + G`            | **打开/收起知识网络图谱**            | 开启或收起右侧关联图谱，支持 1-Hop/2-Hop 局部视野与目录色彩聚类（编辑区免失焦直接穿透）              |
+| `Ctrl + Enter`        | **保存归档闪念**                     | 在闪念微窗内一键原子追加写入 `Inbox/YYYY-MM-DD.md` 收集箱                                            |
+| `Esc`                 | **隐匿微窗 / 退出全屏 / 退出灯箱**   | 随时隐藏闪念胶囊、退出全屏演示、退出灯箱或思维导图模式                                               |
+| `Ctrl + N`            | **新建文件**                         | 打开保存对话框创建新 Markdown 文件并进入编辑                                                         |
+| `Ctrl + S`            | **保存文件**                         | 保存当前文档修改（未保存时顶部与底部指示灯高亮）                                                     |
+| `Ctrl + Shift + S`    | **另存为**                           | 将当前编辑内容另存为新路径                                                                           |
+| `Ctrl + O`            | **打开文件**                         | 快速打开本地单个 Markdown 文件                                                                       |
+| `Ctrl + Shift + O`    | **打开目录**                         | 选择并载入 Markdown 文档文件夹                                                                       |
+| `Ctrl + W`            | **关闭标签页**                       | 关闭当前文档标签页（未保存时触发确认弹窗）                                                           |
+| `Ctrl + Tab`          | **下一标签页**                       | 循环切换到下一个文档标签页                                                                           |
+| `Ctrl + Shift + Tab`  | **上一标签页**                       | 循环切换到上一个文档标签页                                                                           |
+| `F10`                 | **专注模式 (Zen)**                   | 切换专注极简全宽阅读写作模式                                                                         |
+| `Alt + T`             | **打字机居中滚动**                   | 开启/关闭活动光标行视口居中模式                                                                      |
+| `F11`                 | **全屏模式**                         | 切换沉浸式全屏阅读/写作（支持 `Esc` 退出）                                                           |
+| `Ctrl + \`            | **折叠/展开目录栏**                  | 快捷切换左侧文件目录树显示状态（编辑区免失焦直接穿透）                                               |
+| `Ctrl + F`            | **搜索内容**                         | 呼出搜索面板（支持 tag:#、link:[[、"短语"、-排除、全库切换）                                         |
+| `Ctrl + B`            | **添加书签**                         | 快速记录当前小节与阅读百分比                                                                         |
+| `Alt + ←`             | **上一篇**                           | 切换到上一章节（未保存修改时自动拦截提醒）                                                           |
+| `Alt + →`             | **下一篇**                           | 切换到下一章节（未保存修改时自动拦截提醒）                                                           |
 
 ---
 
@@ -540,14 +555,17 @@
 > 🌐 **GitHub 官方发布主页**：[GitHub Releases · v2.6.5](https://github.com/chunxvzhang-lab/KnowSpace/releases/tag/v2.6.5)
 
 ### 1. Windows 图形化安装程序（推荐）
+
 - **安装文件**：[`KnowSpace-Setup-2.6.5.exe`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.6.5/KnowSpace-Setup-2.6.5.exe)
 - **特点**：双击即可向导式安装，支持自定义安装目录，自动创建桌面快捷方式与开始菜单官方品牌图标，深度集成系统级 `.md` 与 `.canvas` 文件关联，内置标准卸载程序。
 
 ### 2. Windows MSI 标准安装包
+
 - **安装文件**：[`KnowSpace-2.6.5.msi`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.6.5/KnowSpace-2.6.5.msi)
 - **特点**：Windows Installer 官方格式，适合企业批量部署、组策略分发与企业级静默安装，支持标准控制面板卸载。
 
 ### 3. Windows 绿色免安装便携版
+
 - **便携文件**：[`KnowSpace-win-x64-portable.zip`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.6.5/KnowSpace-win-x64-portable.zip)
 - **直接运行**：解压后双击 `KnowSpace.exe` 即可直接使用完整功能。
 - **特点**：解压即用、随身携带（支持装入 U 盘或移动硬盘）；完全自包含 Electron 运行时与全套本地依赖，无需配置任何外部开发环境；支持右键「打开方式」关联 Markdown 与白板文档。
@@ -558,12 +576,12 @@
 
 项目基于严谨的跨平台桌面应用架构设计，各开发语言在技术栈中承担明确的核心职责：
 
-| 开发语言 / 技术栈 | 架构层次 | 核心职责与代表模块 | 仓库语言权重 |
-| :--- | :--- | :--- | :---: |
-| **TypeScript / TSX** | 核心业务与交互层 (Core Logic & UI) | React 19 用户界面、CodeMirror 6 极客源码编辑引擎、Markdown/AST 行号映射注入、双向精准同步滚动与高亮 Hook、多标签页管理器、大图与 Mermaid 3x PNG 导出、会话状态机、持久化存储服务 | **~75%** |
-| **CSS3 (Design System)** | 视觉设计系统 (Aesthetic Styling) | 极客暗夜 Twitter Dark 纯黑主题规范、日光浅色变量、Acrylic 毛玻璃灯箱与卡片、物理弹性动画、响应式断点适配 | **~15%** |
-| **JavaScript / CommonJS** | 原生运行时与桥接层 (Electron Desktop Runtime) | Electron 42 主进程生命周期管理、`contextBridge` 安全跨进程通信、原子落盘物理事务保存、UTF-8 BOM/换行符保真与外部修改冲突检测 | **~6%** |
-| **PowerShell / WiX / Python** | 发布构建与自动化 (Build & DevOps) | Windows MSI 安装包生成流水线、WiX 工具链自动编译链接、便携版零依赖打包压缩自动化脚本、GitHub Release 自动上传脚本 | **~4%** |
+| 开发语言 / 技术栈             | 架构层次                                      | 核心职责与代表模块                                                                                                                                                               | 仓库语言权重 |
+| :---------------------------- | :-------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :----------: |
+| **TypeScript / TSX**          | 核心业务与交互层 (Core Logic & UI)            | React 19 用户界面、CodeMirror 6 极客源码编辑引擎、Markdown/AST 行号映射注入、双向精准同步滚动与高亮 Hook、多标签页管理器、大图与 Mermaid 3x PNG 导出、会话状态机、持久化存储服务 |   **~75%**   |
+| **CSS3 (Design System)**      | 视觉设计系统 (Aesthetic Styling)              | 极客暗夜 Twitter Dark 纯黑主题规范、日光浅色变量、Acrylic 毛玻璃灯箱与卡片、物理弹性动画、响应式断点适配                                                                         |   **~15%**   |
+| **JavaScript / CommonJS**     | 原生运行时与桥接层 (Electron Desktop Runtime) | Electron 42 主进程生命周期管理、`contextBridge` 安全跨进程通信、原子落盘物理事务保存、UTF-8 BOM/换行符保真与外部修改冲突检测                                                     |   **~6%**    |
+| **PowerShell / WiX / Python** | 发布构建与自动化 (Build & DevOps)             | Windows MSI 安装包生成流水线、WiX 工具链自动编译链接、便携版零依赖打包压缩自动化脚本、GitHub Release 自动上传脚本                                                                |   **~4%**    |
 
 ---
 
@@ -575,105 +593,105 @@
 
 ### Key Features
 
-- **🃏 FSRS-5 Spaced Repetition (`v2.5.0`, New)**: The missing half of the loop — KnowSpace could record, organise and connect; now it helps you *internalise*. Cards are scheduled by the **FSRS-5 DSR model** (stability, difficulty and retrievability against the forgetting curve `R(t,S) = (1 + FACTOR·t/S)^DECAY`), so the moment your recall probability reaches 90% is exactly when the card comes back. Three inline syntaxes — `Q:`/`A:` blocks, `front :: back`, and `{{c1::answer}}` / `==highlight==` clozes — live inside ordinary Markdown, so nothing is polluted and no third-party editor breaks. Scheduling state is written to a single HTML comment at the end of the document, one card per line, which every other editor sees as an ordinary comment. Card ids derive from content, so reordering a note never detaches a card from its history. Four rating buttons each preview the interval they would produce. Pure CPU, no GPU, no network — the sub-50ms evaluation budget is enforced by a guard test. **v2.6.0** adds four card sources (Space, the open workspace, up to five folders of your own, and the document in front of you) and remembers the last one you used; one step of undo (`Ctrl/Cmd + Z`); a *Start a review* command in the palette and `/闪卡` slash commands that insert ready-made templates; and writes that merge into the file as it is — edits made elsewhere during a review are never overwritten, and a card deleted meanwhile stops being written back.
+- **🃏 FSRS-5 Spaced Repetition (`v2.5.0`, New)**: The missing half of the loop — KnowSpace could record, organise and connect; now it helps you _internalise_. Cards are scheduled by the **FSRS-5 DSR model** (stability, difficulty and retrievability against the forgetting curve `R(t,S) = (1 + FACTOR·t/S)^DECAY`), so the moment your recall probability reaches 90% is exactly when the card comes back. Three inline syntaxes — `Q:`/`A:` blocks, `front :: back`, and `{{c1::answer}}` / `==highlight==` clozes — live inside ordinary Markdown, so nothing is polluted and no third-party editor breaks. Scheduling state is written to a single HTML comment at the end of the document, one card per line, which every other editor sees as an ordinary comment. Card ids derive from content, so reordering a note never detaches a card from its history. Four rating buttons each preview the interval they would produce. Pure CPU, no GPU, no network — the sub-50ms evaluation budget is enforced by a guard test. **v2.6.0** adds four card sources (Space, the open workspace, up to five folders of your own, and the document in front of you) and remembers the last one you used; one step of undo (`Ctrl/Cmd + Z`); a _Start a review_ command in the palette and `/闪卡` slash commands that insert ready-made templates; and writes that merge into the file as it is — edits made elsewhere during a review are never overwritten, and a card deleted meanwhile stops being written back.
 - **🚀 Instant Load & 120FPS Performance Engine**:
-  - *Cooperative Idle-Sliced Background Indexer*: Eliminates UI freezing when opening large directories or switching files. Active document renders immediately (<50ms), while full-vault indexing is deferred and chunked in the background with cooperative 20ms yields. Zero dropped frames!
-  - *Batch IPC File Content Reader (`readMarkdownBatch`)*: High-throughput parallel reads in Node.js worker threads bypass redundant sequential IPC calls, delivering >10× faster disk reads.
-  - *32MB Expanded LRU Cache (256 Docs)*: Common workspace documents remain resident in memory; tab switching requires zero disk I/O.
+  - _Cooperative Idle-Sliced Background Indexer_: Eliminates UI freezing when opening large directories or switching files. Active document renders immediately (<50ms), while full-vault indexing is deferred and chunked in the background with cooperative 20ms yields. Zero dropped frames!
+  - _Batch IPC File Content Reader (`readMarkdownBatch`)_: High-throughput parallel reads in Node.js worker threads bypass redundant sequential IPC calls, delivering >10× faster disk reads.
+  - _32MB Expanded LRU Cache (256 Docs)_: Common workspace documents remain resident in memory; tab switching requires zero disk I/O.
 - **🎨 Infinite Canvas 2.4 & Presentation Mode 2.3 (Multimodal Spatial Canvas · Interactive Layout Spacing · JSON Canvas 1.0 Compatible · `Ctrl + Shift + C` · v2.4.0 Upgrade)**:
-  - *Multimodal Media Cards (v2.4.0 Upgrade)*: Instant clipboard screenshot paste (`Ctrl + V`) directly saves timestamped images into local `assets/` and mounts cards at the current viewport center; one-click image / video / audio insertion from the context menu, dropping the card exactly where you right-clicked; double-click any media card for a full-screen lightbox preview (video playback and audio player included, dismissed with ✕ or `Esc`); drag-and-drop media files (images, audio, video) from desktop; native audio/video playback controls in card; offscreen 1:1 SVG/PNG export fidelity.
-  - *AABB Obstacle Avoidance Routing (v2.4.0 Upgrade)*: Smart 5-segment orthogonal step line routing engine detects intervening card bounding boxes with a +14px safety boundary. Every pierced obstacle is merged into a single envelope, so a chain of adjacent cards is bypassed in one detour rather than only the first one — eliminating lines that cut through card text, while edge label badges dynamically attach to the midpoint.
-  - *F5 Presentation Mode 2.3 (Topological Causality Engine · v2.3.0 Upgrade)*:
-    - *Container-First Ordering*: Sequentially prioritizes cards by container groupings to ensure structured, modular presentation narratives.
-    - *Drill-down Subroutines & Smooth Return*: When playing an initiator card that links to external cards, deeply traverses target branches according to causal topology, then smoothly returns to the initiator's container to resume next cards.
-    - *Single Cards Before Cyclic Groups*: Prioritizes standalone linear branch cards before entering cyclic ring groups to prevent cognitive disruption.
-    - *Clockwise Full Cycle Traversal*: Union-Find loop detection and centroid polar angle sorting play every card in a closed cycle clockwise, followed by external outgoing branch exploration.
-    - *Context-Aware Cross-Container Replay*: Cards referenced earlier by external branches or visited in early containers are gracefully replayed when navigating through their own parent container.
-    - *Cinematic Camera Transitions*: Soft cubic-bezier camera focus, pulse glow illumination on active cards, background dimming overlay, full keyboard flow, and floating auto-play controller.
-  - *Open Standard Compatibility*: Full support for JSON Canvas 1.0 (`.canvas`), seamlessly interoperable with Obsidian Canvas and third-party spatial tools.
-  - *Ring Layout & True Circular Arcs*: One-click circular alignment of multiple cards with true inward circular arc connectors, an interactive radius slider, and drag-any-card-on-the-ring to resize the spacing live (a whole gesture records one history entry).
-  - *Rectangular Grid Layout*: Neatly arrange cards into rectangular matrices whose closed loop renders as a clean rectangular frame; drag any card to adjust row/column gutters live, and drag the hollow middle of the selection to move the whole group without disturbing the spacing.
-  - *12-Color Palettes & Custom Hex Picker*: Twelve professional colours plus full hex input for individual edges, batch card recolouring or batch edge recolouring — the picker previews live while you drag and commits a single history entry, so picking a colour neither crashes nor floods the undo stack.
-  - *Visual Decoupling for Loop-Initiating Cards*: When cards that belong to a closed ring initiate external connections, outgoing lines automatically adopt distinct decoupled colors to prevent visual confusion.
-  - *120FPS GPU Rasterization & Frustum Culling*: Hardware acceleration with rAF batching and 600px viewport culling delivers buttery-smooth 60/120fps panning and zooming.
-  - *Offscreen High-Fidelity 3× Retina PNG / SVG Export*: When the browser's canvas security model intervenes, rasterisation falls back to an offscreen `capturePage()` render inside the main process, so asking for a PNG always yields a PNG rather than a silent format swap; clipboard writes go through the native API; exported colours match the on-screen theme exactly; and media paths resolve against the board's own folder so image cards never render as broken placeholders.
-  - *Multimodal Cards & Geometric Alignment*: Markdown text nodes, embedded document nodes with live scrolling, and grouping containers. 4-side anchors align strictly to the exact geometric midpoints of card borders.
-  - *Vertical Tier Routing Dominance*: Smart routing algorithm prioritizes top/bottom vertical alignment for multi-tier and cross-container layouts even when connecting to outermost cards across wide horizontal spans.
-  - *Advanced Curve Dynamics & Orthogonal Dragging*: Anti-skyrocketing cubic bezier curves (bounded to $\le \text{gap} \times 0.55$) eliminate extreme arches; orthogonal step lines feature an interactive midpoint bend handle (`stepOffset`) with double-click reset.
-  - *Consistent Edge Colors & Container Multi-Card Auto-Differentiation*: All outgoing lines from the same card/starting point share an identical color (inheriting node color if set); when two or more cards within the same container initiate outgoing connection lines, distinct palette colors are automatically assigned to each card.
-  - *Multi-Edge Selection & Batch Operations*: Marquee select or Shift/Ctrl-click edges to reveal a floating batch toolbar for changing colors, markers, line styles, stroke patterns (solid/dashed/dotted), and bulk deletion.
-  - *Disconnect Selected Cards & Alignment Tools*: Context menu options to disconnect internal edges among selected cards while preserving external links, and comprehensive alignment tools including Horizontal Alignment, Vertical Alignment, Left/Center/Right, Top/Bottom, and Equal Distribution.
-  - *Minimap Radar & Reverse Longform Extraction*: Persistent minimap navigation with viewport indicator; one-click algorithmic reverse extraction transforms canvas spatial causality topology into a structured Markdown article!
+  - _Multimodal Media Cards (v2.4.0 Upgrade)_: Instant clipboard screenshot paste (`Ctrl + V`) directly saves timestamped images into local `assets/` and mounts cards at the current viewport center; one-click image / video / audio insertion from the context menu, dropping the card exactly where you right-clicked; double-click any media card for a full-screen lightbox preview (video playback and audio player included, dismissed with ✕ or `Esc`); drag-and-drop media files (images, audio, video) from desktop; native audio/video playback controls in card; offscreen 1:1 SVG/PNG export fidelity.
+  - _AABB Obstacle Avoidance Routing (v2.4.0 Upgrade)_: Smart 5-segment orthogonal step line routing engine detects intervening card bounding boxes with a +14px safety boundary. Every pierced obstacle is merged into a single envelope, so a chain of adjacent cards is bypassed in one detour rather than only the first one — eliminating lines that cut through card text, while edge label badges dynamically attach to the midpoint.
+  - _F5 Presentation Mode 2.3 (Topological Causality Engine · v2.3.0 Upgrade)_:
+    - _Container-First Ordering_: Sequentially prioritizes cards by container groupings to ensure structured, modular presentation narratives.
+    - _Drill-down Subroutines & Smooth Return_: When playing an initiator card that links to external cards, deeply traverses target branches according to causal topology, then smoothly returns to the initiator's container to resume next cards.
+    - _Single Cards Before Cyclic Groups_: Prioritizes standalone linear branch cards before entering cyclic ring groups to prevent cognitive disruption.
+    - _Clockwise Full Cycle Traversal_: Union-Find loop detection and centroid polar angle sorting play every card in a closed cycle clockwise, followed by external outgoing branch exploration.
+    - _Context-Aware Cross-Container Replay_: Cards referenced earlier by external branches or visited in early containers are gracefully replayed when navigating through their own parent container.
+    - _Cinematic Camera Transitions_: Soft cubic-bezier camera focus, pulse glow illumination on active cards, background dimming overlay, full keyboard flow, and floating auto-play controller.
+  - _Open Standard Compatibility_: Full support for JSON Canvas 1.0 (`.canvas`), seamlessly interoperable with Obsidian Canvas and third-party spatial tools.
+  - _Ring Layout & True Circular Arcs_: One-click circular alignment of multiple cards with true inward circular arc connectors, an interactive radius slider, and drag-any-card-on-the-ring to resize the spacing live (a whole gesture records one history entry).
+  - _Rectangular Grid Layout_: Neatly arrange cards into rectangular matrices whose closed loop renders as a clean rectangular frame; drag any card to adjust row/column gutters live, and drag the hollow middle of the selection to move the whole group without disturbing the spacing.
+  - _12-Color Palettes & Custom Hex Picker_: Twelve professional colours plus full hex input for individual edges, batch card recolouring or batch edge recolouring — the picker previews live while you drag and commits a single history entry, so picking a colour neither crashes nor floods the undo stack.
+  - _Visual Decoupling for Loop-Initiating Cards_: When cards that belong to a closed ring initiate external connections, outgoing lines automatically adopt distinct decoupled colors to prevent visual confusion.
+  - _120FPS GPU Rasterization & Frustum Culling_: Hardware acceleration with rAF batching and 600px viewport culling delivers buttery-smooth 60/120fps panning and zooming.
+  - _Offscreen High-Fidelity 3× Retina PNG / SVG Export_: When the browser's canvas security model intervenes, rasterisation falls back to an offscreen `capturePage()` render inside the main process, so asking for a PNG always yields a PNG rather than a silent format swap; clipboard writes go through the native API; exported colours match the on-screen theme exactly; and media paths resolve against the board's own folder so image cards never render as broken placeholders.
+  - _Multimodal Cards & Geometric Alignment_: Markdown text nodes, embedded document nodes with live scrolling, and grouping containers. 4-side anchors align strictly to the exact geometric midpoints of card borders.
+  - _Vertical Tier Routing Dominance_: Smart routing algorithm prioritizes top/bottom vertical alignment for multi-tier and cross-container layouts even when connecting to outermost cards across wide horizontal spans.
+  - _Advanced Curve Dynamics & Orthogonal Dragging_: Anti-skyrocketing cubic bezier curves (bounded to $\le \text{gap} \times 0.55$) eliminate extreme arches; orthogonal step lines feature an interactive midpoint bend handle (`stepOffset`) with double-click reset.
+  - _Consistent Edge Colors & Container Multi-Card Auto-Differentiation_: All outgoing lines from the same card/starting point share an identical color (inheriting node color if set); when two or more cards within the same container initiate outgoing connection lines, distinct palette colors are automatically assigned to each card.
+  - _Multi-Edge Selection & Batch Operations_: Marquee select or Shift/Ctrl-click edges to reveal a floating batch toolbar for changing colors, markers, line styles, stroke patterns (solid/dashed/dotted), and bulk deletion.
+  - _Disconnect Selected Cards & Alignment Tools_: Context menu options to disconnect internal edges among selected cards while preserving external links, and comprehensive alignment tools including Horizontal Alignment, Vertical Alignment, Left/Center/Right, Top/Bottom, and Equal Distribution.
+  - _Minimap Radar & Reverse Longform Extraction_: Persistent minimap navigation with viewport indicator; one-click algorithmic reverse extraction transforms canvas spatial causality topology into a structured Markdown article!
 - **⏳ Local Version History & Side-by-Side Diff (`Ctrl + Shift + H`)**:
-  - *Silent Snapshot Engine*: Maintains local version history in `.knowspace/snapshots/` with 30s debounce, SHA-256 deduplication, and automatic pruning (latest 50 versions).
-  - *Side-by-Side & Unified Diffs*: Myers LCS-powered line-by-line diffing with granular intra-line character diff highlight and additions/deletions stats.
-  - *One-Click Safe Rollback*: Non-destructive revert to any snapshot with safety confirmation and manual snapshot creation.
+  - _Silent Snapshot Engine_: Maintains local version history in `.knowspace/snapshots/` with 30s debounce, SHA-256 deduplication, and automatic pruning (latest 50 versions).
+  - _Side-by-Side & Unified Diffs_: Myers LCS-powered line-by-line diffing with granular intra-line character diff highlight and additions/deletions stats.
+  - _One-Click Safe Rollback_: Non-destructive revert to any snapshot with safety confirmation and manual snapshot creation.
 - **🔍 Hybrid Vault Search & Inverted Index Engine (`Ctrl + F`)**:
-  - *Millisecond Full-Vault Search*: High-performance inverted index (`tagIndex`, `linkIndex`, `termIndex`) delivers results in < 15ms.
-  - *Structured Query Syntax*: Supports `tag:#tag` or `tag:tag`, `link:[[doc]]`, `"exact phrase"`, `-exclusion`, and date ranges (`after:`, `before:`).
-  - *Scope Switching & Highlight Pulse*: Instant toggle between Current Chapter and Entire Vault, fast syntax helper chips, and smooth line scroll with glowing pulse animation.
+  - _Millisecond Full-Vault Search_: High-performance inverted index (`tagIndex`, `linkIndex`, `termIndex`) delivers results in < 15ms.
+  - _Structured Query Syntax_: Supports `tag:#tag` or `tag:tag`, `link:[[doc]]`, `"exact phrase"`, `-exclusion`, and date ranges (`after:`, `before:`).
+  - _Scope Switching & Highlight Pulse_: Instant toggle between Current Chapter and Entire Vault, fast syntax helper chips, and smooth line scroll with glowing pulse animation.
 - **🎯 All-in-One Command Palette & Quick Switcher (`Ctrl + K`)**:
-  - *Three-in-One Global Hub*: Recent file switcher with MRU history & fuzzy pinyin search, `>` action commands (theme switching, export, layout toggle), and `#` heading outline jump.
-  - *Keybinding Penetration*: Instant trigger directly from CodeMirror 6 editor without losing focus or typing flow.
+  - _Three-in-One Global Hub_: Recent file switcher with MRU history & fuzzy pinyin search, `>` action commands (theme switching, export, layout toggle), and `#` heading outline jump.
+  - _Keybinding Penetration_: Instant trigger directly from CodeMirror 6 editor without losing focus or typing flow.
 - **🖨️ High-Fidelity Vector PDF Print & Export (`Ctrl + P`)**:
-  - *Chromium Native Vector Print Engine*: Export standard A4 vector PDF directly or print via system dialog.
-  - *Intelligent Page-Break Prevention*: Custom `@media print` rules prevent code blocks, LaTeX formulas, GFM tables, and Mermaid diagrams from being cut in half across pages.
+  - _Chromium Native Vector Print Engine_: Export standard A4 vector PDF directly or print via system dialog.
+  - _Intelligent Page-Break Prevention_: Custom `@media print` rules prevent code blocks, LaTeX formulas, GFM tables, and Mermaid diagrams from being cut in half across pages.
 - **🧠 Interactive Mind Map & Non-Destructive Bidirectional Sync (`Ctrl + M` · v2.3.0 Upgrade)**:
-  - *Non-Destructive Bidirectional Sync Engine*: AST-driven incremental chunk mapping (`syncMindmapToDocument`) 100% preserves text paragraphs, multi-line code blocks, GFM tables, math formulas, and block anchors during mindmap edits. Reorganizing sections in the mindmap never wipes out document bodies!
-  - *Responsive Wrapped Toolbar (v2.3.0 Upgrade)*: Fluid responsive button bar wraps automatically on narrow displays, split-screen views, or high DPI scaling, eliminating button clipping or horizontal overflowing.
-  - *Explicit Sync Toolbar & Dirty Sensing*: Topbar `🔄 Sync to Document` button with emerald glow and breathing pulse indicator, `Ctrl+S` / `Cmd+S` keyboard sync, and automatic reverse sync when editing markdown headings.
-  - *Pure Minimalist UI*: Eliminated floating plus button next to node collapse/expand toggles, keeping clean native border circles `(+)` / `(-)`.
-  - *Multi-Format Export*: Export 2× Retina transparent PNG diagrams, standard OPML 2.0 (`.opml`) for MindNode / OmniOutliner / Logseq, FreeMind 1.0.1 XML (`.mm`) for XMind / Freeplane with preserved node colors, and structured Markdown outlines. Since **v2.6.0** also SVG and print-to-PDF, plus `.xmind` (a ZIP with DEFLATE written here — the one format this app can read back); the matching imports (`.opml`, `.mm`, `.xmind`) arrive as new documents carrying their notes, links, relations, summaries and boundaries.
-  - *Drag-and-Drop Reparenting*: Intuitive reorganization with cycle detection and snap glow.
-  - *In-Canvas Search & Smooth Focus*: Dynamic keyword highlight and viewport centering.
-  - *Full Keyboard Flow*: `Tab` (add subtopic), `Enter` (add sibling), `Delete` (remove topic), `F2` / Double-Click (in-place rename with Chinese IME support), Arrow Keys (smooth navigation), `Ctrl+Z` / `Ctrl+Y` (undo / redo).
-  - *Right-Click Appearance Customization*: 14 harmonic palettes, 4 node shapes (capsule, rounded, sharp rect, minimalist underline), 3 connector line styles (bezier, step, straight).
-  - *Block-Level Atomic Linking & Clean Badges*: Paragraph-level fingerprinting (`^block-id`), direct jumping (`[[doc#^block]]`), elegant embed cards (`![[doc#^block]]`), and intelligent badge styling hiding raw anchor strings.
+  - _Non-Destructive Bidirectional Sync Engine_: AST-driven incremental chunk mapping (`syncMindmapToDocument`) 100% preserves text paragraphs, multi-line code blocks, GFM tables, math formulas, and block anchors during mindmap edits. Reorganizing sections in the mindmap never wipes out document bodies!
+  - _Responsive Wrapped Toolbar (v2.3.0 Upgrade)_: Fluid responsive button bar wraps automatically on narrow displays, split-screen views, or high DPI scaling, eliminating button clipping or horizontal overflowing.
+  - _Explicit Sync Toolbar & Dirty Sensing_: Topbar `🔄 Sync to Document` button with emerald glow and breathing pulse indicator, `Ctrl+S` / `Cmd+S` keyboard sync, and automatic reverse sync when editing markdown headings.
+  - _Pure Minimalist UI_: Eliminated floating plus button next to node collapse/expand toggles, keeping clean native border circles `(+)` / `(-)`.
+  - _Multi-Format Export_: Export 2× Retina transparent PNG diagrams, standard OPML 2.0 (`.opml`) for MindNode / OmniOutliner / Logseq, FreeMind 1.0.1 XML (`.mm`) for XMind / Freeplane with preserved node colors, and structured Markdown outlines. Since **v2.6.0** also SVG and print-to-PDF, plus `.xmind` (a ZIP with DEFLATE written here — the one format this app can read back); the matching imports (`.opml`, `.mm`, `.xmind`) arrive as new documents carrying their notes, links, relations, summaries and boundaries.
+  - _Drag-and-Drop Reparenting_: Intuitive reorganization with cycle detection and snap glow.
+  - _In-Canvas Search & Smooth Focus_: Dynamic keyword highlight and viewport centering.
+  - _Full Keyboard Flow_: `Tab` (add subtopic), `Enter` (add sibling), `Delete` (remove topic), `F2` / Double-Click (in-place rename with Chinese IME support), Arrow Keys (smooth navigation), `Ctrl+Z` / `Ctrl+Y` (undo / redo).
+  - _Right-Click Appearance Customization_: 14 harmonic palettes, 4 node shapes (capsule, rounded, sharp rect, minimalist underline), 3 connector line styles (bezier, step, straight).
+  - _Block-Level Atomic Linking & Clean Badges_: Paragraph-level fingerprinting (`^block-id`), direct jumping (`[[doc#^block]]`), elegant embed cards (`![[doc#^block]]`), and intelligent badge styling hiding raw anchor strings.
 - **🌐 60FPS Knowledge Graph, Decoupled Navigation & Visual Upgrade (`Ctrl + G` · v2.2.0 Upgrade)**:
-  - *Decoupled Click & Double-Click Navigation*: Single-clicking a node highlights its 1-hop connections and reveals the inspector card without opening the document in the left editor. Double-clicking (350ms window) opens the note. Canvas background click clears selection and restores the full view.
-  - *Structured 280px Glassmorphism Inspector Card*: Tiered layout with Meta badges, dedicated title, monospace path, 3-column metric cards (in-degree, out-degree, cross-folder), and direct jump bar.
-  - *Cytoscape Tween Transition & Hover Headlight*: Smooth 0.18s CSS transition on edge/node highlights, and Hover Headlight illumination on mouseover.
-  - *Hop Depth Filtering*: Toggle between `1-Hop` direct neighbors, `2-Hop` extended subgraphs, and global galaxy to eliminate cognitive overload in large vaults. Click any node to dynamically re-center.
-  - *Folder Cluster Coloring*: HSL harmonic palette automatically groups notes by their root folders with matched glow borders and links.
-  - *MOC Hubs & Orphan Detection*: Filter degree $\ge 3$ core hubs or degree $= 0$ isolated notes for vault maintenance.
-  - *Ultra-Smooth Canvas Engine*: 60FPS native 2D Canvas rendering pipeline with RAF throttling for hundreds of notes.
-  - *Golden Spiral 2D Organic Force-Directed Layout*: Self-developed 2.2ms physics simulation that groups related notes into galaxies and smoothly orbits isolated notes without vertical stacking.
-  - *WikiLink Suggestions & Cascading Refactor*: Typing `[[` pops up instant document autocomplete suggestions; renaming any file automatically updates all references.
+  - _Decoupled Click & Double-Click Navigation_: Single-clicking a node highlights its 1-hop connections and reveals the inspector card without opening the document in the left editor. Double-clicking (350ms window) opens the note. Canvas background click clears selection and restores the full view.
+  - _Structured 280px Glassmorphism Inspector Card_: Tiered layout with Meta badges, dedicated title, monospace path, 3-column metric cards (in-degree, out-degree, cross-folder), and direct jump bar.
+  - _Cytoscape Tween Transition & Hover Headlight_: Smooth 0.18s CSS transition on edge/node highlights, and Hover Headlight illumination on mouseover.
+  - _Hop Depth Filtering_: Toggle between `1-Hop` direct neighbors, `2-Hop` extended subgraphs, and global galaxy to eliminate cognitive overload in large vaults. Click any node to dynamically re-center.
+  - _Folder Cluster Coloring_: HSL harmonic palette automatically groups notes by their root folders with matched glow borders and links.
+  - _MOC Hubs & Orphan Detection_: Filter degree $\ge 3$ core hubs or degree $= 0$ isolated notes for vault maintenance.
+  - _Ultra-Smooth Canvas Engine_: 60FPS native 2D Canvas rendering pipeline with RAF throttling for hundreds of notes.
+  - _Golden Spiral 2D Organic Force-Directed Layout_: Self-developed 2.2ms physics simulation that groups related notes into galaxies and smoothly orbits isolated notes without vertical stacking.
+  - _WikiLink Suggestions & Cascading Refactor_: Typing `[[` pops up instant document autocomplete suggestions; renaming any file automatically updates all references.
 - **✍️ Modern Editor, Slash Commands & Smart Menu**:
-  - *Slash Commands (`/`)*: Fast autocompletion for 20+ templates (headings, checklists, tables, code blocks, math, callouts, and diagrams).
-  - *Context-Aware Right-Click Menu*: Extract selected text to a new note with automatic bidirectional link insertion, create block references (`^block`), save to flash notes, or format text.
-  - *Clipboard Image Paste (`Ctrl + V`)*: Paste screenshots or images directly into CodeMirror 6. Auto-saves timestamped image files into local `assets/` directory and inserts markdown syntax with instant live preview.
-  - *Image Drop*: Drag-and-drop image files from desktop directly into editor.
-  - *AST Precise Synchronized Scrolling*: Eliminates drift between source code and rich preview with piecewise linear interpolation.
-  - *Typewriter Mode (`Alt + T`)*: Keeps the active editing line vertically centered.
-  - *Keybinding Penetration*: Global hotkeys (`Ctrl+K`, `Ctrl+G`, `Ctrl+M`, `Ctrl+\`, `Ctrl+P`) respond directly from inside editor without focus shifting.
+  - _Slash Commands (`/`)_: Fast autocompletion for 20+ templates (headings, checklists, tables, code blocks, math, callouts, and diagrams).
+  - _Context-Aware Right-Click Menu_: Extract selected text to a new note with automatic bidirectional link insertion, create block references (`^block`), save to flash notes, or format text.
+  - _Clipboard Image Paste (`Ctrl + V`)_: Paste screenshots or images directly into CodeMirror 6. Auto-saves timestamped image files into local `assets/` directory and inserts markdown syntax with instant live preview.
+  - _Image Drop_: Drag-and-drop image files from desktop directly into editor.
+  - _AST Precise Synchronized Scrolling_: Eliminates drift between source code and rich preview with piecewise linear interpolation.
+  - _Typewriter Mode (`Alt + T`)_: Keeps the active editing line vertically centered.
+  - _Keybinding Penetration_: Global hotkeys (`Ctrl+K`, `Ctrl+G`, `Ctrl+M`, `Ctrl+\`, `Ctrl+P`) respond directly from inside editor without focus shifting.
 - **📖 Reader & Scientific Diagrams**:
-  - *Typography*: Beautiful 960px golden reading width, distraction-free reading experience.
-  - *Mermaid Diagrams & 3× Retina Export*: Renders flowcharts, mindmaps, sequence diagrams, and class diagrams. Exports ultra-sharp 3× Retina PNG diagrams.
-  - *LaTeX / KaTeX Formula Support*: Fast native inline `\(...\)` and block `\[...\]` math rendering.
-  - *Media & Diagram Lightbox*: Click any image or diagram for full-screen glassmorphic zoom (0.2×~6×) and smooth panning.
+  - _Typography_: Beautiful 960px golden reading width, distraction-free reading experience.
+  - _Mermaid Diagrams & 3× Retina Export_: Renders flowcharts, mindmaps, sequence diagrams, and class diagrams. Exports ultra-sharp 3× Retina PNG diagrams.
+  - _LaTeX / KaTeX Formula Support_: Fast native inline `\(...\)` and block `\[...\]` math rendering.
+  - _Media & Diagram Lightbox_: Click any image or diagram for full-screen glassmorphic zoom (0.2×~6×) and smooth panning.
 - **🎨 Three Immersive Themes**:
-  - *Warm Amber Light*: Gentle warm amber accents (`#D97706` / `#F59E0B`) on soft white, easy on the eyes.
-  - *E-ink Paper*: High-contrast parchment paper style (`#F4F1EA`) with deep ink typography and greyscale diagrams.
-  - *Geek Dark*: Pure black background (`#000000`) with electric blue accents (`#1D9BF0`).
+  - _Warm Amber Light_: Gentle warm amber accents (`#D97706` / `#F59E0B`) on soft white, easy on the eyes.
+  - _E-ink Paper_: High-contrast parchment paper style (`#F4F1EA`) with deep ink typography and greyscale diagrams.
+  - _Geek Dark_: Pure black background (`#000000`) with electric blue accents (`#1D9BF0`).
 - **🪟 Multi-tabs, Dual Split & Detached Windows**:
-  - *Multi-Tabs Bar*: Tab management with dirty state indicators, middle-click close, and tab switching.
-  - *Dual Document Split View*: Compare two Markdown files side-by-side with a draggable splitter.
-  - *Detach Tab to Standalone Window*: Pop any tab out into an independent Electron window.
-  - *Windows Desktop Snap Layouts*: Flawless docking on Windows 10/11 splits.
+  - _Multi-Tabs Bar_: Tab management with dirty state indicators, middle-click close, and tab switching.
+  - _Dual Document Split View_: Compare two Markdown files side-by-side with a draggable splitter.
+  - _Detach Tab to Standalone Window_: Pop any tab out into an independent Electron window.
+  - _Windows Desktop Snap Layouts_: Flawless docking on Windows 10/11 splits.
 - **🔍 Structure & Navigation**:
-  - *Collapsible Directory Tree*: Multi-level folder navigation with remembered expansion states.
-  - *Dynamic Table of Contents (TOC)*: Auto-highlighting current heading with smooth scroll navigation.
-  - *Fulltext Search (`Ctrl + F`)*: Instant paragraph card aggregation with synchronized keyword highlighting.
-  - *Bookmarks (`Ctrl + B`)*: Quick access to important sections with preserved scroll ratios.
+  - _Collapsible Directory Tree_: Multi-level folder navigation with remembered expansion states.
+  - _Dynamic Table of Contents (TOC)_: Auto-highlighting current heading with smooth scroll navigation.
+  - _Fulltext Search (`Ctrl + F`)_: Instant paragraph card aggregation with synchronized keyword highlighting.
+  - _Bookmarks (`Ctrl + B`)_: Quick access to important sections with preserved scroll ratios.
 - **🛡️ Desktop Integration & Data Security**:
-  - *System Tray & Silent Launch*: Runs quietly in system tray, instant background boot with Windows (`--hidden`).
-  - *File Association*: Instant launch on double-clicking any `.md` file in Windows Explorer.
-  - *Atomic File Saving & Encoding Fidelity*: Temp file atomic rename with fsync, preserving UTF-8 BOM and CRLF/LF line breaks.
-  - *Conflict Detection*: Automatic alert when files are modified externally.
+  - _System Tray & Silent Launch_: Runs quietly in system tray, instant background boot with Windows (`--hidden`).
+  - _File Association_: Instant launch on double-clicking any `.md` file in Windows Explorer.
+  - _Atomic File Saving & Encoding Fidelity_: Temp file atomic rename with fsync, preserving UTF-8 BOM and CRLF/LF line breaks.
+  - _Conflict Detection_: Automatic alert when files are modified externally.
 - **🧪 Sub-function Ecosystem & 100% Test Coverage**:
-  - *Full Spectrum Granular Sub-functions*: Zoomable Media Lightbox (0.2×~6×, smooth pan, download, Esc), Typography Status Bar (word/char count, reading time estimation, dirty state, readonly lock), Backlinks & Unlinked Mentions with 1-click upgrade to `[[wikilinks]]`, External File Conflict Arbitrator (`FileConflictDialog`), Unsaved Changes Protector (`UnsavedChangesDialog`), Dynamic TOC & Cross-Chapter Bookmark Resolver, Space Flash Note Directory Isolation, Web Snapshot FIFO Pruning (30-cap), and Mermaid Base64 entity-safe SVG rendering with graceful error fallbacks.
-  - *Rock-Solid Reliability*: 103 test suites, **1276** automated unit and integration tests passing with a 100% success rate!
+  - _Full Spectrum Granular Sub-functions_: Zoomable Media Lightbox (0.2×~6×, smooth pan, download, Esc), Typography Status Bar (word/char count, reading time estimation, dirty state, readonly lock), Backlinks & Unlinked Mentions with 1-click upgrade to `[[wikilinks]]`, External File Conflict Arbitrator (`FileConflictDialog`), Unsaved Changes Protector (`UnsavedChangesDialog`), Dynamic TOC & Cross-Chapter Bookmark Resolver, Space Flash Note Directory Isolation, Web Snapshot FIFO Pruning (30-cap), and Mermaid Base64 entity-safe SVG rendering with graceful error fallbacks.
+  - _Rock-Solid Reliability_: 103 test suites, **1276** automated unit and integration tests passing with a 100% success rate!
 
 ---
 

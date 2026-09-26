@@ -117,7 +117,10 @@ export function isSameRelation(relation: MindmapRelation, a: string, b: string):
  * Pure, and tested: the arithmetic is the part of drawing a line that nobody can
  * check by looking at the result.
  */
-export function boxEdgePoint(box: RelationBox, towards: { x: number; y: number }): { x: number; y: number } {
+export function boxEdgePoint(
+  box: RelationBox,
+  towards: { x: number; y: number },
+): { x: number; y: number } {
   const centreX = box.x + box.width / 2;
   const centreY = box.y + box.height / 2;
   const dx = towards.x - centreX;
@@ -157,7 +160,7 @@ export function relationPath(from: RelationBox, to: RelationBox): string {
  */
 export function relationGeometry(
   from: RelationBox,
-  to: RelationBox
+  to: RelationBox,
 ): {
   path: string;
   start: { x: number; y: number };
@@ -206,11 +209,7 @@ export function relationGeometry(
  * marker: a marker would have to be defined once per colour, and every relation
  * may carry a different one.
  */
-export function arrowHeadPath(
-  point: { x: number; y: number },
-  angle: number,
-  size = 9
-): string {
+export function arrowHeadPath(point: { x: number; y: number }, angle: number, size = 9): string {
   const back = { x: point.x - Math.cos(angle) * size, y: point.y - Math.sin(angle) * size };
   const normal = { x: -Math.sin(angle) * size * 0.45, y: Math.cos(angle) * size * 0.45 };
 
@@ -223,9 +222,7 @@ export function arrowHeadPath(
 }
 
 /** Whether a line with this arrow has a head at its start, and at its end. */
-export function arrowEnds(
-  arrow: string | undefined
-): { atStart: boolean; atEnd: boolean } {
+export function arrowEnds(arrow: string | undefined): { atStart: boolean; atEnd: boolean } {
   const id = findRelationArrow(arrow).id;
   return {
     atStart: id === "backward" || id === "both",

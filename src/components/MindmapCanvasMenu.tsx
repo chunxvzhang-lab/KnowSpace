@@ -1,5 +1,19 @@
 import type { RefObject } from "react";
-import { Braces, CornerDownRight, FoldVertical, Link, ListTree, Maximize2, PlusCircle, SquareDashed, StickyNote, Trash2, Type, UnfoldVertical, X } from "lucide-react";
+import {
+  Braces,
+  CornerDownRight,
+  FoldVertical,
+  Link,
+  ListTree,
+  Maximize2,
+  PlusCircle,
+  SquareDashed,
+  StickyNote,
+  Trash2,
+  Type,
+  UnfoldVertical,
+  X,
+} from "lucide-react";
 import { MINDMAP_MARK_COLORS } from "../core/mindmapPalette";
 import { MINDMAP_RELATION_ARROWS, MINDMAP_RELATION_STYLES } from "../core/mindmapRelations";
 
@@ -41,10 +55,7 @@ function MarkColorSwatches({
  * accident of how the two ids are spelled — so the button says which topics it
  * means rather than which way round the pair happens to be.
  */
-function relationArrowLabel(
-  id: string,
-  relation: { fromText: string; toText: string }
-): string {
+function relationArrowLabel(id: string, relation: { fromText: string; toText: string }): string {
   if (id === "forward") return `${relation.fromText} → ${relation.toText}`;
   if (id === "backward") return `${relation.toText} → ${relation.fromText}`;
   if (id === "both") return "双向";
@@ -300,7 +311,9 @@ export function MindmapCanvasMenu({
             title="双击那条线也一样"
           >
             <Type size={13} />
-            <span>{selectedRelation.label ? `改标签「${selectedRelation.label}」` : "为这条线写字"}</span>
+            <span>
+              {selectedRelation.label ? `改标签「${selectedRelation.label}」` : "为这条线写字"}
+            </span>
           </button>
 
           <div className="mindmap-ctx-label-row">
@@ -351,9 +364,7 @@ export function MindmapCanvasMenu({
 
           <div className="mindmap-ctx-label-row">
             <span className="mindmap-ctx-label">颜色</span>
-            <span className="mindmap-ctx-hint">
-              {selectedRelation.color ? "" : "跟随主题"}
-            </span>
+            <span className="mindmap-ctx-hint">{selectedRelation.color ? "" : "跟随主题"}</span>
           </div>
           <div className="mindmap-boundary-colors">
             <MarkColorSwatches

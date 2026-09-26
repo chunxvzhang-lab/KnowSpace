@@ -19,12 +19,10 @@ const source = [
 
 describe("Mind map node text alignment rendering", () => {
   it("applies the chosen text-anchor as inline style on each node label", () => {
-    const { container } = render(
-      <MindmapView title="Test" source={source} editable={false} />
-    );
+    const { container } = render(<MindmapView title="Test" source={source} editable={false} />);
 
     const labels = Array.from(
-      container.querySelectorAll<SVGTextElement>("text.mindmap-node-title-text")
+      container.querySelectorAll<SVGTextElement>("text.mindmap-node-title-text"),
     );
     expect(labels.length).toBeGreaterThanOrEqual(4);
 
@@ -45,9 +43,7 @@ describe("Mind map node text alignment rendering", () => {
   });
 
   it("does not render floating plus button next to expand/collapse button", () => {
-    const { container } = render(
-      <MindmapView title="Test" source={source} editable={true} />
-    );
+    const { container } = render(<MindmapView title="Test" source={source} editable={true} />);
     expect(container.querySelector(".mindmap-node-add-btn")).toBeNull();
   });
 });
@@ -55,7 +51,7 @@ describe("Mind map node text alignment rendering", () => {
 describe("measureTextWidth metrics", () => {
   it("widens the estimate for bold text and ASCII-heavy strings", () => {
     expect(measureTextWidth("WWW www ###", 13, true)).toBeGreaterThan(
-      measureTextWidth("WWW www ###", 13)
+      measureTextWidth("WWW www ###", 13),
     );
     // ASCII estimate (~0.79x font size) must stay below the actual rendered
     // advance width of a bold Segoe UI string, so nodes stop clipping borders.
@@ -65,9 +61,7 @@ describe("measureTextWidth metrics", () => {
 
 describe("Mindmap responsive toolbar layout and boundaries", () => {
   it("renders toolbar with left, center, and right anchored export button", () => {
-    const { container } = render(
-      <MindmapView title="架构方案" source={source} editable={true} />
-    );
+    const { container } = render(<MindmapView title="架构方案" source={source} editable={true} />);
 
     const toolbar = container.querySelector(".mindmap-toolbar");
     expect(toolbar).toBeTruthy();
@@ -88,9 +82,7 @@ describe("Mindmap responsive toolbar layout and boundaries", () => {
   });
 
   it("toggles export menu correctly when clicked", async () => {
-    const { container } = render(
-      <MindmapView title="架构方案" source={source} editable={true} />
-    );
+    const { container } = render(<MindmapView title="架构方案" source={source} editable={true} />);
 
     const exportBtn = container.querySelector(".mindmap-tool-btn.export-btn") as HTMLButtonElement;
     expect(exportBtn).toBeTruthy();
@@ -104,4 +96,3 @@ describe("Mindmap responsive toolbar layout and boundaries", () => {
     expect(container.querySelector(".mindmap-export-menu")?.textContent).toContain("导出 OPML 2.0");
   });
 });
-

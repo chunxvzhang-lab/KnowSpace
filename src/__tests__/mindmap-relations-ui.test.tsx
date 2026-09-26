@@ -70,7 +70,7 @@ function select(text: string, additive = false) {
  */
 function collapseToggleOf(text: string): Element {
   const group = [...document.querySelectorAll(".mindmap-node-interactive")].find((el) =>
-    el.textContent?.includes(text)
+    el.textContent?.includes(text),
   );
   const toggle = group?.querySelector(".mindmap-collapse-btn");
   if (!toggle) throw new Error(`「${text}」没有折叠按钮`);
@@ -104,7 +104,7 @@ describe("关系线", () => {
       success: true,
       exists: true,
       content: serializeSidecar(
-        toggleRelation(emptySidecar(), nodeIdOf("父节点"), nodeIdOf("第二个分支"))
+        toggleRelation(emptySidecar(), nodeIdOf("父节点"), nodeIdOf("第二个分支")),
       ),
     });
 
@@ -114,8 +114,9 @@ describe("关系线", () => {
     // The dashed line is drawn before the edges and the nodes, so it passes
     // under them rather than across their labels.
     const before = document.querySelector(".mindmap-relations") as Element;
-    expect(before.compareDocumentPosition(document.querySelector(".mindmap-edges-group") as Node))
-      .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(
+      before.compareDocumentPosition(document.querySelector(".mindmap-edges-group") as Node),
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
   it("选中两个主题就能连上：菜单里一行，点了就存", async () => {
@@ -195,7 +196,7 @@ describe("关系线", () => {
       success: true,
       exists: true,
       content: serializeSidecar(
-        toggleRelation(emptySidecar(), nodeIdOf("父节点"), nodeIdOf("子节点甲"))
+        toggleRelation(emptySidecar(), nodeIdOf("父节点"), nodeIdOf("子节点甲")),
       ),
     });
 
@@ -216,7 +217,7 @@ describe("关系线", () => {
       success: true,
       exists: true,
       content: serializeSidecar(
-        toggleRelation(emptySidecar(), nodeIdOf("父节点"), nodeIdOf("第二个分支"))
+        toggleRelation(emptySidecar(), nodeIdOf("父节点"), nodeIdOf("第二个分支")),
       ),
     });
 
@@ -225,7 +226,7 @@ describe("关系线", () => {
 
     const built = buildStandaloneMindmapSvg(
       document.querySelector(".mindmap-svg-canvas") as SVGSVGElement,
-      { bounds: layoutMindmap(parseMarkdownToMindmapTree(SOURCE, "测试")).bounds, dark: true }
+      { bounds: layoutMindmap(parseMarkdownToMindmapTree(SOURCE, "测试")).bounds, dark: true },
     )!;
     const doc = new DOMParser().parseFromString(built.svg, "image/svg+xml");
     // The line itself, not the group around it: the group carries the selection

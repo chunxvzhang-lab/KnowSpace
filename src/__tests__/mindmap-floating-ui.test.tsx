@@ -222,7 +222,7 @@ describe("自由主题", () => {
 
     const built = buildStandaloneMindmapSvg(
       document.querySelector(".mindmap-svg-canvas") as SVGSVGElement,
-      { bounds: layoutMindmap(parseMarkdownToMindmapTree(SOURCE, "测试")).bounds, dark: true }
+      { bounds: layoutMindmap(parseMarkdownToMindmapTree(SOURCE, "测试")).bounds, dark: true },
     )!;
     const doc = new DOMParser().parseFromString(built.svg, "image/svg+xml");
 

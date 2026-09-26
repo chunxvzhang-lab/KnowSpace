@@ -2,7 +2,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MindmapView } from "../components/MindmapView";
 import { parseMarkdownToMindmapTree } from "../services/mindmapService";
-import { emptySidecar, parseSidecar, serializeSidecar, setNodeNote } from "../services/mindmapSidecar";
+import {
+  emptySidecar,
+  parseSidecar,
+  serializeSidecar,
+  setNodeNote,
+} from "../services/mindmapSidecar";
 
 /**
  * Node notes, end to end through the view.

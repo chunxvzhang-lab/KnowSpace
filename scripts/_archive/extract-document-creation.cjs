@@ -126,7 +126,13 @@ function main() {
   for (const line of body) {
     for (const match of line.matchAll(/\b([a-z][A-Za-z0-9_]*)\b/g)) referenced.add(match[1]);
   }
-  const suspicious = ["handleCreateCanvasExtractNote", "selectChapter", "guardAction", "isDirty", "session"];
+  const suspicious = [
+    "handleCreateCanvasExtractNote",
+    "selectChapter",
+    "guardAction",
+    "isDirty",
+    "session",
+  ];
   const leaked = suspicious.filter((name) => referenced.has(name));
   if (leaked.length) {
     console.error(`FAIL: the block references App-only names: ${leaked.join(", ")}`);
@@ -158,7 +164,9 @@ function main() {
   fs.writeFileSync(hookPath, hookSource);
   fs.writeFileSync(appPath, nextApp);
   console.log(`wrote ${path.relative(root, hookPath)}`);
-  console.log(`rewrote ${path.relative(root, appPath)}: ${lines.length} -> ${nextLines.length} lines`);
+  console.log(
+    `rewrote ${path.relative(root, appPath)}: ${lines.length} -> ${nextLines.length} lines`,
+  );
 }
 
 main();

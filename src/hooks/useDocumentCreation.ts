@@ -77,9 +77,11 @@ export function useDocumentCreation({
         };
       }
 
-      const activeChap = nextManifest.chapters.find(
-        (c) => c.absolutePath && c.absolutePath.toLowerCase() === result.absolutePath.toLowerCase()
-      ) ?? result.chapter;
+      const activeChap =
+        nextManifest.chapters.find(
+          (c) =>
+            c.absolutePath && c.absolutePath.toLowerCase() === result.absolutePath.toLowerCase(),
+        ) ?? result.chapter;
 
       setManifest(nextManifest);
       setChapterId(activeChap.id);
@@ -89,7 +91,7 @@ export function useDocumentCreation({
             t.id === activeChap.id ||
             (t.absolutePath &&
               activeChap.absolutePath &&
-              t.absolutePath.toLowerCase() === activeChap.absolutePath.toLowerCase())
+              t.absolutePath.toLowerCase() === activeChap.absolutePath.toLowerCase()),
         );
         if (exists) return prev;
         return [
@@ -159,7 +161,8 @@ export function useDocumentCreation({
 
       const activeChap =
         nextManifest.chapters.find(
-          (c) => c.absolutePath && c.absolutePath.toLowerCase() === result.absolutePath.toLowerCase()
+          (c) =>
+            c.absolutePath && c.absolutePath.toLowerCase() === result.absolutePath.toLowerCase(),
         ) ?? result.chapter;
 
       setManifest(nextManifest);
@@ -170,7 +173,7 @@ export function useDocumentCreation({
             t.id === activeChap.id ||
             (t.absolutePath &&
               activeChap.absolutePath &&
-              t.absolutePath.toLowerCase() === activeChap.absolutePath.toLowerCase())
+              t.absolutePath.toLowerCase() === activeChap.absolutePath.toLowerCase()),
         );
         if (exists) return prev;
         return [
@@ -239,7 +242,8 @@ export function useDocumentCreation({
 
       const activeChap =
         nextManifest.chapters.find(
-          (c) => c.absolutePath && c.absolutePath.toLowerCase() === result.absolutePath.toLowerCase()
+          (c) =>
+            c.absolutePath && c.absolutePath.toLowerCase() === result.absolutePath.toLowerCase(),
         ) ?? result.chapter;
 
       setManifest(nextManifest);
@@ -250,7 +254,7 @@ export function useDocumentCreation({
             t.id === activeChap.id ||
             (t.absolutePath &&
               activeChap.absolutePath &&
-              t.absolutePath.toLowerCase() === activeChap.absolutePath.toLowerCase())
+              t.absolutePath.toLowerCase() === activeChap.absolutePath.toLowerCase()),
         );
         if (exists) return prev;
         return [

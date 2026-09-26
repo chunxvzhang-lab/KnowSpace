@@ -66,8 +66,8 @@ export const CanvasMinimap = memo(function CanvasMinimap({
           theme === "eink"
             ? "rgba(244, 241, 234, 0.9)"
             : !isDark
-            ? "rgba(255, 255, 255, 0.94)"
-            : "rgba(15, 23, 42, 0.85)",
+              ? "rgba(255, 255, 255, 0.94)"
+              : "rgba(15, 23, 42, 0.85)",
         backdropFilter: "blur(8px)",
         border: `1px solid ${!isDark ? "#e2e8f0" : colors.cardBorder}`,
         boxShadow: !isDark ? "0 4px 16px rgba(0,0,0,0.06)" : "0 6px 20px rgba(0,0,0,0.2)",
@@ -99,7 +99,9 @@ export const CanvasMinimap = memo(function CanvasMinimap({
                 y={ry}
                 width={rw}
                 height={rh}
-                fill={pal ? pal.bg : isDark ? "rgba(59, 130, 246, 0.12)" : "rgba(59, 130, 246, 0.08)"}
+                fill={
+                  pal ? pal.bg : isDark ? "rgba(59, 130, 246, 0.12)" : "rgba(59, 130, 246, 0.08)"
+                }
                 stroke={pal ? pal.stroke : "#3b82f6"}
                 strokeWidth={0.8}
                 strokeDasharray="2 2"
@@ -144,12 +146,12 @@ export const CanvasMinimap = memo(function CanvasMinimap({
             const cardColor = isSelected
               ? "#f59e0b"
               : pal
-              ? pal.stroke
-              : card.type === "file"
-              ? "#10b981"
-              : card.type === "link"
-              ? "#8b5cf6"
-              : colors.edgeColor;
+                ? pal.stroke
+                : card.type === "file"
+                  ? "#10b981"
+                  : card.type === "link"
+                    ? "#8b5cf6"
+                    : colors.edgeColor;
             return (
               <rect
                 key={`mini-card-${card.id}`}

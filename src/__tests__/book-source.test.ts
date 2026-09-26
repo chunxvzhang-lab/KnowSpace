@@ -21,7 +21,7 @@ describe("打包书与它的章节", () => {
 
     expect(manifest.chapters.length).toBeGreaterThan(0);
     expect(manifest.chapters.every((chapter) => chapter.id && chapter.title && chapter.src)).toBe(
-      true
+      true,
     );
   });
 
@@ -42,7 +42,7 @@ describe("打包书与它的章节", () => {
     const manifest = await loadPackagedBook();
 
     await expect(loadPackagedChapterMarkdown(manifest, "不存在的章节")).rejects.toThrow(
-      "不存在的章节"
+      "不存在的章节",
     );
   });
 

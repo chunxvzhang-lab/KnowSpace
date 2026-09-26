@@ -75,8 +75,7 @@ describe("Mindmap Format Ecosystem Exporters", () => {
 
     /** Which node of a freshly parsed tree carries what, by the text of the topic. */
     function annotationsByText(xml: string, format: "opml" | "freemind") {
-      const parsed =
-        format === "opml" ? parseOpmlOutline(xml) : parseFreemindOutline(xml);
+      const parsed = format === "opml" ? parseOpmlOutline(xml) : parseFreemindOutline(xml);
       if (!parsed.ok) throw new Error(parsed.message);
 
       const tree = parseMarkdownToMindmapTree(outlineToMarkdown(parsed.outline), "root");
@@ -84,7 +83,10 @@ describe("Mindmap Format Ecosystem Exporters", () => {
       const byText = new Map<string, { note?: string; link?: string }>();
 
       const walk = (node: MindmapNode) => {
-        byText.set(node.text, { note: annotations.notes[node.id], link: annotations.links[node.id] });
+        byText.set(node.text, {
+          note: annotations.notes[node.id],
+          link: annotations.links[node.id],
+        });
         node.children.forEach(walk);
       };
       walk(tree);
@@ -135,14 +137,14 @@ describe("Mindmap Format Ecosystem Exporters", () => {
       expect(xml).toContain("&lt;");
       expect(xml).toContain("&amp;");
       expect(annotationsByText(xml, "freemind").get("存储引擎")?.note).toBe(
-        '小于号 < 与 & 和 "引号"'
+        '小于号 < 与 & 和 "引号"',
       );
     });
   });
 
   it("escapes XML special characters correctly", () => {
     expect(escapeXml("Hello & <World> \"Quotes\" 'Single'")).toBe(
-      "Hello &amp; &lt;World&gt; &quot;Quotes&quot; &apos;Single&apos;"
+      "Hello &amp; &lt;World&gt; &quot;Quotes&quot; &apos;Single&apos;",
     );
     expect(escapeXml("")).toBe("");
   });
@@ -184,49 +186,49 @@ describe("Mindmap Format Ecosystem Exporters", () => {
     expect(md).toContain("  - React 19 & TypeScript");
     expect(md).toContain("  - Cytoscape 知识图谱");
     expect(md).toContain("- 存储引擎");
-      expect(md).toContain("  - 本地优先 (Local-First) & 原子落盘");
+    expect(md).toContain("  - 本地优先 (Local-First) & 原子落盘");
+  });
+
+  describe("FreeMind FOLDED attribute", () => {
+    it("omits FOLDED entirely when nothing is collapsed", () => {
+      expect(exportMindmapToFreeMind(sampleTree)).not.toContain("FOLDED");
     });
 
-    describe("FreeMind FOLDED attribute", () => {
-      it("omits FOLDED entirely when nothing is collapsed", () => {
-        expect(exportMindmapToFreeMind(sampleTree)).not.toContain("FOLDED");
-      });
+    it("writes FOLDED for a node in the collapsed set", () => {
+      const xml = exportMindmapToFreeMind(sampleTree, new Set(["node-1"]));
 
-      it("writes FOLDED for a node in the collapsed set", () => {
-        const xml = exportMindmapToFreeMind(sampleTree, new Set(["node-1"]));
+      // The set is the only place the collapse state actually lives — the
+      // model's own `collapsed` field is never written by anything — so
+      // without being passed in, this attribute was always absent.
+      expect(xml).toContain('FOLDED="true"');
+      expect(xml).toMatch(/TEXT="前端架构 &lt;Web&gt;"[^>]*FOLDED="true"/);
+    });
 
-        // The set is the only place the collapse state actually lives — the
-        // model's own `collapsed` field is never written by anything — so
-        // without being passed in, this attribute was always absent.
-        expect(xml).toContain('FOLDED="true"');
-        expect(xml).toMatch(/TEXT="前端架构 &lt;Web&gt;"[^>]*FOLDED="true"/);
-      });
+    it("never folds a leaf, even when its id is in the set", () => {
+      // Folding a childless node means nothing; FreeMind ignores it, and
+      // emitting it would be noise in the file.
+      const xml = exportMindmapToFreeMind(sampleTree, new Set(["node-1-1"]));
 
-      it("never folds a leaf, even when its id is in the set", () => {
-        // Folding a childless node means nothing; FreeMind ignores it, and
-        // emitting it would be noise in the file.
-        const xml = exportMindmapToFreeMind(sampleTree, new Set(["node-1-1"]));
+      expect(xml).not.toContain("FOLDED");
+    });
 
-        expect(xml).not.toContain("FOLDED");
-      });
+    it("still honours the model's own collapsed field", () => {
+      // Kept as a fallback for a caller that sets the field directly, which
+      // is what the original implementation assumed everyone did.
+      const withFlag: MindmapNode = {
+        ...sampleTree,
+        collapsed: true,
+      };
 
-      it("still honours the model's own collapsed field", () => {
-        // Kept as a fallback for a caller that sets the field directly, which
-        // is what the original implementation assumed everyone did.
-        const withFlag: MindmapNode = {
-          ...sampleTree,
-          collapsed: true,
-        };
+      expect(exportMindmapToFreeMind(withFlag)).toContain('FOLDED="true"');
+    });
 
-        expect(exportMindmapToFreeMind(withFlag)).toContain('FOLDED="true"');
-      });
+    it("marks only the collapsed nodes when several are open", () => {
+      const xml = exportMindmapToFreeMind(sampleTree, new Set(["node-1"]));
 
-      it("marks only the collapsed nodes when several are open", () => {
-        const xml = exportMindmapToFreeMind(sampleTree, new Set(["node-1"]));
-
-        // One FOLDED for one collapsed branch — the rest of the tree stays
-        // expanded so the file opens showing the structure.
-        expect(xml.match(/FOLDED="true"/g)).toHaveLength(1);
-      });
+      // One FOLDED for one collapsed branch — the rest of the tree stays
+      // expanded so the file opens showing the structure.
+      expect(xml.match(/FOLDED="true"/g)).toHaveLength(1);
     });
   });
+});

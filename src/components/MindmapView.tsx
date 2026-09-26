@@ -1,7 +1,13 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 // The icons the style panel draws with went with it; what is left here is the
 // canvas, the toolbar and the inline editor.
-import type { Heading, ThemeMode, MindmapNodeShape, MindmapLineStyle, MindmapTextAlign } from "../core/types";
+import type {
+  Heading,
+  ThemeMode,
+  MindmapNodeShape,
+  MindmapLineStyle,
+  MindmapTextAlign,
+} from "../core/types";
 import { oppositeSide, type MindmapSide } from "../core/mindmapSides";
 import {
   buildMindmapTree,
@@ -167,11 +173,7 @@ export type MindmapViewProps = {
 
 // Curated node border colors (includes default branch color and transparent border)
 
-
-
 // Curated high-contrast font colors
-
-
 
 // Rich 14-color line palette
 
@@ -264,7 +266,7 @@ export const MindmapView = memo(function MindmapView({
       // mean every such preview shared one.
       if (documentKey) saveMindmapTheme(documentKey, next);
     },
-    [documentKey]
+    [documentKey],
   );
 
   /**
@@ -293,7 +295,7 @@ export const MindmapView = memo(function MindmapView({
       // remembered, and inventing a key would make all such previews share one.
       if (documentKey) saveMindmapLayout(documentKey, next);
     },
-    [documentKey]
+    [documentKey],
   );
 
   /**
@@ -436,7 +438,7 @@ export const MindmapView = memo(function MindmapView({
       pendingSidecarSave.current = null;
       if (pending) void saveSidecar(pending.key, pending.sidecar);
     },
-    []
+    [],
   );
 
   /**
@@ -447,16 +449,13 @@ export const MindmapView = memo(function MindmapView({
    * belongs to is decided.
    */
   const applySidecarEdit = useCallback(
-    (
-      sections: SidecarSection[],
-      edit: (current: MindmapSidecar) => MindmapSidecar
-    ) => {
+    (sections: SidecarSection[], edit: (current: MindmapSidecar) => MindmapSidecar) => {
       editedSectionsRef.current = new Set([...editedSectionsRef.current, ...sections]);
       const next = edit(sidecar ?? emptySidecar());
       setSidecar(next);
       if (documentKey) scheduleSidecarSave(documentKey, next);
     },
-    [documentKey, scheduleSidecarSave, sidecar]
+    [documentKey, scheduleSidecarSave, sidecar],
   );
 
   /**
@@ -466,7 +465,7 @@ export const MindmapView = memo(function MindmapView({
   const handleNoteChange = useCallback(
     (nodeId: string, text: string) =>
       applySidecarEdit(["notes"], (current) => setNodeNote(current, nodeId, text)),
-    [applySidecarEdit]
+    [applySidecarEdit],
   );
 
   /**
@@ -476,14 +475,14 @@ export const MindmapView = memo(function MindmapView({
   const handleIconChange = useCallback(
     (nodeId: string, iconId: string) =>
       applySidecarEdit(["icons"], (current) => setNodeIcon(current, nodeId, iconId)),
-    [applySidecarEdit]
+    [applySidecarEdit],
   );
 
   /** A node's link, as typed. Stored verbatim; read when someone follows it. */
   const handleLinkChange = useCallback(
     (nodeId: string, text: string) =>
       applySidecarEdit(["links"], (current) => setNodeLink(current, nodeId, text)),
-    [applySidecarEdit]
+    [applySidecarEdit],
   );
 
   /**
@@ -495,7 +494,7 @@ export const MindmapView = memo(function MindmapView({
   const handleSideChange = useCallback(
     (nodeId: string, side: MindmapSide | null) =>
       applySidecarEdit(["sides"], (current) => setNodeSide(current, nodeId, side)),
-    [applySidecarEdit]
+    [applySidecarEdit],
   );
 
   /**
@@ -506,7 +505,7 @@ export const MindmapView = memo(function MindmapView({
    * the question appears next to the thing it is about.
    */
   const [sideChooser, setSideChooser] = useState<{ parentId: string; x: number; y: number } | null>(
-    null
+    null,
   );
 
   /**
@@ -533,7 +532,7 @@ export const MindmapView = memo(function MindmapView({
       const target = matches[0];
       if (target && onJumpToHeading) onJumpToHeading(target.id, target.line);
     },
-    [onJumpToHeading]
+    [onJumpToHeading],
   );
 
   /**
@@ -552,7 +551,7 @@ export const MindmapView = memo(function MindmapView({
       if (link.kind === "external") {
         const bridge =
           typeof window !== "undefined"
-            ? window.knowSpaceDesktop ?? window.bookMDDesktop
+            ? (window.knowSpaceDesktop ?? window.bookMDDesktop)
             : undefined;
         void bridge?.openExternal?.(link.target);
         return;
@@ -567,14 +566,14 @@ export const MindmapView = memo(function MindmapView({
 
       followAnchor(root, link.target);
     },
-    [followAnchor, onWikiLinkClick, sidecar]
+    [followAnchor, onWikiLinkClick, sidecar],
   );
 
   /** A node's tags, replaced wholesale — the list is what the panel edits. */
   const handleTagsChange = useCallback(
     (nodeId: string, tags: string[]) =>
       applySidecarEdit(["tags"], (current) => setNodeTags(current, nodeId, tags)),
-    [applySidecarEdit]
+    [applySidecarEdit],
   );
 
   /**
@@ -596,9 +595,9 @@ export const MindmapView = memo(function MindmapView({
       applySidecarEdit(["markers"], (current) =>
         field === "priority"
           ? setNodePriority(current, nodeId, value)
-          : setNodeProgress(current, nodeId, value)
+          : setNodeProgress(current, nodeId, value),
       ),
-    [applySidecarEdit]
+    [applySidecarEdit],
   );
 
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -792,7 +791,10 @@ export const MindmapView = memo(function MindmapView({
    * split: folding a branch or changing the layout cannot renumber anything,
    * because neither is an input here — only the document's own structure is.
    */
-  const numbering = useMemo(() => (showNumbering ? numberingFor(tree) : null), [showNumbering, tree]);
+  const numbering = useMemo(
+    () => (showNumbering ? numberingFor(tree) : null),
+    [showNumbering, tree],
+  );
 
   /**
    * The floating topics, measured the same way the layout measures nodes.
@@ -850,9 +852,9 @@ export const MindmapView = memo(function MindmapView({
         layout.nodes.map((node) => [
           node.id,
           { x: node.x, y: node.y, width: node.width, height: node.height },
-        ])
+        ]),
       ),
-    [layout]
+    [layout],
   );
 
   /** The stored relations, or nothing while the file is still being read. */
@@ -927,42 +929,48 @@ export const MindmapView = memo(function MindmapView({
   const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
-  const focusOnNode = useCallback((nodeId: string) => {
-    if (!layout || !containerRef.current) return;
-    const target = layout.nodes.find((n) => n.id === nodeId);
-    if (!target) return;
-    const cWidth = containerRef.current.clientWidth;
-    const cHeight = containerRef.current.clientHeight;
-    const targetCenterX = target.x + target.width / 2;
-    const targetCenterY = target.y + target.height / 2;
-    setTransform((prev) => ({
-      ...prev,
-      x: Math.round(cWidth / 2 - targetCenterX * prev.scale),
-      y: Math.round(cHeight / 2 - targetCenterY * prev.scale),
-    }));
-    setSelectedNodeIds(new Set([nodeId]));
-  }, [layout]);
+  const focusOnNode = useCallback(
+    (nodeId: string) => {
+      if (!layout || !containerRef.current) return;
+      const target = layout.nodes.find((n) => n.id === nodeId);
+      if (!target) return;
+      const cWidth = containerRef.current.clientWidth;
+      const cHeight = containerRef.current.clientHeight;
+      const targetCenterX = target.x + target.width / 2;
+      const targetCenterY = target.y + target.height / 2;
+      setTransform((prev) => ({
+        ...prev,
+        x: Math.round(cWidth / 2 - targetCenterX * prev.scale),
+        y: Math.round(cHeight / 2 - targetCenterY * prev.scale),
+      }));
+      setSelectedNodeIds(new Set([nodeId]));
+    },
+    [layout],
+  );
 
-  const handleSearch = useCallback((q: string) => {
-    setSearchQuery(q);
-    if (!q.trim()) {
-      setSearchMatchIds([]);
+  const handleSearch = useCallback(
+    (q: string) => {
+      setSearchQuery(q);
+      if (!q.trim()) {
+        setSearchMatchIds([]);
+        setCurrentSearchIndex(0);
+        return;
+      }
+      // Two things are searchable: the words in the topics, and the type a topic wears.
+      // The types live in the companion file, so only this side can name them — and being
+      // findable by name is half of what makes the row of icons a way to ask "what is
+      // still open in this map" instead of a row of pictures.
+      const matches = searchMindmapNodes(tree, q, (nodeId) =>
+        describeMindmapIcon(iconFor(sidecar, nodeId)),
+      );
+      setSearchMatchIds(matches);
       setCurrentSearchIndex(0);
-      return;
-    }
-    // Two things are searchable: the words in the topics, and the type a topic wears.
-    // The types live in the companion file, so only this side can name them — and being
-    // findable by name is half of what makes the row of icons a way to ask "what is
-    // still open in this map" instead of a row of pictures.
-    const matches = searchMindmapNodes(tree, q, (nodeId) =>
-      describeMindmapIcon(iconFor(sidecar, nodeId))
-    );
-    setSearchMatchIds(matches);
-    setCurrentSearchIndex(0);
-    if (matches.length > 0) {
-      focusOnNode(matches[0]);
-    }
-  }, [focusOnNode, sidecar, tree]);
+      if (matches.length > 0) {
+        focusOnNode(matches[0]);
+      }
+    },
+    [focusOnNode, sidecar, tree],
+  );
 
   const handleNextSearch = useCallback(() => {
     if (searchMatchIds.length === 0) return;
@@ -1037,7 +1045,7 @@ export const MindmapView = memo(function MindmapView({
       setTree(nextTree);
       setHasUnsyncedChanges(true);
     },
-    [tree]
+    [tree],
   );
 
   /**
@@ -1056,7 +1064,7 @@ export const MindmapView = memo(function MindmapView({
       if (nextTree === tree) return;
       applyTreeChange(nextTree);
     },
-    [applyTreeChange, selectedNodeIds, tree]
+    [applyTreeChange, selectedNodeIds, tree],
   );
 
   /**
@@ -1105,46 +1113,55 @@ export const MindmapView = memo(function MindmapView({
    */
   const [clipboardReady, setClipboardReady] = useState(false);
 
-  const handleCopyNode = useCallback((explicitNodeId?: string) => {
-    const nodeId = explicitNodeId ?? [...selectedNodeIds][0];
-    if (!nodeId) return;
-    const copied = copySubtree(tree, nodeId);
-    if (copied) {
+  const handleCopyNode = useCallback(
+    (explicitNodeId?: string) => {
+      const nodeId = explicitNodeId ?? [...selectedNodeIds][0];
+      if (!nodeId) return;
+      const copied = copySubtree(tree, nodeId);
+      if (copied) {
+        clipboardRef.current = copied;
+        setClipboardReady(true);
+      }
+    },
+    [selectedNodeIds, tree],
+  );
+
+  const handleCutNode = useCallback(
+    (explicitNodeId?: string) => {
+      const nodeId = explicitNodeId ?? [...selectedNodeIds][0];
+      // The root is refused: cutting it would leave no tree to paste into.
+      if (!nodeId || nodeId === tree.id) return;
+
+      const copied = copySubtree(tree, nodeId);
+      if (!copied) return;
       clipboardRef.current = copied;
       setClipboardReady(true);
-    }
-  }, [selectedNodeIds, tree]);
 
-  const handleCutNode = useCallback((explicitNodeId?: string) => {
-    const nodeId = explicitNodeId ?? [...selectedNodeIds][0];
-    // The root is refused: cutting it would leave no tree to paste into.
-    if (!nodeId || nodeId === tree.id) return;
+      // deleteNode returns the tree *and* what to select afterwards, so a cut
+      // leaves a sensible selection rather than nothing selected.
+      const { nextTree, fallbackSelectedId } = deleteNode(tree, nodeId);
+      applyTreeChange(nextTree);
+      setSelectedNodeIds(new Set([fallbackSelectedId]));
+    },
+    [applyTreeChange, selectedNodeIds, tree],
+  );
 
-    const copied = copySubtree(tree, nodeId);
-    if (!copied) return;
-    clipboardRef.current = copied;
-    setClipboardReady(true);
+  const handlePasteNode = useCallback(
+    (explicitParentId?: string) => {
+      const copied = clipboardRef.current;
+      if (!copied) return;
 
-    // deleteNode returns the tree *and* what to select afterwards, so a cut
-    // leaves a sensible selection rather than nothing selected.
-    const { nextTree, fallbackSelectedId } = deleteNode(tree, nodeId);
-    applyTreeChange(nextTree);
-    setSelectedNodeIds(new Set([fallbackSelectedId]));
-  }, [applyTreeChange, selectedNodeIds, tree]);
+      // Pasted under the selection, so a paste into empty space lands on the root
+      // rather than doing nothing. The node menu passes the topic it was opened on, so
+      // its row can name where the branch will land instead of leaving it to the selection.
+      const result = pasteSubtree(tree, explicitParentId ?? [...selectedNodeIds][0], copied);
+      if (!result) return;
 
-  const handlePasteNode = useCallback((explicitParentId?: string) => {
-    const copied = clipboardRef.current;
-    if (!copied) return;
-
-    // Pasted under the selection, so a paste into empty space lands on the root
-    // rather than doing nothing. The node menu passes the topic it was opened on, so
-    // its row can name where the branch will land instead of leaving it to the selection.
-    const result = pasteSubtree(tree, explicitParentId ?? [...selectedNodeIds][0], copied);
-    if (!result) return;
-
-    applyTreeChange(result.nextTree);
-    setSelectedNodeIds(new Set([result.newNodeId]));
-  }, [applyTreeChange, selectedNodeIds, tree]);
+      applyTreeChange(result.nextTree);
+      setSelectedNodeIds(new Set([result.newNodeId]));
+    },
+    [applyTreeChange, selectedNodeIds, tree],
+  );
 
   /**
    * Whether an event landed on bare canvas.
@@ -1184,7 +1201,7 @@ export const MindmapView = memo(function MindmapView({
       setSelectedNodeIds(new Set([newNodeId]));
       startEditingRef.current(newNodeId);
     },
-    [applyTreeChange, editable, isBlankCanvasTarget, tree]
+    [applyTreeChange, editable, isBlankCanvasTarget, tree],
   );
 
   /**
@@ -1208,7 +1225,7 @@ export const MindmapView = memo(function MindmapView({
         isCanvas: true,
       });
     },
-    [isBlankCanvasTarget]
+    [isBlankCanvasTarget],
   );
 
   /** Marquee selection: press on empty canvas, drag a box, release to select. */
@@ -1230,7 +1247,7 @@ export const MindmapView = memo(function MindmapView({
       marqueeRectRef.current = { x1: x, y1: y, x2: x, y2: y };
       setMarquee(marqueeRectRef.current);
     },
-    [isBlankCanvasTarget, transform.scale, transform.x, transform.y]
+    [isBlankCanvasTarget, transform.scale, transform.x, transform.y],
   );
 
   useEffect(() => {
@@ -1268,7 +1285,7 @@ export const MindmapView = memo(function MindmapView({
         // the opposite of what drawing it feels like.
         const hit = layout.nodes
           .filter(
-            (n) => n.x < right && n.x + n.width > left && n.y < bottom && n.y + n.height > top
+            (n) => n.x < right && n.x + n.width > left && n.y < bottom && n.y + n.height > top,
           )
           .map((n) => n.id);
         if (hit.length) setSelectedNodeIds(new Set(hit));
@@ -1326,7 +1343,7 @@ export const MindmapView = memo(function MindmapView({
       if (!node) return;
       handleSideChange(nodeId, oppositeSide(node.side === "left" ? "left" : "right"));
     },
-    [layout, handleSideChange]
+    [layout, handleSideChange],
   );
 
   const handleAddChild = useCallback(
@@ -1385,7 +1402,7 @@ export const MindmapView = memo(function MindmapView({
       layout,
       transform,
       handleSideChange,
-    ]
+    ],
   );
 
   const handleAddSibling = useCallback(
@@ -1399,7 +1416,7 @@ export const MindmapView = memo(function MindmapView({
       setEditingText("新建同级主题");
       setContextMenu(null);
     },
-    [editable, primarySelectedId, tree, applyTreeChange]
+    [editable, primarySelectedId, tree, applyTreeChange],
   );
 
   const handleDeleteNode = useCallback(
@@ -1423,7 +1440,7 @@ export const MindmapView = memo(function MindmapView({
       setEditingNodeId(null);
       setContextMenu(null);
     },
-    [editable, selectedNodeIds, tree, applyTreeChange]
+    [editable, selectedNodeIds, tree, applyTreeChange],
   );
 
   const startEditing = useCallback(
@@ -1438,7 +1455,7 @@ export const MindmapView = memo(function MindmapView({
         setContextMenu(null);
       }
     },
-    [editable, primarySelectedId, tree]
+    [editable, primarySelectedId, tree],
   );
 
   // Keeps the indirection above pointing at the current startEditing. Assigning
@@ -1475,18 +1492,15 @@ export const MindmapView = memo(function MindmapView({
         textAlign?: MindmapTextAlign;
         customWidth?: number;
         customHeight?: number;
-      }
+      },
     ) => {
       // If multiple nodes are selected, apply to ALL selected nodes at once!
-      const targetIds =
-        selectedNodeIds.size > 1
-          ? Array.from(selectedNodeIds)
-          : [nodeId];
+      const targetIds = selectedNodeIds.size > 1 ? Array.from(selectedNodeIds) : [nodeId];
 
       const nextTree = updateNodesStyle(tree, targetIds, styles);
       applyTreeChange(nextTree);
     },
-    [tree, selectedNodeIds, applyTreeChange]
+    [tree, selectedNodeIds, applyTreeChange],
   );
 
   // Keyboard navigation
@@ -1509,7 +1523,7 @@ export const MindmapView = memo(function MindmapView({
         if (next) setSelectedNodeIds(new Set([next.id]));
       }
     },
-    [primarySelectedId, tree]
+    [primarySelectedId, tree],
   );
 
   // Global Mindmap Keydown shortcuts
@@ -1735,44 +1749,47 @@ export const MindmapView = memo(function MindmapView({
   }, [editingNodeId]);
 
   // Pan interaction handlers & blank canvas click deselect
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (e.button !== 0) return;
-    const target = e.target as HTMLElement | SVGElement;
-    if (
-      target.closest(".mindmap-node-interactive") ||
-      target.closest(".mindmap-inline-edit-input") ||
-      target.closest(".mindmap-context-menu")
-    ) {
-      return;
-    }
-    // A click on the control bar: the menus close, and nothing else happens.
-    //
-    // The bar used to sit in the list above, which made a click on it not a click
-    // anywhere — a panel stayed open over a map the reader had started using again, and
-    // the only way to be rid of it was to click the canvas, which threw the selection
-    // away too. Dismissing on the way in is what every other surface here already does.
-    if (target.closest(".mindmap-toolbar")) {
-      if (contextMenu) setContextMenu(null);
-      if (sideChooser) setSideChooser(null);
-      return;
-    }
-    // Clicking blank canvas background commits edit, closes menu, and cancels selection!
-    if (editingNodeId) {
-      handleCommitEdit();
-    }
-    if (contextMenu) {
-      setContextMenu(null);
-    }
-    setSelectedNodeIds(new Set());
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      if (e.button !== 0) return;
+      const target = e.target as HTMLElement | SVGElement;
+      if (
+        target.closest(".mindmap-node-interactive") ||
+        target.closest(".mindmap-inline-edit-input") ||
+        target.closest(".mindmap-context-menu")
+      ) {
+        return;
+      }
+      // A click on the control bar: the menus close, and nothing else happens.
+      //
+      // The bar used to sit in the list above, which made a click on it not a click
+      // anywhere — a panel stayed open over a map the reader had started using again, and
+      // the only way to be rid of it was to click the canvas, which threw the selection
+      // away too. Dismissing on the way in is what every other surface here already does.
+      if (target.closest(".mindmap-toolbar")) {
+        if (contextMenu) setContextMenu(null);
+        if (sideChooser) setSideChooser(null);
+        return;
+      }
+      // Clicking blank canvas background commits edit, closes menu, and cancels selection!
+      if (editingNodeId) {
+        handleCommitEdit();
+      }
+      if (contextMenu) {
+        setContextMenu(null);
+      }
+      setSelectedNodeIds(new Set());
 
-    setIsDragging(true);
-    dragStartRef.current = {
-      x: e.clientX,
-      y: e.clientY,
-      startTransformX: transform.x,
-      startTransformY: transform.y,
-    };
-  }, [transform.x, transform.y, editingNodeId, contextMenu, sideChooser, handleCommitEdit]);
+      setIsDragging(true);
+      dragStartRef.current = {
+        x: e.clientX,
+        y: e.clientY,
+        startTransformX: transform.x,
+        startTransformY: transform.y,
+      };
+    },
+    [transform.x, transform.y, editingNodeId, contextMenu, sideChooser, handleCommitEdit],
+  );
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
@@ -1843,7 +1860,16 @@ export const MindmapView = memo(function MindmapView({
       }));
     },
     // tree.id is here because the drop bands are skipped for the root node.
-    [isDragging, resizingNode, transform.scale, transform.x, transform.y, layout, tree.id, handleUpdateStyle]
+    [
+      isDragging,
+      resizingNode,
+      transform.scale,
+      transform.x,
+      transform.y,
+      layout,
+      tree.id,
+      handleUpdateStyle,
+    ],
   );
 
   const handleMouseUp = useCallback(() => {
@@ -1871,49 +1897,55 @@ export const MindmapView = memo(function MindmapView({
   }, [applyTreeChange, draggingNodeId, dropTargetId, dropPosition, resizingNode, tree]);
 
   // Wheel zoom handler
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    // A wheel that lands on an open menu belongs to the menu. The menus are tall — that is
-    // why they scroll (`overflow-y: auto`, with `overscroll-behavior: contain` so they do
-    // not drag the page with them) — but a wheel event still bubbles up to this container,
-    // so scrolling a long menu also zoomed the map: the reader was trying to see the rest
-    // of the menu and the map grew and shrank underneath it.
-    //
-    // Nothing here moves the map while a menu is up. A wheel outside one dismisses it, the
-    // way a click outside does, and is spent doing that rather than zooming — one gesture,
-    // one effect.
-    const target = e.target as Element | null;
-    if (target?.closest?.(".mindmap-context-menu")) return;
-    // The control bar is chrome, not canvas: a wheel over it is someone trying to get
-    // through the bar, and it used to zoom the map underneath instead. Nothing happens
-    // now — which is also the second half of the fix that lets the bar wrap: the
-    // right-hand controls are on screen rather than somewhere a wheel cannot reach.
-    if (target?.closest?.(".mindmap-toolbar")) return;
-    if (contextMenu) {
-      setContextMenu(null);
-      return;
-    }
+  const handleWheel = useCallback(
+    (e: React.WheelEvent) => {
+      // A wheel that lands on an open menu belongs to the menu. The menus are tall — that is
+      // why they scroll (`overflow-y: auto`, with `overscroll-behavior: contain` so they do
+      // not drag the page with them) — but a wheel event still bubbles up to this container,
+      // so scrolling a long menu also zoomed the map: the reader was trying to see the rest
+      // of the menu and the map grew and shrank underneath it.
+      //
+      // Nothing here moves the map while a menu is up. A wheel outside one dismisses it, the
+      // way a click outside does, and is spent doing that rather than zooming — one gesture,
+      // one effect.
+      const target = e.target as Element | null;
+      if (target?.closest?.(".mindmap-context-menu")) return;
+      // The control bar is chrome, not canvas: a wheel over it is someone trying to get
+      // through the bar, and it used to zoom the map underneath instead. Nothing happens
+      // now — which is also the second half of the fix that lets the bar wrap: the
+      // right-hand controls are on screen rather than somewhere a wheel cannot reach.
+      if (target?.closest?.(".mindmap-toolbar")) return;
+      if (contextMenu) {
+        setContextMenu(null);
+        return;
+      }
 
-    e.preventDefault();
-    const container = containerRef.current;
-    if (!container) return;
+      e.preventDefault();
+      const container = containerRef.current;
+      if (!container) return;
 
-    const rect = container.getBoundingClientRect();
-    const cursorX = e.clientX - rect.left;
-    const cursorY = e.clientY - rect.top;
+      const rect = container.getBoundingClientRect();
+      const cursorX = e.clientX - rect.left;
+      const cursorY = e.clientY - rect.top;
 
-    const zoomFactor = e.deltaY < 0 ? 1.12 : 0.89;
-    setTransform((prev) => {
-      const nextScale = Math.max(0.25, Math.min(2.5, Number((prev.scale * zoomFactor).toFixed(3))));
-      const scaleRatio = nextScale / prev.scale;
-      const nextX = cursorX - (cursorX - prev.x) * scaleRatio;
-      const nextY = cursorY - (cursorY - prev.y) * scaleRatio;
-      return {
-        x: Math.round(nextX),
-        y: Math.round(nextY),
-        scale: nextScale,
-      };
-    });
-  }, [contextMenu]);
+      const zoomFactor = e.deltaY < 0 ? 1.12 : 0.89;
+      setTransform((prev) => {
+        const nextScale = Math.max(
+          0.25,
+          Math.min(2.5, Number((prev.scale * zoomFactor).toFixed(3))),
+        );
+        const scaleRatio = nextScale / prev.scale;
+        const nextX = cursorX - (cursorX - prev.x) * scaleRatio;
+        const nextY = cursorY - (cursorY - prev.y) * scaleRatio;
+        return {
+          x: Math.round(nextX),
+          y: Math.round(nextY),
+          scale: nextScale,
+        };
+      });
+    },
+    [contextMenu],
+  );
 
   // Toggle collapse for a specific node
   const handleToggleCollapse = useCallback((nodeId: string, e: React.MouseEvent) => {
@@ -2042,7 +2074,7 @@ export const MindmapView = memo(function MindmapView({
    */
   const handlePrintPdf = useCallback(() => {
     const bridge =
-      typeof window !== "undefined" ? window.knowSpaceDesktop ?? window.bookMDDesktop : undefined;
+      typeof window !== "undefined" ? (window.knowSpaceDesktop ?? window.bookMDDesktop) : undefined;
 
     if (bridge?.printToPdf) {
       void bridge.printToPdf({ title: `${title || "mindmap"}-思维导图`, landscape: true });
@@ -2128,7 +2160,7 @@ export const MindmapView = memo(function MindmapView({
 
     const confirmed = window.confirm(
       `将把当前主题的外观固化到 ${targetIds.length} 个节点的样式上。\n\n` +
-        "此后切换主题时，这些节点不再跟随；你手工设置过的颜色、形状与字号不会改变。\n\n是否继续？"
+        "此后切换主题时，这些节点不再跟随；你手工设置过的颜色、形状与字号不会改变。\n\n是否继续？",
     );
     if (!confirmed) return;
 
@@ -2144,7 +2176,7 @@ export const MindmapView = memo(function MindmapView({
         nodeId: primarySelectedId || tree.id,
       });
     },
-    [primarySelectedId, tree.id]
+    [primarySelectedId, tree.id],
   );
 
   const [isSemiCompact, setIsSemiCompact] = useState(false);
@@ -2214,10 +2246,10 @@ export const MindmapView = memo(function MindmapView({
       if (!selectedRelation) return;
       const { fromId, toId } = selectedRelation;
       applySidecarEdit(["relations"], (current) =>
-        setRelationFields(current, fromId, toId, { [field]: value })
+        setRelationFields(current, fromId, toId, { [field]: value }),
       );
     },
-    [applySidecarEdit, selectedRelation]
+    [applySidecarEdit, selectedRelation],
   );
 
   /**
@@ -2235,7 +2267,7 @@ export const MindmapView = memo(function MindmapView({
       const y = containerRect ? event.clientY - containerRect.top : event.clientY;
       setContextMenu({ x, y, nodeId: tree.id, isCanvas: true });
     },
-    [tree.id]
+    [tree.id],
   );
 
   const handleRemoveSelectedRelation = useCallback(() => {
@@ -2252,7 +2284,7 @@ export const MindmapView = memo(function MindmapView({
       setEditingRelation({ fromId: relation.fromId, toId: relation.toId });
       setEditingText(relation.label ?? "");
     },
-    []
+    [],
   );
 
   const handleCancelRelationEdit = useCallback(() => setEditingRelation(null), []);
@@ -2262,7 +2294,7 @@ export const MindmapView = memo(function MindmapView({
     setEditingRelation(null);
     if (!relation) return;
     applySidecarEdit(["relations"], (current) =>
-      setRelationFields(current, relation.fromId, relation.toId, { label: editingText })
+      setRelationFields(current, relation.fromId, relation.toId, { label: editingText }),
     );
   }, [applySidecarEdit, editingRelation, editingText]);
 
@@ -2308,7 +2340,7 @@ export const MindmapView = memo(function MindmapView({
       const x = (event.clientX - containerRect.left - transform.x) / transform.scale - offset.x;
       const y = (event.clientY - containerRect.top - transform.y) / transform.scale - offset.y;
       applySidecarEdit(["floating"], (current) =>
-        moveFloatingTopic(current, draggingFloatingId, Math.round(x), Math.round(y))
+        moveFloatingTopic(current, draggingFloatingId, Math.round(x), Math.round(y)),
       );
     };
 
@@ -2339,7 +2371,7 @@ export const MindmapView = memo(function MindmapView({
       draggingFloatingOffsetRef.current = { x: pointerX - box.x, y: pointerY - box.y };
       setDraggingFloatingId(id);
     },
-    [floatingBoxes, transform.scale, transform.x, transform.y]
+    [floatingBoxes, transform.scale, transform.x, transform.y],
   );
 
   const handleStartFloatingEdit = useCallback(
@@ -2349,7 +2381,7 @@ export const MindmapView = memo(function MindmapView({
       setEditingFloatingId(id);
       setEditingText(box.text);
     },
-    [floatingBoxes]
+    [floatingBoxes],
   );
 
   const handleCancelFloatingEdit = useCallback(() => setEditingFloatingId(null), []);
@@ -2395,7 +2427,7 @@ export const MindmapView = memo(function MindmapView({
       setSelectedFloatingId(null);
       applySidecarEdit(["floating"], (current) => removeFloatingTopic(current, id));
     },
-    [applySidecarEdit]
+    [applySidecarEdit],
   );
 
   /**
@@ -2410,13 +2442,12 @@ export const MindmapView = memo(function MindmapView({
     const y = (menuPos.top - transform.y) / transform.scale;
     applySidecarEdit(
       ["floating"],
-      (current) => addFloatingTopic(current, "新主题", Math.round(x), Math.round(y)).sidecar
+      (current) => addFloatingTopic(current, "新主题", Math.round(x), Math.round(y)).sidecar,
     );
   }, [applySidecarEdit, menuPos.left, menuPos.top, transform.scale, transform.x, transform.y]);
 
   /** The box the floating editor is drawing over, if one is open. */
-  const editingFloatingBox =
-    floatingBoxes.find((topic) => topic.id === editingFloatingId) ?? null;
+  const editingFloatingBox = floatingBoxes.find((topic) => topic.id === editingFloatingId) ?? null;
 
   /**
    * Each summary with the bounds it spans.
@@ -2464,7 +2495,7 @@ export const MindmapView = memo(function MindmapView({
       setEditingSummaryId(id);
       setEditingText(summary.text);
     },
-    [summaryBoxes]
+    [summaryBoxes],
   );
 
   const handleCancelSummaryEdit = useCallback(() => setEditingSummaryId(null), []);
@@ -2517,7 +2548,7 @@ export const MindmapView = memo(function MindmapView({
       const id = selectedBoundaryId;
       applySidecarEdit(["boundaries"], (current) => setBoundaryColor(current, id, colorId));
     },
-    [applySidecarEdit, selectedBoundaryId]
+    [applySidecarEdit, selectedBoundaryId],
   );
 
   const handleStartBoundaryEdit = useCallback(
@@ -2527,7 +2558,7 @@ export const MindmapView = memo(function MindmapView({
       setEditingBoundaryId(id);
       setEditingText(boundary.text);
     },
-    [boundaryBoxes]
+    [boundaryBoxes],
   );
 
   const handleCancelBoundaryEdit = useCallback(() => setEditingBoundaryId(null), []);
@@ -2819,7 +2850,7 @@ export const MindmapView = memo(function MindmapView({
             {layout.nodes.map((node) => {
               const defaultBranchColor =
                 node.level === 0
-                  ? mindmapTheme.root.fill ?? mindmapTheme.node.fill
+                  ? (mindmapTheme.root.fill ?? mindmapTheme.node.fill)
                   : branchColorFor(mindmapTheme, node.colorIndex);
               const customBg = node.color || "";
               const isCustomTransparent = customBg === "transparent";
@@ -2840,17 +2871,15 @@ export const MindmapView = memo(function MindmapView({
                 strokeColor = isSelected
                   ? "#38bdf8"
                   : isHovered
-                  ? "rgba(255, 255, 255, 0.75)"
-                  : "rgba(0, 0, 0, 0.18)";
+                    ? "rgba(255, 255, 255, 0.75)"
+                    : "rgba(0, 0, 0, 0.18)";
               }
 
               // Automatic high-contrast text color when custom background is set
               const autoContrastTextColor =
                 customBg && !isCustomTransparent ? getContrastTextColor(customBg) : "";
               const resolvedTextColor =
-                node.textColor ||
-                autoContrastTextColor ||
-                (isRoot ? "#38bdf8" : undefined);
+                node.textColor || autoContrastTextColor || (isRoot ? "#38bdf8" : undefined);
 
               return (
                 <g
@@ -2974,7 +3003,9 @@ export const MindmapView = memo(function MindmapView({
                       fill="none"
                       stroke="#f59e0b"
                       strokeWidth={searchMatchIds[currentSearchIndex] === node.id ? 3 : 1.8}
-                      strokeDasharray={searchMatchIds[currentSearchIndex] === node.id ? "none" : "4 2"}
+                      strokeDasharray={
+                        searchMatchIds[currentSearchIndex] === node.id ? "none" : "4 2"
+                      }
                     />
                   )}
 
@@ -2989,23 +3020,23 @@ export const MindmapView = memo(function MindmapView({
                         node.shape === "capsule"
                           ? (node.height + 6) / 2
                           : node.shape === "rect"
-                          ? 0
-                          : node.shape === "underline"
-                          ? 4
-                          : isRoot
-                          ? 11
-                          : 9
+                            ? 0
+                            : node.shape === "underline"
+                              ? 4
+                              : isRoot
+                                ? 11
+                                : 9
                       }
                       ry={
                         node.shape === "capsule"
                           ? (node.height + 6) / 2
                           : node.shape === "rect"
-                          ? 0
-                          : node.shape === "underline"
-                          ? 4
-                          : isRoot
-                          ? 11
-                          : 9
+                            ? 0
+                            : node.shape === "underline"
+                              ? 4
+                              : isRoot
+                                ? 11
+                                : 9
                       }
                       className="mindmap-node-selection-ring"
                       stroke="#38bdf8"
@@ -3029,7 +3060,10 @@ export const MindmapView = memo(function MindmapView({
                         y1={node.height - 2}
                         x2={node.width}
                         y2={node.height - 2}
-                        stroke={node.borderColor || (customBg && !isCustomTransparent ? customBg : defaultBranchColor)}
+                        stroke={
+                          node.borderColor ||
+                          (customBg && !isCustomTransparent ? customBg : defaultBranchColor)
+                        }
                         strokeWidth={isSelected ? 2.8 : isHovered ? 2.2 : 1.8}
                       />
                     </>
@@ -3041,29 +3075,29 @@ export const MindmapView = memo(function MindmapView({
                         node.shape === "capsule"
                           ? node.height / 2
                           : node.shape === "rect"
-                          ? 0
-                          : node.shape === "rounded"
-                          ? 6
-                          : isRoot
-                          ? 8
-                          : 6
+                            ? 0
+                            : node.shape === "rounded"
+                              ? 6
+                              : isRoot
+                                ? 8
+                                : 6
                       }
                       ry={
                         node.shape === "capsule"
                           ? node.height / 2
                           : node.shape === "rect"
-                          ? 0
-                          : node.shape === "rounded"
-                          ? 6
-                          : isRoot
-                          ? 8
-                          : 6
+                            ? 0
+                            : node.shape === "rounded"
+                              ? 6
+                              : isRoot
+                                ? 8
+                                : 6
                       }
                       className="mindmap-node-rect"
                       data-custom-color={!!customBg}
                       data-transparent={isCustomTransparent}
                       style={{
-                        fill: isCustomTransparent ? "transparent" : (customBg || undefined),
+                        fill: isCustomTransparent ? "transparent" : customBg || undefined,
                         stroke: strokeColor,
                         strokeWidth: strokeWidth,
                       }}
@@ -3106,7 +3140,13 @@ export const MindmapView = memo(function MindmapView({
                         className={`mindmap-node-title-text ${isRoot ? "root-title" : ""}`}
                         style={{
                           fontSize: `${effectiveFontSize}px`,
-                          fontWeight: node.fontWeight ? (node.fontWeight === "bold" ? 700 : 400) : (isRoot ? 700 : 500),
+                          fontWeight: node.fontWeight
+                            ? node.fontWeight === "bold"
+                              ? 700
+                              : 400
+                            : isRoot
+                              ? 700
+                              : 500,
                           fill: resolvedTextColor || undefined,
                           // Inline styles beat author CSS, guaranteeing the chosen
                           // alignment actually takes effect on the SVG text.
@@ -3116,7 +3156,8 @@ export const MindmapView = memo(function MindmapView({
                       >
                         {lines.map((line, idx) => {
                           const isNotLast = idx < lines.length - 1;
-                          const isJustified = align === "justify" && isNotLast && line.trim().length > 1;
+                          const isJustified =
+                            align === "justify" && isNotLast && line.trim().length > 1;
 
                           return (
                             <tspan
@@ -3218,7 +3259,6 @@ export const MindmapView = memo(function MindmapView({
                     </g>
                   )}
 
-
                   {/* Manual Resize Handle at bottom-right corner */}
                   {editable && (isHovered || isSelected) && (
                     <g
@@ -3300,7 +3340,7 @@ export const MindmapView = memo(function MindmapView({
             onStartDrag={handleFloatingDragStart}
             onOpenMenu={handleFloatingContextMenu}
             onOpenLink={(id) => handleOpenLink(tree, id)}
-            />
+          />
         </g>
       </svg>
 
@@ -3503,7 +3543,8 @@ export const MindmapView = memo(function MindmapView({
         // branch. A deeper topic follows its branch, so it has no other side of its own to
         // be moved to.
         onMoveToSide={
-          activeLayoutId === "bidirectional" && tree.children.some((child) => child.id === panelNodeId)
+          activeLayoutId === "bidirectional" &&
+          tree.children.some((child) => child.id === panelNodeId)
             ? handleMoveToSide
             : undefined
         }

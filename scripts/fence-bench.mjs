@@ -61,7 +61,14 @@ for (const size of [500, 2000, 5000]) {
 
   const speedup = (oldMs / Math.max(newMs, 0.001)).toFixed(0);
   console.log(
-    String(size).padStart(5) + " 行 | 旧 O(n^2): " + oldMs.toFixed(1).padStart(9) + " ms | 新 O(n): " +
-      newMs.toFixed(2).padStart(7) + " ms | 提速 " + speedup + "x | 结果一致 " + (a === b)
+    String(size).padStart(5) +
+      " 行 | 旧 O(n^2): " +
+      oldMs.toFixed(1).padStart(9) +
+      " ms | 新 O(n): " +
+      newMs.toFixed(2).padStart(7) +
+      " ms | 提速 " +
+      speedup +
+      "x | 结果一致 " +
+      (a === b),
   );
 }

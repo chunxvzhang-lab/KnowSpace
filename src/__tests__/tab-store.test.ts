@@ -82,13 +82,9 @@ describe("useTabStore - tab state", () => {
     });
 
     it("finds an existing tab by absolute path, ignoring case", () => {
-      useTabStore.getState().ensureTab(
-        tab("a", { absolutePath: "C:\\Vault\\Note.md" })
-      );
+      useTabStore.getState().ensureTab(tab("a", { absolutePath: "C:\\Vault\\Note.md" }));
 
-      useTabStore.getState().ensureTab(
-        tab("b", { absolutePath: "c:\\vault\\note.md" })
-      );
+      useTabStore.getState().ensureTab(tab("b", { absolutePath: "c:\\vault\\note.md" }));
 
       expect(useTabStore.getState().tabs).toHaveLength(1);
     });
@@ -124,16 +120,12 @@ describe("useTabStore - tab state", () => {
       // apart by title, so the second one is treated as the first. Recorded so
       // that changing it later is a deliberate decision, not an accident.
       const tabs = [tab("draft-1", { title: "未命名", relativePath: "" })];
-      expect(
-        findTabIndex(tabs, tab("draft-2", { title: "未命名", relativePath: "" }))
-      ).toBe(0);
+      expect(findTabIndex(tabs, tab("draft-2", { title: "未命名", relativePath: "" }))).toBe(0);
     });
 
     it("does not fall back to title once either side has a path", () => {
       const tabs = [tab("a", { title: "同名", absolutePath: "/vault/a.md" })];
-      expect(
-        findTabIndex(tabs, tab("b", { title: "同名", absolutePath: "/vault/b.md" }))
-      ).toBe(-1);
+      expect(findTabIndex(tabs, tab("b", { title: "同名", absolutePath: "/vault/b.md" }))).toBe(-1);
     });
   });
 
@@ -160,7 +152,7 @@ describe("useTabStore - tab state", () => {
       const flagged = tabsWithDirtyFlags(
         [tab("a", { title: "笔记", absolutePath: "/vault/a.md" })],
         "a",
-        true
+        true,
       );
 
       expect(flagged[0]).toMatchObject({
@@ -323,7 +315,11 @@ describe("开一个文档时，标签页怎么变", () => {
     const tabs = [tab("别的", { title: "第二章", absolutePath: "C:\\Vault\\旧的.md" })];
 
     expect(
-      tabsWithNewDocument(tabs, { ...chapter, id: "另一个 id", absolutePath: undefined }, undefined)
+      tabsWithNewDocument(
+        tabs,
+        { ...chapter, id: "另一个 id", absolutePath: undefined },
+        undefined,
+      ),
     ).toBe(tabs);
   });
 
@@ -334,7 +330,7 @@ describe("开一个文档时，标签页怎么变", () => {
     const tabs = [tab("别的", { title: "第二章", absolutePath: "C:\\Vault\\旧的.md" })];
 
     expect(
-      tabsWithNewDocument(tabs, { ...chapter, id: "另一个 id" }, "C:\\Vault\\ch-2.md")
+      tabsWithNewDocument(tabs, { ...chapter, id: "另一个 id" }, "C:\\Vault\\ch-2.md"),
     ).toHaveLength(2);
   });
 });

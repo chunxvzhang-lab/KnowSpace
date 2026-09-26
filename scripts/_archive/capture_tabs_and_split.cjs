@@ -68,80 +68,86 @@ async function saveBoth(page, name) {
     deviceScaleFactor: 1.5,
   });
 
-  await context.addInitScript(({ s1, s2, s3 }) => {
-    const chapters = [
-      {
-        id: "doc-1",
-        title: "01-架构设计与核心技术",
-        src: "01-架构设计与核心技术.md",
-        absolutePath: "C:\\\\Docs\\\\01-架构设计与核心技术.md",
-      },
-      {
-        id: "doc-2",
-        title: "02-AST双向零延迟同步",
-        src: "02-AST双向零延迟同步.md",
-        absolutePath: "C:\\\\Docs\\\\02-AST双向零延迟同步.md",
-      },
-      {
-        id: "doc-3",
-        title: "03-闪念胶囊与原子落盘",
-        src: "03-闪念胶囊与原子落盘.md",
-        absolutePath: "C:\\\\Docs\\\\03-闪念胶囊与原子落盘.md",
-      },
-    ];
+  await context.addInitScript(
+    ({ s1, s2, s3 }) => {
+      const chapters = [
+        {
+          id: "doc-1",
+          title: "01-架构设计与核心技术",
+          src: "01-架构设计与核心技术.md",
+          absolutePath: "C:\\\\Docs\\\\01-架构设计与核心技术.md",
+        },
+        {
+          id: "doc-2",
+          title: "02-AST双向零延迟同步",
+          src: "02-AST双向零延迟同步.md",
+          absolutePath: "C:\\\\Docs\\\\02-AST双向零延迟同步.md",
+        },
+        {
+          id: "doc-3",
+          title: "03-闪念胶囊与原子落盘",
+          src: "03-闪念胶囊与原子落盘.md",
+          absolutePath: "C:\\\\Docs\\\\03-闪念胶囊与原子落盘.md",
+        },
+      ];
 
-    const contentMap = {
-      "C:\\\\Docs\\\\01-架构设计与核心技术.md": s1,
-      "C:\\\\Docs\\\\02-AST双向零延迟同步.md": s2,
-      "C:\\\\Docs\\\\03-闪念胶囊与原子落盘.md": s3,
-      "doc-1": s1,
-      "doc-2": s2,
-      "doc-3": s3,
-    };
+      const contentMap = {
+        "C:\\\\Docs\\\\01-架构设计与核心技术.md": s1,
+        "C:\\\\Docs\\\\02-AST双向零延迟同步.md": s2,
+        "C:\\\\Docs\\\\03-闪念胶囊与原子落盘.md": s3,
+        "doc-1": s1,
+        "doc-2": s2,
+        "doc-3": s3,
+      };
 
-    const mockDesktop = {
-      getInitialSyncData: () => ({
-        filePath: "C:\\\\Docs\\\\01-架构设计与核心技术.md",
-        source: {
-          markdown: s1,
+      const mockDesktop = {
+        getInitialSyncData: () => ({
+          filePath: "C:\\\\Docs\\\\01-架构设计与核心技术.md",
+          source: {
+            markdown: s1,
+            baseUrl: "file:///C:/Docs/",
+            diskVersion: "v1",
+            writable: true,
+            hasBom: false,
+            lineEnding: "LF",
+          },
+        }),
+        getLaunchFilePath: async () => "C:\\\\Docs\\\\01-架构设计与核心技术.md",
+        getDirectoryForFile: async () => ({
+          directory: {
+            id: "knowspace-library",
+            title: "KnowSpace 核心知识库",
+            rootPath: "C:\\\\Docs",
+            chapters,
+          },
+        }),
+        readMarkdownFile: async (filePath) => ({
+          markdown: contentMap[filePath] || s1,
           baseUrl: "file:///C:/Docs/",
           diskVersion: "v1",
           writable: true,
           hasBom: false,
           lineEnding: "LF",
-        },
-      }),
-      getLaunchFilePath: async () => "C:\\\\Docs\\\\01-架构设计与核心技术.md",
-      getDirectoryForFile: async () => ({
-        directory: {
-          id: "knowspace-library",
-          title: "KnowSpace 核心知识库",
-          rootPath: "C:\\\\Docs",
-          chapters,
-        },
-      }),
-      readMarkdownFile: async (filePath) => ({
-        markdown: contentMap[filePath] || s1,
-        baseUrl: "file:///C:/Docs/",
-        diskVersion: "v1",
-        writable: true,
-        hasBom: false,
-        lineEnding: "LF",
-      }),
-      saveMarkdownFile: async () => ({ success: true }),
-      saveMarkdownFileAs: async () => ({ success: true }),
-      setNativeTheme: async () => {},
-      onOpenFilePath: () => () => {},
-      onMenuCommand: () => () => {},
-      onBeforeClose: () => () => {},
-      onFlashNoteSaved: () => () => {},
-      exportSvgAsPng: async () => ({ success: true }),
-      savePngData: async () => ({ success: true, filePath: "C:\\\\Exports\\\\mermaid-diagram.png" }),
-    };
+        }),
+        saveMarkdownFile: async () => ({ success: true }),
+        saveMarkdownFileAs: async () => ({ success: true }),
+        setNativeTheme: async () => {},
+        onOpenFilePath: () => () => {},
+        onMenuCommand: () => () => {},
+        onBeforeClose: () => () => {},
+        onFlashNoteSaved: () => () => {},
+        exportSvgAsPng: async () => ({ success: true }),
+        savePngData: async () => ({
+          success: true,
+          filePath: "C:\\\\Exports\\\\mermaid-diagram.png",
+        }),
+      };
 
-    window.knowSpaceDesktop = mockDesktop;
-    window.bookMDDesktop = mockDesktop;
-  }, { s1: sampleDoc1, s2: sampleDoc2, s3: sampleDoc3 });
+      window.knowSpaceDesktop = mockDesktop;
+      window.bookMDDesktop = mockDesktop;
+    },
+    { s1: sampleDoc1, s2: sampleDoc2, s3: sampleDoc3 },
+  );
 
   const page = await context.newPage();
   await page.goto(BASE_URL);
@@ -156,7 +162,7 @@ async function saveBoth(page, name) {
   // Click second file in tree
   const fileRows = page.locator(".tree-row.file-row");
   console.log("File rows count:", await fileRows.count());
-  if (await fileRows.count() >= 2) {
+  if ((await fileRows.count()) >= 2) {
     await fileRows.nth(1).click();
     await page.waitForTimeout(800);
   }
@@ -164,7 +170,7 @@ async function saveBoth(page, name) {
   // Check tabs
   const tabs = page.locator(".tab-item");
   console.log("Tabs count:", await tabs.count());
-  if (await tabs.count() >= 2) {
+  if ((await tabs.count()) >= 2) {
     // Right click inactive tab
     await tabs.nth(0).click({ button: "right" });
     await page.waitForTimeout(500);
@@ -173,7 +179,7 @@ async function saveBoth(page, name) {
 
     // Click split compare
     const splitOption = page.locator('.tab-context-menu button:has-text("分屏对比")');
-    if (await splitOption.count() > 0) {
+    if ((await splitOption.count()) > 0) {
       await splitOption.click();
       await page.waitForTimeout(1200);
       console.log("Saving 10-dual-split-compare.png...");

@@ -79,9 +79,12 @@ export function parseCanvasData(jsonString: string): CanvasData {
           type: "group",
           label: typeof item.label === "string" ? item.label : "",
           background: typeof item.background === "string" ? item.background : undefined,
-          backgroundStyle: item.backgroundStyle === "cover" || item.backgroundStyle === "ratio" || item.backgroundStyle === "repeat"
-            ? item.backgroundStyle
-            : undefined,
+          backgroundStyle:
+            item.backgroundStyle === "cover" ||
+            item.backgroundStyle === "ratio" ||
+            item.backgroundStyle === "repeat"
+              ? item.backgroundStyle
+              : undefined,
           x,
           y,
           width: width < 300 ? 400 : width,
@@ -113,9 +116,7 @@ export function parseCanvasData(jsonString: string): CanvasData {
           ? item.strokePattern
           : undefined;
       const labelShape =
-        item.labelShape === "rect" || item.labelShape === "diamond"
-          ? item.labelShape
-          : undefined;
+        item.labelShape === "rect" || item.labelShape === "diamond" ? item.labelShape : undefined;
 
       // Ring layout extension: keep the circular arc metadata so a ring stays
       // a perfect circle after reloading the .canvas file.
@@ -173,7 +174,7 @@ export function serializeCanvasData(data: CanvasData): string {
       edges: data.edges,
     },
     null,
-    2
+    2,
   );
 }
 

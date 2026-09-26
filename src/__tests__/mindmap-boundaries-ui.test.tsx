@@ -122,7 +122,7 @@ describe("边界", () => {
     const { sidecar } = addBoundary(
       emptySidecar(),
       [nodeIdOf("子节点甲"), nodeIdOf("子节点乙")],
-      "这两种走法"
+      "这两种走法",
     );
     api.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
@@ -227,7 +227,7 @@ describe("边界", () => {
     const { sidecar, id } = addBoundary(
       emptySidecar(),
       [nodeIdOf("子节点甲"), nodeIdOf("子节点乙")],
-      "这两种走法"
+      "这两种走法",
     );
     api.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
@@ -247,7 +247,7 @@ describe("边界", () => {
 
     const built = buildStandaloneMindmapSvg(
       document.querySelector(".mindmap-svg-canvas") as SVGSVGElement,
-      { bounds: layoutMindmap(parseMarkdownToMindmapTree(SOURCE, "测试")).bounds, dark: false }
+      { bounds: layoutMindmap(parseMarkdownToMindmapTree(SOURCE, "测试")).bounds, dark: false },
     )!;
     const doc = new DOMParser().parseFromString(built.svg, "image/svg+xml");
     const box = doc.querySelector(".mindmap-boundary-box");
@@ -260,5 +260,3 @@ describe("边界", () => {
     expect(doc.querySelector(".mindmap-boundary-selection")).toBeNull();
   });
 });
-
-

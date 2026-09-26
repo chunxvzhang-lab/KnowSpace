@@ -77,7 +77,7 @@ const THEMES = {
 type ThemeKey = keyof typeof THEMES;
 
 const BLOCKS: Record<ThemeKey, Record<string, string>> = Object.fromEntries(
-  Object.entries(THEMES).map(([k, sel]) => [k, declarationsOf(blockBody(sel))])
+  Object.entries(THEMES).map(([k, sel]) => [k, declarationsOf(blockBody(sel))]),
 ) as Record<ThemeKey, Record<string, string>>;
 
 /** 主题内取值，取不到则回落到 `:root`（浅色默认）。 */
@@ -91,14 +91,21 @@ type Rgb = [number, number, number];
 
 function parseHex(value: string): Rgb {
   const h = value.trim().replace("#", "");
-  const full = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  const full =
+    h.length === 3
+      ? h
+          .split("")
+          .map((c) => c + c)
+          .join("")
+      : h;
   return [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16)) as Rgb;
 }
 
 function parseTriplet(value: string): Rgb {
   const nums = value.split(",").map((s) => Number(s.trim()));
   expect(nums.length, `通道三元组应为 3 个数: ${value}`).toBe(3);
-  for (const n of nums) expect(Number.isInteger(n) && n >= 0 && n <= 255, `通道越界: ${value}`).toBe(true);
+  for (const n of nums)
+    expect(Number.isInteger(n) && n >= 0 && n <= 255, `通道越界: ${value}`).toBe(true);
   return nums as Rgb;
 }
 
@@ -157,12 +164,14 @@ describe("青色强调色令牌 --accent-info", () => {
       for (const s of TEXT_SURFACES) {
         const bg = parseHex(token(theme, s));
         const c = contrast(fg, bg);
-        if (c < TEXT_MIN) report.push(`${theme}: ${ACCENT} 对 ${s} 只有 ${c.toFixed(2)}:1（需 ${TEXT_MIN}）`);
+        if (c < TEXT_MIN)
+          report.push(`${theme}: ${ACCENT} 对 ${s} 只有 ${c.toFixed(2)}:1（需 ${TEXT_MIN}）`);
       }
       for (const s of UI_SURFACES) {
         const bg = parseHex(token(theme, s));
         const c = contrast(fg, bg);
-        if (c < UI_MIN) report.push(`${theme}: ${ACCENT} 对 ${s} 只有 ${c.toFixed(2)}:1（需 ${UI_MIN}）`);
+        if (c < UI_MIN)
+          report.push(`${theme}: ${ACCENT} 对 ${s} 只有 ${c.toFixed(2)}:1（需 ${UI_MIN}）`);
       }
     }
     expect(report, report.join(" | ")).toEqual([]);
@@ -191,7 +200,7 @@ describe("青色强调色令牌 --accent-info", () => {
     }
     expect(
       offenders,
-      `这些地方应改用 var(${ACCENT}) / rgba(var(${ACCENT_RGB}), …): ${offenders.join(" | ")}`
+      `这些地方应改用 var(${ACCENT}) / rgba(var(${ACCENT_RGB}), …): ${offenders.join(" | ")}`,
     ).toEqual([]);
   });
 
@@ -201,7 +210,7 @@ describe("青色强调色令牌 --accent-info", () => {
     expect(flash, "闪念胶囊基线里应有 --flash-info 定义").toBeTruthy();
     expect(
       parseHex(flash),
-      `--flash-info (${flash}) 与深色 ${ACCENT} 已不同值——要么同步，要么把它也换成令牌并从允许清单移除`
+      `--flash-info (${flash}) 与深色 ${ACCENT} 已不同值——要么同步，要么把它也换成令牌并从允许清单移除`,
     ).toEqual(parseHex(token("twitter", ACCENT)));
   });
 });

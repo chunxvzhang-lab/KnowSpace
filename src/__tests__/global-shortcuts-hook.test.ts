@@ -94,9 +94,7 @@ describe("useGlobalShortcuts - desktop wiring", () => {
 
     captured.onOpenFilePath?.("C:/vault/dropped.md" as never);
 
-    expect(params.openDesktopMarkdownPathRef.current).toHaveBeenCalledWith(
-      "C:/vault/dropped.md"
-    );
+    expect(params.openDesktopMarkdownPathRef.current).toHaveBeenCalledWith("C:/vault/dropped.md");
   });
 
   it("routes a menu command to the matching ref", () => {

@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { renderMarkdown, extractHeadingsFromSource, findHeadingLineInSource } from "../services/markdown";
+import {
+  renderMarkdown,
+  extractHeadingsFromSource,
+  findHeadingLineInSource,
+} from "../services/markdown";
 import type { Heading } from "../core/types";
 
 describe("v1.5.0 Markdown Enhancements", () => {

@@ -7,12 +7,7 @@ import type { Heading, Bookmark, BookManifest } from "../core/types";
 describe("TOC and Bookmark Panels Sub-function Tests", () => {
   describe("TocPanel", () => {
     it("renders empty state when no headings exist", () => {
-      render(
-        <TocPanel
-          headings={[]}
-          onJump={vi.fn()}
-        />
-      );
+      render(<TocPanel headings={[]} onJump={vi.fn()} />);
       expect(screen.getByText("本章没有标题。")).toBeDefined();
     });
 
@@ -32,7 +27,7 @@ describe("TOC and Bookmark Panels Sub-function Tests", () => {
           activeHeadingId="h2-arch"
           bookmarkedHeadingIds={bookmarkedIds}
           onJump={onJump}
-        />
+        />,
       );
 
       expect(screen.getByText("一、引言背景")).toBeDefined();
@@ -73,7 +68,7 @@ describe("TOC and Bookmark Panels Sub-function Tests", () => {
           manifest={mockManifest}
           onJump={vi.fn()}
           onDelete={vi.fn()}
-        />
+        />,
       );
       expect(screen.getByText(/还没有书签/)).toBeDefined();
     });
@@ -103,7 +98,7 @@ describe("TOC and Bookmark Panels Sub-function Tests", () => {
           manifest={mockManifest}
           onJump={onJump}
           onDelete={onDelete}
-        />
+        />,
       );
 
       expect(screen.getByText("引言大纲")).toBeDefined();

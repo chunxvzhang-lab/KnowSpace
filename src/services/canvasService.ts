@@ -28,11 +28,7 @@ export {
   toggleChecklistInMarkdown,
 } from "./canvasPrimitives";
 
-export {
-  parseCanvasData,
-  serializeCanvasData,
-  createDefaultCanvas,
-} from "./canvasSerialization";
+export { parseCanvasData, serializeCanvasData, createDefaultCanvas } from "./canvasSerialization";
 
 export {
   computeBoundingBox,
@@ -121,7 +117,4 @@ export {
   copyCanvasImageToClipboard,
 } from "./canvasExport";
 
-export type {
-  CanvasExportOptions,
-  CanvasDownloadResult,
-} from "./canvasExport";
+export type { CanvasExportOptions, CanvasDownloadResult } from "./canvasExport";

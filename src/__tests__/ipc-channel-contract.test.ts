@@ -104,7 +104,7 @@ const diffSets = <T>(a: Map<string, T>, b: Map<string, T>) => {
   const onlyA = new Set([...a.keys()].filter((k) => !b.has(k)));
   const onlyB = new Set([...b.keys()].filter((k) => !a.has(k)));
   return { onlyA, onlyB };
-}
+};
 
 /** Element ③: run the real contract logic on fixtures — a hole must be found. */
 function missingHandlers(preloadText: string, mainText: string) {
@@ -173,7 +173,7 @@ describe("IPC channel contract (preload.cjs ↔ main.cjs ↔ desktop.d.ts)", () 
 
   it("every handler main registers is reachable from preload (no dead handlers)", () => {
     const orphans = [...diffSets(main.handles, invoke).onlyA].filter(
-      (channel) => !ALLOWED_MAIN_ONLY.some((a) => a.channel === channel)
+      (channel) => !ALLOWED_MAIN_ONLY.some((a) => a.channel === channel),
     );
     expect(orphans).toEqual([]);
   });
@@ -188,13 +188,17 @@ describe("IPC channel contract (preload.cjs ↔ main.cjs ↔ desktop.d.ts)", () 
 
   it("every method preload exposes is declared in desktop.d.ts", () => {
     const { onlyA } = diffSets(methods, dtsMethods);
-    const undeclared = [...onlyA].filter((name) => !ALLOWED_PRELOAD_ONLY.some((a) => a.name === name));
+    const undeclared = [...onlyA].filter(
+      (name) => !ALLOWED_PRELOAD_ONLY.some((a) => a.name === name),
+    );
     expect(undeclared).toEqual([]);
   });
 
   it("every method desktop.d.ts declares is implemented by preload", () => {
     const { onlyB } = diffSets(methods, dtsMethods);
-    const unimplemented = [...onlyB].filter((name) => !ALLOWED_DTS_ONLY.some((a) => a.name === name));
+    const unimplemented = [...onlyB].filter(
+      (name) => !ALLOWED_DTS_ONLY.some((a) => a.name === name),
+    );
     expect(unimplemented).toEqual([]);
   });
 

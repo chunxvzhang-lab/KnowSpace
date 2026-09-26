@@ -15,21 +15,24 @@ const candle = path.join(wixBase, "candle.exe");
 const light = path.join(wixBase, "light.exe");
 
 console.log("Compiling WiX XML with candle.exe...");
-execSync(
-  `& "${candle}" -arch x64 -pedantic -dappDir="${appOutDir}" project.wxs`,
-  { cwd: stageDir, stdio: "inherit", shell: ps }
-);
+execSync(`& "${candle}" -arch x64 -pedantic -dappDir="${appOutDir}" project.wxs`, {
+  cwd: stageDir,
+  stdio: "inherit",
+  shell: ps,
+});
 
 console.log("Linking WiX Object with light.exe to:", finalMsiPath);
 execSync(
   `& "${light}" -out "${finalMsiPath}" -spdb -sw1076 -dappDir="${appOutDir}" -b "${appOutDir}" -ext WixUIExtension project.wixobj`,
-  { cwd: stageDir, stdio: "inherit", shell: ps }
+  { cwd: stageDir, stdio: "inherit", shell: ps },
 );
 
 if (fs.existsSync(finalMsiPath)) {
   const stat = fs.statSync(finalMsiPath);
-  console.log(`\n🎉 MSI installer successfully created at: ${finalMsiPath} (${(stat.size / (1024 * 1024)).toFixed(2)} MB)`);
-  
+  console.log(
+    `\n🎉 MSI installer successfully created at: ${finalMsiPath} (${(stat.size / (1024 * 1024)).toFixed(2)} MB)`,
+  );
+
   if (fs.existsSync(releaseRepo)) {
     const repoMsi = path.join(releaseRepo, "BookMD-Reader-1.0.0.msi");
     fs.copyFileSync(finalMsiPath, repoMsi);

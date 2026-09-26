@@ -15,13 +15,7 @@ import type { MindmapNode, MindmapNodeShape } from "./types";
  * write to the document, which this one never does.
  */
 
-export type MindmapThemeId =
-  | "classic"
-  | "minimal"
-  | "dark"
-  | "sketch"
-  | "contrast"
-  | "corporate";
+export type MindmapThemeId = "classic" | "minimal" | "dark" | "sketch" | "contrast" | "corporate";
 
 /** The appearance of one node, once the theme has had its say. */
 export type NodeAppearance = {
@@ -210,9 +204,12 @@ export function resolveThemeId(value: unknown): MindmapThemeId {
  * test has to be about presence rather than about truthiness.
  */
 export function resolveNodeAppearance(
-  node: Pick<MindmapNode, "color" | "textColor" | "borderColor" | "shape" | "fontSize" | "fontWeight">,
+  node: Pick<
+    MindmapNode,
+    "color" | "textColor" | "borderColor" | "shape" | "fontSize" | "fontWeight"
+  >,
   theme: MindmapTheme,
-  isRoot: boolean
+  isRoot: boolean,
 ): NodeAppearance {
   const base = isRoot ? { ...theme.node, ...theme.root } : theme.node;
 
@@ -249,7 +246,7 @@ export function resolveNodeAppearance(
 export function freezeAppearance(
   tree: MindmapNode,
   nodeIds: readonly string[],
-  theme: MindmapTheme
+  theme: MindmapTheme,
 ): MindmapNode {
   const targets = new Set(nodeIds);
 

@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { parseSearchQuery, extractTagsFromMarkdown, extractLinksFromMarkdown, tokenizeText, buildVaultSearchIndex, updateVaultSearchIndexForDocument, searchVault } from "../services/searchIndexService";
+import {
+  parseSearchQuery,
+  extractTagsFromMarkdown,
+  extractLinksFromMarkdown,
+  tokenizeText,
+  buildVaultSearchIndex,
+  updateVaultSearchIndexForDocument,
+  searchVault,
+} from "../services/searchIndexService";
 
 describe("searchIndexService - Structured Search Syntax Parser", () => {
   it("parses empty and whitespace queries safely", () => {
@@ -214,7 +222,13 @@ LSM-Tree 和 B-Tree 是经典的数据组织形式。
 
     // Update doc-3 to include #架构 tag
     const updatedContent = `# 前端架构演进\n\n全新重构，融入统一 #架构 标准体系。`;
-    index = updateVaultSearchIndexForDocument(index, "doc-3", "前端架构演进", updatedContent, "frontend.md");
+    index = updateVaultSearchIndexForDocument(
+      index,
+      "doc-3",
+      "前端架构演进",
+      updatedContent,
+      "frontend.md",
+    );
 
     const results = searchVault(index, "tag:#架构");
     expect(results.length).toBe(3);

@@ -51,8 +51,8 @@ describe("读 OPML", () => {
   it("嵌套按嵌套读，不按出现顺序拍平", () => {
     const outline = outlineOf(
       opml(
-        '<outline text="第一章"><outline text="1.1"/><outline text="1.2"><outline text="1.2.1"/></outline></outline><outline text="第二章"/>'
-      )
+        '<outline text="第一章"><outline text="1.1"/><outline text="1.2"><outline text="1.2.1"/></outline></outline><outline text="第二章"/>',
+      ),
     );
 
     expect(outline.topics).toHaveLength(2);
@@ -68,7 +68,7 @@ describe("读 OPML", () => {
     // `text` is OPML 2.0's; the other two are what other exporters write instead,
     // and a topic with no label at all would be a list item with nothing in it.
     const outline = outlineOf(
-      opml('<outline text="甲的"/><outline title="乙的"/><outline>丙的</outline><outline/>')
+      opml('<outline text="甲的"/><outline title="乙的"/><outline>丙的</outline><outline/>'),
     );
 
     expect(outline.topics.map((t) => t.text)).toEqual(["甲的", "乙的", "丙的", "未命名"]);
@@ -85,7 +85,9 @@ describe("读 OPML", () => {
 
   it("备注与链接跟着主题走，两种写法都认", () => {
     const outline = outlineOf(
-      opml('<outline text="甲" _note="记一笔"/><outline text="乙" note="换个名字写" url="https://example.com"/>')
+      opml(
+        '<outline text="甲" _note="记一笔"/><outline text="乙" note="换个名字写" url="https://example.com"/>',
+      ),
     );
 
     expect(outline.topics[0].note).toBe("记一笔");
@@ -99,7 +101,7 @@ describe("读 OPML", () => {
     // does not implement describes the topic's contents elsewhere, not its place
     // in the outline, and refusing the file over it would be the wrong trade.
     const outline = outlineOf(
-      opml('<outline text="订阅" type="rss" xmlUrl="https://example.com/feed.xml" 自定义="随便"/>')
+      opml('<outline text="订阅" type="rss" xmlUrl="https://example.com/feed.xml" 自定义="随便"/>'),
     );
 
     expect(outline.topics[0].text).toBe("订阅");
@@ -121,7 +123,9 @@ describe("读 OPML", () => {
 
     // An outline in another format: FreeMind's `<map>` is not an OPML, and saying
     // so is more useful than importing its attributes as topics.
-    const freemind = parseOpmlOutline('<?xml version="1.0"?><map version="1.0.1"><node TEXT="甲"/></map>');
+    const freemind = parseOpmlOutline(
+      '<?xml version="1.0"?><map version="1.0.1"><node TEXT="甲"/></map>',
+    );
     expect(freemind).toEqual({
       ok: false,
       message: "这个文件不是 OPML 大纲（没有 <opml><body>）。",
@@ -139,7 +143,9 @@ describe("读 OPML", () => {
 describe("写成 Markdown", () => {
   it("每层两个空格，用 - 开头", () => {
     const markdown = outlineToMarkdown(
-      outlineOf(opml('<outline text="甲"><outline text="乙"><outline text="丙"/></outline></outline>'))
+      outlineOf(
+        opml('<outline text="甲"><outline text="乙"><outline text="丙"/></outline></outline>'),
+      ),
     );
 
     expect(markdown).toBe("- 甲\n  - 乙\n    - 丙\n");
@@ -155,8 +161,8 @@ describe("写成 Markdown", () => {
     // will be applied to it a second later.
     const outline = outlineOf(
       opml(
-        '<outline text="父"><outline text="子甲"/><outline text="子乙"><outline text="孙"/></outline></outline><outline text="第二个分支"/>'
-      )
+        '<outline text="父"><outline text="子甲"/><outline text="子乙"><outline text="孙"/></outline></outline><outline text="第二个分支"/>',
+      ),
     );
 
     const tree = parseMarkdownToMindmapTree(outlineToMarkdown(outline), "我的大纲");
@@ -176,8 +182,8 @@ describe("备注与链接落到哪几个节点上", () => {
   it("按位置对上，包括嵌套里的", () => {
     const outline = outlineOf(
       opml(
-        '<outline text="父" _note="父的备注"><outline text="子" _note="子的备注" url="https://example.com"/></outline>'
-      )
+        '<outline text="父" _note="父的备注"><outline text="子" _note="子的备注" url="https://example.com"/></outline>',
+      ),
     );
     const tree = parseMarkdownToMindmapTree(outlineToMarkdown(outline), "我的大纲");
 
@@ -196,7 +202,9 @@ describe("备注与链接落到哪几个节点上", () => {
     // put every annotation after the mismatch on the wrong topic — a failure that
     // looks like the importer mis-remembering, not like a mismatch.
     const outline = outlineOf(
-      opml('<outline text="甲" _note="甲的"><outline text="甲的子里有备注" _note="子的"/></outline>')
+      opml(
+        '<outline text="甲" _note="甲的"><outline text="甲的子里有备注" _note="子的"/></outline>',
+      ),
     );
     const tree = parseMarkdownToMindmapTree("- 甲\n", "标题");
 
@@ -236,7 +244,9 @@ describe("读 FreeMind", () => {
     // The difference from OPML is not a detail: a single root *is* the outline, so
     // its text names the file and its children are the document's first level.
     const outline = freemindOf(
-      mm('<node TEXT="我的导图"><node TEXT="甲"/><node TEXT="乙"><node TEXT="乙一"/></node></node>')
+      mm(
+        '<node TEXT="我的导图"><node TEXT="甲"/><node TEXT="乙"><node TEXT="乙一"/></node></node>',
+      ),
     );
 
     expect(outline.root?.text).toBe("我的导图");
@@ -259,8 +269,8 @@ describe("读 FreeMind", () => {
     // breaks are the note's own shape.
     const outline = freemindOf(
       mm(
-        '<node TEXT="甲"><richcontent TYPE="NOTE"><html><body><p>第一段</p><p>第二段<br/>下一行</p></body></html></richcontent></node>'
-      )
+        '<node TEXT="甲"><richcontent TYPE="NOTE"><html><body><p>第一段</p><p>第二段<br/>下一行</p></body></html></richcontent></node>',
+      ),
     );
 
     expect(outline.root?.note).toBe("第一段\n第二段\n下一行");
@@ -268,7 +278,7 @@ describe("读 FreeMind", () => {
 
   it("备注写成纯文字也认", () => {
     const outline = freemindOf(
-      mm('<node TEXT="甲"><richcontent TYPE="NOTE">就是一句话</richcontent></node>')
+      mm('<node TEXT="甲"><richcontent TYPE="NOTE">就是一句话</richcontent></node>'),
     );
 
     expect(outline.root?.note).toBe("就是一句话");
@@ -280,8 +290,8 @@ describe("读 FreeMind", () => {
     // the document.
     const outline = freemindOf(
       mm(
-        '<node TEXT="甲" LINK="https://example.com" FOLDED="true" POSITION="right" COLOR="#ff0000"><icon BUILTIN="idea"/><node TEXT="乙"/></node>'
-      )
+        '<node TEXT="甲" LINK="https://example.com" FOLDED="true" POSITION="right" COLOR="#ff0000"><icon BUILTIN="idea"/><node TEXT="乙"/></node>',
+      ),
     );
 
     expect(outline.root?.link).toBe("https://example.com");
@@ -298,8 +308,8 @@ describe("读 FreeMind", () => {
   it("根主题的备注落在文档根上，不是丢掉", () => {
     const outline = freemindOf(
       mm(
-        '<node TEXT="我的导图"><richcontent TYPE="NOTE">根上的一句话</richcontent><node TEXT="甲"><richcontent TYPE="NOTE">甲的</richcontent></node></node>'
-      )
+        '<node TEXT="我的导图"><richcontent TYPE="NOTE">根上的一句话</richcontent><node TEXT="甲"><richcontent TYPE="NOTE">甲的</richcontent></node></node>',
+      ),
     );
     const tree = parseMarkdownToMindmapTree(outlineToMarkdown(outline), "我的导图");
 
@@ -314,7 +324,9 @@ describe("读 FreeMind", () => {
 
   it("写出来的 Markdown 读回去还是一样深", () => {
     const outline = freemindOf(
-      mm('<node TEXT="我的导图"><node TEXT="甲"/><node TEXT="乙"><node TEXT="乙一"/></node></node>')
+      mm(
+        '<node TEXT="我的导图"><node TEXT="甲"/><node TEXT="乙"><node TEXT="乙一"/></node></node>',
+      ),
     );
 
     const tree = parseMarkdownToMindmapTree(outlineToMarkdown(outline), "我的导图");
@@ -325,7 +337,11 @@ describe("读 FreeMind", () => {
 
 describe("读 XMind", () => {
   /** A sheet as XMind writes one, with topic ids this app never sees. */
-  const xmindTopic = (title: string, extra: Record<string, unknown> = {}, attached: unknown[] = []) => ({
+  const xmindTopic = (
+    title: string,
+    extra: Record<string, unknown> = {},
+    attached: unknown[] = [],
+  ) => ({
     id: `xmind-${title}`,
     class: "topic",
     title,
@@ -421,7 +437,9 @@ describe("读 XMind", () => {
   it("没有 content.json 的时候，XMind 8 的事要说出来", () => {
     // An older XMind stores content.xml instead, and "no such entry" would leave
     // the reader with nothing to go on.
-    const zip = buildZip([{ name: "content.xml", data: new TextEncoder().encode("<xmap-content/>") }]);
+    const zip = buildZip([
+      { name: "content.xml", data: new TextEncoder().encode("<xmap-content/>") },
+    ]);
 
     const result = parseXmindOutline(zip);
     expect(result.ok).toBe(false);
@@ -452,7 +470,13 @@ describe("读 XMind", () => {
         title: "画布",
         rootTopic: xmindTopic("根", {}, [xmindTopic("甲"), xmindTopic("乙")]),
         relationships: [
-          { id: "rel-1", class: "relationship", end1Id: "xmind-甲", end2Id: "xmind-乙", title: "取决于" },
+          {
+            id: "rel-1",
+            class: "relationship",
+            end1Id: "xmind-甲",
+            end2Id: "xmind-乙",
+            title: "取决于",
+          },
           // One end names a topic this sheet does not have: a line to nowhere.
           { id: "rel-2", class: "relationship", end1Id: "xmind-甲", end2Id: "xmind-不存在" },
         ],
@@ -553,7 +577,7 @@ describe("读 XMind", () => {
     const tree = parseMarkdownToMindmapTree(markdown, "我的画布");
     const sidecar = applyImportedAnnotations(
       emptySidecar(),
-      annotationsFromOutline(parsed.outline, tree)
+      annotationsFromOutline(parsed.outline, tree),
     );
 
     expect(shape(tree)).toEqual(["我的画布", "  甲", "  乙", "    乙一"]);
@@ -593,12 +617,12 @@ describe("按内容决定是哪种格式", () => {
     // The same exporter writes .xml for both, so the extension cannot be trusted
     // and the root element cannot be wrong.
     const opmlResult = parseOutlineFile(
-      '<?xml version="1.0"?><opml version="2.0"><body><outline text="甲"/></body></opml>'
+      '<?xml version="1.0"?><opml version="2.0"><body><outline text="甲"/></body></opml>',
     );
     expect(opmlResult.ok && opmlResult.outline.topics[0].text).toBe("甲");
 
     const freemindResult = parseOutlineFile(
-      '<?xml version="1.0"?><map version="1.0.1"><node TEXT="根"/></map>'
+      '<?xml version="1.0"?><map version="1.0.1"><node TEXT="根"/></map>',
     );
     expect(freemindResult.ok && freemindResult.outline.root?.text).toBe("根");
   });
@@ -630,7 +654,9 @@ describe("按内容决定是哪种格式", () => {
     const zipped = parseOutlineBytes(zip);
     expect(zipped.ok && zipped.outline.root?.text).toBe("根");
 
-    const text = parseOutlineBytes(new TextEncoder().encode('<?xml version="1.0"?><map><node TEXT="甲"/></map>'));
+    const text = parseOutlineBytes(
+      new TextEncoder().encode('<?xml version="1.0"?><map><node TEXT="甲"/></map>'),
+    );
     expect(text.ok && text.outline.root?.text).toBe("甲");
   });
 
@@ -650,7 +676,7 @@ describe("导入的判断（不经过任何界面）", () => {
 
   it("能读的大纲：说清楚写什么、叫什么", () => {
     const opmlBytes = encoder.encode(
-      '<?xml version="1.0"?><opml version="2.0"><head><title>我的大纲</title></head><body><outline text="甲"><outline text="乙"/></outline></body></opml>'
+      '<?xml version="1.0"?><opml version="2.0"><head><title>我的大纲</title></head><body><outline text="甲"><outline text="乙"/></outline></body></opml>',
     );
 
     const plan = planOutlineImport(opmlBytes, "导出.opml");
@@ -699,7 +725,7 @@ describe("导入的判断（不经过任何界面）", () => {
     // wrong problem.
     const plan = planOutlineImport(
       encoder.encode('<?xml version="1.0"?><opml version="2.0"><body></body></opml>'),
-      "空的.opml"
+      "空的.opml",
     );
 
     expect(plan.kind).toBe("refuse");
@@ -716,7 +742,7 @@ describe("导入的判断（不经过任何界面）", () => {
     const emptyFile = planOutlineImport(new Uint8Array(), "空.opml");
     const emptyOutline = planOutlineImport(
       buildXmind([{ title: "空的画布", rootTopic: { title: "只有根" } }]),
-      "空的.xmind"
+      "空的.xmind",
     );
 
     for (const plan of [emptyFile, emptyOutline]) {
@@ -757,7 +783,13 @@ describe("标注键到哪几个节点上", () => {
     const outline: ImportedOutline = {
       title: "",
       topics: [],
-      root: { text: "根", children: [{ text: "甲", children: [] }, { text: "乙", children: [] }] },
+      root: {
+        text: "根",
+        children: [
+          { text: "甲", children: [] },
+          { text: "乙", children: [] },
+        ],
+      },
       references: {
         relations: [{ fromId: "a", toId: "b" }],
         summaries: [{ nodeIds: ["a", "b"], text: "两种" }],
@@ -790,14 +822,14 @@ describe("新文档叫什么", () => {
     expect(importFileName({ title: "", topics: [] }, "我的导图.mm")).toBe("我的导图.md");
     // A single root names the file when there is no head title — the format has
     // nowhere else to put a name.
-    expect(importFileName({ title: "", topics: [], root: { text: "根的名字", children: [] } }, "x.mm")).toBe(
-      "根的名字.md"
-    );
+    expect(
+      importFileName({ title: "", topics: [], root: { text: "根的名字", children: [] } }, "x.mm"),
+    ).toBe("根的名字.md");
   });
 
   it("名字里的分隔符换掉：文件得能建出来", () => {
     expect(importFileName({ title: "第一章/第二章: 开头", topics: [] }, "x.opml")).toBe(
-      "第一章 第二章 开头.md"
+      "第一章 第二章 开头.md",
     );
     // Nothing usable left: a default rather than a file called `.md`.
     expect(importFileName({ title: "///", topics: [] }, ".opml")).toBe("导入的大纲.md");

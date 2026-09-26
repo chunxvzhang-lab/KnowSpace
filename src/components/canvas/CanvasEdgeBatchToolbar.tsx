@@ -122,7 +122,11 @@ export const CanvasEdgeBatchToolbar = memo(function CanvasEdgeBatchToolbar({
       {divider}
 
       {/* Stroke pattern cycle */}
-      <button onClick={onCycleStrokePattern} style={toolBtn} title="批量切换虚实 (实线 / 虚线 / 点线)">
+      <button
+        onClick={onCycleStrokePattern}
+        style={toolBtn}
+        title="批量切换虚实 (实线 / 虚线 / 点线)"
+      >
         <span style={{ fontSize: 10, letterSpacing: 1 }}>- -</span>
         <span>虚实</span>
       </button>

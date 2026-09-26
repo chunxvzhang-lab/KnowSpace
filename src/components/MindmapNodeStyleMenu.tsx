@@ -278,7 +278,6 @@ export function MindmapNodeStyleMenu({
   if (!open) return null;
 
   return (
-
     <div
       ref={menuRef}
       className="mindmap-context-menu"
@@ -298,16 +297,9 @@ export function MindmapNodeStyleMenu({
           }
         >
           <Palette size={13} className="text-cyan" />
-          {isBatchMode
-            ? `批量样式定制 (${selectedCount}节点)`
-            : target?.text || "主题样式定制"}
+          {isBatchMode ? `批量样式定制 (${selectedCount}节点)` : target?.text || "主题样式定制"}
         </span>
-        <button
-          type="button"
-          className="mindmap-ctx-close"
-          onClick={() => onClose()}
-          title="关闭"
-        >
+        <button type="button" className="mindmap-ctx-close" onClick={() => onClose()} title="关闭">
           <X size={13} />
         </button>
       </div>
@@ -359,11 +351,18 @@ export function MindmapNodeStyleMenu({
                 key={c.label}
                 type="button"
                 className={`mindmap-color-swatch ${isTransparent ? "is-transparent-swatch" : ""} ${isActive ? "is-active" : ""}`}
-                style={{ background: isTransparent ? undefined : (c.value || "var(--surface-2)") }}
+                style={{ background: isTransparent ? undefined : c.value || "var(--surface-2)" }}
                 onClick={() => onUpdateStyle(nodeId, { color: c.value })}
                 title={`背景: ${c.label}`}
               >
-                {isActive && <Check size={11} color={c.value === "transparent" ? "#0f172a" : (c.value ? "#ffffff" : "var(--text)")} />}
+                {isActive && (
+                  <Check
+                    size={11}
+                    color={
+                      c.value === "transparent" ? "#0f172a" : c.value ? "#ffffff" : "var(--text)"
+                    }
+                  />
+                )}
               </button>
             );
           })}
@@ -378,7 +377,11 @@ export function MindmapNodeStyleMenu({
             <input
               type="color"
               className="mindmap-hidden-color-input"
-              value={target?.borderColor && target.borderColor !== "transparent" ? target.borderColor : "#38bdf8"}
+              value={
+                target?.borderColor && target.borderColor !== "transparent"
+                  ? target.borderColor
+                  : "#38bdf8"
+              }
               onChange={(e) => onUpdateStyle(nodeId, { borderColor: e.target.value })}
             />
             <span className="mindmap-custom-color-badge">🎨 自定义</span>
@@ -393,11 +396,18 @@ export function MindmapNodeStyleMenu({
                 key={c.label}
                 type="button"
                 className={`mindmap-color-swatch ${isTransparent ? "is-transparent-swatch" : ""} ${isActive ? "is-active" : ""}`}
-                style={{ background: isTransparent ? undefined : (c.value || "var(--surface-2)") }}
+                style={{ background: isTransparent ? undefined : c.value || "var(--surface-2)" }}
                 onClick={() => onUpdateStyle(nodeId, { borderColor: c.value })}
                 title={`边框: ${c.label}`}
               >
-                {isActive && <Check size={11} color={c.value === "transparent" ? "#0f172a" : (c.value ? "#ffffff" : "var(--text)")} />}
+                {isActive && (
+                  <Check
+                    size={11}
+                    color={
+                      c.value === "transparent" ? "#0f172a" : c.value ? "#ffffff" : "var(--text)"
+                    }
+                  />
+                )}
               </button>
             );
           })}
@@ -510,7 +520,9 @@ export function MindmapNodeStyleMenu({
                 onClick={() => onUpdateStyle(nodeId, { textColor: tc.value })}
                 title={`文字: ${tc.label}`}
               >
-                {isActive && <Check size={11} color={tc.value === "#ffffff" ? "#0f172a" : "#ffffff"} />}
+                {isActive && (
+                  <Check size={11} color={tc.value === "#ffffff" ? "#0f172a" : "#ffffff"} />
+                )}
               </button>
             );
           })}

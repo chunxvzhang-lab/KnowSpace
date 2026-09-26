@@ -26,7 +26,7 @@ export interface AABBBox {
 export function collectCollidingEnvelope(
   points: Array<{ x: number; y: number }>,
   obstacles: CanvasObstacle[],
-  margin: number
+  margin: number,
 ): AABBBox | null {
   const boxes: AABBBox[] = [];
   for (const obs of obstacles) {
@@ -47,24 +47,31 @@ export function collectCollidingEnvelope(
   };
 }
 
-export function horizontalSegmentIntersectsBox(x1: number, x2: number, y: number, box: AABBBox): boolean {
+export function horizontalSegmentIntersectsBox(
+  x1: number,
+  x2: number,
+  y: number,
+  box: AABBBox,
+): boolean {
   if (y < box.minY || y > box.maxY) return false;
   const segMinX = Math.min(x1, x2);
   const segMaxX = Math.max(x1, x2);
   return Math.max(segMinX, box.minX) < Math.min(segMaxX, box.maxX);
 }
 
-export function verticalSegmentIntersectsBox(x: number, y1: number, y2: number, box: AABBBox): boolean {
+export function verticalSegmentIntersectsBox(
+  x: number,
+  y1: number,
+  y2: number,
+  box: AABBBox,
+): boolean {
   if (x < box.minX || x > box.maxX) return false;
   const segMinY = Math.min(y1, y2);
   const segMaxY = Math.max(y1, y2);
   return Math.max(segMinY, box.minY) < Math.min(segMaxY, box.maxY);
 }
 
-export function pathIntersectsBox(
-  points: Array<{ x: number; y: number }>,
-  box: AABBBox
-): boolean {
+export function pathIntersectsBox(points: Array<{ x: number; y: number }>, box: AABBBox): boolean {
   for (let i = 0; i < points.length - 1; i++) {
     const pt1 = points[i];
     const pt2 = points[i + 1];
@@ -89,7 +96,7 @@ export function computeEdgePath(
   style: CanvasEdgeLineStyle = "bezier",
   stepOffset?: number,
   ring?: { center: { x: number; y: number }; radius: number },
-  obstacles?: CanvasObstacle[]
+  obstacles?: CanvasObstacle[],
 ): string {
   const dx = p2.x - p1.x;
   const dy = p2.y - p1.y;
@@ -103,7 +110,8 @@ export function computeEdgePath(
     const a = projectPointOntoRing(p1, ring);
     const b = projectPointOntoRing(p2, ring);
 
-    let delta = Math.atan2(b.y - ring.center.y, b.x - ring.center.x) -
+    let delta =
+      Math.atan2(b.y - ring.center.y, b.x - ring.center.x) -
       Math.atan2(a.y - ring.center.y, a.x - ring.center.x);
     // Normalise to (-π, π] so we always draw the shorter arc
     while (delta > Math.PI) delta -= Math.PI * 2;
@@ -121,8 +129,10 @@ export function computeEdgePath(
     // 1. Check obstacle avoidance if obstacle bounding boxes are provided
     if (obstacles && obstacles.length > 0) {
       const MARGIN = 14;
-      const isHorizontal = (side1 === "left" || side1 === "right") && (side2 === "left" || side2 === "right");
-      const isVertical = (side1 === "top" || side1 === "bottom") && (side2 === "top" || side2 === "bottom");
+      const isHorizontal =
+        (side1 === "left" || side1 === "right") && (side2 === "left" || side2 === "right");
+      const isVertical =
+        (side1 === "top" || side1 === "bottom") && (side2 === "top" || side2 === "bottom");
 
       if (isHorizontal) {
         const midX = p1.x + dx / 2 + (stepOffset || 0);
@@ -140,8 +150,10 @@ export function computeEdgePath(
         if (box) {
           const routeAbove = Math.abs(p1.y - box.minY) < Math.abs(p1.y - box.maxY);
           const bypassY = routeAbove ? box.minY - MARGIN : box.maxY + MARGIN;
-          const seg1X = p1.x < p2.x ? Math.min(p1.x + 24, box.minX - 6) : Math.max(p1.x - 24, box.maxX + 6);
-          const seg2X = p1.x < p2.x ? Math.max(p2.x - 24, box.maxX + 6) : Math.min(p2.x + 24, box.minX - 6);
+          const seg1X =
+            p1.x < p2.x ? Math.min(p1.x + 24, box.minX - 6) : Math.max(p1.x - 24, box.maxX + 6);
+          const seg2X =
+            p1.x < p2.x ? Math.max(p2.x - 24, box.maxX + 6) : Math.min(p2.x + 24, box.minX - 6);
 
           return `M ${p1.x} ${p1.y} L ${seg1X} ${p1.y} L ${seg1X} ${bypassY} L ${seg2X} ${bypassY} L ${seg2X} ${p2.y} L ${p2.x} ${p2.y}`;
         }
@@ -160,8 +172,10 @@ export function computeEdgePath(
         if (box) {
           const routeLeft = Math.abs(p1.x - box.minX) < Math.abs(p1.x - box.maxX);
           const bypassX = routeLeft ? box.minX - MARGIN : box.maxX + MARGIN;
-          const seg1Y = p1.y < p2.y ? Math.min(p1.y + 24, box.minY - 6) : Math.max(p1.y - 24, box.maxY + 6);
-          const seg2Y = p1.y < p2.y ? Math.max(p2.y - 24, box.maxY + 6) : Math.min(p2.y + 24, box.minY - 6);
+          const seg1Y =
+            p1.y < p2.y ? Math.min(p1.y + 24, box.minY - 6) : Math.max(p1.y - 24, box.maxY + 6);
+          const seg2Y =
+            p1.y < p2.y ? Math.max(p2.y - 24, box.maxY + 6) : Math.min(p2.y + 24, box.minY - 6);
 
           return `M ${p1.x} ${p1.y} L ${p1.x} ${seg1Y} L ${bypassX} ${seg1Y} L ${bypassX} ${seg2Y} L ${p2.x} ${seg2Y} L ${p2.x} ${p2.y}`;
         }
@@ -209,7 +223,7 @@ export function computeEdgeMidpoint(
   style: CanvasEdgeLineStyle = "bezier",
   stepOffset?: number,
   ring?: { center: { x: number; y: number }; radius: number },
-  obstacles?: CanvasObstacle[]
+  obstacles?: CanvasObstacle[],
 ): { x: number; y: number } {
   const dx = p2.x - p1.x;
   const dy = p2.y - p1.y;
@@ -243,8 +257,10 @@ export function computeEdgeMidpoint(
   if (style === "step") {
     if (obstacles && obstacles.length > 0) {
       const MARGIN = 14;
-      const isHorizontal = (side1 === "left" || side1 === "right") && (side2 === "left" || side2 === "right");
-      const isVertical = (side1 === "top" || side1 === "bottom") && (side2 === "top" || side2 === "bottom");
+      const isHorizontal =
+        (side1 === "left" || side1 === "right") && (side2 === "left" || side2 === "right");
+      const isVertical =
+        (side1 === "top" || side1 === "bottom") && (side2 === "top" || side2 === "bottom");
 
       if (isHorizontal) {
         const midX = p1.x + dx / 2 + (stepOffset || 0);
@@ -258,8 +274,10 @@ export function computeEdgeMidpoint(
         if (box) {
           const routeAbove = Math.abs(p1.y - box.minY) < Math.abs(p1.y - box.maxY);
           const bypassY = routeAbove ? box.minY - MARGIN : box.maxY + MARGIN;
-          const seg1X = p1.x < p2.x ? Math.min(p1.x + 24, box.minX - 6) : Math.max(p1.x - 24, box.maxX + 6);
-          const seg2X = p1.x < p2.x ? Math.max(p2.x - 24, box.maxX + 6) : Math.min(p2.x + 24, box.minX - 6);
+          const seg1X =
+            p1.x < p2.x ? Math.min(p1.x + 24, box.minX - 6) : Math.max(p1.x - 24, box.maxX + 6);
+          const seg2X =
+            p1.x < p2.x ? Math.max(p2.x - 24, box.maxX + 6) : Math.min(p2.x + 24, box.minX - 6);
           return { x: Math.round((seg1X + seg2X) / 2), y: Math.round(bypassY) };
         }
       } else if (isVertical) {
@@ -274,8 +292,10 @@ export function computeEdgeMidpoint(
         if (box) {
           const routeLeft = Math.abs(p1.x - box.minX) < Math.abs(p1.x - box.maxX);
           const bypassX = routeLeft ? box.minX - MARGIN : box.maxX + MARGIN;
-          const seg1Y = p1.y < p2.y ? Math.min(p1.y + 24, box.minY - 6) : Math.max(p1.y - 24, box.maxY + 6);
-          const seg2Y = p1.y < p2.y ? Math.max(p2.y - 24, box.maxY + 6) : Math.min(p2.y + 24, box.minY - 6);
+          const seg1Y =
+            p1.y < p2.y ? Math.min(p1.y + 24, box.minY - 6) : Math.max(p1.y - 24, box.maxY + 6);
+          const seg2Y =
+            p1.y < p2.y ? Math.max(p2.y - 24, box.maxY + 6) : Math.min(p2.y + 24, box.minY - 6);
           return { x: Math.round(bypassX), y: Math.round((seg1Y + seg2Y) / 2) };
         }
       }

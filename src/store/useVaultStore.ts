@@ -61,7 +61,7 @@ type VaultActions = {
   persistBookmarks: (bookmarks: Bookmark[]) => void;
   setBacklinkIndex: (index: BacklinkIndexData) => void;
   setVaultSearchIndex: (
-    index: VaultSearchIndex | ((prev: VaultSearchIndex) => VaultSearchIndex)
+    index: VaultSearchIndex | ((prev: VaultSearchIndex) => VaultSearchIndex),
   ) => void;
   setSearchQuery: (query: string) => void;
   setSearchScope: (scope: "current" | "vault") => void;
@@ -89,7 +89,7 @@ export type VaultStore = VaultState & VaultActions;
 export function listingWithNewChapter(
   manifest: BookManifest | null,
   chapter: ChapterManifest,
-  absolutePath: string
+  absolutePath: string,
 ): BookManifest {
   if (manifest) return { ...manifest, chapters: [...manifest.chapters, chapter] };
 
@@ -112,7 +112,7 @@ export function listingWithNewChapter(
  */
 export function chapterForFile(
   manifest: BookManifest | null,
-  absolutePath: string
+  absolutePath: string,
 ): ChapterManifest | null {
   return manifest?.chapters.find((chapter) => samePath(chapter.absolutePath, absolutePath)) ?? null;
 }
@@ -148,8 +148,7 @@ export const useVaultStore = create<VaultStore>()((set, get) => ({
 
   setVaultSearchIndex: (index) =>
     set((state) => ({
-      vaultSearchIndex:
-        typeof index === "function" ? index(state.vaultSearchIndex) : index,
+      vaultSearchIndex: typeof index === "function" ? index(state.vaultSearchIndex) : index,
     })),
 
   setSearchQuery: (query) => set({ searchQuery: query }),

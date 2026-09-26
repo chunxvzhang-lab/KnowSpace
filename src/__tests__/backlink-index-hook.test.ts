@@ -18,8 +18,7 @@ const defaults: Params = {
 };
 
 /** A session object carrying only the fields these derived values read. */
-const sessionWith = (over: Record<string, unknown>) =>
-  over as unknown as Params["session"];
+const sessionWith = (over: Record<string, unknown>) => over as unknown as Params["session"];
 
 describe("useBacklinkIndex - derived values", () => {
   beforeEach(() => {

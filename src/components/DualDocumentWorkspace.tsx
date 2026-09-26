@@ -146,10 +146,7 @@ export const DualDocumentWorkspace = memo(function DualDocumentWorkspace({
       className={`dual-document-workspace ${isDragging ? "is-resizing" : ""}`}
     >
       {/* Left Primary Document Pane */}
-      <div
-        className="dual-pane dual-pane-primary"
-        style={{ flex: `0 0 ${dualRatio * 100}%` }}
-      >
+      <div className="dual-pane dual-pane-primary" style={{ flex: `0 0 ${dualRatio * 100}%` }}>
         <div className="dual-pane-header">
           <div className="dual-pane-title-group">
             <BookOpen size={14} className="dual-pane-icon text-orange" />

@@ -17,13 +17,7 @@ describe("ChapterList Component Sub-function Tests", () => {
 
   it("renders chapter hierarchy and folders, hides space notes by default unless active", () => {
     const onSelect = vi.fn();
-    render(
-      <ChapterList
-        manifest={manifest}
-        activeChapterId="c1"
-        onSelectChapter={onSelect}
-      />
-    );
+    render(<ChapterList manifest={manifest} activeChapterId="c1" onSelectChapter={onSelect} />);
 
     // Regular docs are visible
     expect(screen.getByText("getting-started.md")).toBeDefined();
@@ -48,7 +42,7 @@ describe("ChapterList Component Sub-function Tests", () => {
         activeChapterId="c1"
         onSelectChapter={vi.fn()}
         onImportOutline={onImportOutline}
-      />
+      />,
     );
 
     const button = screen.getByRole("button", { name: "导入大纲" });
@@ -63,13 +57,7 @@ describe("ChapterList Component Sub-function Tests", () => {
   });
 
   it("shows space notes when current active chapter is in space/", () => {
-    render(
-      <ChapterList
-        manifest={manifest}
-        activeChapterId="c4"
-        onSelectChapter={vi.fn()}
-      />
-    );
+    render(<ChapterList manifest={manifest} activeChapterId="c4" onSelectChapter={vi.fn()} />);
 
     // When space note is active, space folder and notes are shown
     expect(screen.getByText("space")).toBeDefined();
@@ -77,13 +65,7 @@ describe("ChapterList Component Sub-function Tests", () => {
   });
 
   it("allows toggling folder expansion", () => {
-    render(
-      <ChapterList
-        manifest={manifest}
-        activeChapterId="c1"
-        onSelectChapter={vi.fn()}
-      />
-    );
+    render(<ChapterList manifest={manifest} activeChapterId="c1" onSelectChapter={vi.fn()} />);
 
     const folderBtn = screen.getByText("guides").closest("button")!;
     expect(folderBtn).toBeDefined();
@@ -109,9 +91,7 @@ describe("ChapterList Component Sub-function Tests", () => {
         })),
       };
 
-      render(
-        <ChapterList manifest={wide} activeChapterId="w0" onSelectChapter={vi.fn()} />,
-      );
+      render(<ChapterList manifest={wide} activeChapterId="w0" onSelectChapter={vi.fn()} />);
 
       // The folder holding the active document is expanded on open, so there is
       // nothing to click — clicking it here would close it again.
@@ -133,9 +113,7 @@ describe("ChapterList Component Sub-function Tests", () => {
         ],
       };
 
-      render(
-        <ChapterList manifest={deep} activeChapterId="d1" onSelectChapter={vi.fn()} />,
-      );
+      render(<ChapterList manifest={deep} activeChapterId="d1" onSelectChapter={vi.fn()} />);
 
       // Each level of the path becomes its own folder row.
       expect(screen.getByText("专业课")).toBeDefined();
@@ -153,9 +131,7 @@ describe("ChapterList Component Sub-function Tests", () => {
         chapters: [{ id: "x1", title: "章节", src: "guides\\concepts.md" }],
       };
 
-      render(
-        <ChapterList manifest={windows} activeChapterId="x1" onSelectChapter={vi.fn()} />,
-      );
+      render(<ChapterList manifest={windows} activeChapterId="x1" onSelectChapter={vi.fn()} />);
 
       // `guides` is one folder either way — not a single folder literally named
       // "guides\concepts.md".
@@ -189,9 +165,7 @@ describe("ChapterList Component Sub-function Tests", () => {
     }
 
     it("puts visible entries before hidden ones", () => {
-      render(
-        <ChapterList manifest={withHidden} activeChapterId="a" onSelectChapter={vi.fn()} />,
-      );
+      render(<ChapterList manifest={withHidden} activeChapterId="a" onSelectChapter={vi.fn()} />);
 
       const order = renderedOrder();
       const firstHidden = order.findIndex((name) => name.startsWith("."));
@@ -215,9 +189,7 @@ describe("ChapterList Component Sub-function Tests", () => {
         ],
       };
 
-      render(
-        <ChapterList manifest={mixed} activeChapterId="m1" onSelectChapter={vi.fn()} />,
-      );
+      render(<ChapterList manifest={mixed} activeChapterId="m1" onSelectChapter={vi.fn()} />);
 
       // `zzz` is a folder and sorts after `aaa.md` by name, but folders lead.
       const order = renderedOrder();
@@ -225,16 +197,14 @@ describe("ChapterList Component Sub-function Tests", () => {
     });
 
     it("marks exactly the entries that are hidden", () => {
-      render(
-        <ChapterList manifest={withHidden} activeChapterId="a" onSelectChapter={vi.fn()} />,
-      );
+      render(<ChapterList manifest={withHidden} activeChapterId="a" onSelectChapter={vi.fn()} />);
 
       const marked = Array.from(document.querySelectorAll(".tree-row-name.is-hidden")).map(
         (node) => node.textContent ?? "",
       );
-      const unmarked = Array.from(
-        document.querySelectorAll(".tree-row-name:not(.is-hidden)"),
-      ).map((node) => node.textContent ?? "");
+      const unmarked = Array.from(document.querySelectorAll(".tree-row-name:not(.is-hidden)")).map(
+        (node) => node.textContent ?? "",
+      );
 
       // `.archive` is collapsed, so its child is not in the DOM at all — the
       // marker follows the name, and no visible-named row carries it.

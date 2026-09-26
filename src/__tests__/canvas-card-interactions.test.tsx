@@ -47,7 +47,7 @@ function renderCanvas(overrides: Partial<Parameters<typeof CanvasView>[0]> = {})
       editable={true}
       theme="twitter"
       {...overrides}
-    />
+    />,
   );
   return { onSourceChange, ...utils };
 }

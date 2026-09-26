@@ -195,7 +195,9 @@ async function recordSnapshot({ filePath, rootPath, content, reason = "save" }) 
     await fsPromises.writeFile(snapshotFile, JSON.stringify(snapshotData, null, 2), "utf8");
 
     // Prune excessive snapshots if exceeding maximum count
-    const updatedFiles = (await fsPromises.readdir(fileSnapDir)).filter((f) => f.endsWith(".json")).sort();
+    const updatedFiles = (await fsPromises.readdir(fileSnapDir))
+      .filter((f) => f.endsWith(".json"))
+      .sort();
     if (updatedFiles.length > MAX_SNAPSHOTS_PER_FILE) {
       const filesToDelete = updatedFiles.slice(0, updatedFiles.length - MAX_SNAPSHOTS_PER_FILE);
       for (const file of filesToDelete) {
@@ -256,7 +258,7 @@ async function listSnapshots({ filePath, rootPath }) {
     }
 
     return Array.from(resultsMap.values()).sort(
-      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
     );
   } catch (err) {
     console.error("Failed to list version snapshots:", err);

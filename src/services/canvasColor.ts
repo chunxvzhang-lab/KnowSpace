@@ -6,11 +6,7 @@
  */
 
 import type { CanvasNode, CanvasEdge, CanvasGroupNode } from "../types/canvasTypes";
-import {
-  CANVAS_COLOR_PALETTES,
-  findContainerForNode,
-  isNodeInsideGroup,
-} from "./canvasPrimitives";
+import { CANVAS_COLOR_PALETTES, findContainerForNode, isNodeInsideGroup } from "./canvasPrimitives";
 import { getLoopEdgeIdsCached } from "./canvasGraph";
 
 /**
@@ -110,7 +106,7 @@ export function isColorSimilarToAny(color: string, colorsSet: Iterable<string>):
 export function getLoopComponentInfo(
   sourceId: string,
   edges: CanvasEdge[],
-  allNodes?: CanvasNode[]
+  allNodes?: CanvasNode[],
 ): {
   isSourceInLoop: boolean;
   loopNodeIds: Set<string>;
@@ -204,14 +200,11 @@ export function getSourceNodeEdgeColor(
   source: CanvasNode | string,
   existingEdges: CanvasEdge[],
   allNodes?: CanvasNode[],
-  target?: CanvasNode | string
+  target?: CanvasNode | string,
 ): string {
   const sourceId = typeof source === "string" ? source : source.id;
   const targetId = target ? (typeof target === "string" ? target : target.id) : undefined;
-  const sourceNode =
-    typeof source !== "string"
-      ? source
-      : allNodes?.find((n) => n.id === sourceId);
+  const sourceNode = typeof source !== "string" ? source : allNodes?.find((n) => n.id === sourceId);
   const explicitColor = sourceNode?.color;
   const paletteKeys = Object.keys(CANVAS_COLOR_PALETTES);
 
@@ -247,7 +240,7 @@ export function getSourceNodeEdgeColor(
         (targetId ? e.toNode !== targetId : true) &&
         e.color &&
         (CANVAS_COLOR_PALETTES[e.color] || e.color.startsWith("#")) &&
-        !isRingConflict(e.color)
+        !isRingConflict(e.color),
     );
     if (existingExternalEdge && existingExternalEdge.color) {
       return existingExternalEdge.color;
@@ -274,7 +267,7 @@ export function getSourceNodeEdgeColor(
       const container = findContainerForNode(sourceNode, allNodes);
       if (container) {
         const siblingCards = allNodes.filter(
-          (n) => n.id !== container.id && n.type !== "group" && isNodeInsideGroup(n, container)
+          (n) => n.id !== container.id && n.type !== "group" && isNodeInsideGroup(n, container),
         );
         const otherSiblings = siblingCards.filter((s) => s.id !== sourceId);
 
@@ -284,7 +277,7 @@ export function getSourceNodeEdgeColor(
             (e) =>
               e.fromNode === sib.id &&
               e.color &&
-              (CANVAS_COLOR_PALETTES[e.color] || e.color.startsWith("#"))
+              (CANVAS_COLOR_PALETTES[e.color] || e.color.startsWith("#")),
           );
           for (const edge of outgoingEdges) {
             if (edge.color) usedSiblingColors.add(edge.color);
@@ -302,18 +295,16 @@ export function getSourceNodeEdgeColor(
         }
 
         const idealColor = candidatePalettes.find(
-          (k) => !usedSiblingColors.has(k) && !usedAllSourceColors.has(k)
+          (k) => !usedSiblingColors.has(k) && !usedAllSourceColors.has(k),
         );
         if (idealColor) return idealColor;
 
-        const siblingAvailable = candidatePalettes.find(
-          (k) => !usedSiblingColors.has(k)
-        );
+        const siblingAvailable = candidatePalettes.find((k) => !usedSiblingColors.has(k));
         if (siblingAvailable) return siblingAvailable;
 
         if (candidatePalettes.length > 0) {
           const otherActiveSiblings = otherSiblings.filter((s) =>
-            existingEdges.some((e) => e.fromNode === s.id)
+            existingEdges.some((e) => e.fromNode === s.id),
           );
           return candidatePalettes[otherActiveSiblings.length % candidatePalettes.length];
         }
@@ -330,14 +321,12 @@ export function getSourceNodeEdgeColor(
       return explicitColor;
     }
 
-    const canvasAvailable = candidatePalettes.find(
-      (k) => !usedAllSourceColors.has(k)
-    );
+    const canvasAvailable = candidatePalettes.find((k) => !usedAllSourceColors.has(k));
     if (canvasAvailable) return canvasAvailable;
 
     if (candidatePalettes.length > 0) {
       const otherSources = Array.from(
-        new Set(existingEdges.map((e) => e.fromNode).filter((id) => id && id !== sourceId))
+        new Set(existingEdges.map((e) => e.fromNode).filter((id) => id && id !== sourceId)),
       );
       return candidatePalettes[otherSources.length % candidatePalettes.length];
     }
@@ -348,7 +337,7 @@ export function getSourceNodeEdgeColor(
     (e) =>
       e.fromNode === sourceId &&
       e.color &&
-      (CANVAS_COLOR_PALETTES[e.color] || e.color.startsWith("#"))
+      (CANVAS_COLOR_PALETTES[e.color] || e.color.startsWith("#")),
   );
   if (existingEdge && existingEdge.color) {
     return existingEdge.color;
@@ -372,7 +361,7 @@ export function getSourceNodeEdgeColor(
     const container = findContainerForNode(sourceNode, allNodes);
     if (container) {
       const siblingCards = allNodes.filter(
-        (n) => n.id !== container.id && n.type !== "group" && isNodeInsideGroup(n, container)
+        (n) => n.id !== container.id && n.type !== "group" && isNodeInsideGroup(n, container),
       );
       const otherSiblings = siblingCards.filter((s) => s.id !== sourceId);
 
@@ -383,7 +372,7 @@ export function getSourceNodeEdgeColor(
           (e) =>
             e.fromNode === sib.id &&
             e.color &&
-            (CANVAS_COLOR_PALETTES[e.color] || e.color.startsWith("#"))
+            (CANVAS_COLOR_PALETTES[e.color] || e.color.startsWith("#")),
         );
         for (const edge of outgoingEdges) {
           if (edge.color) usedSiblingColors.add(edge.color);
@@ -402,7 +391,7 @@ export function getSourceNodeEdgeColor(
 
       // First priority: pick color unused by siblings in container AND unused across canvas
       const idealColor = paletteKeys.find(
-        (k) => !usedSiblingColors.has(k) && !usedAllSourceColors.has(k)
+        (k) => !usedSiblingColors.has(k) && !usedAllSourceColors.has(k),
       );
       if (idealColor) {
         return idealColor;
@@ -416,7 +405,7 @@ export function getSourceNodeEdgeColor(
 
       // Fallback: cycle among container siblings with outgoing edges
       const otherActiveSiblings = otherSiblings.filter((s) =>
-        existingEdges.some((e) => e.fromNode === s.id)
+        existingEdges.some((e) => e.fromNode === s.id),
       );
       return paletteKeys[otherActiveSiblings.length % paletteKeys.length];
     }
@@ -439,7 +428,7 @@ export function getSourceNodeEdgeColor(
 
   // Fallback: cycle across all distinct source cards on the canvas
   const otherSources = Array.from(
-    new Set(existingEdges.map((e) => e.fromNode).filter((id) => id && id !== sourceId))
+    new Set(existingEdges.map((e) => e.fromNode).filter((id) => id && id !== sourceId)),
   );
   return paletteKeys[otherSources.length % paletteKeys.length];
 }
@@ -452,7 +441,7 @@ export function getNextEdgeColorForSource(
   sourceNodeId: string,
   existingEdges: CanvasEdge[],
   allNodes?: CanvasNode[],
-  targetNodeId?: string
+  targetNodeId?: string,
 ): string {
   return getSourceNodeEdgeColor(sourceNodeId, existingEdges, allNodes, targetNodeId);
 }
@@ -471,7 +460,7 @@ export function getEffectiveEdgeColorKey(
   edge: CanvasEdge,
   allEdges: CanvasEdge[],
   allNodes?: CanvasNode[],
-  sourceDisplayColorMap?: Map<string, string>
+  sourceDisplayColorMap?: Map<string, string>,
 ): string | undefined {
   if (!edge.fromNode) {
     return edge.color;
@@ -482,8 +471,7 @@ export function getEffectiveEdgeColorKey(
 
   if (isLoopEdge) {
     return (
-      edge.color ||
-      (sourceDisplayColorMap ? sourceDisplayColorMap.get(edge.fromNode) : undefined)
+      edge.color || (sourceDisplayColorMap ? sourceDisplayColorMap.get(edge.fromNode) : undefined)
     );
   }
 
@@ -504,8 +492,7 @@ export function getEffectiveEdgeColorKey(
   }
 
   return (
-    edge.color ||
-    (sourceDisplayColorMap ? sourceDisplayColorMap.get(edge.fromNode) : undefined)
+    edge.color || (sourceDisplayColorMap ? sourceDisplayColorMap.get(edge.fromNode) : undefined)
   );
 }
 
@@ -525,7 +512,7 @@ export function getEffectiveEdgeColorKey(
  */
 export function computeSourceDisplayColorMap(
   nodes: CanvasNode[],
-  edges: CanvasEdge[]
+  edges: CanvasEdge[],
 ): Map<string, string> {
   const map = new Map<string, string>();
   const paletteKeys = Object.keys(CANVAS_COLOR_PALETTES);
@@ -576,7 +563,11 @@ export function computeSourceDisplayColorMap(
       }
       set.add(e.fromNode);
       set.add(e.toNode);
-      if (!groupColor.has(root) && e.color && (CANVAS_COLOR_PALETTES[e.color] || e.color.startsWith("#"))) {
+      if (
+        !groupColor.has(root) &&
+        e.color &&
+        (CANVAS_COLOR_PALETTES[e.color] || e.color.startsWith("#"))
+      ) {
         groupColor.set(root, e.color);
       }
     }
@@ -652,7 +643,11 @@ export function computeSourceDisplayColorMap(
       const existingColor = sourceExistingColor.get(sId);
       let preferredColor = existingColor || sNode?.color;
 
-      if (!preferredColor || containerUsed.has(preferredColor) || !CANVAS_COLOR_PALETTES[preferredColor]) {
+      if (
+        !preferredColor ||
+        containerUsed.has(preferredColor) ||
+        !CANVAS_COLOR_PALETTES[preferredColor]
+      ) {
         preferredColor =
           paletteKeys.find((k) => !containerUsed.has(k) && !usedColors.has(k)) ||
           paletteKeys.find((k) => !containerUsed.has(k)) ||
@@ -671,7 +666,11 @@ export function computeSourceDisplayColorMap(
     const sNode = nodeMap.get(sId);
     const existingColor = sourceExistingColor.get(sId);
     let preferredColor = existingColor || sNode?.color;
-    if (!preferredColor || usedColors.has(preferredColor) || !CANVAS_COLOR_PALETTES[preferredColor]) {
+    if (
+      !preferredColor ||
+      usedColors.has(preferredColor) ||
+      !CANVAS_COLOR_PALETTES[preferredColor]
+    ) {
       preferredColor =
         paletteKeys.find((k) => !usedColors.has(k)) ||
         paletteKeys[usedColors.size % paletteKeys.length];

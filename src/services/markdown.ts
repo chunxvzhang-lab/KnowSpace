@@ -39,7 +39,11 @@ type MarkdownBlockState = {
 type MarkdownInlineState = {
   pos: number;
   src: string;
-  push: (type: string, tag: string, nesting: -1 | 0 | 1) => {
+  push: (
+    type: string,
+    tag: string,
+    nesting: -1 | 0 | 1,
+  ) => {
     content: string;
     markup: string;
   };
@@ -66,7 +70,10 @@ function sourceLineMappingPlugin(md: MarkdownIt) {
         if (token.nesting === 1) {
           token.attrSet("data-source-line", String(token.map[0] + 1));
           token.attrSet("data-source-line-end", String(token.map[1]));
-        } else if (token.nesting === 0 && (token.type === "fence" || token.type === "code_block" || token.type === "hr")) {
+        } else if (
+          token.nesting === 0 &&
+          (token.type === "fence" || token.type === "code_block" || token.type === "hr")
+        ) {
           token.attrSet("data-source-line", String(token.map[0] + 1));
           token.attrSet("data-source-line-end", String(token.map[1]));
         }
@@ -77,8 +84,12 @@ function sourceLineMappingPlugin(md: MarkdownIt) {
   const prevFence = md.renderer.rules.fence;
   md.renderer.rules.fence = (tokens, idx, options, env, self) => {
     const token = tokens[idx];
-    const lineAttr = token.map ? ` data-source-line="${token.map[0] + 1}" data-source-line-end="${token.map[1]}"` : "";
-    const rendered = prevFence ? prevFence(tokens, idx, options, env, self) : self.renderToken(tokens, idx, options);
+    const lineAttr = token.map
+      ? ` data-source-line="${token.map[0] + 1}" data-source-line-end="${token.map[1]}"`
+      : "";
+    const rendered = prevFence
+      ? prevFence(tokens, idx, options, env, self)
+      : self.renderToken(tokens, idx, options);
     if (lineAttr && rendered.startsWith("<pre")) {
       return rendered.replace("<pre", `<pre${lineAttr}`);
     }
@@ -88,8 +99,12 @@ function sourceLineMappingPlugin(md: MarkdownIt) {
   const prevCodeBlock = md.renderer.rules.code_block;
   md.renderer.rules.code_block = (tokens, idx, options, env, self) => {
     const token = tokens[idx];
-    const lineAttr = token.map ? ` data-source-line="${token.map[0] + 1}" data-source-line-end="${token.map[1]}"` : "";
-    const rendered = prevCodeBlock ? prevCodeBlock(tokens, idx, options, env, self) : self.renderToken(tokens, idx, options);
+    const lineAttr = token.map
+      ? ` data-source-line="${token.map[0] + 1}" data-source-line-end="${token.map[1]}"`
+      : "";
+    const rendered = prevCodeBlock
+      ? prevCodeBlock(tokens, idx, options, env, self)
+      : self.renderToken(tokens, idx, options);
     if (lineAttr && rendered.startsWith("<pre")) {
       return rendered.replace("<pre", `<pre${lineAttr}`);
     }
@@ -99,8 +114,12 @@ function sourceLineMappingPlugin(md: MarkdownIt) {
   const prevHr = md.renderer.rules.hr;
   md.renderer.rules.hr = (tokens, idx, options, env, self) => {
     const token = tokens[idx];
-    const lineAttr = token.map ? ` data-source-line="${token.map[0] + 1}" data-source-line-end="${token.map[1]}"` : "";
-    const rendered = prevHr ? prevHr(tokens, idx, options, env, self) : self.renderToken(tokens, idx, options);
+    const lineAttr = token.map
+      ? ` data-source-line="${token.map[0] + 1}" data-source-line-end="${token.map[1]}"`
+      : "";
+    const rendered = prevHr
+      ? prevHr(tokens, idx, options, env, self)
+      : self.renderToken(tokens, idx, options);
     if (lineAttr && rendered.startsWith("<hr")) {
       return rendered.replace("<hr", `<hr${lineAttr}`);
     }
@@ -130,7 +149,11 @@ const markdown: MarkdownIt = new MarkdownIt({
       return `<pre class="mermaid" data-mermaid-src="${b64}">${markdown.utils.escapeHtml(source)}</pre>`;
     }
     const displayLang = languageName || "";
-    if (source.length <= maxHighlightedCodeLength && languageName && hljs.getLanguage(languageName)) {
+    if (
+      source.length <= maxHighlightedCodeLength &&
+      languageName &&
+      hljs.getLanguage(languageName)
+    ) {
       const hlKey = `${languageName}:${source}`;
       const cached = highlightCache.get(hlKey);
       if (cached !== undefined) return cached;
@@ -204,7 +227,10 @@ export function renderCardMarkdown(source: string): string {
   return result;
 }
 
-export async function renderMarkdown(source: string, baseUrl = window.location.href): Promise<RenderedChapter> {
+export async function renderMarkdown(
+  source: string,
+  baseUrl = window.location.href,
+): Promise<RenderedChapter> {
   const cacheKey = `${baseUrl}:::${source}`;
   const cached = renderedMarkdownCache.get(cacheKey);
   if (cached) {
@@ -241,7 +267,8 @@ export async function renderMarkdown(source: string, baseUrl = window.location.h
       "target",
       "draggable",
     ],
-    ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel|file|data):|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i,
+    ALLOWED_URI_REGEXP:
+      /^(?:(?:(?:f|ht)tps?|mailto|tel|file|data):|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i,
   }) as unknown as DocumentFragment;
   const headings = addHeadingIds(fragment);
   rewriteRelativeUrls(fragment, baseUrl);
@@ -369,12 +396,18 @@ function parseSourceBlocks(sourceMarkdown: string): SourceBlock[] {
   return blocks;
 }
 
-function nearestHeadingForLine(lines: string[], headings: Heading[], targetLine: number): Heading | undefined {
+function nearestHeadingForLine(
+  lines: string[],
+  headings: Heading[],
+  targetLine: number,
+): Heading | undefined {
   for (let i = targetLine - 1; i >= 0; i--) {
     const line = lines[i].trim();
     if (line.startsWith("#")) {
       const headingText = line.replace(/^#+\s*/, "").trim();
-      const matchedHeading = headings.find((h) => h.text.toLowerCase() === headingText.toLowerCase());
+      const matchedHeading = headings.find(
+        (h) => h.text.toLowerCase() === headingText.toLowerCase(),
+      );
       if (matchedHeading) return matchedHeading;
       return {
         id: uniqueSlug(headingText, new Map()),
@@ -470,9 +503,15 @@ export function findInChapter(
           lineEndNumber: block.endLine,
           lineOffset: firstPos,
           query: q,
-          title: heading?.text ?? (block.startLine === block.endLine ? `第 ${block.startLine} 行` : `第 ${block.startLine}-${block.endLine} 行`),
+          title:
+            heading?.text ??
+            (block.startLine === block.endLine
+              ? `第 ${block.startLine} 行`
+              : `第 ${block.startLine}-${block.endLine} 行`),
           headingId: heading?.id,
-          excerpt: compactWhitespace(blockText.length > 180 ? blockText.slice(start, end) : blockText),
+          excerpt: compactWhitespace(
+            blockText.length > 180 ? blockText.slice(start, end) : blockText,
+          ),
           matchedText: blockText.slice(firstPos, firstPos + primaryMatchText.length),
           matchCountInBlock: 1,
           category,
@@ -510,9 +549,15 @@ export function findInChapter(
         lineEndNumber: block.endLine,
         lineOffset: firstPos,
         query: q,
-        title: heading?.text ?? (block.startLine === block.endLine ? `第 ${block.startLine} 行` : `第 ${block.startLine}-${block.endLine} 行`),
+        title:
+          heading?.text ??
+          (block.startLine === block.endLine
+            ? `第 ${block.startLine} 行`
+            : `第 ${block.startLine}-${block.endLine} 行`),
         headingId: heading?.id,
-        excerpt: compactWhitespace(blockText.length > 180 ? blockText.slice(start, end) : blockText),
+        excerpt: compactWhitespace(
+          blockText.length > 180 ? blockText.slice(start, end) : blockText,
+        ),
         matchedText: blockText.slice(firstPos, firstPos + q.length),
         matchCountInBlock: occurrences,
       });
@@ -645,7 +690,10 @@ export function findHeadingLineInSource(source: string, targetHeading: Heading):
         .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
         .trim()
         .toLowerCase();
-      if (level === targetHeading.level && (rawText === targetText || rawText.includes(targetText) || targetText.includes(rawText))) {
+      if (
+        level === targetHeading.level &&
+        (rawText === targetText || rawText.includes(targetText) || targetText.includes(rawText))
+      ) {
         return i + 1; // 1-indexed line number
       }
     }
@@ -707,7 +755,9 @@ function normalizeFenceLanguage(language: string): string {
 }
 
 function isMermaidFence(language: string): boolean {
-  return language === "mermaid" || language === "mmd" || language === "mindmap" || language === "mermind";
+  return (
+    language === "mermaid" || language === "mmd" || language === "mindmap" || language === "mermind"
+  );
 }
 
 function mathPlugin(md: MarkdownIt): void {
@@ -720,7 +770,12 @@ function mathPlugin(md: MarkdownIt): void {
   md.renderer.rules.math_block = (tokens, index) => `${renderMath(tokens[index].content, true)}\n`;
 }
 
-function mathBlockRule(state: MarkdownBlockState, startLine: number, endLine: number, silent: boolean): boolean {
+function mathBlockRule(
+  state: MarkdownBlockState,
+  startLine: number,
+  endLine: number,
+  silent: boolean,
+): boolean {
   const start = state.bMarks[startLine] + state.tShift[startLine];
   const max = state.eMarks[startLine];
   const firstLine = state.src.slice(start, max);
@@ -941,9 +996,11 @@ function nearestHeadingForOffset(
 }
 
 function firstVisibleParagraph(container: HTMLElement): HTMLElement | null {
-  return Array.from(container.querySelectorAll<HTMLElement>("p, li, blockquote")).find(
-    (item) => item.textContent?.trim(),
-  ) ?? null;
+  return (
+    Array.from(container.querySelectorAll<HTMLElement>("p, li, blockquote")).find((item) =>
+      item.textContent?.trim(),
+    ) ?? null
+  );
 }
 
 function compactWhitespace(value: string): string {
@@ -1040,7 +1097,10 @@ function wikiLinkPlugin(md: MarkdownIt): void {
       const isBlockRef = target.includes("#^");
       const token = state.push(isEmbed ? "wikilink_embed" : "wikilink", isEmbed ? "div" : "a", 0);
       token.attrs = [
-        ["class", isEmbed ? "wikilink-embed-card" : isBlockRef ? "wikilink wikilink-block" : "wikilink"],
+        [
+          "class",
+          isEmbed ? "wikilink-embed-card" : isBlockRef ? "wikilink wikilink-block" : "wikilink",
+        ],
         ["href", `#wikilink:${encodeURIComponent(target)}`],
         ["data-wikilink-target", target],
         ["data-wikilink-label", label],
@@ -1085,4 +1145,3 @@ function wikiLinkPlugin(md: MarkdownIt): void {
     return `<div class="wikilink-embed-card" data-embed-target="${escapedTarget}"><div class="embed-header"><span class="embed-tag">🔗 块级内联引用</span><a class="embed-source-link" href="#wikilink:${encodedTarget}" data-wikilink-target="${escapedTarget}" title="跳转至原出处">${escapedDisplaySource}</a></div><div class="embed-content">${escapedLabel}</div></div>`;
   };
 }
-

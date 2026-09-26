@@ -76,7 +76,7 @@ describe("CSS 主题词汇表", () => {
       bad,
       `这些 data-theme 取值不存在于 ThemeMode（${UNION.join(" | ")}）: ${bad.join(", ")}` +
         `\n提示：深色主题叫 "twitter"，不是 "dark"——"dark" 是被改名前的遗留值，` +
-        `写在 CSS 里永远不会匹配。`
+        `写在 CSS 里永远不会匹配。`,
     ).toEqual([]);
   });
 
@@ -84,7 +84,7 @@ describe("CSS 主题词汇表", () => {
     const bad = [...new Set(themeClassValues())].filter((v) => !KNOWN.has(v));
     expect(
       bad,
-      `这些 .theme-* 类不存在于 ThemeMode（${UNION.join(" | ")}）: ${bad.join(", ")}`
+      `这些 .theme-* 类不存在于 ThemeMode（${UNION.join(" | ")}）: ${bad.join(", ")}`,
     ).toEqual([]);
   });
 });

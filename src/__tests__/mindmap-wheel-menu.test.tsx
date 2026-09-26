@@ -19,7 +19,8 @@ describe("滚轮与右键菜单", () => {
   });
 
   /** 视口组的变换就是缩放本身：它变没变，比任何内部状态都直接。 */
-  const transformOf = () => document.querySelector(".mindmap-viewport")?.getAttribute("transform") ?? "";
+  const transformOf = () =>
+    document.querySelector(".mindmap-viewport")?.getAttribute("transform") ?? "";
   const menuOf = () => document.querySelector(".mindmap-context-menu");
   const viewport = () => document.querySelector(".mindmap-viewport") as Element;
 

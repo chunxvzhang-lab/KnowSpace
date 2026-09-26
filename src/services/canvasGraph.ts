@@ -44,7 +44,10 @@ export function buildPresentationSequence(data: CanvasData): string[] {
   for (const grp of groups) {
     const inside = getNodesInsideGroup(contentNodes, grp);
     if (inside.length > 0) {
-      containerMembers.set(grp.id, inside.map((n) => n.id));
+      containerMembers.set(
+        grp.id,
+        inside.map((n) => n.id),
+      );
       for (const n of inside) {
         cardToContainerId.set(n.id, grp.id);
       }
@@ -230,7 +233,7 @@ export function buildPresentationSequence(data: CanvasData): string[] {
     const startNode = nodeMap.get(startNodeId)!;
     const startAngle = Math.atan2(
       startNode.y + startNode.height / 2 - cy,
-      startNode.x + startNode.width / 2 - cx
+      startNode.x + startNode.width / 2 - cx,
     );
 
     return [...nodes]
@@ -275,7 +278,9 @@ export function buildPresentationSequence(data: CanvasData): string[] {
       seen.add(curr);
       ordered.push(curr);
 
-      const children = (adj.get(curr) || []).filter((id) => memberSet.has(id) && !seen.has(id)).sort(spatialSort);
+      const children = (adj.get(curr) || [])
+        .filter((id) => memberSet.has(id) && !seen.has(id))
+        .sort(spatialSort);
       for (const c of children) {
         memberInDegree.set(c, memberInDegree.get(c)! - 1);
         if (memberInDegree.get(c)! <= 0) {
@@ -306,11 +311,7 @@ export function buildPresentationSequence(data: CanvasData): string[] {
   }
 
   // Function to play an entire cycle in clockwise order
-  function playCycle(
-    cycleIdx: number,
-    entryNodeId?: string,
-    containerVisited?: Set<string>
-  ) {
+  function playCycle(cycleIdx: number, entryNodeId?: string, containerVisited?: Set<string>) {
     const cycleNodeIds = cycleNodesMap.get(cycleIdx) || [];
     if (cycleNodeIds.length === 0) return;
 
@@ -321,7 +322,10 @@ export function buildPresentationSequence(data: CanvasData): string[] {
 
     // Emit ALL cycle nodes first (Complete clockwise circle - never truncated!)
     for (const id of orderedCycle) {
-      if (containerVisited && cardToContainerId.get(id) === cardToContainerId.get(entryNodeId || "")) {
+      if (
+        containerVisited &&
+        cardToContainerId.get(id) === cardToContainerId.get(entryNodeId || "")
+      ) {
         containerVisited.add(id);
       }
       emitSlide(id);
@@ -332,7 +336,7 @@ export function buildPresentationSequence(data: CanvasData): string[] {
     // in clockwise order of the source cards in the cycle
     for (const cycleCardId of orderedCycle) {
       const outEdges = (adj.get(cycleCardId) || []).filter(
-        (targetId) => !cycleNodeIds.includes(targetId) && !activeStack.has(targetId)
+        (targetId) => !cycleNodeIds.includes(targetId) && !activeStack.has(targetId),
       );
       if (outEdges.length > 0) {
         playOutgoingTargets(outEdges, cardToContainerId.get(cycleCardId), containerVisited);
@@ -346,7 +350,7 @@ export function buildPresentationSequence(data: CanvasData): string[] {
     targetIds: string[],
     currentContainerId?: string,
     containerVisited?: Set<string>,
-    parentDeferredCycleIds?: Set<number>
+    parentDeferredCycleIds?: Set<number>,
   ) {
     const validTargets = targetIds.filter((id) => nodeMap.has(id) && !activeStack.has(id));
     if (validTargets.length === 0) return;
@@ -405,7 +409,7 @@ export function buildPresentationSequence(data: CanvasData): string[] {
   function playCard(
     cardId: string,
     containerVisited?: Set<string>,
-    deferredCycleIds?: Set<number>
+    deferredCycleIds?: Set<number>,
   ) {
     if (activeStack.has(cardId)) return;
     activeStack.add(cardId);
@@ -428,8 +432,9 @@ export function buildPresentationSequence(data: CanvasData): string[] {
 
     // If this card belongs to a different container than the active presenting container,
     // it acts as a cross-container reference slide; do not recursively play that other container's internal cards.
-    const isCrossContainerReference =
-      Boolean(activeContainerId && containerId && containerId !== activeContainerId);
+    const isCrossContainerReference = Boolean(
+      activeContainerId && containerId && containerId !== activeContainerId,
+    );
 
     if (!isCrossContainerReference) {
       // "当播放到做为发起点的卡片，按顺序播放其指向的卡片"
@@ -613,7 +618,7 @@ export function buildPresentationSequence(data: CanvasData): string[] {
  */
 export function extractCanvasToMarkdown(
   data: CanvasData,
-  title: string = "白板结构化萃取专著"
+  title: string = "白板结构化萃取专著",
 ): string {
   if (!data || data.nodes.length === 0) {
     return `# ${title}\n\n*（当前白板为空，暂无可萃取内容）*\n`;
@@ -676,10 +681,13 @@ export function extractCanvasToMarkdown(
           ? target.type === "file"
             ? `[[${target.file.replace(/\.(md|markdown)$/i, "")}]]`
             : target.type === "text"
-            ? `「${target.text.split("\n")[0].replace(/^#+\s*/, "").slice(0, 20)}」`
-            : target.type === "group"
-            ? `组群【${target.label || "未命名"}】`
-            : "目标节点"
+              ? `「${target.text
+                  .split("\n")[0]
+                  .replace(/^#+\s*/, "")
+                  .slice(0, 20)}」`
+              : target.type === "group"
+                ? `组群【${target.label || "未命名"}】`
+                : "目标节点"
           : "目标节点";
         return `${r.label ? `[${r.label}] -> ` : "-> "}${targetTitle}`;
       });
@@ -733,10 +741,7 @@ export function extractCanvasToMarkdown(
  * (A->B together with B->A, i.e. a bidirectional arrow) is NOT treated as a
  * ring — those should stay free to reuse any palette color.
  */
-function isEdgeOnCycle(
-  edge: CanvasEdge,
-  outgoing: Map<string, CanvasEdge[]>
-): boolean {
+function isEdgeOnCycle(edge: CanvasEdge, outgoing: Map<string, CanvasEdge[]>): boolean {
   const start = edge.toNode;
   const target = edge.fromNode;
   if (start === target) return true; // self-loop
@@ -854,7 +859,7 @@ export function getLoopEdgeColors(edges: CanvasEdge[]): Set<string> {
  */
 export function expandLoopEdgeSelection(
   edges: CanvasEdge[],
-  targetIds: Iterable<string>
+  targetIds: Iterable<string>,
 ): Set<string> {
   const result = new Set<string>(targetIds);
   const loopIds = getLoopEdgeIds(edges);
@@ -907,15 +912,13 @@ export function expandLoopEdgeSelection(
 export function syncGridEdges(
   nodes: CanvasNode[],
   edges: CanvasEdge[],
-  scopeNodeIds: Set<string> | string[]
+  scopeNodeIds: Set<string> | string[],
 ): CanvasEdge[] {
   const scope = scopeNodeIds instanceof Set ? scopeNodeIds : new Set(scopeNodeIds);
   const scopedNodes = nodes.filter((n) => scope.has(n.id));
   const scopedIds = new Set(scopedNodes.map((n) => n.id));
 
-  const scopedEdges = edges.filter(
-    (e) => scopedIds.has(e.fromNode) && scopedIds.has(e.toNode)
-  );
+  const scopedEdges = edges.filter((e) => scopedIds.has(e.fromNode) && scopedIds.has(e.toNode));
   if (scopedEdges.length === 0) return edges;
 
   const loopIds = getLoopEdgeIds(scopedEdges);
@@ -967,7 +970,7 @@ export function syncGridEdges(
 export function syncRingEdges(
   nodes: CanvasNode[],
   edges: CanvasEdge[],
-  scopeNodeIds: Set<string> | string[]
+  scopeNodeIds: Set<string> | string[],
 ): CanvasEdge[] {
   const scope = scopeNodeIds instanceof Set ? scopeNodeIds : new Set(scopeNodeIds);
   const scopedNodes = nodes.filter((n) => scope.has(n.id));
@@ -975,9 +978,7 @@ export function syncRingEdges(
   // Ring detection only considers cards that are themselves part of a cycle,
   // so a plain row of cards is never mistaken for a ring.
   const scopedIds = new Set(scopedNodes.map((n) => n.id));
-  const scopedEdges = edges.filter(
-    (e) => scopedIds.has(e.fromNode) && scopedIds.has(e.toNode)
-  );
+  const scopedEdges = edges.filter((e) => scopedIds.has(e.fromNode) && scopedIds.has(e.toNode));
   if (scopedEdges.length === 0) return edges;
 
   const loopIds = getLoopEdgeIds(scopedEdges);
@@ -1040,10 +1041,7 @@ export function syncRingEdges(
  * rectangle satisfies both tests); failing both, the metadata is cleared so
  * the edge falls back to a plain bezier/step/straight path.
  */
-export function syncLoopEdgeGeometry(
-  nodes: CanvasNode[],
-  edges: CanvasEdge[]
-): CanvasEdge[] {
+export function syncLoopEdgeGeometry(nodes: CanvasNode[], edges: CanvasEdge[]): CanvasEdge[] {
   // Memoised on the edge topology: this runs on every drag frame, where the
   // topology is unchanged and only the coordinates move.
   const loopIds = getLoopEdgeIdsCached(edges);

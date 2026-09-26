@@ -23,7 +23,9 @@ describe("blocklink & embedding", () => {
     expect(rendered.html).toContain('data-wikilink-target="USER_MANUAL#^key-summary"');
     expect(rendered.html).toContain("⚓");
     expect(rendered.html).toContain("USER_MANUAL &gt; 段落引用");
-    expect(rendered.html).not.toContain('<span class="wikilink-text">USER_MANUAL#^key-summary</span>');
+    expect(rendered.html).not.toContain(
+      '<span class="wikilink-text">USER_MANUAL#^key-summary</span>',
+    );
   });
 
   it("renders local block reference [[#^block-id]] as semantic '段落引用'", async () => {

@@ -44,10 +44,10 @@ export interface SearchIndexDocument {
 
 export interface VaultSearchIndex {
   documents: Map<string, SearchIndexDocument>;
-  tagIndex: Map<string, Set<string>>;     // lowercase tag -> Set<blockId>
-  linkIndex: Map<string, Set<string>>;    // lowercase link target -> Set<blockId>
-  termIndex: Map<string, Set<string>>;    // lowercase token -> Set<blockId>
-  blockMap: Map<string, SearchIndexBlock>;// blockId -> SearchIndexBlock
+  tagIndex: Map<string, Set<string>>; // lowercase tag -> Set<blockId>
+  linkIndex: Map<string, Set<string>>; // lowercase link target -> Set<blockId>
+  termIndex: Map<string, Set<string>>; // lowercase token -> Set<blockId>
+  blockMap: Map<string, SearchIndexBlock>; // blockId -> SearchIndexBlock
 }
 
 /**
@@ -153,7 +153,10 @@ export function parseSearchQuery(query: string): ParsedSearchQuery {
   }
 
   // 5. Parse remaining tokens (space separated)
-  const tokens = remaining.split(/\s+/).map((t) => t.trim()).filter(Boolean);
+  const tokens = remaining
+    .split(/\s+/)
+    .map((t) => t.trim())
+    .filter(Boolean);
 
   for (const token of tokens) {
     if (token.startsWith("-") && token.length > 1) {
@@ -264,7 +267,10 @@ function parseFrontmatterTags(lines: string[]): string[] {
   for (const line of lines) {
     if (inTagsList) {
       if (/^\s*-\s+/.test(line)) {
-        const val = line.replace(/^\s*-\s+/, "").trim().replace(/^['"]|['"]$/g, "");
+        const val = line
+          .replace(/^\s*-\s+/, "")
+          .trim()
+          .replace(/^['"]|['"]$/g, "");
         if (val) result.push(normalizeTag(val));
       } else if (!/^\s+/.test(line)) {
         inTagsList = false;
@@ -280,7 +286,10 @@ function parseFrontmatterTags(lines: string[]): string[] {
     } else if (/^tags?\s*:\s*$/i.test(line)) {
       inTagsList = true;
     } else if (/^tags?\s*:\s*(.+)$/i.test(line)) {
-      const val = line.match(/^tags?\s*:\s*(.+)$/i)?.[1]?.trim().replace(/^['"]|['"]$/g, "");
+      const val = line
+        .match(/^tags?\s*:\s*(.+)$/i)?.[1]
+        ?.trim()
+        .replace(/^['"]|['"]$/g, "");
       if (val && val !== "[]") result.push(normalizeTag(val));
     }
   }
@@ -340,7 +349,7 @@ export function parseDocumentBlocks(
   chapterTitle: string,
   content: string,
   path?: string,
-  date?: string
+  date?: string,
 ): SearchIndexBlock[] {
   if (!content) return [];
   const lines = content.split(/\r?\n/);
@@ -536,7 +545,7 @@ export async function buildVaultSearchIndexChunked(
     chunkSize?: number;
     onProgress?: (done: number, total: number) => void;
     isCancelled?: () => boolean;
-  } = {}
+  } = {},
 ): Promise<VaultSearchIndex> {
   const { chunkSize = 12, onProgress, isCancelled } = options;
   const maps = emptyIndexMaps();
@@ -569,7 +578,7 @@ export function updateVaultSearchIndexForDocument(
   docId: string,
   title: string,
   content: string,
-  path?: string
+  path?: string,
 ): VaultSearchIndex {
   const existingDoc = currentIndex.documents.get(docId);
 
@@ -641,7 +650,7 @@ export function searchVault(
   options?: {
     scopeChapterId?: string;
     limit?: number;
-  }
+  },
 ): SearchResult[] {
   const parsed = parseSearchQuery(rawQuery);
   if (parsed.isEmpty) return [];
@@ -876,8 +885,10 @@ export function searchVault(
     const end = Math.min(block.text.length, firstMatchOffset + primaryMatchText.length + 90);
     const excerpt = compactWhitespace(
       block.text.length > 160
-        ? (start > 0 ? "..." : "") + block.text.slice(start, end) + (end < block.text.length ? "..." : "")
-        : block.text
+        ? (start > 0 ? "..." : "") +
+            block.text.slice(start, end) +
+            (end < block.text.length ? "..." : "")
+        : block.text,
     );
 
     let category: SearchResult["category"] = "text";

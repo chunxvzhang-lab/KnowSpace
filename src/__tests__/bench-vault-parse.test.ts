@@ -29,7 +29,7 @@ function makeRealNote(index: number): string {
     lines.push("");
     lines.push(
       `这是第 ${index} 章的正文段落 ${para}。真实笔记里会有引用、列表、代码与链接，` +
-        `长度也远不止一行 —— 这一段刻意写长，让每篇文档接近 10 KB。`
+        `长度也远不止一行 —— 这一段刻意写长，让每篇文档接近 10 KB。`,
     );
     lines.push("");
     lines.push("- 要点一：长文里多数行都不是卡片，解析要看过每一行才能下结论。");
@@ -101,7 +101,7 @@ describe.skipIf(!benchEnabled)("知识库来源的解析代价（量测）", () 
         `  —— 合计:                                    ${(tParseOnce + tDerive).toFixed(0)} ms`,
         "",
         `卡片 ${queue.length} 张（另一次 ${queue2.length} 张，共 ${stats.total} / ${stats2.total} 张）`,
-      ].join("\n")
+      ].join("\n"),
     );
   }, 60000);
 });

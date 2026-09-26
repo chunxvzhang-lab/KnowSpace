@@ -49,7 +49,7 @@ import type { ReviewSourceDocument } from "../services/reviewSources";
 function sourceFrom(
   notes: ReviewSourceDocument[],
   cache: Map<string, { content: string; parsed: ParsedNote }>,
-  written: Map<string, string>
+  written: Map<string, string>,
 ): ParsedReviewSource {
   const source = emptyParsedSource();
   for (const note of notes) {
@@ -136,7 +136,10 @@ function readStoredSource(): ReviewSourceKind {
 }
 
 /** Rating labels, matching FSRS semantics (1 = forgot, 4 = trivial). */
-const RATING_META: Record<FsrsRating, { key: string; label: string; hint: string; className: string }> = {
+const RATING_META: Record<
+  FsrsRating,
+  { key: string; label: string; hint: string; className: string }
+> = {
   1: { key: "1", label: "重来", hint: "完全没想起来", className: "again" },
   2: { key: "2", label: "困难", hint: "想起来了，但很吃力", className: "hard" },
   3: { key: "3", label: "良好", hint: "顺利回忆", className: "good" },
@@ -495,7 +498,11 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
    * The card id → note mapping is needed on every rating, to merge the new
    * scheduling state back into the right file.
    */
-  const { queue: initialQueue, stats, sourceMap } = useMemo(() => {
+  const {
+    queue: initialQueue,
+    stats,
+    sourceMap,
+  } = useMemo(() => {
     const sources = new Map<string, { path: string; content: string }>();
     for (const [cardId, note] of parsed.owner) {
       sources.set(cardId, { path: note.path, content: note.content });
@@ -594,7 +601,7 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
 
         const updatedContent = upsertFsrsMetadata(
           baseContent,
-          new Map([[current.card.id, result.progress]])
+          new Map([[current.card.id, result.progress]]),
         );
 
         const res = await desktop.saveMarkdownFile({
@@ -663,7 +670,7 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
       vault.applySaved,
       folder.applySaved,
       noteWritten,
-    ]
+    ],
   );
 
   /**
@@ -811,7 +818,7 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
   }, []);
 
   const currentSourceName = current
-    ? sourceMap.get(current.card.id)?.path.split(/[\\/]/).pop() ?? ""
+    ? (sourceMap.get(current.card.id)?.path.split(/[\\/]/).pop() ?? "")
     : "";
 
   const correctCount = log.filter((entry) => entry.rating >= 3).length;
@@ -1064,8 +1071,8 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
             <FolderOpen size={32} />
             <p>还没有选择文件夹</p>
             <p className="dr-empty-hint">
-              挑一个放着笔记的文件夹（最多 {MAX_REVIEW_FOLDERS} 个），它里面的卡片就会进入复习
-              —— 只是复习，不会把它打开成工作区。
+              挑一个放着笔记的文件夹（最多 {MAX_REVIEW_FOLDERS} 个），它里面的卡片就会进入复习 ——
+              只是复习，不会把它打开成工作区。
             </p>
             <button
               type="button"
@@ -1089,13 +1096,13 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
             <p className="dr-empty-hint">
               {isFolderSource ? (
                 <>
-                  在这个文件夹的任意文档里写下 <code>问题 :: 答案</code>、
-                  <code>Q: / A:</code> 或 <code>{"{{c1::答案}}"}</code>，即可生成卡片。
+                  在这个文件夹的任意文档里写下 <code>问题 :: 答案</code>、<code>Q: / A:</code> 或{" "}
+                  <code>{"{{c1::答案}}"}</code>，即可生成卡片。
                 </>
               ) : isVaultSource ? (
                 <>
-                  在当前知识库的任意文档里写下 <code>问题 :: 答案</code>、
-                  <code>Q: / A:</code> 或 <code>{"{{c1::答案}}"}</code>，即可生成卡片。
+                  在当前知识库的任意文档里写下 <code>问题 :: 答案</code>、<code>Q: / A:</code> 或{" "}
+                  <code>{"{{c1::答案}}"}</code>，即可生成卡片。
                 </>
               ) : (
                 <>
@@ -1123,9 +1130,7 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
                 </div>
                 <div className="dr-summary-row">
                   <span>下次到期</span>
-                  <strong>
-                    {log.filter((e) => e.intervalDays <= 1).length} 张明日再来
-                  </strong>
+                  <strong>{log.filter((e) => e.intervalDays <= 1).length} 张明日再来</strong>
                 </div>
               </div>
             ) : (
@@ -1201,8 +1206,8 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
                         {days === null || days === undefined
                           ? "—"
                           : days <= 1
-                          ? "明天"
-                          : `${days} 天后`}
+                            ? "明天"
+                            : `${days} 天后`}
                       </span>
                     </button>
                   );

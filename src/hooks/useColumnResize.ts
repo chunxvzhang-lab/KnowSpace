@@ -34,8 +34,7 @@ const DIRECTORY_FIT_MAX = 380;
 const DIRECTORY_GUTTER = 60;
 
 const SIDEBAR_FIT_SELECTOR = ".side-panel";
-const SIDEBAR_ITEM_SELECTOR =
-  ".toc-item-text, .search-card-excerpt, .bookmark-item-title, .tabs";
+const SIDEBAR_ITEM_SELECTOR = ".toc-item-text, .search-card-excerpt, .bookmark-item-title, .tabs";
 const SIDEBAR_FIT_MIN = 220;
 const SIDEBAR_FIT_MAX = 400;
 const SIDEBAR_GUTTER = 48;
@@ -58,7 +57,7 @@ function clamp(value: number, min: number, max: number): number {
 function measureWidestItem(
   containerSelector: string,
   itemSelector: string,
-  gutter: number
+  gutter: number,
 ): number | null {
   const container = document.querySelector(containerSelector);
   if (!container) return null;
@@ -91,7 +90,7 @@ export function useColumnResize() {
       // onMouseDown prop sixty times a second for no reason.
       startWidthRef.current = useUiStore.getState().directoryWidth;
     },
-    [setResizingType]
+    [setResizingType],
   );
 
   const handleSidebarResizeMouseDown = useCallback(
@@ -101,7 +100,7 @@ export function useColumnResize() {
       startXRef.current = e.clientX;
       startWidthRef.current = useUiStore.getState().sidebarWidth;
     },
-    [setResizingType]
+    [setResizingType],
   );
 
   useEffect(() => {
@@ -111,15 +110,11 @@ export function useColumnResize() {
       const deltaX = e.clientX - startXRef.current;
       if (resizingType === "dir") {
         setDirectoryWidth(
-          clamp(
-            startWidthRef.current + deltaX,
-            DIRECTORY_WIDTH_MIN,
-            DIRECTORY_WIDTH_MAX
-          )
+          clamp(startWidthRef.current + deltaX, DIRECTORY_WIDTH_MIN, DIRECTORY_WIDTH_MAX),
         );
       } else if (resizingType === "sidebar") {
         setSidebarWidth(
-          clamp(startWidthRef.current + deltaX, SIDEBAR_WIDTH_MIN, SIDEBAR_WIDTH_MAX)
+          clamp(startWidthRef.current + deltaX, SIDEBAR_WIDTH_MIN, SIDEBAR_WIDTH_MAX),
         );
       }
     };
@@ -151,27 +146,23 @@ export function useColumnResize() {
     const measured = measureWidestItem(
       DIRECTORY_FIT_SELECTOR,
       DIRECTORY_ITEM_SELECTOR,
-      DIRECTORY_GUTTER
+      DIRECTORY_GUTTER,
     );
     setDirectoryWidth(
       measured === null
         ? DIRECTORY_WIDTH_DEFAULT
-        : clamp(Math.ceil(measured), DIRECTORY_FIT_MIN, DIRECTORY_FIT_MAX)
+        : clamp(Math.ceil(measured), DIRECTORY_FIT_MIN, DIRECTORY_FIT_MAX),
     );
     // persistLayout reads through get(), so it already sees the width just set.
     persistLayout();
   }, [setDirectoryWidth, persistLayout]);
 
   const handleSidebarDoubleClick = useCallback(() => {
-    const measured = measureWidestItem(
-      SIDEBAR_FIT_SELECTOR,
-      SIDEBAR_ITEM_SELECTOR,
-      SIDEBAR_GUTTER
-    );
+    const measured = measureWidestItem(SIDEBAR_FIT_SELECTOR, SIDEBAR_ITEM_SELECTOR, SIDEBAR_GUTTER);
     setSidebarWidth(
       measured === null
         ? SIDEBAR_WIDTH_DEFAULT
-        : clamp(Math.ceil(measured), SIDEBAR_FIT_MIN, SIDEBAR_FIT_MAX)
+        : clamp(Math.ceil(measured), SIDEBAR_FIT_MIN, SIDEBAR_FIT_MAX),
     );
     persistLayout();
   }, [setSidebarWidth, persistLayout]);

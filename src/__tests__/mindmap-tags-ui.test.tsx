@@ -75,7 +75,7 @@ const chips = () => document.querySelectorAll(".mindmap-tag-chip");
  */
 function chipsOf(text: string): number {
   const group = [...document.querySelectorAll(".mindmap-node-interactive")].find((el) =>
-    el.textContent?.includes(text)
+    el.textContent?.includes(text),
   );
   return group ? group.querySelectorAll(".mindmap-tag-chip").length : 0;
 }
@@ -89,7 +89,7 @@ const tagField = () => document.querySelector(".mindmap-tag-input") as HTMLInput
  */
 function suggestion(tag: string): HTMLElement {
   const found = [...document.querySelectorAll<HTMLElement>(".mindmap-tag-suggestion")].find((el) =>
-    el.textContent?.startsWith(`#${tag}`)
+    el.textContent?.startsWith(`#${tag}`),
   );
   if (!found) throw new Error(`没有 #${tag} 的建议芯片`);
   return found;
@@ -143,7 +143,9 @@ describe("节点标签", () => {
     render(<MindmapView title="测试" source={SOURCE} documentKey={DOC} />);
 
     await waitFor(() => expect(chips().length).toBe(4));
-    const texts = [...document.querySelectorAll(".mindmap-tag-chip-text")].map((el) => el.textContent);
+    const texts = [...document.querySelectorAll(".mindmap-tag-chip-text")].map(
+      (el) => el.textContent,
+    );
     expect(texts).toEqual(["#a", "#b", "#c", "+2"]);
   });
 
@@ -213,7 +215,11 @@ describe("节点标签", () => {
       // 父节点 already wears one; 子节点甲 wears the other, which is what makes
       // it worth offering as a chip at all.
       content: serializeSidecar(
-        setNodeTags(setNodeTags(emptySidecar(), nodeIdOf("父节点"), ["api"]), nodeIdOf("子节点甲"), ["紧急"])
+        setNodeTags(
+          setNodeTags(emptySidecar(), nodeIdOf("父节点"), ["api"]),
+          nodeIdOf("子节点甲"),
+          ["紧急"],
+        ),
       ),
     });
 
@@ -244,9 +250,7 @@ describe("节点标签", () => {
     // offered: the chips are the document's own vocabulary, not a fixed list.
     expect(document.querySelectorAll(".mindmap-tag-suggestion").length).toBe(1);
 
-    await waitFor(() =>
-      expect(lastWritten(api)?.tags[nodeIdOf("父节点")]).toEqual(["紧急"])
-    );
+    await waitFor(() => expect(lastWritten(api)?.tags[nodeIdOf("父节点")]).toEqual(["紧急"]));
   });
 
   it("文件里的标签不像样：不画、不报错，也不擦", async () => {

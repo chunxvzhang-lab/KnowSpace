@@ -45,10 +45,7 @@ function escapeSvgXml(str: string): string {
 /**
  * Generates an ultra-crisp, standalone SVG vector representation of the canvas
  */
-export function exportCanvasToSvg(
-  data: CanvasData,
-  options?: CanvasExportOptions
-): string {
+export function exportCanvasToSvg(data: CanvasData, options?: CanvasExportOptions): string {
   // The very same palette the on-screen renderer uses, so the exported image
   // matches what the user is looking at. This used to be a hand-maintained
   // copy that had drifted: the light theme exported on a #f8fafc backdrop
@@ -68,8 +65,8 @@ export function exportCanvasToSvg(
     options?.background === "transparent"
       ? "none"
       : options?.background === "white"
-      ? "#ffffff"
-      : themePalette.canvasBg;
+        ? "#ffffff"
+        : themePalette.canvasBg;
 
   const cardBorder = themePalette.cardBorder;
   const defaultEdgeColor = themePalette.edgeColor;
@@ -85,7 +82,8 @@ export function exportCanvasToSvg(
   // matching arrow markers up-front in <defs>.
   const exportHexColors = new Set<string>();
   for (const edge of data.edges) {
-    const effectiveColorKey = edge.color || (edge.fromNode ? sourceDisplayColorMap.get(edge.fromNode) : undefined);
+    const effectiveColorKey =
+      edge.color || (edge.fromNode ? sourceDisplayColorMap.get(edge.fromNode) : undefined);
     if (effectiveColorKey && effectiveColorKey.startsWith("#")) {
       exportHexColors.add(effectiveColorKey);
     }
@@ -94,33 +92,37 @@ export function exportCanvasToSvg(
   const lines: string[] = [];
   lines.push(`<?xml version="1.0" encoding="UTF-8"?>`);
   lines.push(
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${minX} ${minY} ${width} ${height}" width="${width}" height="${height}">`
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${minX} ${minY} ${width} ${height}" width="${width}" height="${height}">`,
   );
 
   // Definitions (Filters, Grid Pattern, Arrow Markers)
   lines.push(`  <defs>`);
   lines.push(`    <filter id="card-shadow" x="-8%" y="-8%" width="120%" height="120%">`);
-  lines.push(`      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="rgba(0,0,0,0.18)" />`);
+  lines.push(
+    `      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="rgba(0,0,0,0.18)" />`,
+  );
   lines.push(`    </filter>`);
   if (bgColor !== "none") {
-    lines.push(`    <pattern id="canvas-dots" width="28" height="28" patternUnits="userSpaceOnUse">`);
+    lines.push(
+      `    <pattern id="canvas-dots" width="28" height="28" patternUnits="userSpaceOnUse">`,
+    );
     lines.push(`      <circle cx="2" cy="2" r="1.2" fill="${dotColor}" />`);
     lines.push(`    </pattern>`);
   }
   // Arrow markers for each palette color
   Object.entries(CANVAS_COLOR_PALETTES).forEach(([k, c]) => {
     lines.push(
-      `    <marker id="arrow-${k}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 1 L 10 5 L 0 9 z" fill="${c.stroke}" /></marker>`
+      `    <marker id="arrow-${k}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 1 L 10 5 L 0 9 z" fill="${c.stroke}" /></marker>`,
     );
   });
   // Arrow markers for any custom hex colors that may appear on edges
   exportHexColors.forEach((hex) => {
     lines.push(
-      `    <marker id="arrow-${hex.replace("#", "hex-")}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 1 L 10 5 L 0 9 z" fill="${hex}" /></marker>`
+      `    <marker id="arrow-${hex.replace("#", "hex-")}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 1 L 10 5 L 0 9 z" fill="${hex}" /></marker>`,
     );
   });
   lines.push(
-    `    <marker id="arrow-default" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 1 L 10 5 L 0 9 z" fill="${defaultEdgeColor}" /></marker>`
+    `    <marker id="arrow-default" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 1 L 10 5 L 0 9 z" fill="${defaultEdgeColor}" /></marker>`,
   );
   lines.push(`  </defs>`);
 
@@ -128,36 +130,62 @@ export function exportCanvasToSvg(
   // Mirrors the on-screen card styling so the exported image reproduces every
   // visible element (header tint, origin badge, rich Markdown body, …).
   lines.push(`  <style><![CDATA[`);
-  lines.push(`    .ks-card{width:100%;height:100%;box-sizing:border-box;border-radius:12px;display:flex;flex-direction:column;overflow:hidden;background:${themePalette.cardBg};box-shadow:${themePalette.cardShadow};font-family:system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;}`);
-  lines.push(`    .ks-hdr{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:6px 10px;font-size:11px;font-weight:600;border-bottom:1px solid ${themePalette.cardHeaderBorder};flex-shrink:0;}`);
-  lines.push(`    .ks-title{display:inline-flex;align-items:center;gap:4px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}`);
-  lines.push(`    .ks-badge{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;white-space:nowrap;flex-shrink:0;}`);
-  lines.push(`    .ks-body{flex:1;padding:8px 12px;overflow:hidden;font-size:13px;line-height:1.6;color:${themePalette.cardText};}`);
+  lines.push(
+    `    .ks-card{width:100%;height:100%;box-sizing:border-box;border-radius:12px;display:flex;flex-direction:column;overflow:hidden;background:${themePalette.cardBg};box-shadow:${themePalette.cardShadow};font-family:system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;}`,
+  );
+  lines.push(
+    `    .ks-hdr{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:6px 10px;font-size:11px;font-weight:600;border-bottom:1px solid ${themePalette.cardHeaderBorder};flex-shrink:0;}`,
+  );
+  lines.push(
+    `    .ks-title{display:inline-flex;align-items:center;gap:4px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}`,
+  );
+  lines.push(
+    `    .ks-badge{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;white-space:nowrap;flex-shrink:0;}`,
+  );
+  lines.push(
+    `    .ks-body{flex:1;padding:8px 12px;overflow:hidden;font-size:13px;line-height:1.6;color:${themePalette.cardText};}`,
+  );
   lines.push(`    .ks-body > *:first-child{margin-top:0;}`);
   lines.push(`    .ks-body > *:last-child{margin-bottom:0;}`);
   lines.push(`    .ks-body h1{font-size:17px;font-weight:700;margin:0 0 8px;}`);
   lines.push(`    .ks-body h2{font-size:15.5px;font-weight:700;margin:0 0 8px;}`);
   lines.push(`    .ks-body h3{font-size:14px;font-weight:700;margin:0 0 6px;}`);
-  lines.push(`    .ks-body h4,.ks-body h5,.ks-body h6{font-size:13px;font-weight:700;margin:0 0 6px;}`);
+  lines.push(
+    `    .ks-body h4,.ks-body h5,.ks-body h6{font-size:13px;font-weight:700;margin:0 0 6px;}`,
+  );
   lines.push(`    .ks-body p{margin:0 0 6px;}`);
   lines.push(`    .ks-body ul,.ks-body ol{margin:0 0 6px;padding-left:20px;}`);
   lines.push(`    .ks-body li{margin:2px 0;}`);
   lines.push(`    .ks-body li.task-list-item{list-style:none;margin-left:-18px;}`);
-  lines.push(`    .ks-body code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px;padding:1px 4px;border-radius:4px;background:${themePalette.codeBg};}`);
-  lines.push(`    .ks-body pre{padding:8px 10px;border-radius:6px;overflow:hidden;background:${themePalette.codeBg};margin:0 0 6px;}`);
+  lines.push(
+    `    .ks-body code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px;padding:1px 4px;border-radius:4px;background:${themePalette.codeBg};}`,
+  );
+  lines.push(
+    `    .ks-body pre{padding:8px 10px;border-radius:6px;overflow:hidden;background:${themePalette.codeBg};margin:0 0 6px;}`,
+  );
   lines.push(`    .ks-body pre code{padding:0;background:none;}`);
-  lines.push(`    .ks-body blockquote{margin:0 0 6px;padding-left:10px;border-left:3px solid ${themePalette.quoteBorder};opacity:.88;}`);
+  lines.push(
+    `    .ks-body blockquote{margin:0 0 6px;padding-left:10px;border-left:3px solid ${themePalette.quoteBorder};opacity:.88;}`,
+  );
   lines.push(`    .ks-body a{color:${defaultEdgeColor};text-decoration:underline;}`);
   lines.push(`    .ks-body table{border-collapse:collapse;font-size:12px;}`);
-  lines.push(`    .ks-body th,.ks-body td{border:1px solid ${themePalette.cardBorder};padding:2px 6px;}`);
-  lines.push(`    .ks-body hr{border:none;border-top:1px solid ${themePalette.cardBorder};margin:8px 0;}`);
+  lines.push(
+    `    .ks-body th,.ks-body td{border:1px solid ${themePalette.cardBorder};padding:2px 6px;}`,
+  );
+  lines.push(
+    `    .ks-body hr{border:none;border-top:1px solid ${themePalette.cardBorder};margin:8px 0;}`,
+  );
   lines.push(`    .ks-body img{max-width:100%;}`);
   lines.push(`  ]]></style>`);
 
   // Background Rect
   if (bgColor !== "none") {
-    lines.push(`  <rect x="${minX}" y="${minY}" width="${width}" height="${height}" fill="${bgColor}" />`);
-    lines.push(`  <rect x="${minX}" y="${minY}" width="${width}" height="${height}" fill="url(#canvas-dots)" />`);
+    lines.push(
+      `  <rect x="${minX}" y="${minY}" width="${width}" height="${height}" fill="${bgColor}" />`,
+    );
+    lines.push(
+      `  <rect x="${minX}" y="${minY}" width="${width}" height="${height}" fill="url(#canvas-dots)" />`,
+    );
   }
 
   // 1. Group Containers Layer
@@ -168,19 +196,20 @@ export function exportCanvasToSvg(
       // fall back to the theme's own group tones. This used to hard-code the
       // sky-blue palette entry, so an untinted group looked nothing like the
       // one on screen — most visibly in the e-ink theme.
-      const pal = g.color && CANVAS_COLOR_PALETTES[g.color] ? CANVAS_COLOR_PALETTES[g.color] : undefined;
+      const pal =
+        g.color && CANVAS_COLOR_PALETTES[g.color] ? CANVAS_COLOR_PALETTES[g.color] : undefined;
       const groupFill = pal ? pal.bg : themePalette.groupBg;
       const groupStroke = pal ? pal.stroke : themePalette.groupBorder;
       lines.push(`  <g class="canvas-group" data-id="${g.id}">`);
       lines.push(
-        `    <rect x="${g.x}" y="${g.y}" width="${g.width}" height="${g.height}" rx="16" fill="${groupFill}" stroke="${groupStroke}" stroke-width="2" stroke-dasharray="6,6" />`
+        `    <rect x="${g.x}" y="${g.y}" width="${g.width}" height="${g.height}" rx="16" fill="${groupFill}" stroke="${groupStroke}" stroke-width="2" stroke-dasharray="6,6" />`,
       );
       // Group title header
       lines.push(
-        `    <path d="M ${g.x} ${g.y + 32} L ${g.x} ${g.y + 14} Q ${g.x} ${g.y} ${g.x + 14} ${g.y} L ${g.x + g.width - 14} ${g.y} Q ${g.x + g.width} ${g.y} ${g.x + g.width} ${g.y + 14} L ${g.x + g.width} ${g.y + 32} Z" fill="${groupStroke}" />`
+        `    <path d="M ${g.x} ${g.y + 32} L ${g.x} ${g.y + 14} Q ${g.x} ${g.y} ${g.x + 14} ${g.y} L ${g.x + g.width - 14} ${g.y} Q ${g.x + g.width} ${g.y} ${g.x + g.width} ${g.y + 14} L ${g.x + g.width} ${g.y + 32} Z" fill="${groupStroke}" />`,
       );
       lines.push(
-        `    <text x="${g.x + 14}" y="${g.y + 19}" fill="#ffffff" font-family="system-ui, sans-serif" font-size="13" font-weight="600" dominant-baseline="central">📁 ${escapeSvgXml(g.label || "分组容器")}</text>`
+        `    <text x="${g.x + 14}" y="${g.y + 19}" fill="#ffffff" font-family="system-ui, sans-serif" font-size="13" font-weight="600" dominant-baseline="central">📁 ${escapeSvgXml(g.label || "分组容器")}</text>`,
       );
       lines.push(`  </g>`);
     });
@@ -204,44 +233,67 @@ export function exportCanvasToSvg(
         : undefined;
     const exportStyle = edge.gridPath ? "straight" : edge.style;
     const obstacles = data.nodes.filter((n) => n.id !== edge.fromNode && n.id !== edge.toNode);
-    const pathD = computeEdgePath(p1, fromSide, p2, toSide, exportStyle, edge.stepOffset, ringArc, obstacles);
+    const pathD = computeEdgePath(
+      p1,
+      fromSide,
+      p2,
+      toSide,
+      exportStyle,
+      edge.stepOffset,
+      ringArc,
+      obstacles,
+    );
 
     // Mirror the on-screen renderer's color resolution: prefer the
     // edge's own explicit color, then fall back to source-aware display color.
-    const effectiveColorKey = getEffectiveEdgeColorKey(edge, data.edges, data.nodes, sourceDisplayColorMap);
+    const effectiveColorKey = getEffectiveEdgeColorKey(
+      edge,
+      data.edges,
+      data.nodes,
+      sourceDisplayColorMap,
+    );
     const edgeColor =
       effectiveColorKey && CANVAS_COLOR_PALETTES[effectiveColorKey]
         ? CANVAS_COLOR_PALETTES[effectiveColorKey].stroke
         : effectiveColorKey && effectiveColorKey.startsWith("#")
-        ? effectiveColorKey
-        : defaultEdgeColor;
+          ? effectiveColorKey
+          : defaultEdgeColor;
 
     const markerRef = effectiveColorKey
       ? CANVAS_COLOR_PALETTES[effectiveColorKey]
         ? `arrow-${effectiveColorKey}`
         : effectiveColorKey.startsWith("#")
-        ? `arrow-${effectiveColorKey.replace("#", "hex-")}`
-        : "arrow-default"
+          ? `arrow-${effectiveColorKey.replace("#", "hex-")}`
+          : "arrow-default"
       : "arrow-default";
     const markerEnd = edge.toEnd === "arrow" ? `url(#${markerRef})` : "none";
     const markerStart = edge.fromEnd === "arrow" ? `url(#${markerRef})` : "none";
 
     lines.push(`  <g class="canvas-edge" data-id="${edge.id}">`);
     lines.push(
-      `    <path d="${pathD}" fill="none" stroke="${edgeColor}" stroke-width="2" stroke-linecap="round" marker-end="${markerEnd}" marker-start="${markerStart}" />`
+      `    <path d="${pathD}" fill="none" stroke="${edgeColor}" stroke-width="2" stroke-linecap="round" marker-end="${markerEnd}" marker-start="${markerStart}" />`,
     );
     if (edge.fromEnd !== "arrow") {
       // On a ring the origin dot must sit on the circle too, not on the raw
       // card anchor point.
       const originPoint = ringArc ? projectPointOntoRing(p1, ringArc) : p1;
       lines.push(
-        `    <circle cx="${originPoint.x}" cy="${originPoint.y}" r="3.5" fill="${edgeColor}" stroke="${isDark ? "#0f172a" : "#ffffff"}" stroke-width="1.2" />`
+        `    <circle cx="${originPoint.x}" cy="${originPoint.y}" r="3.5" fill="${edgeColor}" stroke="${isDark ? "#0f172a" : "#ffffff"}" stroke-width="1.2" />`,
       );
     }
 
     // 3. Edge Label Badges
     if (edge.label && edge.label.trim()) {
-      const rawMid = computeEdgeMidpoint(p1, fromSide, p2, toSide, exportStyle, edge.stepOffset, ringArc, obstacles);
+      const rawMid = computeEdgeMidpoint(
+        p1,
+        fromSide,
+        p2,
+        toSide,
+        exportStyle,
+        edge.stepOffset,
+        ringArc,
+        obstacles,
+      );
       const labelText = escapeSvgXml(edge.label.trim());
       const shape = edge.labelShape || "pill";
       const charWidth = 11.5;
@@ -249,25 +301,27 @@ export function exportCanvasToSvg(
       const labelHeight = 24;
       const labelBg = themePalette.edgeLabelBg;
 
-      lines.push(`    <g class="canvas-edge-label" transform="translate(${rawMid.x}, ${rawMid.y})">`);
+      lines.push(
+        `    <g class="canvas-edge-label" transform="translate(${rawMid.x}, ${rawMid.y})">`,
+      );
       if (shape === "diamond") {
         const halfW = (labelWidth + 18) / 2;
         const halfH = 14;
         lines.push(
-          `      <polygon points="0,${-halfH} ${halfW},0 0,${halfH} ${-halfW},0" fill="${labelBg}" stroke="${edgeColor}" stroke-width="1.5" />`
+          `      <polygon points="0,${-halfH} ${halfW},0 0,${halfH} ${-halfW},0" fill="${labelBg}" stroke="${edgeColor}" stroke-width="1.5" />`,
         );
       } else if (shape === "rect") {
         lines.push(
-          `      <rect x="${-labelWidth / 2}" y="${-labelHeight / 2}" width="${labelWidth}" height="${labelHeight}" rx="4" fill="${labelBg}" stroke="${edgeColor}" stroke-width="1.5" />`
+          `      <rect x="${-labelWidth / 2}" y="${-labelHeight / 2}" width="${labelWidth}" height="${labelHeight}" rx="4" fill="${labelBg}" stroke="${edgeColor}" stroke-width="1.5" />`,
         );
       } else {
         // pill
         lines.push(
-          `      <rect x="${-labelWidth / 2}" y="${-labelHeight / 2}" width="${labelWidth}" height="${labelHeight}" rx="12" fill="${labelBg}" stroke="${edgeColor}" stroke-width="1.5" />`
+          `      <rect x="${-labelWidth / 2}" y="${-labelHeight / 2}" width="${labelWidth}" height="${labelHeight}" rx="12" fill="${labelBg}" stroke="${edgeColor}" stroke-width="1.5" />`,
         );
       }
       lines.push(
-        `      <text x="0" y="0" fill="${themePalette.edgeLabelText}" font-family="system-ui, sans-serif" font-size="11.5" font-weight="600" text-anchor="middle" dominant-baseline="central">${labelText}</text>`
+        `      <text x="0" y="0" fill="${themePalette.edgeLabelText}" font-family="system-ui, sans-serif" font-size="11.5" font-weight="600" text-anchor="middle" dominant-baseline="central">${labelText}</text>`,
       );
       lines.push(`    </g>`);
     }
@@ -310,7 +364,12 @@ export function exportCanvasToSvg(
       // Header icon + label — identical wording to the on-screen card
       let headerIcon = "📝";
       let headerLabel = "便签卡片";
-      const mediaType = card.type === "file" ? getMediaFileType(card.file) : card.type === "link" ? getMediaFileType(card.url) : "other";
+      const mediaType =
+        card.type === "file"
+          ? getMediaFileType(card.file)
+          : card.type === "link"
+            ? getMediaFileType(card.url)
+            : "other";
 
       if (card.type === "file") {
         if (mediaType === "image") {
@@ -366,14 +425,14 @@ export function exportCanvasToSvg(
 
       lines.push(`  <g class="canvas-card" data-id="${card.id}">`);
       lines.push(
-        `    <foreignObject x="${card.x}" y="${card.y}" width="${card.width}" height="${card.height}">`
+        `    <foreignObject x="${card.x}" y="${card.y}" width="${card.width}" height="${card.height}">`,
       );
       lines.push(
-        `      <div xmlns="http://www.w3.org/1999/xhtml" class="ks-card" style="border:${borderWidth}px solid ${borderStroke};">`
+        `      <div xmlns="http://www.w3.org/1999/xhtml" class="ks-card" style="border:${borderWidth}px solid ${borderStroke};">`,
       );
       lines.push(
         `        <div class="ks-hdr" style="background:${headerBg};color:${themePalette.cardHeaderText};">` +
-          `<span class="ks-title">${headerIcon} ${escapeSvgXml(headerLabel)}</span>${badgeHtml}</div>`
+          `<span class="ks-title">${headerIcon} ${escapeSvgXml(headerLabel)}</span>${badgeHtml}</div>`,
       );
       lines.push(`        <div class="ks-body">${bodyHtml}</div>`);
       lines.push(`      </div>`);
@@ -409,11 +468,7 @@ const EXPORT_RASTERISE_TIMEOUT_MS = 20_000;
  * whiteboard exported at scale 2 would ask for a canvas the browser cannot
  * allocate, and the renderer would die instead of reporting an error.
  */
-export function resolveExportScale(
-  width: number,
-  height: number,
-  requested: number
-): number {
+export function resolveExportScale(width: number, height: number, requested: number): number {
   const safeW = Math.max(1, width);
   const safeH = Math.max(1, height);
   let scale = Math.max(0.1, requested);
@@ -558,7 +613,9 @@ async function readUrlAsDataUrl(url: string): Promise<string | null> {
       xhr.onload = () => {
         const blob = xhr.response as Blob | null;
         if (blob && blob.size > 0) {
-          blobToDataUrl(blob).then(finish).catch(() => finish(null));
+          blobToDataUrl(blob)
+            .then(finish)
+            .catch(() => finish(null));
         } else {
           finish(null);
         }
@@ -622,10 +679,10 @@ export function valueBooleanAttributes(svgString: string): string {
       if (!attrs) return full;
       const fixed = attrs.replace(
         HTML_BOOLEAN_ATTR_RE,
-        (_match, whitespace: string, name: string) => `${whitespace}${name}="${name}"`
+        (_match, whitespace: string, name: string) => `${whitespace}${name}="${name}"`,
       );
       return fixed === attrs ? full : `<${tag}${fixed}${selfClose}>`;
-    }
+    },
   );
 }
 
@@ -665,7 +722,7 @@ async function sanitizeSvgViaDom(svgString: string): Promise<string | null> {
   if (targets.length === 0) return svgString;
 
   const resolved = await Promise.all(
-    targets.map(async (t) => ({ ...t, dataUrl: await readUrlAsDataUrl(t.url) }))
+    targets.map(async (t) => ({ ...t, dataUrl: await readUrlAsDataUrl(t.url) })),
   );
 
   for (const t of resolved) {
@@ -673,9 +730,7 @@ async function sanitizeSvgViaDom(svgString: string): Promise<string | null> {
       const style = t.el.getAttribute("style") ?? "";
       t.el.setAttribute(
         "style",
-        t.dataUrl
-          ? style.replace(t.url, t.dataUrl)
-          : style.replace(/url\([^)]*\)/gi, "none")
+        t.dataUrl ? style.replace(t.url, t.dataUrl) : style.replace(/url\([^)]*\)/gi, "none"),
       );
       continue;
     }
@@ -721,7 +776,7 @@ async function sanitizeSvgViaRegex(svgString: string): Promise<string> {
   await Promise.all(
     [...urls].map(async (url) => {
       resolved.set(url, await readUrlAsDataUrl(url));
-    })
+    }),
   );
 
   let out = svgString.replace(SVG_IMAGE_TAG_RE, (full, _attr, _quote, url) => {
@@ -752,9 +807,7 @@ function stripSvgImages(svgString: string): string {
   // Textual fallback. This used to be the only path and it silently gave up
   // when the markup was not well-formed XML, which is precisely the case that
   // matters here — so now the regex always runs.
-  return svgString
-    .replace(SVG_IMAGE_TAG_RE, "")
-    .replace(SVG_CSS_URL_RE, "none");
+  return svgString.replace(SVG_IMAGE_TAG_RE, "").replace(SVG_CSS_URL_RE, "none");
 }
 
 /** Returns null when the SVG could not be parsed as XML. */
@@ -807,7 +860,7 @@ function blobToDataUrl(blob: Blob): Promise<string> {
  */
 export async function exportCanvasToPngBlob(
   data: CanvasData,
-  options?: CanvasExportOptions
+  options?: CanvasExportOptions,
 ): Promise<Blob> {
   const svgString = exportCanvasToSvg(data, options);
   const bbox = computeBoundingBox(data.nodes);
@@ -883,7 +936,9 @@ export async function exportCanvasToPngBlob(
       return await rasterise(stripped);
     } catch (retryErr) {
       if (isTaintedCanvasError(retryErr)) {
-        throw new Error("白板包含无法内联的外部图片，浏览器安全策略阻止了图片导出", { cause: retryErr });
+        throw new Error("白板包含无法内联的外部图片，浏览器安全策略阻止了图片导出", {
+          cause: retryErr,
+        });
       }
       throw retryErr;
     }
@@ -892,7 +947,7 @@ export async function exportCanvasToPngBlob(
 
 export async function exportCanvasToPng(
   data: CanvasData,
-  options?: CanvasExportOptions
+  options?: CanvasExportOptions,
 ): Promise<string> {
   const blob = await exportCanvasToPngBlob(data, options);
   return blobToDataUrl(blob);
@@ -907,7 +962,7 @@ export async function downloadCanvasAsImage(
   data: CanvasData,
   filename: string,
   format: "png" | "svg" = "png",
-  options?: CanvasExportOptions
+  options?: CanvasExportOptions,
 ): Promise<CanvasDownloadResult> {
   const cleanName = filename.replace(/\.(png|svg|canvas)$/i, "");
 
@@ -916,7 +971,9 @@ export async function downloadCanvasAsImage(
     // .svg file actually opens in a browser or Illustrator. Without it the
     // unclosed tags and valueless boolean attributes from the card HTML
     // produce a file most viewers reject.
-    const svgContent = serializeSvgForExport(valueBooleanAttributes(exportCanvasToSvg(data, options)));
+    const svgContent = serializeSvgForExport(
+      valueBooleanAttributes(exportCanvasToSvg(data, options)),
+    );
     const svgBlob = new Blob([svgContent], { type: "image/svg+xml;charset=utf-8" });
     const url = URL.createObjectURL(svgBlob);
     const a = document.createElement("a");
@@ -934,9 +991,7 @@ export async function downloadCanvasAsImage(
   }
 
   const desktop =
-    typeof window !== "undefined"
-      ? window.knowSpaceDesktop ?? window.bookMDDesktop
-      : undefined;
+    typeof window !== "undefined" ? (window.knowSpaceDesktop ?? window.bookMDDesktop) : undefined;
 
   const buildExportSvg = (): string =>
     serializeSvgForExport(valueBooleanAttributes(exportCanvasToSvg(data, options)));
@@ -1011,12 +1066,10 @@ export async function downloadCanvasAsImage(
  */
 export async function copyCanvasImageToClipboard(
   data: CanvasData,
-  options?: CanvasExportOptions
+  options?: CanvasExportOptions,
 ): Promise<boolean> {
   const desktop =
-    typeof window !== "undefined"
-      ? window.knowSpaceDesktop ?? window.bookMDDesktop
-      : undefined;
+    typeof window !== "undefined" ? (window.knowSpaceDesktop ?? window.bookMDDesktop) : undefined;
 
   let blob: Blob | null = null;
   try {

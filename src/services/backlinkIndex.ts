@@ -193,7 +193,10 @@ export function refactorWikiLinksInContent(
   let changedCount = 0;
   const escapedOld = cleanOld.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   // Regex to match [[oldTitle(#anchor)?(|alias)?]]
-  const regex = new RegExp(`\\[\\[(${escapedOld}(?:\\.md)?)(#[^\\]\n|]+)?(\\|[^\\]\n]+)?\\]\\]`, "gi");
+  const regex = new RegExp(
+    `\\[\\[(${escapedOld}(?:\\.md)?)(#[^\\]\n|]+)?(\\|[^\\]\n]+)?\\]\\]`,
+    "gi",
+  );
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];

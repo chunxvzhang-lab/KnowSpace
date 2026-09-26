@@ -28,11 +28,7 @@ function releasePointer() {
  * Builds a measurable column. jsdom reports every element as zero-sized, so the
  * one rect the fit logic reads is stubbed directly.
  */
-function mountColumn(
-  containerClass: string,
-  itemClass: string,
-  itemWidth: number
-): HTMLElement {
+function mountColumn(containerClass: string, itemClass: string, itemWidth: number): HTMLElement {
   const container = document.createElement("div");
   container.className = containerClass;
   const item = document.createElement("div");

@@ -1,9 +1,106 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ZoomIn, ZoomOut, Maximize2, Plus, FileText, Boxes, RotateCcw, RotateCw, BookOpen, Copy, ExternalLink, Trash2, Edit2, Check, X, Link, Save, BoxSelect, CheckSquare, ArrowUpToLine, ArrowDownToLine, GitBranch, AlignLeft, AlignRight, AlignJustify, Image as ImageIcon, Clipboard, Grid, Minimize2, AlignCenter, AlignHorizontalJustifyCenter, AlignVerticalJustifyCenter, Share2, Play, Pause, ChevronLeft, ChevronRight, Music, Video, Film, List, Scan } from "lucide-react";
+import {
+  ZoomIn,
+  ZoomOut,
+  Maximize2,
+  Plus,
+  FileText,
+  Boxes,
+  RotateCcw,
+  RotateCw,
+  BookOpen,
+  Copy,
+  ExternalLink,
+  Trash2,
+  Edit2,
+  Check,
+  X,
+  Link,
+  Save,
+  BoxSelect,
+  CheckSquare,
+  ArrowUpToLine,
+  ArrowDownToLine,
+  GitBranch,
+  AlignLeft,
+  AlignRight,
+  AlignJustify,
+  Image as ImageIcon,
+  Clipboard,
+  Grid,
+  Minimize2,
+  AlignCenter,
+  AlignHorizontalJustifyCenter,
+  AlignVerticalJustifyCenter,
+  Share2,
+  Play,
+  Pause,
+  ChevronLeft,
+  ChevronRight,
+  Music,
+  Video,
+  Film,
+  List,
+  Scan,
+} from "lucide-react";
 import type { ThemeMode } from "../core/types";
-import type { CanvasData, CanvasNode, CanvasEdge, CanvasNodeSide, CanvasTextNode, CanvasFileNode, CanvasGroupNode, CanvasViewport, CanvasEdgeLabelShape, CanvasEdgeLineStyle, CanvasObstacle } from "../types/canvasTypes";
-import { parseCanvasData, serializeCanvasData, createDefaultCanvas, computeBoundingBox, getNodeAnchorPoint, extractCanvasToMarkdown, CANVAS_COLOR_PALETTES, CANVAS_STANDARD_COLOR_IDS, isNodeInsideGroup, toggleChecklistInMarkdown, spawnConnectedCard, connectOneToMany, connectChainNodes, connectLoopNodes, disconnectNodeEdges, spawnMultipleBranches, computeEdgeMidpoint, cycleEdgeArrow, cycleEdgeStyle, cycleEdgeStrokePattern, reverseEdgeDirection, getOptimalAnchorSides, getSourceNodeEdgeColor, computeSourceDisplayColorMap, expandLoopEdgeSelection, syncLoopEdgeGeometry, computeGridLayout, resizeGridSpacing, computeRingSpacingLayout, resizeRingSpacing, isPointInsideNodeHull, alignNodesInCircle, downloadCanvasAsImage, copyCanvasImageToClipboard, CanvasAlignDirection, alignNodes, getMediaFileType, isMediaFile, resolveMediaSrc, buildPresentationSequence, findContainerForNode } from "../services/canvasService";
+import type {
+  CanvasData,
+  CanvasNode,
+  CanvasEdge,
+  CanvasNodeSide,
+  CanvasTextNode,
+  CanvasFileNode,
+  CanvasGroupNode,
+  CanvasViewport,
+  CanvasEdgeLabelShape,
+  CanvasEdgeLineStyle,
+  CanvasObstacle,
+} from "../types/canvasTypes";
+import {
+  parseCanvasData,
+  serializeCanvasData,
+  createDefaultCanvas,
+  computeBoundingBox,
+  getNodeAnchorPoint,
+  extractCanvasToMarkdown,
+  CANVAS_COLOR_PALETTES,
+  CANVAS_STANDARD_COLOR_IDS,
+  isNodeInsideGroup,
+  toggleChecklistInMarkdown,
+  spawnConnectedCard,
+  connectOneToMany,
+  connectChainNodes,
+  connectLoopNodes,
+  disconnectNodeEdges,
+  spawnMultipleBranches,
+  computeEdgeMidpoint,
+  cycleEdgeArrow,
+  cycleEdgeStyle,
+  cycleEdgeStrokePattern,
+  reverseEdgeDirection,
+  getOptimalAnchorSides,
+  getSourceNodeEdgeColor,
+  computeSourceDisplayColorMap,
+  expandLoopEdgeSelection,
+  syncLoopEdgeGeometry,
+  computeGridLayout,
+  resizeGridSpacing,
+  computeRingSpacingLayout,
+  resizeRingSpacing,
+  isPointInsideNodeHull,
+  alignNodesInCircle,
+  downloadCanvasAsImage,
+  copyCanvasImageToClipboard,
+  CanvasAlignDirection,
+  alignNodes,
+  getMediaFileType,
+  isMediaFile,
+  resolveMediaSrc,
+  buildPresentationSequence,
+  findContainerForNode,
+} from "../services/canvasService";
 import { renderCardMarkdown } from "../services/markdown";
 import { getCanvasThemeColors } from "../services/canvasTheme";
 import {
@@ -95,7 +192,7 @@ function computeBoxSelectionHits(
   maxX: number,
   minY: number,
   maxY: number,
-  nodes: CanvasNode[]
+  nodes: CanvasNode[],
 ): Set<string> {
   const hitCardIds = new Set<string>();
   const hitGroupIds = new Set<string>();
@@ -122,7 +219,7 @@ function computeBoxSelectionHits(
 
   if (hitGroupIds.size > 0 && hitCardIds.size > 0) {
     const hitGroups = nodes.filter(
-      (n): n is CanvasGroupNode => n.type === "group" && hitGroupIds.has(n.id)
+      (n): n is CanvasGroupNode => n.type === "group" && hitGroupIds.has(n.id),
     );
     const externalCardIds = new Set<string>();
     for (const cardId of hitCardIds) {
@@ -157,7 +254,7 @@ function computeBoxSelectionEdgeHits(
   minY: number,
   maxY: number,
   edges: CanvasEdge[],
-  nodeMap: Map<string, CanvasNode>
+  nodeMap: Map<string, CanvasNode>,
 ): Set<string> {
   const hitEdgeIds = new Set<string>();
   for (const edge of edges) {
@@ -169,7 +266,15 @@ function computeBoxSelectionEdgeHits(
     const toSide = edge.toSide || optSides.toSide;
     const p1 = getNodeAnchorPoint(fromNode, fromSide);
     const p2 = getNodeAnchorPoint(toNode, toSide);
-    const mid = computeEdgeMidpoint(p1, fromSide, p2, toSide, edge.style, edge.stepOffset, getEdgeRing(edge));
+    const mid = computeEdgeMidpoint(
+      p1,
+      fromSide,
+      p2,
+      toSide,
+      edge.style,
+      edge.stepOffset,
+      getEdgeRing(edge),
+    );
     if (mid.x >= minX && mid.x <= maxX && mid.y >= minY && mid.y <= maxY) {
       hitEdgeIds.add(edge.id);
     }
@@ -203,9 +308,9 @@ const CanvasCardMarkdown = memo(function CanvasCardMarkdown({
       data-node-id={nodeId}
       onClick={onActivate}
       dangerouslySetInnerHTML={{ __html: renderCardMarkdown(text) }}
-      />
-    );
-  });
+    />
+  );
+});
 
 export const CanvasView = memo(function CanvasView({
   title,
@@ -306,7 +411,7 @@ export const CanvasView = memo(function CanvasView({
   const connectedInternalEdges = useMemo(() => {
     if (selectedNodeIds.size < 2) return [];
     return data.edges.filter(
-      (e) => selectedNodeIds.has(e.fromNode) && selectedNodeIds.has(e.toNode)
+      (e) => selectedNodeIds.has(e.fromNode) && selectedNodeIds.has(e.toNode),
     );
   }, [data.edges, selectedNodeIds]);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
@@ -430,7 +535,7 @@ export const CanvasView = memo(function CanvasView({
         colorCommitTimerRef.current = null;
       }
     },
-    []
+    [],
   );
 
   // Dynamically clamp context menu position against the actual viewport so
@@ -667,7 +772,11 @@ export const CanvasView = memo(function CanvasView({
     zoomEvents: Array<{ factor: number; clientX: number; clientY: number }>;
   }>({ deltaX: 0, deltaY: 0, zoomEvents: [] });
   const rafBoxSelectIdRef = useRef<number | null>(null);
-  const latestBoxSelectPosRef = useRef<{ clientX: number; clientY: number; isModifier: boolean } | null>(null);
+  const latestBoxSelectPosRef = useRef<{
+    clientX: number;
+    clientY: number;
+    isModifier: boolean;
+  } | null>(null);
   const rafConnectIdRef = useRef<number | null>(null);
   const latestConnectPosRef = useRef<{ clientX: number; clientY: number } | null>(null);
   const rafStepBendIdRef = useRef<number | null>(null);
@@ -695,19 +804,16 @@ export const CanvasView = memo(function CanvasView({
   const onSourceChangeRef = useRef(onSourceChange);
   onSourceChangeRef.current = onSourceChange;
 
-  const emitChange = useCallback(
-    (newData: CanvasData) => {
-      setData(newData);
-      latestDataRef.current = newData;
-      const handler = onSourceChangeRef.current;
-      if (handler) {
-        const serialized = serializeCanvasData(newData);
-        lastEmittedSourceRef.current = serialized;
-        handler(serialized);
-      }
-    },
-    []
-  );
+  const emitChange = useCallback((newData: CanvasData) => {
+    setData(newData);
+    latestDataRef.current = newData;
+    const handler = onSourceChangeRef.current;
+    if (handler) {
+      const serialized = serializeCanvasData(newData);
+      lastEmittedSourceRef.current = serialized;
+      handler(serialized);
+    }
+  }, []);
 
   // Push history snapshot
   const pushHistory = useCallback(
@@ -718,7 +824,7 @@ export const CanvasView = memo(function CanvasView({
       }));
       emitChange(newData);
     },
-    [emitChange]
+    [emitChange],
   );
 
   // ── Colour-picker preview & commit ───────────────────────────────────────
@@ -781,14 +887,14 @@ export const CanvasView = memo(function CanvasView({
         const next = {
           ...prev,
           nodes: prev.nodes.map((n) =>
-            selectedNodeIds.has(n.id) ? { ...n, color: color || undefined } : n
+            selectedNodeIds.has(n.id) ? { ...n, color: color || undefined } : n,
           ),
         };
         latestDataRef.current = next;
         return next;
       });
     },
-    [editable, selectedNodeIds, captureColorSnapshot]
+    [editable, selectedNodeIds, captureColorSnapshot],
   );
 
   const previewBatchEdgeColor = useCallback(
@@ -800,14 +906,14 @@ export const CanvasView = memo(function CanvasView({
         const next = {
           ...prev,
           edges: prev.edges.map((e) =>
-            affected.has(e.id) ? { ...e, color: color || undefined } : e
+            affected.has(e.id) ? { ...e, color: color || undefined } : e,
           ),
         };
         latestDataRef.current = next;
         return next;
       });
     },
-    [editable, selectedEdgeIds, captureColorSnapshot]
+    [editable, selectedEdgeIds, captureColorSnapshot],
   );
 
   const previewEdgeColor = useCallback(
@@ -819,14 +925,14 @@ export const CanvasView = memo(function CanvasView({
         const next = {
           ...prev,
           edges: prev.edges.map((e) =>
-            affected.has(e.id) ? { ...e, color: color || undefined } : e
+            affected.has(e.id) ? { ...e, color: color || undefined } : e,
           ),
         };
         latestDataRef.current = next;
         return next;
       });
     },
-    [editable, captureColorSnapshot]
+    [editable, captureColorSnapshot],
   );
 
   const previewNodeColor = useCallback(
@@ -836,15 +942,13 @@ export const CanvasView = memo(function CanvasView({
       setData((prev) => {
         const next = {
           ...prev,
-          nodes: prev.nodes.map((n) =>
-            n.id === nodeId ? { ...n, color: color || undefined } : n
-          ),
+          nodes: prev.nodes.map((n) => (n.id === nodeId ? { ...n, color: color || undefined } : n)),
         };
         latestDataRef.current = next;
         return next;
       });
     },
-    [editable, captureColorSnapshot]
+    [editable, captureColorSnapshot],
   );
 
   const handleUndo = useCallback(() => {
@@ -973,78 +1077,75 @@ export const CanvasView = memo(function CanvasView({
   }, []);
 
   // Mouse wheel zoom and pan with requestAnimationFrame batching
-  const handleWheel = useCallback(
-    (e: React.WheelEvent) => {
-      // A wheel over something that can still scroll belongs to that something —
-      // a card body — and the canvas must leave it alone. Without this the wheel
-      // reached the card, scrolled it, and bubbled up here as well, so scrolling a
-      // checklist dragged the whole whiteboard with it. Once the inner region is
-      // pinned at its edge the canvas takes the wheel back, so a wheel over a card
-      // is never a dead zone. Ctrl+wheel is a zoom gesture and always belongs to
-      // the canvas.
-      //
-      // This only sees what is inside the canvas. A popup portalled to
-      // `document.body` — the card editor's suggestion list — is not on the walk
-      // (its ancestors are body and html, not this container), so it stops the
-      // wheel itself; see `canvas/CanvasCardSuggestMenu`.
-      if (
-        !e.ctrlKey &&
-        !e.metaKey &&
-        wheelBelongsToInnerScroller(e.target, e.deltaX, e.deltaY, containerRef.current)
-      ) {
-        return;
-      }
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    // A wheel over something that can still scroll belongs to that something —
+    // a card body — and the canvas must leave it alone. Without this the wheel
+    // reached the card, scrolled it, and bubbled up here as well, so scrolling a
+    // checklist dragged the whole whiteboard with it. Once the inner region is
+    // pinned at its edge the canvas takes the wheel back, so a wheel over a card
+    // is never a dead zone. Ctrl+wheel is a zoom gesture and always belongs to
+    // the canvas.
+    //
+    // This only sees what is inside the canvas. A popup portalled to
+    // `document.body` — the card editor's suggestion list — is not on the walk
+    // (its ancestors are body and html, not this container), so it stops the
+    // wheel itself; see `canvas/CanvasCardSuggestMenu`.
+    if (
+      !e.ctrlKey &&
+      !e.metaKey &&
+      wheelBelongsToInnerScroller(e.target, e.deltaX, e.deltaY, containerRef.current)
+    ) {
+      return;
+    }
 
-      e.preventDefault();
-      if (e.ctrlKey || e.metaKey) {
-        const delta = e.deltaY < 0 ? 1.15 : 0.85;
-        wheelAccumulatorRef.current.zoomEvents.push({
-          factor: delta,
-          clientX: e.clientX,
-          clientY: e.clientY,
-        });
-      } else {
-        wheelAccumulatorRef.current.deltaX += e.deltaX;
-        wheelAccumulatorRef.current.deltaY += e.deltaY;
-      }
+    e.preventDefault();
+    if (e.ctrlKey || e.metaKey) {
+      const delta = e.deltaY < 0 ? 1.15 : 0.85;
+      wheelAccumulatorRef.current.zoomEvents.push({
+        factor: delta,
+        clientX: e.clientX,
+        clientY: e.clientY,
+      });
+    } else {
+      wheelAccumulatorRef.current.deltaX += e.deltaX;
+      wheelAccumulatorRef.current.deltaY += e.deltaY;
+    }
 
-      if (!rafWheelIdRef.current) {
-        rafWheelIdRef.current = requestAnimationFrame(() => {
-          rafWheelIdRef.current = null;
-          const { deltaX, deltaY, zoomEvents } = wheelAccumulatorRef.current;
-          wheelAccumulatorRef.current = { deltaX: 0, deltaY: 0, zoomEvents: [] };
+    if (!rafWheelIdRef.current) {
+      rafWheelIdRef.current = requestAnimationFrame(() => {
+        rafWheelIdRef.current = null;
+        const { deltaX, deltaY, zoomEvents } = wheelAccumulatorRef.current;
+        wheelAccumulatorRef.current = { deltaX: 0, deltaY: 0, zoomEvents: [] };
 
-          if (deltaX !== 0 || deltaY !== 0 || zoomEvents.length > 0) {
-            setViewport((prev) => {
-              let nextPanX = prev.panX - deltaX;
-              let nextPanY = prev.panY - deltaY;
-              let nextZoom = prev.zoom;
+        if (deltaX !== 0 || deltaY !== 0 || zoomEvents.length > 0) {
+          setViewport((prev) => {
+            let nextPanX = prev.panX - deltaX;
+            let nextPanY = prev.panY - deltaY;
+            let nextZoom = prev.zoom;
 
-              if (containerRef.current && zoomEvents.length > 0) {
-                const rect = containerRef.current.getBoundingClientRect();
-                for (const zEvent of zoomEvents) {
-                  const targetZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, nextZoom * zEvent.factor));
-                  const cursorX = zEvent.clientX - rect.left;
-                  const cursorY = zEvent.clientY - rect.top;
-                  const factor = targetZoom / nextZoom;
-                  nextPanX = cursorX - (cursorX - nextPanX) * factor;
-                  nextPanY = cursorY - (cursorY - nextPanY) * factor;
-                  nextZoom = targetZoom;
-                }
+            if (containerRef.current && zoomEvents.length > 0) {
+              const rect = containerRef.current.getBoundingClientRect();
+              for (const zEvent of zoomEvents) {
+                const targetZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, nextZoom * zEvent.factor));
+                const cursorX = zEvent.clientX - rect.left;
+                const cursorY = zEvent.clientY - rect.top;
+                const factor = targetZoom / nextZoom;
+                nextPanX = cursorX - (cursorX - nextPanX) * factor;
+                nextPanY = cursorY - (cursorY - nextPanY) * factor;
+                nextZoom = targetZoom;
               }
+            }
 
-              return {
-                panX: nextPanX,
-                panY: nextPanY,
-                zoom: nextZoom,
-              };
-            });
-          }
-        });
-      }
-    },
-    []
-  );
+            return {
+              panX: nextPanX,
+              panY: nextPanY,
+              zoom: nextZoom,
+            };
+          });
+        }
+      });
+    }
+  }, []);
 
   // Marquee box selection starter
   const handleStartBoxSelection = useCallback(
@@ -1071,7 +1172,7 @@ export const CanvasView = memo(function CanvasView({
         setSelectedEdgeIds(new Set());
       }
     },
-    [selectedNodeIds, selectedEdgeIds]
+    [selectedNodeIds, selectedEdgeIds],
   );
 
   // Background drag to pan or start box selection
@@ -1117,16 +1218,14 @@ export const CanvasView = memo(function CanvasView({
       const canvasX = (e.clientX - rect.left - viewportRef.current.panX) / zoom;
       const canvasY = (e.clientY - rect.top - viewportRef.current.panY) / zoom;
       const selected = latestDataRef.current.nodes.filter(
-        (n) => selectedNodeIds.has(n.id) && n.type !== "group"
+        (n) => selectedNodeIds.has(n.id) && n.type !== "group",
       );
 
       if (isPointInsideNodeHull({ x: canvasX, y: canvasY }, selected)) {
         groupDragRef.current = {
           startClientX: e.clientX,
           startClientY: e.clientY,
-          startById: new Map(
-            selected.map((n) => [n.id, { id: n.id, startX: n.x, startY: n.y }])
-          ),
+          startById: new Map(selected.map((n) => [n.id, { id: n.id, startX: n.x, startY: n.y }])),
         };
         hasDraggedRef.current = false;
         e.preventDefault();
@@ -1146,110 +1245,130 @@ export const CanvasView = memo(function CanvasView({
   };
 
   // Node operations
-  const handleAddTextCard = useCallback((atX?: number, atY?: number) => {
-    if (!editable) return;
-    if (editingNodeIdRef.current) {
-      handleSaveNodeEdit();
-    }
-    const id = `text-${Date.now()}`;
-    const targetX = typeof atX === "number" ? atX : Math.round((-viewport.panX + 300) / viewport.zoom);
-    const targetY = typeof atY === "number" ? atY : Math.round((-viewport.panY + 200) / viewport.zoom);
-    const newNode: CanvasTextNode = {
-      id,
-      type: "text",
-      text: "### 新想法卡片\n双击此处或按 Enter 进行 Markdown 编辑...",
-      x: targetX,
-      y: targetY,
-      width: 280,
-      height: 160,
-      color: undefined,
-    };
-    const currentData = latestDataRef.current;
-    pushHistory({
-      ...currentData,
-      nodes: [...currentData.nodes, newNode],
-    });
-    setSelectedNodeIds(new Set([id]));
-    setEditingNodeId(null);
-    setContextMenu(null);
-  }, [editable, viewport, pushHistory, handleSaveNodeEdit]);
+  const handleAddTextCard = useCallback(
+    (atX?: number, atY?: number) => {
+      if (!editable) return;
+      if (editingNodeIdRef.current) {
+        handleSaveNodeEdit();
+      }
+      const id = `text-${Date.now()}`;
+      const targetX =
+        typeof atX === "number" ? atX : Math.round((-viewport.panX + 300) / viewport.zoom);
+      const targetY =
+        typeof atY === "number" ? atY : Math.round((-viewport.panY + 200) / viewport.zoom);
+      const newNode: CanvasTextNode = {
+        id,
+        type: "text",
+        text: "### 新想法卡片\n双击此处或按 Enter 进行 Markdown 编辑...",
+        x: targetX,
+        y: targetY,
+        width: 280,
+        height: 160,
+        color: undefined,
+      };
+      const currentData = latestDataRef.current;
+      pushHistory({
+        ...currentData,
+        nodes: [...currentData.nodes, newNode],
+      });
+      setSelectedNodeIds(new Set([id]));
+      setEditingNodeId(null);
+      setContextMenu(null);
+    },
+    [editable, viewport, pushHistory, handleSaveNodeEdit],
+  );
 
-  const handleAddFileCard = useCallback((chapter: { title: string; src: string }, atX?: number, atY?: number) => {
-    if (!editable) return;
-    if (editingNodeIdRef.current) {
-      handleSaveNodeEdit();
-    }
-    const id = `file-${Date.now()}`;
-    const targetX = typeof atX === "number" ? atX : Math.round((-viewport.panX + 320) / viewport.zoom);
-    const targetY = typeof atY === "number" ? atY : Math.round((-viewport.panY + 220) / viewport.zoom);
-    const newNode: CanvasFileNode = {
-      id,
-      type: "file",
-      file: chapter.src,
-      x: targetX,
-      y: targetY,
-      width: 320,
-      height: 220,
-      color: "4",
-    };
-    const currentData = latestDataRef.current;
-    pushHistory({
-      ...currentData,
-      nodes: [...currentData.nodes, newNode],
-    });
-    setSelectedNodeIds(new Set([id]));
-    setShowFilePicker(false);
-    setContextMenu(null);
-  }, [editable, viewport, pushHistory, handleSaveNodeEdit]);
+  const handleAddFileCard = useCallback(
+    (chapter: { title: string; src: string }, atX?: number, atY?: number) => {
+      if (!editable) return;
+      if (editingNodeIdRef.current) {
+        handleSaveNodeEdit();
+      }
+      const id = `file-${Date.now()}`;
+      const targetX =
+        typeof atX === "number" ? atX : Math.round((-viewport.panX + 320) / viewport.zoom);
+      const targetY =
+        typeof atY === "number" ? atY : Math.round((-viewport.panY + 220) / viewport.zoom);
+      const newNode: CanvasFileNode = {
+        id,
+        type: "file",
+        file: chapter.src,
+        x: targetX,
+        y: targetY,
+        width: 320,
+        height: 220,
+        color: "4",
+      };
+      const currentData = latestDataRef.current;
+      pushHistory({
+        ...currentData,
+        nodes: [...currentData.nodes, newNode],
+      });
+      setSelectedNodeIds(new Set([id]));
+      setShowFilePicker(false);
+      setContextMenu(null);
+    },
+    [editable, viewport, pushHistory, handleSaveNodeEdit],
+  );
 
-  const handleAddGroup = useCallback((atX?: number, atY?: number) => {
-    if (!editable) return;
-    if (editingNodeIdRef.current) {
-      handleSaveNodeEdit();
-    }
-    const id = `group-${Date.now()}`;
-    const targetX = typeof atX === "number" ? atX : Math.round((-viewport.panX + 250) / viewport.zoom);
-    const targetY = typeof atY === "number" ? atY : Math.round((-viewport.panY + 150) / viewport.zoom);
-    const newGroup: CanvasGroupNode = {
-      id,
-      type: "group",
-      label: "概念分组容器",
-      x: targetX,
-      y: targetY,
-      width: 600,
-      height: 400,
-      color: "5",
-    };
-    const currentData = latestDataRef.current;
-    pushHistory({
-      ...currentData,
-      nodes: [...currentData.nodes, newGroup],
-    });
-    freshGroupIdsRef.current.add(id);
-    setSelectedNodeIds(new Set([id]));
-    setEditingNodeId(null);
-    setContextMenu(null);
-  }, [editable, viewport, pushHistory, handleSaveNodeEdit]);
+  const handleAddGroup = useCallback(
+    (atX?: number, atY?: number) => {
+      if (!editable) return;
+      if (editingNodeIdRef.current) {
+        handleSaveNodeEdit();
+      }
+      const id = `group-${Date.now()}`;
+      const targetX =
+        typeof atX === "number" ? atX : Math.round((-viewport.panX + 250) / viewport.zoom);
+      const targetY =
+        typeof atY === "number" ? atY : Math.round((-viewport.panY + 150) / viewport.zoom);
+      const newGroup: CanvasGroupNode = {
+        id,
+        type: "group",
+        label: "概念分组容器",
+        x: targetX,
+        y: targetY,
+        width: 600,
+        height: 400,
+        color: "5",
+      };
+      const currentData = latestDataRef.current;
+      pushHistory({
+        ...currentData,
+        nodes: [...currentData.nodes, newGroup],
+      });
+      freshGroupIdsRef.current.add(id);
+      setSelectedNodeIds(new Set([id]));
+      setEditingNodeId(null);
+      setContextMenu(null);
+    },
+    [editable, viewport, pushHistory, handleSaveNodeEdit],
+  );
 
-  const handleDeleteNode = useCallback((nodeId: string) => {
-    if (!editable) return;
-    pushHistory({
-      nodes: data.nodes.filter((n) => n.id !== nodeId),
-      edges: data.edges.filter((e) => e.fromNode !== nodeId && e.toNode !== nodeId),
-    });
-    setSelectedNodeIds((prev) => {
-      const next = new Set(prev);
-      next.delete(nodeId);
-      return next;
-    });
-    setContextMenu(null);
-  }, [editable, data, pushHistory]);
+  const handleDeleteNode = useCallback(
+    (nodeId: string) => {
+      if (!editable) return;
+      pushHistory({
+        nodes: data.nodes.filter((n) => n.id !== nodeId),
+        edges: data.edges.filter((e) => e.fromNode !== nodeId && e.toNode !== nodeId),
+      });
+      setSelectedNodeIds((prev) => {
+        const next = new Set(prev);
+        next.delete(nodeId);
+        return next;
+      });
+      setContextMenu(null);
+    },
+    [editable, data, pushHistory],
+  );
 
   const handleDeleteSelected = useCallback(() => {
     if (!editable || selectedNodeIds.size === 0) return;
     pushHistory({
       nodes: data.nodes.filter((n) => !selectedNodeIds.has(n.id)),
-      edges: data.edges.filter((e) => !selectedNodeIds.has(e.fromNode) && !selectedNodeIds.has(e.toNode)),
+      edges: data.edges.filter(
+        (e) => !selectedNodeIds.has(e.fromNode) && !selectedNodeIds.has(e.toNode),
+      ),
     });
     setSelectedNodeIds(new Set());
     setContextMenu(null);
@@ -1273,7 +1392,7 @@ export const CanvasView = memo(function CanvasView({
       setSelectedNodeIds(new Set([newNode.id]));
       setContextMenu(null);
     },
-    [editable, data, pushHistory]
+    [editable, data, pushHistory],
   );
 
   const handleDuplicateSelected = useCallback(() => {
@@ -1316,41 +1435,50 @@ export const CanvasView = memo(function CanvasView({
     setContextMenu(null);
   }, [data.nodes]);
 
-  const handleBatchColorChange = useCallback((color: string) => {
-    if (!editable || selectedNodeIds.size === 0) return;
-    pushHistory({
-      ...data,
-      nodes: data.nodes.map((n) =>
-        selectedNodeIds.has(n.id) ? { ...n, color: color || undefined } : n
-      ),
-    });
-    // Deliberately does NOT close the context menu here — the caller decides
-    // when. When the colour came from the native picker, closing has to wait
-    // until that dialog has finished dismissing; unmounting the <input> from
-    // onChange tears it down mid-flight and crashes the renderer (闪退).
-  }, [editable, selectedNodeIds, data, pushHistory]);
+  const handleBatchColorChange = useCallback(
+    (color: string) => {
+      if (!editable || selectedNodeIds.size === 0) return;
+      pushHistory({
+        ...data,
+        nodes: data.nodes.map((n) =>
+          selectedNodeIds.has(n.id) ? { ...n, color: color || undefined } : n,
+        ),
+      });
+      // Deliberately does NOT close the context menu here — the caller decides
+      // when. When the colour came from the native picker, closing has to wait
+      // until that dialog has finished dismissing; unmounting the <input> from
+      // onChange tears it down mid-flight and crashes the renderer (闪退).
+    },
+    [editable, selectedNodeIds, data, pushHistory],
+  );
 
-  const handleBringToFront = useCallback((nodeId: string) => {
-    if (!editable) return;
-    const node = data.nodes.find((n) => n.id === nodeId);
-    if (!node) return;
-    pushHistory({
-      ...data,
-      nodes: [...data.nodes.filter((n) => n.id !== nodeId), node],
-    });
-    setContextMenu(null);
-  }, [editable, data, pushHistory]);
+  const handleBringToFront = useCallback(
+    (nodeId: string) => {
+      if (!editable) return;
+      const node = data.nodes.find((n) => n.id === nodeId);
+      if (!node) return;
+      pushHistory({
+        ...data,
+        nodes: [...data.nodes.filter((n) => n.id !== nodeId), node],
+      });
+      setContextMenu(null);
+    },
+    [editable, data, pushHistory],
+  );
 
-  const handleSendToBack = useCallback((nodeId: string) => {
-    if (!editable) return;
-    const node = data.nodes.find((n) => n.id === nodeId);
-    if (!node) return;
-    pushHistory({
-      ...data,
-      nodes: [node, ...data.nodes.filter((n) => n.id !== nodeId)],
-    });
-    setContextMenu(null);
-  }, [editable, data, pushHistory]);
+  const handleSendToBack = useCallback(
+    (nodeId: string) => {
+      if (!editable) return;
+      const node = data.nodes.find((n) => n.id === nodeId);
+      if (!node) return;
+      pushHistory({
+        ...data,
+        nodes: [node, ...data.nodes.filter((n) => n.id !== nodeId)],
+      });
+      setContextMenu(null);
+    },
+    [editable, data, pushHistory],
+  );
 
   const handleDeleteEdge = useCallback(
     (edgeId: string) => {
@@ -1369,7 +1497,7 @@ export const CanvasView = memo(function CanvasView({
       if (editingEdgeId === edgeId) setEditingEdgeId(null);
       setContextMenu(null);
     },
-    [editable, editingEdgeId, pushHistory]
+    [editable, editingEdgeId, pushHistory],
   );
 
   const handleBatchDeleteEdges = useCallback(() => {
@@ -1392,14 +1520,12 @@ export const CanvasView = memo(function CanvasView({
       const currentData = latestDataRef.current;
       pushHistory({
         ...currentData,
-        edges: currentData.edges.map((e) =>
-          selectedEdgeIds.has(e.id) ? { ...e, style } : e
-        ),
+        edges: currentData.edges.map((e) => (selectedEdgeIds.has(e.id) ? { ...e, style } : e)),
       });
       const styleName = style === "bezier" ? "贝塞尔曲线" : style === "step" ? "直角折线" : "直线";
       showToast(`已将 ${selectedEdgeIds.size} 条连线设为${styleName}`);
     },
-    [editable, selectedEdgeIds, pushHistory, showToast]
+    [editable, selectedEdgeIds, pushHistory, showToast],
   );
 
   const handleBatchCycleStrokePattern = useCallback(() => {
@@ -1410,12 +1536,12 @@ export const CanvasView = memo(function CanvasView({
       first?.strokePattern === "dashed"
         ? "dotted"
         : first?.strokePattern === "dotted"
-        ? "solid"
-        : "dashed";
+          ? "solid"
+          : "dashed";
     pushHistory({
       ...currentData,
       edges: currentData.edges.map((e) =>
-        selectedEdgeIds.has(e.id) ? { ...e, strokePattern: nextPattern } : e
+        selectedEdgeIds.has(e.id) ? { ...e, strokePattern: nextPattern } : e,
       ),
     });
     const patName = nextPattern === "dashed" ? "虚线" : nextPattern === "dotted" ? "点线" : "实线";
@@ -1447,7 +1573,7 @@ export const CanvasView = memo(function CanvasView({
     pushHistory({
       ...currentData,
       edges: currentData.edges.map((e) =>
-        selectedEdgeIds.has(e.id) ? { ...e, fromEnd: nextFromEnd, toEnd: nextToEnd } : e
+        selectedEdgeIds.has(e.id) ? { ...e, fromEnd: nextFromEnd, toEnd: nextToEnd } : e,
       ),
     });
     showToast(`已将 ${selectedEdgeIds.size} 条连线切换为${desc}`);
@@ -1462,13 +1588,11 @@ export const CanvasView = memo(function CanvasView({
       const affected = expandLoopEdgeSelection(currentData.edges, selectedEdgeIds);
       pushHistory({
         ...currentData,
-        edges: currentData.edges.map((e) =>
-          affected.has(e.id) ? { ...e, color: colorKey } : e
-        ),
+        edges: currentData.edges.map((e) => (affected.has(e.id) ? { ...e, color: colorKey } : e)),
       });
       showToast(`已修改 ${affected.size} 条连线的颜色`);
     },
-    [editable, selectedEdgeIds, pushHistory, showToast]
+    [editable, selectedEdgeIds, pushHistory, showToast],
   );
 
   const handleBatchReverseEdges = useCallback(() => {
@@ -1478,7 +1602,7 @@ export const CanvasView = memo(function CanvasView({
     pushHistory({
       ...currentData,
       edges: currentData.edges.map((e) =>
-        selectedEdgeIds.has(e.id) ? reverseEdgeDirection(e) : e
+        selectedEdgeIds.has(e.id) ? reverseEdgeDirection(e) : e,
       ),
     });
     showToast(`已反转 ${count} 条连线的流向`);
@@ -1497,7 +1621,7 @@ export const CanvasView = memo(function CanvasView({
     const currentData = latestDataRef.current;
     const beforeCount = currentData.edges.length;
     const remainingEdges = currentData.edges.filter(
-      (e) => !(selectedNodeIds.has(e.fromNode) && selectedNodeIds.has(e.toNode))
+      (e) => !(selectedNodeIds.has(e.fromNode) && selectedNodeIds.has(e.toNode)),
     );
     const removedCount = beforeCount - remainingEdges.length;
     if (removedCount === 0) {
@@ -1519,7 +1643,7 @@ export const CanvasView = memo(function CanvasView({
       e: React.MouseEvent,
       edgeId: string,
       orientation: "horizontal" | "vertical",
-      currentOffset: number
+      currentOffset: number,
     ) => {
       if (e.button !== 0 || !editable) return;
       e.preventDefault();
@@ -1532,7 +1656,7 @@ export const CanvasView = memo(function CanvasView({
         orientation,
       };
     },
-    [editable]
+    [editable],
   );
 
   const handleResetEdgeStepOffset = useCallback(
@@ -1542,12 +1666,12 @@ export const CanvasView = memo(function CanvasView({
       pushHistory({
         ...currentData,
         edges: currentData.edges.map((e) =>
-          e.id === edgeId ? { ...e, stepOffset: undefined } : e
+          e.id === edgeId ? { ...e, stepOffset: undefined } : e,
         ),
       });
       showToast("已重置折线转折位置");
     },
-    [editable, pushHistory, showToast]
+    [editable, pushHistory, showToast],
   );
 
   const handleNodeColorChange = useCallback(
@@ -1557,11 +1681,11 @@ export const CanvasView = memo(function CanvasView({
       pushHistory({
         ...currentData,
         nodes: currentData.nodes.map((n) =>
-          n.id === nodeId ? { ...n, color: color || undefined } : n
+          n.id === nodeId ? { ...n, color: color || undefined } : n,
         ),
       });
     },
-    [editable, pushHistory]
+    [editable, pushHistory],
   );
 
   const handleToggleEdgeStyle = useCallback(
@@ -1576,7 +1700,7 @@ export const CanvasView = memo(function CanvasView({
         edges: currentData.edges.map((e) => (e.id === edgeId ? updated : e)),
       });
     },
-    [editable, pushHistory]
+    [editable, pushHistory],
   );
 
   const handleToggleEdgeArrow = useCallback(
@@ -1591,7 +1715,7 @@ export const CanvasView = memo(function CanvasView({
         edges: currentData.edges.map((e) => (e.id === edgeId ? updated : e)),
       });
     },
-    [editable, pushHistory]
+    [editable, pushHistory],
   );
 
   const handleReverseEdge = useCallback(
@@ -1606,7 +1730,7 @@ export const CanvasView = memo(function CanvasView({
         edges: currentData.edges.map((e) => (e.id === edgeId ? updated : e)),
       });
     },
-    [editable, pushHistory]
+    [editable, pushHistory],
   );
 
   const handleEdgeColorChange = useCallback(
@@ -1621,7 +1745,7 @@ export const CanvasView = memo(function CanvasView({
         edges: currentData.edges.map((e) => (affected.has(e.id) ? { ...e, color } : e)),
       });
     },
-    [editable, pushHistory]
+    [editable, pushHistory],
   );
 
   const handleEdgeLabelChange = useCallback(
@@ -1631,11 +1755,11 @@ export const CanvasView = memo(function CanvasView({
       pushHistory({
         ...currentData,
         edges: currentData.edges.map((e) =>
-          e.id === edgeId ? { ...e, label: label.trim() || undefined } : e
+          e.id === edgeId ? { ...e, label: label.trim() || undefined } : e,
         ),
       });
     },
-    [editable, pushHistory]
+    [editable, pushHistory],
   );
 
   const handleEdgeLabelShapeChange = useCallback(
@@ -1644,12 +1768,10 @@ export const CanvasView = memo(function CanvasView({
       const currentData = latestDataRef.current;
       pushHistory({
         ...currentData,
-        edges: currentData.edges.map((e) =>
-          e.id === edgeId ? { ...e, labelShape: shape } : e
-        ),
+        edges: currentData.edges.map((e) => (e.id === edgeId ? { ...e, labelShape: shape } : e)),
       });
     },
-    [editable, pushHistory]
+    [editable, pushHistory],
   );
 
   const handleSetEdgeAnchorSide = useCallback(
@@ -1658,12 +1780,10 @@ export const CanvasView = memo(function CanvasView({
       const currentData = latestDataRef.current;
       pushHistory({
         ...currentData,
-        edges: currentData.edges.map((e) =>
-          e.id === edgeId ? { ...e, [sideKey]: side } : e
-        ),
+        edges: currentData.edges.map((e) => (e.id === edgeId ? { ...e, [sideKey]: side } : e)),
       });
     },
-    [editable, pushHistory]
+    [editable, pushHistory],
   );
 
   const handleCycleEdgeAnchor = useCallback(
@@ -1672,12 +1792,18 @@ export const CanvasView = memo(function CanvasView({
       const currentEdge = latestDataRef.current.edges.find((e) => e.id === edgeId);
       if (!currentEdge) return;
       const current = currentEdge[sideKey];
-      const sequence: (CanvasNodeSide | undefined)[] = [undefined, "top", "right", "bottom", "left"];
+      const sequence: (CanvasNodeSide | undefined)[] = [
+        undefined,
+        "top",
+        "right",
+        "bottom",
+        "left",
+      ];
       const currIdx = sequence.indexOf(current);
       const nextSide = sequence[(currIdx + 1) % sequence.length];
       handleSetEdgeAnchorSide(edgeId, sideKey, nextSide);
     },
-    [editable, handleSetEdgeAnchorSide]
+    [editable, handleSetEdgeAnchorSide],
   );
 
   const handleToggleEdgeStrokePattern = useCallback(
@@ -1692,7 +1818,7 @@ export const CanvasView = memo(function CanvasView({
         edges: currentData.edges.map((e) => (e.id === edgeId ? updated : e)),
       });
     },
-    [editable, pushHistory]
+    [editable, pushHistory],
   );
 
   const handleConnectSelectedNodes = useCallback(() => {
@@ -1702,7 +1828,13 @@ export const CanvasView = memo(function CanvasView({
     if (selectedNodes.length < 2) return;
 
     // Use spatially sorted chain connection to prevent criss-crossing dead knots
-    const newEdges = connectChainNodes(selectedNodes, currentData.edges, "bezier", true, currentData.nodes);
+    const newEdges = connectChainNodes(
+      selectedNodes,
+      currentData.edges,
+      "bezier",
+      true,
+      currentData.nodes,
+    );
 
     if (newEdges.length > 0) {
       pushHistory({
@@ -1745,7 +1877,13 @@ export const CanvasView = memo(function CanvasView({
       if (!rootNode) return;
 
       const targetNodes = selectedNodes.filter((n) => n.id !== rootNode!.id);
-      const newEdges = connectOneToMany(rootNode, targetNodes, currentData.edges, "bezier", currentData.nodes);
+      const newEdges = connectOneToMany(
+        rootNode,
+        targetNodes,
+        currentData.edges,
+        "bezier",
+        currentData.nodes,
+      );
 
       if (newEdges.length > 0) {
         pushHistory({
@@ -1754,17 +1892,22 @@ export const CanvasView = memo(function CanvasView({
         });
         const rootTitle =
           rootNode.type === "text"
-            ? rootNode.text.split("\n")[0].replace(/^[#\s*->]+/, "").slice(0, 12) || "主卡片"
+            ? rootNode.text
+                .split("\n")[0]
+                .replace(/^[#\s*->]+/, "")
+                .slice(0, 12) || "主卡片"
             : rootNode.type === "group"
-            ? rootNode.label || "分组"
-            : "主卡片";
-        showToast(`已建立以「${rootTitle}」为发起节点的一对多关联（辐射其余 ${newEdges.length} 张卡片）`);
+              ? rootNode.label || "分组"
+              : "主卡片";
+        showToast(
+          `已建立以「${rootTitle}」为发起节点的一对多关联（辐射其余 ${newEdges.length} 张卡片）`,
+        );
       } else {
         showToast("选中的卡片之间已存在一对多关联");
       }
       setContextMenu(null);
     },
-    [editable, selectedNodeIds, selectedNodeId, pushHistory, showToast]
+    [editable, selectedNodeIds, selectedNodeId, pushHistory, showToast],
   );
 
   const handleConnectLoopNodes = useCallback(() => {
@@ -1776,7 +1919,13 @@ export const CanvasView = memo(function CanvasView({
       return;
     }
 
-    const newEdges = connectLoopNodes(selectedNodes, currentData.edges, "bezier", true, currentData.nodes);
+    const newEdges = connectLoopNodes(
+      selectedNodes,
+      currentData.edges,
+      "bezier",
+      true,
+      currentData.nodes,
+    );
 
     if (newEdges.length > 0) {
       pushHistory({
@@ -1795,7 +1944,7 @@ export const CanvasView = memo(function CanvasView({
       if (!editable) return;
       const currentData = latestDataRef.current;
       const connectedCount = currentData.edges.filter(
-        (e) => e.fromNode === nodeId || e.toNode === nodeId
+        (e) => e.fromNode === nodeId || e.toNode === nodeId,
       ).length;
       if (connectedCount === 0) {
         showToast("该卡片当前没有任何关联连线");
@@ -1810,7 +1959,7 @@ export const CanvasView = memo(function CanvasView({
       showToast(`已断开该卡片的 ${connectedCount} 条关联连线`);
       setContextMenu(null);
     },
-    [editable, pushHistory, showToast]
+    [editable, pushHistory, showToast],
   );
 
   const handleSpawnMultipleBranches = useCallback(
@@ -1825,7 +1974,7 @@ export const CanvasView = memo(function CanvasView({
         count,
         direction,
         currentData.edges,
-        currentData.nodes
+        currentData.nodes,
       );
       pushHistory({
         ...currentData,
@@ -1837,7 +1986,7 @@ export const CanvasView = memo(function CanvasView({
       showToast(`已成功派生 ${newNodes.length} 个分支想法卡片`);
       setContextMenu(null);
     },
-    [editable, pushHistory, showToast]
+    [editable, pushHistory, showToast],
   );
 
   const handleConfirmBatchSpawn = useCallback(() => {
@@ -1859,7 +2008,7 @@ export const CanvasView = memo(function CanvasView({
         undefined,
         undefined,
         currentData.edges,
-        currentData.nodes
+        currentData.nodes,
       );
       pushHistory({
         ...currentData,
@@ -1872,7 +2021,7 @@ export const CanvasView = memo(function CanvasView({
       setEditingText(newNode.text);
       setContextMenu(null);
     },
-    [editable, pushHistory]
+    [editable, pushHistory],
   );
 
   const handleAlignSelected = useCallback(
@@ -1908,7 +2057,7 @@ export const CanvasView = memo(function CanvasView({
       showToast(toastMap[direction] || "所选卡片已对齐");
       setContextMenu(null);
     },
-    [editable, selectedNodeIds, pushHistory, showToast]
+    [editable, selectedNodeIds, pushHistory, showToast],
   );
 
   const handleGroupSelectedNodes = useCallback(() => {
@@ -1966,13 +2115,13 @@ export const CanvasView = memo(function CanvasView({
       pushHistory({
         ...currentData,
         nodes: currentData.nodes.map((n) =>
-          n.id === nodeId ? { ...n, width: defaultW, height: defaultH } : n
+          n.id === nodeId ? { ...n, width: defaultW, height: defaultH } : n,
         ),
       });
       showToast("已重置卡片为标准尺寸");
       setContextMenu(null);
     },
-    [editable, pushHistory, showToast]
+    [editable, pushHistory, showToast],
   );
 
   const handleCopyNodeText = useCallback(
@@ -1994,7 +2143,7 @@ export const CanvasView = memo(function CanvasView({
       }
       setContextMenu(null);
     },
-    [showToast]
+    [showToast],
   );
 
   const handleCopyNodeWikilink = useCallback(
@@ -2003,7 +2152,10 @@ export const CanvasView = memo(function CanvasView({
       if (node.type === "file") {
         wikilink = `[[${node.file.replace(/\.md$/i, "")}]]`;
       } else if (node.type === "text") {
-        const firstLine = node.text.split("\n")[0].replace(/^[#\s\-*]+/, "").trim();
+        const firstLine = node.text
+          .split("\n")[0]
+          .replace(/^[#\s\-*]+/, "")
+          .trim();
         wikilink = `[[${firstLine || "卡片"}]]`;
       } else if (node.type === "group") {
         wikilink = `[[${node.label || "分组"}]]`;
@@ -2017,7 +2169,7 @@ export const CanvasView = memo(function CanvasView({
       }
       setContextMenu(null);
     },
-    [showToast]
+    [showToast],
   );
 
   const handleExtractCardToNote = useCallback(
@@ -2031,14 +2183,14 @@ export const CanvasView = memo(function CanvasView({
       showToast(`已提取为新笔记: ${title}`);
       setContextMenu(null);
     },
-    [onExtractToNote, showToast]
+    [onExtractToNote, showToast],
   );
 
   const handleSelectGroupNodes = useCallback(
     (groupNode: CanvasGroupNode) => {
       const currentData = latestDataRef.current;
       const insideNodes = currentData.nodes.filter(
-        (n) => n.id !== groupNode.id && isNodeInsideGroup(n, groupNode)
+        (n) => n.id !== groupNode.id && isNodeInsideGroup(n, groupNode),
       );
       if (insideNodes.length > 0) {
         setSelectedNodeIds(new Set(insideNodes.map((n) => n.id)));
@@ -2049,7 +2201,7 @@ export const CanvasView = memo(function CanvasView({
       }
       setContextMenu(null);
     },
-    [showToast]
+    [showToast],
   );
 
   const handleFitGroupSize = useCallback(
@@ -2057,7 +2209,7 @@ export const CanvasView = memo(function CanvasView({
       if (!editable) return;
       const currentData = latestDataRef.current;
       const insideNodes = currentData.nodes.filter(
-        (n) => n.id !== groupNode.id && isNodeInsideGroup(n, groupNode)
+        (n) => n.id !== groupNode.id && isNodeInsideGroup(n, groupNode),
       );
       if (insideNodes.length === 0) {
         showToast("分组内暂无卡片，无需调整");
@@ -2081,13 +2233,13 @@ export const CanvasView = memo(function CanvasView({
                 width: bbox.width + padX * 2,
                 height: bbox.height + padTop + padBottom,
               }
-            : n
+            : n,
         ),
       });
       showToast("分组尺寸已贴合内部卡片");
       setContextMenu(null);
     },
-    [editable, pushHistory, showToast]
+    [editable, pushHistory, showToast],
   );
 
   const handleDissolveGroup = useCallback(
@@ -2098,7 +2250,7 @@ export const CanvasView = memo(function CanvasView({
         ...currentData,
         nodes: currentData.nodes.filter((n) => n.id !== groupNodeId),
         edges: currentData.edges.filter(
-          (e) => e.fromNode !== groupNodeId && e.toNode !== groupNodeId
+          (e) => e.fromNode !== groupNodeId && e.toNode !== groupNodeId,
         ),
       });
       if (selectedNodeId === groupNodeId) setSelectedNodeId(null);
@@ -2110,7 +2262,7 @@ export const CanvasView = memo(function CanvasView({
       showToast("已解散分组（保留内部卡片）");
       setContextMenu(null);
     },
-    [editable, selectedNodeId, selectedNodeIds, pushHistory, showToast]
+    [editable, selectedNodeId, selectedNodeIds, pushHistory, showToast],
   );
 
   const handleDeleteGroupWithContents = useCallback(
@@ -2120,14 +2272,14 @@ export const CanvasView = memo(function CanvasView({
       const insideNodeIds = new Set(
         currentData.nodes
           .filter((n) => n.id === groupNode.id || isNodeInsideGroup(n, groupNode))
-          .map((n) => n.id)
+          .map((n) => n.id),
       );
 
       pushHistory({
         ...currentData,
         nodes: currentData.nodes.filter((n) => !insideNodeIds.has(n.id)),
         edges: currentData.edges.filter(
-          (e) => !insideNodeIds.has(e.fromNode) && !insideNodeIds.has(e.toNode)
+          (e) => !insideNodeIds.has(e.fromNode) && !insideNodeIds.has(e.toNode),
         ),
       });
       setSelectedNodeIds(new Set());
@@ -2135,7 +2287,7 @@ export const CanvasView = memo(function CanvasView({
       showToast(`已删除分组容器及内部 ${insideNodeIds.size - 1} 张卡片`);
       setContextMenu(null);
     },
-    [editable, pushHistory, showToast]
+    [editable, pushHistory, showToast],
   );
 
   const handlePasteClipboardAsCard = useCallback(
@@ -2168,7 +2320,10 @@ export const CanvasView = memo(function CanvasView({
           });
 
           let finalFilePath = base64;
-          const desktop = typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
+          const desktop =
+            typeof window !== "undefined"
+              ? window.knowSpaceDesktop || window.bookMDDesktop
+              : undefined;
           if (desktop?.savePastedImage) {
             const res = await desktop.savePastedImage({
               currentFilePath,
@@ -2237,7 +2392,7 @@ export const CanvasView = memo(function CanvasView({
       showToast("已从剪贴板粘贴为新卡片");
       setContextMenu(null);
     },
-    [editable, currentFilePath, pushHistory, showToast]
+    [editable, currentFilePath, pushHistory, showToast],
   );
 
   const handleTriggerInsertMedia = useCallback(() => {
@@ -2256,7 +2411,7 @@ export const CanvasView = memo(function CanvasView({
       mediaInsertPosRef.current = { x: canvasX, y: canvasY };
       imageFileInputRef.current?.click();
     },
-    [editable]
+    [editable],
   );
 
   const handleTriggerInsertVideo = useCallback(
@@ -2265,7 +2420,7 @@ export const CanvasView = memo(function CanvasView({
       mediaInsertPosRef.current = { x: canvasX, y: canvasY };
       videoFileInputRef.current?.click();
     },
-    [editable]
+    [editable],
   );
 
   const handleTriggerInsertAudio = useCallback(
@@ -2274,7 +2429,7 @@ export const CanvasView = memo(function CanvasView({
       mediaInsertPosRef.current = { x: canvasX, y: canvasY };
       audioFileInputRef.current?.click();
     },
-    [editable]
+    [editable],
   );
 
   const handleMediaFileInputChange = useCallback(
@@ -2282,7 +2437,8 @@ export const CanvasView = memo(function CanvasView({
       const files = Array.from(e.target.files || []);
       if (files.length === 0 || !editable) return;
 
-      const desktop = typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
+      const desktop =
+        typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
       const newNodes: CanvasNode[] = [];
 
       // Right-click inserts land exactly where the user clicked; toolbar /
@@ -2290,10 +2446,12 @@ export const CanvasView = memo(function CanvasView({
       const insertPos = mediaInsertPosRef.current;
       const centerX = insertPos
         ? insertPos.x
-        : -viewport.panX / viewport.zoom + (containerRef.current?.clientWidth || 800) / (2 * viewport.zoom);
+        : -viewport.panX / viewport.zoom +
+          (containerRef.current?.clientWidth || 800) / (2 * viewport.zoom);
       const centerY = insertPos
         ? insertPos.y
-        : -viewport.panY / viewport.zoom + (containerRef.current?.clientHeight || 600) / (2 * viewport.zoom);
+        : -viewport.panY / viewport.zoom +
+          (containerRef.current?.clientHeight || 600) / (2 * viewport.zoom);
       mediaInsertPosRef.current = null;
 
       for (let i = 0; i < files.length; i++) {
@@ -2349,7 +2507,7 @@ export const CanvasView = memo(function CanvasView({
 
       e.target.value = "";
     },
-    [editable, viewport, currentFilePath, pushHistory, showToast]
+    [editable, viewport, currentFilePath, pushHistory, showToast],
   );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -2373,7 +2531,8 @@ export const CanvasView = memo(function CanvasView({
       const files = Array.from(e.dataTransfer.files || []);
       if (files.length === 0) return;
 
-      const desktop = typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
+      const desktop =
+        typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
       const newNodes: CanvasNode[] = [];
 
       for (let i = 0; i < files.length; i++) {
@@ -2439,7 +2598,7 @@ export const CanvasView = memo(function CanvasView({
         showToast(`已将 ${newNodes.length} 个文件添加为画布卡片`);
       }
     },
-    [editable, currentFilePath, pushHistory, showToast]
+    [editable, currentFilePath, pushHistory, showToast],
   );
 
   // Node lookups & relationship maps
@@ -2454,7 +2613,7 @@ export const CanvasView = memo(function CanvasView({
         width: n.width,
         height: n.height,
       })),
-    [data.nodes]
+    [data.nodes],
   );
 
   const presentationSequence = useMemo(() => buildPresentationSequence(data), [data]);
@@ -2474,19 +2633,26 @@ export const CanvasView = memo(function CanvasView({
       const usableH = Math.max(300, containerH - 90);
       const targetZoom = Math.min(
         1.35,
-        Math.max(0.35, Math.min((containerW - 160) / targetNode.width, (usableH - 120) / targetNode.height))
+        Math.max(
+          0.35,
+          Math.min((containerW - 160) / targetNode.width, (usableH - 120) / targetNode.height),
+        ),
       );
 
       // Target center slightly shifted upward to give clearance to the bottom presentation controller
       const visualCenterY = usableH / 2 + 10;
-      const targetPanX = Math.round(containerW / 2 - (targetNode.x + targetNode.width / 2) * targetZoom);
-      const targetPanY = Math.round(visualCenterY - (targetNode.y + targetNode.height / 2) * targetZoom);
+      const targetPanX = Math.round(
+        containerW / 2 - (targetNode.x + targetNode.width / 2) * targetZoom,
+      );
+      const targetPanY = Math.round(
+        visualCenterY - (targetNode.y + targetNode.height / 2) * targetZoom,
+      );
 
       setViewport({ panX: targetPanX, panY: targetPanY, zoom: targetZoom });
       setSelectedNodeIds(new Set([targetId]));
       setSelectedNodeId(targetId);
     },
-    [presentationSequence, nodeMap]
+    [presentationSequence, nodeMap],
   );
 
   const handleJumpToSlide = useCallback(
@@ -2495,7 +2661,7 @@ export const CanvasView = memo(function CanvasView({
       setCurrentSlideIndex(index);
       focusSlide(index);
     },
-    [presentationSequence.length, focusSlide]
+    [presentationSequence.length, focusSlide],
   );
 
   const handleTogglePresentation = useCallback(() => {
@@ -2523,7 +2689,15 @@ export const CanvasView = memo(function CanvasView({
       setCurrentSlideIndex(startIndex);
       focusSlide(startIndex);
     }
-  }, [isPresentationMode, presentationSequence, viewport, selectedNodeId, selectedNodeIds, focusSlide, showToast]);
+  }, [
+    isPresentationMode,
+    presentationSequence,
+    viewport,
+    selectedNodeId,
+    selectedNodeIds,
+    focusSlide,
+    showToast,
+  ]);
 
   const handleNextSlide = useCallback(() => {
     if (presentationSequence.length === 0) return;
@@ -2534,7 +2708,8 @@ export const CanvasView = memo(function CanvasView({
 
   const handlePrevSlide = useCallback(() => {
     if (presentationSequence.length === 0) return;
-    const prevIdx = (currentSlideIndex - 1 + presentationSequence.length) % presentationSequence.length;
+    const prevIdx =
+      (currentSlideIndex - 1 + presentationSequence.length) % presentationSequence.length;
     setCurrentSlideIndex(prevIdx);
     focusSlide(prevIdx);
   }, [currentSlideIndex, presentationSequence.length, focusSlide]);
@@ -2544,7 +2719,9 @@ export const CanvasView = memo(function CanvasView({
       onToggleFullscreen();
       return;
     }
-    const desktopWin = (window as unknown as { bookMDDesktop?: { toggleFullScreen?: () => Promise<boolean> } }).bookMDDesktop;
+    const desktopWin = (
+      window as unknown as { bookMDDesktop?: { toggleFullScreen?: () => Promise<boolean> } }
+    ).bookMDDesktop;
     if (desktopWin?.toggleFullScreen) {
       const next = await desktopWin.toggleFullScreen();
       setIsPresentationFullscreen(Boolean(next));
@@ -2759,76 +2936,85 @@ export const CanvasView = memo(function CanvasView({
     setContextMenu(null);
   }, [editable, pushHistory, showToast]);
 
-  const handleContextMenuCanvas = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    if (isPresentationMode) return;
-    if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const localX = e.clientX - rect.left;
-    const localY = e.clientY - rect.top;
-    const canvasX = Math.round((localX - viewportRef.current.panX) / viewportRef.current.zoom);
-    const canvasY = Math.round((localY - viewportRef.current.panY) / viewportRef.current.zoom);
+  const handleContextMenuCanvas = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      if (isPresentationMode) return;
+      if (!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const localX = e.clientX - rect.left;
+      const localY = e.clientY - rect.top;
+      const canvasX = Math.round((localX - viewportRef.current.panX) / viewportRef.current.zoom);
+      const canvasY = Math.round((localY - viewportRef.current.panY) / viewportRef.current.zoom);
 
-    setContextMenu({
-      // Use viewport-absolute coordinates so the portal-rendered menu can use
-      // position: fixed and never be clipped by ancestor `overflow: hidden`.
-      x: e.clientX,
-      y: e.clientY,
-      canvasX,
-      canvasY,
-    });
-  }, [isPresentationMode]);
+      setContextMenu({
+        // Use viewport-absolute coordinates so the portal-rendered menu can use
+        // position: fixed and never be clipped by ancestor `overflow: hidden`.
+        x: e.clientX,
+        y: e.clientY,
+        canvasX,
+        canvasY,
+      });
+    },
+    [isPresentationMode],
+  );
 
-  const handleContextMenuNode = useCallback((e: React.MouseEvent, node: CanvasNode) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (isPresentationMode) return;
-    if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const localX = e.clientX - rect.left;
-    const localY = e.clientY - rect.top;
-    const canvasX = Math.round((localX - viewportRef.current.panX) / viewportRef.current.zoom);
-    const canvasY = Math.round((localY - viewportRef.current.panY) / viewportRef.current.zoom);
+  const handleContextMenuNode = useCallback(
+    (e: React.MouseEvent, node: CanvasNode) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (isPresentationMode) return;
+      if (!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const localX = e.clientX - rect.left;
+      const localY = e.clientY - rect.top;
+      const canvasX = Math.round((localX - viewportRef.current.panX) / viewportRef.current.zoom);
+      const canvasY = Math.round((localY - viewportRef.current.panY) / viewportRef.current.zoom);
 
-    if (!selectedNodeIds.has(node.id)) {
-      setSelectedNodeIds(new Set([node.id]));
-    }
+      if (!selectedNodeIds.has(node.id)) {
+        setSelectedNodeIds(new Set([node.id]));
+      }
 
-    setContextMenu({
-      x: e.clientX,
-      y: e.clientY,
-      canvasX,
-      canvasY,
-      targetNodeId: node.id,
-    });
-  }, [isPresentationMode, selectedNodeIds]);
+      setContextMenu({
+        x: e.clientX,
+        y: e.clientY,
+        canvasX,
+        canvasY,
+        targetNodeId: node.id,
+      });
+    },
+    [isPresentationMode, selectedNodeIds],
+  );
 
-  const handleContextMenuEdge = useCallback((e: React.MouseEvent, edge: CanvasEdge) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (isPresentationMode) return;
-    if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const localX = e.clientX - rect.left;
-    const localY = e.clientY - rect.top;
-    const canvasX = Math.round((localX - viewportRef.current.panX) / viewportRef.current.zoom);
-    const canvasY = Math.round((localY - viewportRef.current.panY) / viewportRef.current.zoom);
+  const handleContextMenuEdge = useCallback(
+    (e: React.MouseEvent, edge: CanvasEdge) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (isPresentationMode) return;
+      if (!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const localX = e.clientX - rect.left;
+      const localY = e.clientY - rect.top;
+      const canvasX = Math.round((localX - viewportRef.current.panX) / viewportRef.current.zoom);
+      const canvasY = Math.round((localY - viewportRef.current.panY) / viewportRef.current.zoom);
 
-    if (selectedEdgeIds.has(edge.id) && selectedEdgeIds.size > 1) {
-      // keep multiple selection
-    } else {
-      setSelectedEdgeIds(new Set([edge.id]));
-    }
-    setSelectedNodeIds(new Set());
+      if (selectedEdgeIds.has(edge.id) && selectedEdgeIds.size > 1) {
+        // keep multiple selection
+      } else {
+        setSelectedEdgeIds(new Set([edge.id]));
+      }
+      setSelectedNodeIds(new Set());
 
-    setContextMenu({
-      x: e.clientX,
-      y: e.clientY,
-      canvasX,
-      canvasY,
-      targetEdgeId: edge.id,
-    });
-  }, [selectedEdgeIds]);
+      setContextMenu({
+        x: e.clientX,
+        y: e.clientY,
+        canvasX,
+        canvasY,
+        targetEdgeId: edge.id,
+      });
+    },
+    [selectedEdgeIds],
+  );
 
   const handleSaveEdgeLabel = () => {
     if (!editingEdgeId) return;
@@ -2836,7 +3022,7 @@ export const CanvasView = memo(function CanvasView({
     pushHistory({
       ...currentData,
       edges: currentData.edges.map((e) =>
-        e.id === editingEdgeId ? { ...e, label: editingEdgeLabel.trim() || undefined } : e
+        e.id === editingEdgeId ? { ...e, label: editingEdgeLabel.trim() || undefined } : e,
       ),
     });
     setEditingEdgeId(null);
@@ -2895,8 +3081,7 @@ export const CanvasView = memo(function CanvasView({
     const liveNode = latestDataRef.current.nodes.find((n) => n.id === node.id) || node;
 
     const isModifier = e.shiftKey || e.ctrlKey || e.metaKey;
-    const isGroupBodyClick =
-      liveNode.type === "group" && !target?.closest(".canvas-group-header");
+    const isGroupBodyClick = liveNode.type === "group" && !target?.closest(".canvas-group-header");
 
     // If in box select mode, or holding modifier over group background body, start box selection
     if (isBoxSelectMode || (isModifier && isGroupBodyClick)) {
@@ -2932,7 +3117,7 @@ export const CanvasView = memo(function CanvasView({
       // live, instead of translating every card by the same offset.
       if (liveNode.type !== "group") {
         const selectedCards = latestDataRef.current.nodes.filter(
-          (n) => currentSelected.has(n.id) && n.type !== "group"
+          (n) => currentSelected.has(n.id) && n.type !== "group",
         );
         const gridLayout = computeGridLayout(selectedCards);
         if (gridLayout) {
@@ -2940,7 +3125,7 @@ export const CanvasView = memo(function CanvasView({
             gridLayout.orderedIds.map((id) => {
               const n = latestDataRef.current.nodes.find((x) => x.id === id)!;
               return [id, { id, startX: n.x, startY: n.y }];
-            })
+            }),
           );
           nodeDragRef.current = {
             nodeId: liveNode.id,
@@ -2982,13 +3167,17 @@ export const CanvasView = memo(function CanvasView({
         }
       }
 
-      const selectedOthers = latestDataRef.current.nodes
-        .filter((n) => currentSelected.has(n.id) && n.id !== liveNode.id);
+      const selectedOthers = latestDataRef.current.nodes.filter(
+        (n) => currentSelected.has(n.id) && n.id !== liveNode.id,
+      );
 
       let containedCards: CanvasNode[] = [];
       if (liveNode.type === "group") {
         containedCards = latestDataRef.current.nodes.filter(
-          (n) => n.id !== liveNode.id && !currentSelected.has(n.id) && isNodeInsideGroup(n, liveNode as CanvasGroupNode)
+          (n) =>
+            n.id !== liveNode.id &&
+            !currentSelected.has(n.id) &&
+            isNodeInsideGroup(n, liveNode as CanvasGroupNode),
         );
       }
 
@@ -3014,31 +3203,32 @@ export const CanvasView = memo(function CanvasView({
       const isFresh = freshGroupIdsRef.current.has(liveNode.id);
       const isAltOnly = e.altKey;
       const allGroups = latestDataRef.current.nodes.filter(
-        (n): n is CanvasGroupNode => n.type === "group"
+        (n): n is CanvasGroupNode => n.type === "group",
       );
       const thisIdx = latestDataRef.current.nodes.findIndex((x) => x.id === liveNode.id);
 
       // Cards inside this group that do NOT belong to an older existing container
-      const contained = (isFresh || isAltOnly)
-        ? []
-        : latestDataRef.current.nodes.filter((n) => {
-            if (n.id === liveNode.id || n.type === "group") return false;
-            if (!isNodeInsideGroup(n, liveNode as CanvasGroupNode)) return false;
+      const contained =
+        isFresh || isAltOnly
+          ? []
+          : latestDataRef.current.nodes.filter((n) => {
+              if (n.id === liveNode.id || n.type === "group") return false;
+              if (!isNodeInsideGroup(n, liveNode as CanvasGroupNode)) return false;
 
-            // If card also lies inside another group, check if that group was established earlier
-            const otherContainingGroups = allGroups.filter(
-              (og) => og.id !== liveNode.id && isNodeInsideGroup(n, og)
-            );
-            if (otherContainingGroups.length > 0) {
-              for (const og of otherContainingGroups) {
-                const otherIdx = latestDataRef.current.nodes.findIndex((x) => x.id === og.id);
-                if (otherIdx !== -1 && otherIdx < thisIdx) {
-                  return false; // older container owns this card, don't drag it
+              // If card also lies inside another group, check if that group was established earlier
+              const otherContainingGroups = allGroups.filter(
+                (og) => og.id !== liveNode.id && isNodeInsideGroup(n, og),
+              );
+              if (otherContainingGroups.length > 0) {
+                for (const og of otherContainingGroups) {
+                  const otherIdx = latestDataRef.current.nodes.findIndex((x) => x.id === og.id);
+                  if (otherIdx !== -1 && otherIdx < thisIdx) {
+                    return false; // older container owns this card, don't drag it
+                  }
                 }
               }
-            }
-            return true;
-          });
+              return true;
+            });
 
       if (isFresh) freshGroupIdsRef.current.delete(liveNode.id);
       const groupContained = contained.map((c) => ({
@@ -3096,7 +3286,11 @@ export const CanvasView = memo(function CanvasView({
     });
   };
 
-  const handleAnchorMouseUp = (e: React.MouseEvent, targetNodeId: string, targetSide: CanvasNodeSide) => {
+  const handleAnchorMouseUp = (
+    e: React.MouseEvent,
+    targetNodeId: string,
+    targetSide: CanvasNodeSide,
+  ) => {
     if (!connectingState || connectingState.fromNodeId === targetNodeId) return;
     e.stopPropagation();
 
@@ -3111,11 +3305,16 @@ export const CanvasView = memo(function CanvasView({
     const exists = currentData.edges.some(
       (ed) =>
         (ed.fromNode === fromNode.id && ed.toNode === targetNode.id) ||
-        (ed.fromNode === targetNode.id && ed.toNode === fromNode.id)
+        (ed.fromNode === targetNode.id && ed.toNode === fromNode.id),
     );
 
     if (!exists) {
-      const edgeColor = getSourceNodeEdgeColor(fromNode, currentData.edges, currentData.nodes, targetNode);
+      const edgeColor = getSourceNodeEdgeColor(
+        fromNode,
+        currentData.edges,
+        currentData.nodes,
+        targetNode,
+      );
       const newEdge: CanvasEdge = {
         id: `edge-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         fromNode: fromNode.id,
@@ -3157,11 +3356,16 @@ export const CanvasView = memo(function CanvasView({
       const exists = currentData.edges.some(
         (ed) =>
           (ed.fromNode === fromNode.id && ed.toNode === targetNode.id) ||
-          (ed.fromNode === targetNode.id && ed.toNode === fromNode.id)
+          (ed.fromNode === targetNode.id && ed.toNode === fromNode.id),
       );
 
       if (!exists) {
-        const edgeColor = getSourceNodeEdgeColor(fromNode, currentData.edges, currentData.nodes, targetNode);
+        const edgeColor = getSourceNodeEdgeColor(
+          fromNode,
+          currentData.edges,
+          currentData.nodes,
+          targetNode,
+        );
         const newEdge: CanvasEdge = {
           id: `edge-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
           fromNode: fromNode.id,
@@ -3183,7 +3387,7 @@ export const CanvasView = memo(function CanvasView({
       }
       setConnectingState(null);
     },
-    [connectingState, pushHistory, showToast]
+    [connectingState, pushHistory, showToast],
   );
 
   // What a press on a rendered card body means: a link opens the note it names,
@@ -3223,7 +3427,7 @@ export const CanvasView = memo(function CanvasView({
         const nodeId = cardEl.dataset.nodeId;
         if (!nodeId) return;
         const idx = Array.from(cardEl.querySelectorAll('input[type="checkbox"]')).indexOf(
-          target as HTMLInputElement
+          target as HTMLInputElement,
         );
         if (idx === -1) return;
         const live = latestDataRef.current;
@@ -3236,7 +3440,7 @@ export const CanvasView = memo(function CanvasView({
         });
       }
     },
-    [allChapters, onOpenFile, pushHistory, showToast]
+    [allChapters, onOpenFile, pushHistory, showToast],
   );
 
   /**
@@ -3260,7 +3464,7 @@ export const CanvasView = memo(function CanvasView({
     const lines = value.split("\n");
     const column = Array.from(lines[lines.length - 1] ?? "").reduce(
       (width, ch) => width + (ch.charCodeAt(0) > 0x2e7f ? 2 : 1),
-      0
+      0,
     );
     const probe = document.createElement("span");
     probe.style.cssText = `position:absolute;visibility:hidden;white-space:pre;font:${style.font}`;
@@ -3300,7 +3504,7 @@ export const CanvasView = memo(function CanvasView({
   /** The rows the popup shows, in the order it shows them. */
   const buildCardSuggestItems = (
     kind: "note" | "command",
-    query: string
+    query: string,
   ): CanvasCardSuggestItem[] => {
     if (kind === "command") {
       return matchSlashCommands(query).map((cmd) => ({
@@ -3408,7 +3612,7 @@ export const CanvasView = memo(function CanvasView({
         editingText,
         { query: suggest.query, startIndex: suggest.startIndex },
         caret,
-        command
+        command,
       );
       commitCardEdit(applied.text, applied.caret);
       return;
@@ -3419,7 +3623,7 @@ export const CanvasView = memo(function CanvasView({
     const inserted = `[[${target.title}]]`;
     commitCardEdit(
       `${editingText.slice(0, suggest.startIndex)}${inserted}${editingText.slice(caret)}`,
-      suggest.startIndex + inserted.length
+      suggest.startIndex + inserted.length,
     );
   };
 
@@ -3431,7 +3635,7 @@ export const CanvasView = memo(function CanvasView({
             ...prev,
             selectedIndex: (prev.selectedIndex + delta + prev.items.length) % prev.items.length,
           }
-        : prev
+        : prev,
     );
   };
 
@@ -3442,7 +3646,8 @@ export const CanvasView = memo(function CanvasView({
       if (stepBendDragRef.current) {
         const { edgeId, startX, startY, initialOffset, orientation } = stepBendDragRef.current;
         const zoom = viewportRef.current.zoom;
-        const delta = orientation === "horizontal" ? (e.clientX - startX) / zoom : (e.clientY - startY) / zoom;
+        const delta =
+          orientation === "horizontal" ? (e.clientX - startX) / zoom : (e.clientY - startY) / zoom;
         const newOffset = Math.round(initialOffset + delta);
         latestStepBendPosRef.current = { edgeId, newOffset };
         if (!rafStepBendIdRef.current) {
@@ -3453,7 +3658,7 @@ export const CanvasView = memo(function CanvasView({
             setData((prev) => ({
               ...prev,
               edges: prev.edges.map((edge) =>
-                edge.id === bend.edgeId ? { ...edge, stepOffset: bend.newOffset } : edge
+                edge.id === bend.edgeId ? { ...edge, stepOffset: bend.newOffset } : edge,
               ),
             }));
           });
@@ -3470,9 +3675,7 @@ export const CanvasView = memo(function CanvasView({
         const dx = (e.clientX - group.startClientX) / zoom;
         const dy = (e.clientY - group.startClientY) / zoom;
 
-        if (
-          Math.hypot(e.clientX - group.startClientX, e.clientY - group.startClientY) > 3
-        ) {
+        if (Math.hypot(e.clientX - group.startClientX, e.clientY - group.startClientY) > 3) {
           hasDraggedRef.current = true;
         }
         latestGroupDragPosRef.current = { dx, dy };
@@ -3547,10 +3750,10 @@ export const CanvasView = memo(function CanvasView({
                 maxX,
                 minY,
                 maxY,
-                latestDataRef.current.nodes
+                latestDataRef.current.nodes,
               );
               setSelectedNodeIds(
-                isModifier ? new Set([...baseSelectionBeforeBoxRef.current, ...hitIds]) : hitIds
+                isModifier ? new Set([...baseSelectionBeforeBoxRef.current, ...hitIds]) : hitIds,
               );
               const currentNodesMap = new Map(latestDataRef.current.nodes.map((n) => [n.id, n]));
               const hitEdgeIds = computeBoxSelectionEdgeHits(
@@ -3559,10 +3762,12 @@ export const CanvasView = memo(function CanvasView({
                 minY,
                 maxY,
                 latestDataRef.current.edges,
-                currentNodesMap
+                currentNodesMap,
               );
               setSelectedEdgeIds(
-                isModifier ? new Set([...baseEdgeSelectionBeforeBoxRef.current, ...hitEdgeIds]) : hitEdgeIds
+                isModifier
+                  ? new Set([...baseEdgeSelectionBeforeBoxRef.current, ...hitEdgeIds])
+                  : hitEdgeIds,
               );
             } else {
               setSelectedNodeIds(baseSelectionBeforeBoxRef.current);
@@ -3599,9 +3804,7 @@ export const CanvasView = memo(function CanvasView({
       // 2. Dragging node (with multi-select collaborative dragging & group coordination)
       if (nodeDragRef.current) {
         const dragInfo = nodeDragRef.current;
-        if (
-          Math.hypot(e.clientX - dragInfo.mouseStartX, e.clientY - dragInfo.mouseStartY) > 3
-        ) {
+        if (Math.hypot(e.clientX - dragInfo.mouseStartX, e.clientY - dragInfo.mouseStartY) > 3) {
           hasDraggedRef.current = true;
         }
         const currentZoom = viewportRef.current.zoom;
@@ -3645,7 +3848,7 @@ export const CanvasView = memo(function CanvasView({
                         x: Math.round(startPos.startX + pos.dx),
                         y: Math.round(startPos.startY + pos.dy),
                       }
-                    : n
+                    : n,
                 );
                 workingNodes = resizeGridSpacing(
                   workingNodes,
@@ -3654,7 +3857,7 @@ export const CanvasView = memo(function CanvasView({
                   pos.dx,
                   pos.dy,
                   gs.baseGapX,
-                  gs.baseGapY
+                  gs.baseGapY,
                 );
                 const gridData = {
                   ...prev,
@@ -3679,7 +3882,7 @@ export const CanvasView = memo(function CanvasView({
                         x: Math.round(pos.startX + pos.dx),
                         y: Math.round(pos.startY + pos.dy),
                       }
-                    : n
+                    : n,
                 );
                 const moved = movedNodes.find((n) => n.id === pos.updatedId);
                 if (moved) {
@@ -3758,7 +3961,7 @@ export const CanvasView = memo(function CanvasView({
                         width: Math.max(180, Math.round(pos.startW + pos.dw)),
                         height: Math.max(100, Math.round(pos.startH + pos.dh)),
                       }
-                    : n
+                    : n,
                 ),
               };
               latestDataRef.current = nextData;
@@ -3784,7 +3987,7 @@ export const CanvasView = memo(function CanvasView({
             const mouseCanvasX = (pos.clientX - rect.left - currentPanX) / currentZoom;
             const mouseCanvasY = (pos.clientY - rect.top - currentPanY) / currentZoom;
             setConnectingState((prev) =>
-              prev ? { ...prev, currentX: mouseCanvasX, currentY: mouseCanvasY } : null
+              prev ? { ...prev, currentX: mouseCanvasX, currentY: mouseCanvasY } : null,
             );
           });
         }
@@ -3843,10 +4046,12 @@ export const CanvasView = memo(function CanvasView({
         const { edgeId, startX, startY, initialOffset, orientation } = stepBendDragRef.current;
         stepBendDragRef.current = null;
         const zoom = viewportRef.current.zoom;
-        const delta = orientation === "horizontal" ? (e.clientX - startX) / zoom : (e.clientY - startY) / zoom;
-        const newOffset = latestStepBendPosRef.current?.newOffset ?? Math.round(initialOffset + delta);
+        const delta =
+          orientation === "horizontal" ? (e.clientX - startX) / zoom : (e.clientY - startY) / zoom;
+        const newOffset =
+          latestStepBendPosRef.current?.newOffset ?? Math.round(initialOffset + delta);
         const nextEdges = latestDataRef.current.edges.map((edge) =>
-          edge.id === edgeId ? { ...edge, stepOffset: newOffset } : edge
+          edge.id === edgeId ? { ...edge, stepOffset: newOffset } : edge,
         );
         const nextData = { ...latestDataRef.current, edges: nextEdges };
         latestDataRef.current = nextData;
@@ -3882,10 +4087,10 @@ export const CanvasView = memo(function CanvasView({
             maxX,
             minY,
             maxY,
-            latestDataRef.current.nodes
+            latestDataRef.current.nodes,
           );
           setSelectedNodeIds(
-            isModifier ? new Set([...baseSelectionBeforeBoxRef.current, ...hitIds]) : hitIds
+            isModifier ? new Set([...baseSelectionBeforeBoxRef.current, ...hitIds]) : hitIds,
           );
           const currentNodesMap = new Map(latestDataRef.current.nodes.map((n) => [n.id, n]));
           const hitEdgeIds = computeBoxSelectionEdgeHits(
@@ -3894,10 +4099,12 @@ export const CanvasView = memo(function CanvasView({
             minY,
             maxY,
             latestDataRef.current.edges,
-            currentNodesMap
+            currentNodesMap,
           );
           setSelectedEdgeIds(
-            isModifier ? new Set([...baseEdgeSelectionBeforeBoxRef.current, ...hitEdgeIds]) : hitEdgeIds
+            isModifier
+              ? new Set([...baseEdgeSelectionBeforeBoxRef.current, ...hitEdgeIds])
+              : hitEdgeIds,
           );
         } else {
           setSelectedNodeIds(baseSelectionBeforeBoxRef.current);
@@ -3942,7 +4149,7 @@ export const CanvasView = memo(function CanvasView({
             const movedNodes = latestDataRef.current.nodes.map((n) =>
               n.id === updatedId
                 ? { ...n, x: Math.round(startX + dx), y: Math.round(startY + dy) }
-                : n
+                : n,
             );
             const moved = movedNodes.find((n) => n.id === updatedId);
             finalNodes = moved
@@ -3962,7 +4169,7 @@ export const CanvasView = memo(function CanvasView({
                     x: Math.round(startPos.startX + dx),
                     y: Math.round(startPos.startY + dy),
                   }
-                : n
+                : n,
             );
             finalNodes = resizeGridSpacing(
               movedNodes,
@@ -3971,7 +4178,7 @@ export const CanvasView = memo(function CanvasView({
               dx,
               dy,
               gs.baseGapX,
-              gs.baseGapY
+              gs.baseGapY,
             );
           } else {
             finalNodes = latestDataRef.current.nodes.map((n) => {
@@ -4130,7 +4337,9 @@ export const CanvasView = memo(function CanvasView({
         if (node && editable) {
           e.preventDefault();
           setEditingNodeId(node.id);
-          setEditingText(node.type === "text" ? node.text : node.type === "group" ? node.label || "" : "");
+          setEditingText(
+            node.type === "text" ? node.text : node.type === "group" ? node.label || "" : "",
+          );
         }
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
         if (e.shiftKey) {
@@ -4306,7 +4515,7 @@ export const CanvasView = memo(function CanvasView({
   // pipeline so that on-screen and exported colors stay perfectly in sync).
   const sourceDisplayColorMap = useMemo(
     () => computeSourceDisplayColorMap(data.nodes, data.edges),
-    [data.nodes, data.edges]
+    [data.nodes, data.edges],
   );
 
   const currentMultiRootNode = useMemo(() => {
@@ -4322,7 +4531,12 @@ export const CanvasView = memo(function CanvasView({
   const currentMultiRootTitle = useMemo(() => {
     if (!currentMultiRootNode) return "首选卡片";
     if (currentMultiRootNode.type === "text") {
-      return currentMultiRootNode.text.split("\n")[0].replace(/^[#\s*->]+/, "").slice(0, 8) || "卡片";
+      return (
+        currentMultiRootNode.text
+          .split("\n")[0]
+          .replace(/^[#\s*->]+/, "")
+          .slice(0, 8) || "卡片"
+      );
     }
     if (currentMultiRootNode.type === "group") {
       return currentMultiRootNode.label || "分组";
@@ -4338,8 +4552,12 @@ export const CanvasView = memo(function CanvasView({
 
   // Viewport frustum bounds for culling off-screen elements with a generous 600px buffer
   const viewportBounds = useMemo(() => {
-    const width = containerRef.current?.clientWidth || (typeof window !== "undefined" ? window.innerWidth : 1920);
-    const height = containerRef.current?.clientHeight || (typeof window !== "undefined" ? window.innerHeight : 1080);
+    const width =
+      containerRef.current?.clientWidth ||
+      (typeof window !== "undefined" ? window.innerWidth : 1920);
+    const height =
+      containerRef.current?.clientHeight ||
+      (typeof window !== "undefined" ? window.innerHeight : 1080);
     const zoom = viewport.zoom;
     const buffer = 600 / zoom;
     return {
@@ -4365,7 +4583,7 @@ export const CanvasView = memo(function CanvasView({
         node.y > viewportBounds.maxY
       );
     },
-    [selectedNodeIds, editingNodeId, hoveredNodeId, connectingState, viewportBounds]
+    [selectedNodeIds, editingNodeId, hoveredNodeId, connectingState, viewportBounds],
   );
 
   const isEdgeInViewport = useCallback(
@@ -4376,7 +4594,10 @@ export const CanvasView = memo(function CanvasView({
       const minX = Math.min(fromNode.x, toNode.x);
       const maxX = Math.max(fromNode.x + (fromNode.width || 300), toNode.x + (toNode.width || 300));
       const minY = Math.min(fromNode.y, toNode.y);
-      const maxY = Math.max(fromNode.y + (fromNode.height || 200), toNode.y + (toNode.height || 200));
+      const maxY = Math.max(
+        fromNode.y + (fromNode.height || 200),
+        toNode.y + (toNode.height || 200),
+      );
       return !(
         maxX < viewportBounds.minX ||
         minX > viewportBounds.maxX ||
@@ -4384,14 +4605,14 @@ export const CanvasView = memo(function CanvasView({
         minY > viewportBounds.maxY
       );
     },
-    [selectedEdgeIds, selectedNodeIds, editingEdgeId, viewportBounds]
+    [selectedEdgeIds, selectedNodeIds, editingEdgeId, viewportBounds],
   );
 
   // Seed for the batch custom-colour picker: reuse a custom colour already set
   // on one of the selected cards, otherwise start from a neutral blue.
   const batchCustomColor = useMemo(() => {
     const withHex = data.nodes.find(
-      (n) => selectedNodeIds.has(n.id) && typeof n.color === "string" && n.color.startsWith("#")
+      (n) => selectedNodeIds.has(n.id) && typeof n.color === "string" && n.color.startsWith("#"),
     );
     return (withHex?.color as string | undefined) ?? "#3b82f6";
   }, [data.nodes, selectedNodeIds]);
@@ -4399,7 +4620,7 @@ export const CanvasView = memo(function CanvasView({
   // Same idea for the selection of edges.
   const batchEdgeCustomColor = useMemo(() => {
     const withHex = data.edges.find(
-      (e) => selectedEdgeIds.has(e.id) && typeof e.color === "string" && e.color.startsWith("#")
+      (e) => selectedEdgeIds.has(e.id) && typeof e.color === "string" && e.color.startsWith("#"),
     );
     return (withHex?.color as string | undefined) ?? "#3b82f6";
   }, [data.edges, selectedEdgeIds]);
@@ -4421,7 +4642,7 @@ export const CanvasView = memo(function CanvasView({
         alt: title,
       });
     },
-    [currentFilePath]
+    [currentFilePath],
   );
 
   // ── Ring spacing controls ────────────────────────────────────────────────
@@ -4466,7 +4687,7 @@ export const CanvasView = memo(function CanvasView({
       latestDataRef.current = nextData;
       setData(nextData);
     },
-    []
+    [],
   );
 
   const handleRingSliderStart = useCallback(() => {
@@ -4480,7 +4701,7 @@ export const CanvasView = memo(function CanvasView({
       setRingRadiusDraft(radius);
       applyRingRadius(radius, info);
     },
-    [selectedRingInfo, applyRingRadius]
+    [selectedRingInfo, applyRingRadius],
   );
 
   const handleRingSliderCommit = useCallback(() => {
@@ -4564,8 +4785,8 @@ export const CanvasView = memo(function CanvasView({
             theme === "eink"
               ? "rgba(244, 241, 234, 0.95)"
               : !isDark
-              ? "rgba(255, 255, 255, 0.94)"
-              : "rgba(15, 23, 42, 0.9)",
+                ? "rgba(255, 255, 255, 0.94)"
+                : "rgba(15, 23, 42, 0.9)",
           backdropFilter: "blur(12px)",
           boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
           border: `1px solid ${colors.cardBorder}`,
@@ -4670,7 +4891,11 @@ export const CanvasView = memo(function CanvasView({
         <button
           className={`canvas-tool-btn ${isBoxSelectMode ? "active" : ""}`}
           onClick={() => setIsBoxSelectMode((prev) => !prev)}
-          title={isBoxSelectMode ? "退出框选模式 (可直接按 Shift+拖动)" : "开启框选模式 (或按住 Shift+鼠标拖动)"}
+          title={
+            isBoxSelectMode
+              ? "退出框选模式 (可直接按 Shift+拖动)"
+              : "开启框选模式 (或按住 Shift+鼠标拖动)"
+          }
           style={{
             ...toolBtnStyle(theme, colors),
             backgroundColor: isBoxSelectMode
@@ -4717,7 +4942,9 @@ export const CanvasView = memo(function CanvasView({
               }}
             >
               <Share2 size={13} />
-              <span className="canvas-btn-label">一对多关联 (以「{currentMultiRootTitle}」发起源)</span>
+              <span className="canvas-btn-label">
+                一对多关联 (以「{currentMultiRootTitle}」发起源)
+              </span>
             </button>
             <button
               className="canvas-tool-btn"
@@ -4784,8 +5011,7 @@ export const CanvasView = memo(function CanvasView({
                     minWidth: 196,
                     padding: "6px 0",
                     borderRadius: 10,
-                    backgroundColor:
-                      theme === "eink" ? "#f4f1ea" : !isDark ? "#ffffff" : "#1e293b",
+                    backgroundColor: theme === "eink" ? "#f4f1ea" : !isDark ? "#ffffff" : "#1e293b",
                     border: `1px solid ${colors.cardBorder}`,
                     boxShadow: "0 12px 36px rgba(0,0,0,0.22)",
                     fontSize: 12.5,
@@ -4796,10 +5022,12 @@ export const CanvasView = memo(function CanvasView({
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="canvas-ctx-section-label">中心对齐</div>
-                  {([
-                    ["horizontal", "水平中线对齐", AlignJustify],
-                    ["vertical", "垂直中线对齐", AlignCenter],
-                  ] as const).map(([dir, label, Icon]) => (
+                  {(
+                    [
+                      ["horizontal", "水平中线对齐", AlignJustify],
+                      ["vertical", "垂直中线对齐", AlignCenter],
+                    ] as const
+                  ).map(([dir, label, Icon]) => (
                     <div
                       key={dir}
                       className="canvas-ctx-item"
@@ -4826,13 +5054,10 @@ export const CanvasView = memo(function CanvasView({
                         <span style={{ fontWeight: 600 }}>环形对齐 (圆周等分)</span>
                       </div>
                       {selectedRingInfo && (
-                        <div
-                          className="canvas-ctx-slider"
-                          onMouseDown={(e) => e.stopPropagation()}
-                        >
+                        <div className="canvas-ctx-slider" onMouseDown={(e) => e.stopPropagation()}>
                           <div className="canvas-ctx-section-label">
-                            环半径 ·{" "}
-                            {Math.round(ringRadiusDraft ?? selectedRingInfo.layout.radius)}px
+                            环半径 · {Math.round(ringRadiusDraft ?? selectedRingInfo.layout.radius)}
+                            px
                           </div>
                           <input
                             type="range"
@@ -4868,13 +5093,15 @@ export const CanvasView = memo(function CanvasView({
 
                   <div className="canvas-ctx-divider" />
                   <div className="canvas-ctx-section-label">边缘对齐</div>
-                  {([
-                    ["left", "左对齐", AlignLeft],
-                    ["center", "水平居中", null],
-                    ["right", "右对齐", AlignRight],
-                    ["top", "顶端对齐", ArrowUpToLine],
-                    ["bottom", "底端对齐", ArrowDownToLine],
-                  ] as const).map(([dir, label, Icon]) => (
+                  {(
+                    [
+                      ["left", "左对齐", AlignLeft],
+                      ["center", "水平居中", null],
+                      ["right", "右对齐", AlignRight],
+                      ["top", "顶端对齐", ArrowUpToLine],
+                      ["bottom", "底端对齐", ArrowDownToLine],
+                    ] as const
+                  ).map(([dir, label, Icon]) => (
                     <div
                       key={dir}
                       className="canvas-ctx-item"
@@ -5014,18 +5241,25 @@ export const CanvasView = memo(function CanvasView({
           title={isPresentationMode ? "退出演示模式 (Esc)" : "进入白板分镜演示模式 (F5)"}
           style={{
             ...toolBtnStyle(theme, colors),
-            color: isPresentationMode ? (isDark ? "#818cf8" : isEink ? "#1e293b" : "#6366f1") : colors.cardText,
+            color: isPresentationMode
+              ? isDark
+                ? "#818cf8"
+                : isEink
+                  ? "#1e293b"
+                  : "#6366f1"
+              : colors.cardText,
             fontWeight: 600,
             backgroundColor: isPresentationMode
               ? isDark
                 ? "rgba(129, 140, 248, 0.22)"
                 : isEink
-                ? "rgba(30, 41, 59, 0.12)"
-                : "rgba(99, 102, 241, 0.15)"
+                  ? "rgba(30, 41, 59, 0.12)"
+                  : "rgba(99, 102, 241, 0.15)"
               : "transparent",
           }}
         >
-          <Play size={14} /> <span className="canvas-btn-label">{isPresentationMode ? "退出演示" : "演示 (F5)"}</span>
+          <Play size={14} />{" "}
+          <span className="canvas-btn-label">{isPresentationMode ? "退出演示" : "演示 (F5)"}</span>
         </button>
 
         <div style={{ width: 1, height: 18, background: colors.cardBorder }} />
@@ -5040,7 +5274,13 @@ export const CanvasView = memo(function CanvasView({
           <ZoomOut size={14} />
         </button>
         <span
-          style={{ fontSize: 12, fontWeight: 500, minWidth: 42, textAlign: "center", cursor: "pointer" }}
+          style={{
+            fontSize: 12,
+            fontWeight: 500,
+            minWidth: 42,
+            textAlign: "center",
+            cursor: "pointer",
+          }}
           onClick={() => setViewport((prev) => ({ ...prev, zoom: 1.0 }))}
           title="重置为 100% 缩放"
         >
@@ -5068,13 +5308,19 @@ export const CanvasView = memo(function CanvasView({
           title={isFullscreenActive ? "退出全屏 (F11 / Esc)" : "全屏沉浸白板 (F11)"}
           style={{
             ...toolBtnStyle(theme, colors),
-            color: isFullscreenActive ? (isDark ? "#818cf8" : isEink ? "#1e293b" : "#6366f1") : colors.cardText,
+            color: isFullscreenActive
+              ? isDark
+                ? "#818cf8"
+                : isEink
+                  ? "#1e293b"
+                  : "#6366f1"
+              : colors.cardText,
             backgroundColor: isFullscreenActive
               ? isDark
                 ? "rgba(129, 140, 248, 0.22)"
                 : isEink
-                ? "rgba(30, 41, 59, 0.12)"
-                : "rgba(99, 102, 241, 0.15)"
+                  ? "rgba(30, 41, 59, 0.12)"
+                  : "rgba(99, 102, 241, 0.15)"
               : "transparent",
           }}
         >
@@ -5107,7 +5353,9 @@ export const CanvasView = memo(function CanvasView({
           height: "100%",
           transform: `translate3d(${viewport.panX}px, ${viewport.panY}px, 0) scale(${viewport.zoom})`,
           transformOrigin: "0 0",
-          transition: isPresentationMode ? "transform 0.5s cubic-bezier(0.2, 0.9, 0.3, 1)" : undefined,
+          transition: isPresentationMode
+            ? "transform 0.5s cubic-bezier(0.2, 0.9, 0.3, 1)"
+            : undefined,
           backgroundImage: `radial-gradient(${colors.dotColor} 1.2px, transparent 1.2px)`,
           backgroundSize: "28px 28px",
           backfaceVisibility: "hidden",
@@ -5117,7 +5365,36 @@ export const CanvasView = memo(function CanvasView({
             zIndex stays BELOW the card layers: even when a connector's geometry
             passes over a card, the card (and its text) paints on top, so lines
             never cover labels or titles. */}
-        <CanvasEdgeLayer edges={data.edges} nodes={data.nodes} nodeMap={nodeMap} obstacles={canvasObstacles} selectedEdgeIds={selectedEdgeIds} hoveredNodeId={hoveredNodeId} connecting={connectingState} editable={editable} isDark={isDark} isEink={isEink} colorMap={sourceDisplayColorMap} colors={colors} presentation={{ active: isPresentationMode, sequence: presentationSequence, index: currentSlideIndex }} isInViewport={isEdgeInViewport} onSelectEdge={setSelectedEdgeIds} onClearNodeSelection={() => setSelectedNodeIds(new Set())} onStartEditingLabel={(edgeId) => { setEditingEdgeId(edgeId); setEditingEdgeLabel(data.edges.find((e) => e.id === edgeId)?.label || ''); }} onContextMenu={handleContextMenuEdge} onCycleAnchor={handleCycleEdgeAnchor} onStepBendMouseDown={handleStepBendMouseDown} onResetStepOffset={handleResetEdgeStepOffset} />
+        <CanvasEdgeLayer
+          edges={data.edges}
+          nodes={data.nodes}
+          nodeMap={nodeMap}
+          obstacles={canvasObstacles}
+          selectedEdgeIds={selectedEdgeIds}
+          hoveredNodeId={hoveredNodeId}
+          connecting={connectingState}
+          editable={editable}
+          isDark={isDark}
+          isEink={isEink}
+          colorMap={sourceDisplayColorMap}
+          colors={colors}
+          presentation={{
+            active: isPresentationMode,
+            sequence: presentationSequence,
+            index: currentSlideIndex,
+          }}
+          isInViewport={isEdgeInViewport}
+          onSelectEdge={setSelectedEdgeIds}
+          onClearNodeSelection={() => setSelectedNodeIds(new Set())}
+          onStartEditingLabel={(edgeId) => {
+            setEditingEdgeId(edgeId);
+            setEditingEdgeLabel(data.edges.find((e) => e.id === edgeId)?.label || "");
+          }}
+          onContextMenu={handleContextMenuEdge}
+          onCycleAnchor={handleCycleEdgeAnchor}
+          onStepBendMouseDown={handleStepBendMouseDown}
+          onResetStepOffset={handleResetEdgeStepOffset}
+        />
 
         {/* 3. MULTIMODAL CARDS LAYER */}
         {data.nodes.map((node) => {
@@ -5129,13 +5406,21 @@ export const CanvasView = memo(function CanvasView({
 
           // Render Group Container (z-index: 2)
           if (node.type === "group") {
-            const currentSlideNodeId = isPresentationMode ? presentationSequence[currentSlideIndex] : null;
+            const currentSlideNodeId = isPresentationMode
+              ? presentationSequence[currentSlideIndex]
+              : null;
             const currentSlideNode = currentSlideNodeId ? nodeMap.get(currentSlideNodeId) : null;
             const isCurrentGroupSlide = isPresentationMode && currentSlideNodeId === node.id;
             const isGroupContainingCurrentSlide =
-              isPresentationMode && currentSlideNode ? isNodeInsideGroup(currentSlideNode, node as CanvasGroupNode) : false;
+              isPresentationMode && currentSlideNode
+                ? isNodeInsideGroup(currentSlideNode, node as CanvasGroupNode)
+                : false;
 
-            const defaultGlowRgb = isDark ? "129, 140, 248" : isEink ? "30, 41, 59" : "99, 102, 241";
+            const defaultGlowRgb = isDark
+              ? "129, 140, 248"
+              : isEink
+                ? "30, 41, 59"
+                : "99, 102, 241";
             const defaultRingColor = isDark ? "#818cf8" : isEink ? "#1e293b" : "#6366f1";
             const customGlowRgb = palette?.stroke ? hexToRgbString(palette.stroke) : null;
             const slideGlowRgb = customGlowRgb || defaultGlowRgb;
@@ -5145,8 +5430,8 @@ export const CanvasView = memo(function CanvasView({
               ? isCurrentGroupSlide
                 ? 1
                 : isGroupContainingCurrentSlide
-                ? 0.88
-                : 0.12
+                  ? 0.88
+                  : 0.12
               : 1;
 
             const groupFilter = isPresentationMode
@@ -5159,15 +5444,16 @@ export const CanvasView = memo(function CanvasView({
               ? isCurrentGroupSlide
                 ? "translateZ(0) scale(1.004)"
                 : isGroupContainingCurrentSlide
-                ? "translateZ(0)"
-                : "translateZ(0) scale(0.99)"
+                  ? "translateZ(0)"
+                  : "translateZ(0) scale(0.99)"
               : undefined;
 
             const isGroupConnectingTarget =
               connectingState !== null && connectingState.fromNodeId !== node.id;
             const groupOutgoingInfo = nodeOutgoingMap.get(node.id);
             const isGroupOneToManySource = !!groupOutgoingInfo && groupOutgoingInfo.count >= 2;
-            const isGroupMultiRoot = selectedNodeIds.size >= 2 && currentMultiRootNode?.id === node.id;
+            const isGroupMultiRoot =
+              selectedNodeIds.size >= 2 && currentMultiRootNode?.id === node.id;
             return (
               <div
                 key={node.id}
@@ -5188,35 +5474,39 @@ export const CanvasView = memo(function CanvasView({
                       ? "2.5px solid #1e293b"
                       : `2.5px solid ${slideRingColor}`
                     : isGroupContainingCurrentSlide
-                    ? isEink
-                      ? "2px dashed #1e293b"
-                      : `2px solid rgba(${slideGlowRgb}, 0.5)`
-                    : isSelected
-                    ? "2px solid #f59e0b"
-                    : isGroupConnectingTarget && isHovered
-                    ? "2px solid #0284c7"
-                    : isGroupConnectingTarget
-                    ? "2px dashed rgba(2, 132, 199, 0.7)"
-                    : palette
-                    ? `2px dashed ${palette.stroke}`
-                    : `2px dashed ${colors.groupBorder}`,
+                      ? isEink
+                        ? "2px dashed #1e293b"
+                        : `2px solid rgba(${slideGlowRgb}, 0.5)`
+                      : isSelected
+                        ? "2px solid #f59e0b"
+                        : isGroupConnectingTarget && isHovered
+                          ? "2px solid #0284c7"
+                          : isGroupConnectingTarget
+                            ? "2px dashed rgba(2, 132, 199, 0.7)"
+                            : palette
+                              ? `2px dashed ${palette.stroke}`
+                              : `2px dashed ${colors.groupBorder}`,
                   backgroundColor: palette ? palette.bg : colors.groupBg,
                   boxShadow: isCurrentGroupSlide
                     ? isEink
                       ? "0 0 0 4px rgba(30, 41, 59, 0.3), 0 12px 36px rgba(0, 0, 0, 0.2)"
                       : `0 0 0 1.5px rgba(255, 255, 255, ${isDark ? "0.2" : "0.5"}), 0 0 0 4px rgba(${slideGlowRgb}, 0.38), 0 12px 36px rgba(${slideGlowRgb}, ${isDark ? "0.32" : "0.22"}), 0 24px 60px rgba(0, 0, 0, ${isDark ? "0.65" : "0.22"})`
                     : isGroupContainingCurrentSlide
-                    ? isEink
-                      ? "0 0 16px rgba(0,0,0,0.08)"
-                      : `0 0 28px rgba(${slideGlowRgb}, 0.16)`
-                    : isSelected
-                    ? "0 0 16px rgba(245,158,11,0.3)"
-                    : isGroupConnectingTarget && isHovered
-                    ? "0 0 0 3px rgba(2, 132, 199, 0.4), 0 0 16px rgba(2, 132, 199, 0.3)"
-                    : undefined,
+                      ? isEink
+                        ? "0 0 16px rgba(0,0,0,0.08)"
+                        : `0 0 28px rgba(${slideGlowRgb}, 0.16)`
+                      : isSelected
+                        ? "0 0 16px rgba(245,158,11,0.3)"
+                        : isGroupConnectingTarget && isHovered
+                          ? "0 0 0 3px rgba(2, 132, 199, 0.4), 0 0 16px rgba(2, 132, 199, 0.3)"
+                          : undefined,
                   display: "flex",
                   flexDirection: "column",
-                  cursor: isPresentationMode ? "pointer" : isGroupConnectingTarget ? "crosshair" : "move",
+                  cursor: isPresentationMode
+                    ? "pointer"
+                    : isGroupConnectingTarget
+                      ? "crosshair"
+                      : "move",
                   transition:
                     "opacity 0.4s cubic-bezier(0.2, 0.9, 0.3, 1), filter 0.4s cubic-bezier(0.2, 0.9, 0.3, 1), transform 0.4s cubic-bezier(0.2, 0.9, 0.3, 1), border-color 0.2s ease, box-shadow 0.25s ease",
                   ...((isCurrentGroupSlide
@@ -5344,7 +5634,15 @@ export const CanvasView = memo(function CanvasView({
                       }}
                     />
                   ) : (
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, overflow: "hidden" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        flex: 1,
+                        overflow: "hidden",
+                      }}
+                    >
                       <span
                         onDoubleClick={(e) => {
                           e.stopPropagation();
@@ -5352,8 +5650,14 @@ export const CanvasView = memo(function CanvasView({
                           setEditingNodeId(node.id);
                           setEditingText(node.label || "");
                         }}
-                        title={isPresentationMode ? node.label || "分组" : "双击重命名 | 拖动移动分组"}
-                        style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                        title={
+                          isPresentationMode ? node.label || "分组" : "双击重命名 | 拖动移动分组"
+                        }
+                        style={{
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
                       >
                         📁 {node.label || "未命名分组"}
                       </span>
@@ -5386,7 +5690,12 @@ export const CanvasView = memo(function CanvasView({
                           e.stopPropagation();
                           handleDeleteNode(node.id);
                         }}
-                        style={{ background: "none", border: "none", color: "#ffffff", cursor: "pointer" }}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          color: "#ffffff",
+                          cursor: "pointer",
+                        }}
                         title="删除分组"
                       >
                         <Trash2 size={13} />
@@ -5429,7 +5738,8 @@ export const CanvasView = memo(function CanvasView({
           }
 
           // Render Normal Cards (Text, File, Link) (z-index: 10)
-          const isConnectingTarget = connectingState !== null && connectingState.fromNodeId !== node.id;
+          const isConnectingTarget =
+            connectingState !== null && connectingState.fromNodeId !== node.id;
           const outgoingInfo = nodeOutgoingMap.get(node.id);
           const isOneToManySource = !!outgoingInfo && outgoingInfo.count >= 2;
           const effectiveSourceColor = sourceDisplayColorMap.get(node.id) || outgoingInfo?.color;
@@ -5437,7 +5747,8 @@ export const CanvasView = memo(function CanvasView({
             effectiveSourceColor && CANVAS_COLOR_PALETTES[effectiveSourceColor]
               ? CANVAS_COLOR_PALETTES[effectiveSourceColor]
               : undefined;
-          const isCurrentSlide = isPresentationMode && presentationSequence[currentSlideIndex] === node.id;
+          const isCurrentSlide =
+            isPresentationMode && presentationSequence[currentSlideIndex] === node.id;
           const isMultiRoot = selectedNodeIds.size >= 2 && currentMultiRootNode?.id === node.id;
 
           const defaultGlowRgb = isDark ? "129, 140, 248" : isEink ? "30, 41, 59" : "99, 102, 241";
@@ -5479,31 +5790,37 @@ export const CanvasView = memo(function CanvasView({
                     ? "2.5px solid #1e293b"
                     : `2.5px solid ${slideRingColor}`
                   : isSelected
-                  ? "2px solid #f59e0b"
-                  : isConnectingTarget && isHovered
-                  ? "2px solid #0284c7"
-                  : isConnectingTarget
-                  ? "2px dashed rgba(2, 132, 199, 0.6)"
-                  : isOneToManySource && sourceColorPalette
-                  ? `2px solid ${sourceColorPalette.stroke}`
-                  : palette
-                  ? `2px solid ${palette.stroke}`
-                  : `1px solid ${colors.cardBorder}`,
+                    ? "2px solid #f59e0b"
+                    : isConnectingTarget && isHovered
+                      ? "2px solid #0284c7"
+                      : isConnectingTarget
+                        ? "2px dashed rgba(2, 132, 199, 0.6)"
+                        : isOneToManySource && sourceColorPalette
+                          ? `2px solid ${sourceColorPalette.stroke}`
+                          : palette
+                            ? `2px solid ${palette.stroke}`
+                            : `1px solid ${colors.cardBorder}`,
                 boxShadow: isCurrentSlide
                   ? isEink
                     ? "0 0 0 4px rgba(30, 41, 59, 0.35), 0 16px 40px rgba(0, 0, 0, 0.25)"
                     : `0 0 0 1.5px rgba(255, 255, 255, ${isDark ? "0.2" : "0.5"}), 0 0 0 4px rgba(${slideGlowRgb}, 0.38), 0 12px 36px rgba(${slideGlowRgb}, ${isDark ? "0.32" : "0.22"}), 0 24px 60px rgba(0, 0, 0, ${isDark ? "0.65" : "0.22"})`
                   : isSelected
-                  ? "0 12px 36px rgba(245,158,11,0.35)"
-                  : isConnectingTarget && isHovered
-                  ? "0 0 0 3px rgba(2, 132, 199, 0.4), 0 12px 36px rgba(2, 132, 199, 0.35)"
-                  : isOneToManySource && sourceColorPalette
-                  ? `0 0 0 1px ${sourceColorPalette.stroke}88, 0 8px 24px ${sourceColorPalette.stroke}22`
-                  : colors.cardShadow,
+                    ? "0 12px 36px rgba(245,158,11,0.35)"
+                    : isConnectingTarget && isHovered
+                      ? "0 0 0 3px rgba(2, 132, 199, 0.4), 0 12px 36px rgba(2, 132, 199, 0.35)"
+                      : isOneToManySource && sourceColorPalette
+                        ? `0 0 0 1px ${sourceColorPalette.stroke}88, 0 8px 24px ${sourceColorPalette.stroke}22`
+                        : colors.cardShadow,
                 display: "flex",
                 flexDirection: "column",
                 color: colors.cardText,
-                cursor: isPresentationMode ? "pointer" : isConnectingTarget ? "crosshair" : isEditing ? "text" : "move",
+                cursor: isPresentationMode
+                  ? "pointer"
+                  : isConnectingTarget
+                    ? "crosshair"
+                    : isEditing
+                      ? "text"
+                      : "move",
                 transition:
                   "border-color 0.2s ease, box-shadow 0.25s ease, opacity 0.4s cubic-bezier(0.2, 0.9, 0.3, 1), filter 0.4s cubic-bezier(0.2, 0.9, 0.3, 1), transform 0.4s cubic-bezier(0.2, 0.9, 0.3, 1)",
                 ...((isCurrentSlide
@@ -5631,14 +5948,17 @@ export const CanvasView = memo(function CanvasView({
                           borderRadius: "50%",
                           backgroundColor: col.stroke,
                           cursor: "pointer",
-                          border: node.color === key ? "2px solid #f59e0b" : "1px solid rgba(0,0,0,0.2)",
+                          border:
+                            node.color === key ? "2px solid #f59e0b" : "1px solid rgba(0,0,0,0.2)",
                           transition: "transform 0.1s ease",
                         }}
                         title={col.label}
                       />
                     );
                   })}
-                  <div style={{ width: 1, height: 14, background: colors.cardBorder, margin: "0 2px" }} />
+                  <div
+                    style={{ width: 1, height: 14, background: colors.cardBorder, margin: "0 2px" }}
+                  />
                   {node.type === "text" && (
                     <button
                       onClick={() => {
@@ -5707,15 +6027,14 @@ export const CanvasView = memo(function CanvasView({
                     </span>
                   ) : (
                     <>
-                      {node.type === "file" && (
+                      {node.type === "file" &&
                         (() => {
                           const mType = getMediaFileType(node.file);
                           if (mType === "image") return <ImageIcon size={13} color="#0284c7" />;
                           if (mType === "audio") return <Music size={13} color="#a855f7" />;
                           if (mType === "video") return <Video size={13} color="#ef4444" />;
                           return <FileText size={13} color="#10b981" />;
-                        })()
-                      )}
+                        })()}
                       {node.type === "text" && <Edit2 size={13} color={colors.edgeColor} />}
                       {node.type === "link" && <Link size={13} color="#a855f7" />}
                       <span style={{ fontSize: 11, fontWeight: 600 }}>
@@ -5723,11 +6042,11 @@ export const CanvasView = memo(function CanvasView({
                           ? node.file.startsWith("data:")
                             ? "嵌入图片"
                             : node.file.length > 28
-                            ? "..." + node.file.slice(-24)
-                            : node.file
+                              ? "..." + node.file.slice(-24)
+                              : node.file
                           : node.type === "text"
-                          ? "便签卡片"
-                          : "外部参考"}
+                            ? "便签卡片"
+                            : "外部参考"}
                       </span>
                       {isOneToManySource && (
                         <span
@@ -5740,7 +6059,9 @@ export const CanvasView = memo(function CanvasView({
                             fontWeight: 700,
                             padding: "1px 6px",
                             borderRadius: 8,
-                            backgroundColor: sourceColorPalette ? sourceColorPalette.bg : "rgba(16, 185, 129, 0.15)",
+                            backgroundColor: sourceColorPalette
+                              ? sourceColorPalette.bg
+                              : "rgba(16, 185, 129, 0.15)",
                             color: sourceColorPalette ? sourceColorPalette.stroke : "#10b981",
                             border: `1px solid ${sourceColorPalette ? sourceColorPalette.stroke : "#10b981"}`,
                             marginLeft: 4,
@@ -5978,7 +6299,11 @@ export const CanvasView = memo(function CanvasView({
                           }}
                         >
                           <Music size={28} color="#a855f7" />
-                          <audio src={resolveMediaSrc(node.file, currentFilePath)} controls style={{ width: "95%" }} />
+                          <audio
+                            src={resolveMediaSrc(node.file, currentFilePath)}
+                            controls
+                            style={{ width: "95%" }}
+                          />
                         </div>
                       );
                     }
@@ -6036,30 +6361,115 @@ export const CanvasView = memo(function CanvasView({
         })}
 
         {/* 4. EDGE LABELS OVERLAY LAYER (z-index: 25 - never occluded by cards) */}
-        <CanvasEdgeLabelLayer edges={data.edges} nodes={data.nodes} nodeMap={nodeMap} obstacles={canvasObstacles} selectedEdgeIds={selectedEdgeIds} editingEdgeId={editingEdgeId} editingLabel={editingEdgeLabel} onEditingLabelChange={setEditingEdgeLabel} onStartEditing={(edgeId) => { setEditingEdgeId(edgeId); setEditingEdgeLabel(data.edges.find((e) => e.id === edgeId)?.label || ''); }} onStopEditing={() => setEditingEdgeId(null)} onSelectionChange={setSelectedEdgeIds} onClearNodeSelection={() => setSelectedNodeIds(new Set())} onSaveLabel={handleSaveEdgeLabel} onContextMenu={handleContextMenuEdge} isInViewport={isEdgeInViewport} colorMap={sourceDisplayColorMap} colors={colors} isDark={isDark} presentation={{ active: isPresentationMode, sequence: presentationSequence, index: currentSlideIndex }} />
+        <CanvasEdgeLabelLayer
+          edges={data.edges}
+          nodes={data.nodes}
+          nodeMap={nodeMap}
+          obstacles={canvasObstacles}
+          selectedEdgeIds={selectedEdgeIds}
+          editingEdgeId={editingEdgeId}
+          editingLabel={editingEdgeLabel}
+          onEditingLabelChange={setEditingEdgeLabel}
+          onStartEditing={(edgeId) => {
+            setEditingEdgeId(edgeId);
+            setEditingEdgeLabel(data.edges.find((e) => e.id === edgeId)?.label || "");
+          }}
+          onStopEditing={() => setEditingEdgeId(null)}
+          onSelectionChange={setSelectedEdgeIds}
+          onClearNodeSelection={() => setSelectedNodeIds(new Set())}
+          onSaveLabel={handleSaveEdgeLabel}
+          onContextMenu={handleContextMenuEdge}
+          isInViewport={isEdgeInViewport}
+          colorMap={sourceDisplayColorMap}
+          colors={colors}
+          isDark={isDark}
+          presentation={{
+            active: isPresentationMode,
+            sequence: presentationSequence,
+            index: currentSlideIndex,
+          }}
+        />
       </div>
 
       {/* 5. BOTTOM-RIGHT INTERACTIVE MINIMAP */}
-      <CanvasMinimap data={data} viewport={viewport} theme={theme} isDark={isDark} colors={colors} nodeMap={nodeMap} selectedNodeIds={selectedNodeIds} bounds={minimapBBox} scale={minimapScale} offsetX={minimapOffsetX} offsetY={minimapOffsetY} containerEl={containerRef.current} onNavigate={handleMinimapNavigate} />
+      <CanvasMinimap
+        data={data}
+        viewport={viewport}
+        theme={theme}
+        isDark={isDark}
+        colors={colors}
+        nodeMap={nodeMap}
+        selectedNodeIds={selectedNodeIds}
+        bounds={minimapBBox}
+        scale={minimapScale}
+        offsetX={minimapOffsetX}
+        offsetY={minimapOffsetY}
+        containerEl={containerRef.current}
+        onNavigate={handleMinimapNavigate}
+      />
 
       {/* 5. MODAL: INSERT NOTE FILE PICKER */}
       {showFilePicker && (
-      <FilePickerModal chapters={allChapters} searchKeyword={searchKeyword} onSearchChange={setSearchKeyword} theme={theme} colors={colors} onPick={handleAddFileCard} onClose={() => setShowFilePicker(false)} />
+        <FilePickerModal
+          chapters={allChapters}
+          searchKeyword={searchKeyword}
+          onSearchChange={setSearchKeyword}
+          theme={theme}
+          colors={colors}
+          onPick={handleAddFileCard}
+          onClose={() => setShowFilePicker(false)}
+        />
       )}
 
       {/* 6. MODAL: EXTRACT CANVAS TO ARTICLE PREVIEW */}
       {showExtractModal && (
-      <ExtractModal markdown={extractedMarkdown} theme={theme} colors={colors} copied={copiedNotification} canSaveAsNote={Boolean(onExtractToNote)} onCopy={handleCopyExtracted} onSaveAsNote={handleSaveAsNote} onClose={() => setShowExtractModal(false)} />
+        <ExtractModal
+          markdown={extractedMarkdown}
+          theme={theme}
+          colors={colors}
+          copied={copiedNotification}
+          canSaveAsNote={Boolean(onExtractToNote)}
+          onCopy={handleCopyExtracted}
+          onSaveAsNote={handleSaveAsNote}
+          onClose={() => setShowExtractModal(false)}
+        />
       )}
 
       {/* 6.5. MODAL: EXPORT CANVAS AS IMAGE */}
       {showExportModal && (
-      <ExportModal nodeCount={data.nodes.length} edgeCount={data.edges.length} format={exportFormat} onFormatChange={setExportFormat} background={exportBg} onBackgroundChange={setExportBg} isExporting={isExporting} copyFeedback={exportCopyFeedback} theme={theme} colors={colors} onCopy={handleCopyExport} onDownload={handleDownloadExport} onClose={() => setShowExportModal(false)} />
+        <ExportModal
+          nodeCount={data.nodes.length}
+          edgeCount={data.edges.length}
+          format={exportFormat}
+          onFormatChange={setExportFormat}
+          background={exportBg}
+          onBackgroundChange={setExportBg}
+          isExporting={isExporting}
+          copyFeedback={exportCopyFeedback}
+          theme={theme}
+          colors={colors}
+          onCopy={handleCopyExport}
+          onDownload={handleDownloadExport}
+          onClose={() => setShowExportModal(false)}
+        />
       )}
 
       {/* 6.6. MODAL: BATCH SPAWN BRANCHES */}
       {spawnModalState && (
-      <SpawnBranchModal count={spawnModalState.count} direction={spawnModalState.direction} onCountChange={(count) => setSpawnModalState((prev) => (prev ? { ...prev, count } : null))} onDirectionChange={(direction) => setSpawnModalState((prev) => (prev ? { ...prev, direction } : null))} theme={theme} colors={colors} onConfirm={handleConfirmBatchSpawn} onClose={() => setSpawnModalState(null)} />
+        <SpawnBranchModal
+          count={spawnModalState.count}
+          direction={spawnModalState.direction}
+          onCountChange={(count) =>
+            setSpawnModalState((prev) => (prev ? { ...prev, count } : null))
+          }
+          onDirectionChange={(direction) =>
+            setSpawnModalState((prev) => (prev ? { ...prev, direction } : null))
+          }
+          theme={theme}
+          colors={colors}
+          onConfirm={handleConfirmBatchSpawn}
+          onClose={() => setSpawnModalState(null)}
+        />
       )}
 
       {/* 7. MARQUEE SELECTION BOX */}
@@ -6106,237 +6516,319 @@ export const CanvasView = memo(function CanvasView({
             onWheel={(e) => e.stopPropagation()}
           >
             {contextMenu.targetEdgeId ? (
-            <EdgeContextMenu data={data} nodeMap={nodeMap} contextMenu={contextMenu} selectedEdgeIds={selectedEdgeIds} batchEdgeCustomColor={batchEdgeCustomColor} colors={colors} isDark={isDark} setContextMenu={setContextMenu} handleToggleEdgeStyle={handleToggleEdgeStyle} handleToggleEdgeArrow={handleToggleEdgeArrow} handleToggleEdgeStrokePattern={handleToggleEdgeStrokePattern} handleReverseEdge={handleReverseEdge} handleEdgeColorChange={handleEdgeColorChange} handleEdgeLabelChange={handleEdgeLabelChange} handleEdgeLabelShapeChange={handleEdgeLabelShapeChange} handleSetEdgeAnchorSide={handleSetEdgeAnchorSide} handleDeleteEdge={handleDeleteEdge} handleBatchSetEdgeStyle={handleBatchSetEdgeStyle} handleBatchCycleStrokePattern={handleBatchCycleStrokePattern} handleBatchToggleArrow={handleBatchToggleArrow} handleBatchSetEdgeColor={handleBatchSetEdgeColor} handleBatchDeleteEdges={handleBatchDeleteEdges} handleBatchReverseEdges={handleBatchReverseEdges} previewBatchEdgeColor={previewBatchEdgeColor} previewEdgeColor={previewEdgeColor} debounceCommitColorPick={debounceCommitColorPick} />
+              <EdgeContextMenu
+                data={data}
+                nodeMap={nodeMap}
+                contextMenu={contextMenu}
+                selectedEdgeIds={selectedEdgeIds}
+                batchEdgeCustomColor={batchEdgeCustomColor}
+                colors={colors}
+                isDark={isDark}
+                setContextMenu={setContextMenu}
+                handleToggleEdgeStyle={handleToggleEdgeStyle}
+                handleToggleEdgeArrow={handleToggleEdgeArrow}
+                handleToggleEdgeStrokePattern={handleToggleEdgeStrokePattern}
+                handleReverseEdge={handleReverseEdge}
+                handleEdgeColorChange={handleEdgeColorChange}
+                handleEdgeLabelChange={handleEdgeLabelChange}
+                handleEdgeLabelShapeChange={handleEdgeLabelShapeChange}
+                handleSetEdgeAnchorSide={handleSetEdgeAnchorSide}
+                handleDeleteEdge={handleDeleteEdge}
+                handleBatchSetEdgeStyle={handleBatchSetEdgeStyle}
+                handleBatchCycleStrokePattern={handleBatchCycleStrokePattern}
+                handleBatchToggleArrow={handleBatchToggleArrow}
+                handleBatchSetEdgeColor={handleBatchSetEdgeColor}
+                handleBatchDeleteEdges={handleBatchDeleteEdges}
+                handleBatchReverseEdges={handleBatchReverseEdges}
+                previewBatchEdgeColor={previewBatchEdgeColor}
+                previewEdgeColor={previewEdgeColor}
+                debounceCommitColorPick={debounceCommitColorPick}
+              />
             ) : contextMenu.targetNodeId ? (
-            <NodeContextMenu data={data} contextMenu={contextMenu} selectedNodeIds={selectedNodeIds} connectedInternalEdges={connectedInternalEdges} batchCustomColor={batchCustomColor} colors={colors} setContextMenu={setContextMenu} setSpawnModalState={setSpawnModalState} handleAlignSelected={handleAlignSelected} handleSpawnConnectedChild={handleSpawnConnectedChild} handleDisconnectSelectedNodesEdges={handleDisconnectSelectedNodesEdges} handleDisconnectNodeEdges={handleDisconnectNodeEdges} handleCopyNodeText={handleCopyNodeText} handleCopyNodeWikilink={handleCopyNodeWikilink} handleExtractCardToNote={handleExtractCardToNote} handleSelectGroupNodes={handleSelectGroupNodes} handleFitGroupSize={handleFitGroupSize} handleDissolveGroup={handleDissolveGroup} handleDeleteGroupWithContents={handleDeleteGroupWithContents} handleGroupSelectedNodes={handleGroupSelectedNodes} handleResetNodeSize={handleResetNodeSize} handleNodeColorChange={handleNodeColorChange} handleBatchColorChange={handleBatchColorChange} handleDeleteNode={handleDeleteNode} handleDeleteSelected={handleDeleteSelected} handleDuplicateNode={handleDuplicateNode} handleDuplicateSelected={handleDuplicateSelected} handleBringToFront={handleBringToFront} handleSendToBack={handleSendToBack} handleConnectSelectedNodes={handleConnectSelectedNodes} handleConnectOneToMany={handleConnectOneToMany} handleConnectLoopNodes={handleConnectLoopNodes} previewNodeColor={previewNodeColor} previewBatchNodeColor={previewBatchNodeColor} debounceCommitColorPick={debounceCommitColorPick} editable={editable} setEditingNodeId={setEditingNodeId} setEditingText={setEditingText} onExtractToNote={onExtractToNote} onOpenFile={onOpenFile} />
-          ) : (
-            // 3. Canvas Background Context Menu
-            <>
-              <div
-                className="canvas-ctx-header"
-                style={{
-                  padding: "6px 12px 6px",
-                  fontSize: 11,
-                  fontWeight: 600,
-                  color: colors.edgeColor,
-                  borderBottom: `1px solid ${colors.cardHeaderBorder}`,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}
-              >
-                <span>白板快捷菜单</span>
-                <button
-                  onClick={() => setContextMenu(null)}
+              <NodeContextMenu
+                data={data}
+                contextMenu={contextMenu}
+                selectedNodeIds={selectedNodeIds}
+                connectedInternalEdges={connectedInternalEdges}
+                batchCustomColor={batchCustomColor}
+                colors={colors}
+                setContextMenu={setContextMenu}
+                setSpawnModalState={setSpawnModalState}
+                handleAlignSelected={handleAlignSelected}
+                handleSpawnConnectedChild={handleSpawnConnectedChild}
+                handleDisconnectSelectedNodesEdges={handleDisconnectSelectedNodesEdges}
+                handleDisconnectNodeEdges={handleDisconnectNodeEdges}
+                handleCopyNodeText={handleCopyNodeText}
+                handleCopyNodeWikilink={handleCopyNodeWikilink}
+                handleExtractCardToNote={handleExtractCardToNote}
+                handleSelectGroupNodes={handleSelectGroupNodes}
+                handleFitGroupSize={handleFitGroupSize}
+                handleDissolveGroup={handleDissolveGroup}
+                handleDeleteGroupWithContents={handleDeleteGroupWithContents}
+                handleGroupSelectedNodes={handleGroupSelectedNodes}
+                handleResetNodeSize={handleResetNodeSize}
+                handleNodeColorChange={handleNodeColorChange}
+                handleBatchColorChange={handleBatchColorChange}
+                handleDeleteNode={handleDeleteNode}
+                handleDeleteSelected={handleDeleteSelected}
+                handleDuplicateNode={handleDuplicateNode}
+                handleDuplicateSelected={handleDuplicateSelected}
+                handleBringToFront={handleBringToFront}
+                handleSendToBack={handleSendToBack}
+                handleConnectSelectedNodes={handleConnectSelectedNodes}
+                handleConnectOneToMany={handleConnectOneToMany}
+                handleConnectLoopNodes={handleConnectLoopNodes}
+                previewNodeColor={previewNodeColor}
+                previewBatchNodeColor={previewBatchNodeColor}
+                debounceCommitColorPick={debounceCommitColorPick}
+                editable={editable}
+                setEditingNodeId={setEditingNodeId}
+                setEditingText={setEditingText}
+                onExtractToNote={onExtractToNote}
+                onOpenFile={onOpenFile}
+              />
+            ) : (
+              // 3. Canvas Background Context Menu
+              <>
+                <div
+                  className="canvas-ctx-header"
                   style={{
-                    background: "none",
-                    border: "none",
-                    padding: 0,
-                    cursor: "pointer",
-                    color: colors.cardText,
-                    opacity: 0.6,
+                    padding: "6px 12px 6px",
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: colors.edgeColor,
+                    borderBottom: `1px solid ${colors.cardHeaderBorder}`,
                     display: "flex",
                     alignItems: "center",
+                    justifyContent: "space-between",
                   }}
-                  title="关闭菜单"
                 >
-                  <X size={12} />
-                </button>
-              </div>
-
-              {editable && (
-                <>
-                  <div className="canvas-ctx-section-label">🎯 新建与引入</div>
-                  <div
-                    className="canvas-ctx-item"
-                    onClick={() => handleAddTextCard(contextMenu.canvasX, contextMenu.canvasY)}
-                  >
-                    <Plus size={13} />
-                    <span>在此处新建文本卡片</span>
-                  </div>
-                  <div
-                    className="canvas-ctx-item"
-                    onClick={() => handlePasteClipboardAsCard(contextMenu.canvasX, contextMenu.canvasY)}
-                  >
-                    <Clipboard size={13} color="#10b981" />
-                    <span>从剪贴板粘贴为卡片</span>
-                    <span className="canvas-ctx-shortcut">Ctrl+V</span>
-                  </div>
-                  <div
-                    className="canvas-ctx-item"
-                    onClick={() => {
-                      handleTriggerInsertImage(contextMenu.canvasX, contextMenu.canvasY);
-                      setContextMenu(null);
+                  <span>白板快捷菜单</span>
+                  <button
+                    onClick={() => setContextMenu(null)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      padding: 0,
+                      cursor: "pointer",
+                      color: colors.cardText,
+                      opacity: 0.6,
+                      display: "flex",
+                      alignItems: "center",
                     }}
+                    title="关闭菜单"
                   >
-                    <ImageIcon size={13} color="#0284c7" />
-                    <span>插入图片...</span>
-                  </div>
-                  <div
-                    className="canvas-ctx-item"
-                    onClick={() => {
-                      handleTriggerInsertVideo(contextMenu.canvasX, contextMenu.canvasY);
-                      setContextMenu(null);
-                    }}
-                  >
-                    <Video size={13} color="#ef4444" />
-                    <span>插入视频...</span>
-                  </div>
-                  <div
-                    className="canvas-ctx-item"
-                    onClick={() => {
-                      handleTriggerInsertAudio(contextMenu.canvasX, contextMenu.canvasY);
-                      setContextMenu(null);
-                    }}
-                  >
-                    <Music size={13} color="#a855f7" />
-                    <span>插入音频...</span>
-                  </div>
-                  <div
-                    className="canvas-ctx-item"
-                    onClick={() => {
-                      setShowFilePicker(true);
-                      setContextMenu(null);
-                    }}
-                  >
-                    <FileText size={13} />
-                    <span>引入知识库笔记...</span>
-                  </div>
-                  <div
-                    className="canvas-ctx-item"
-                    onClick={() => handleAddGroup(contextMenu.canvasX, contextMenu.canvasY)}
-                  >
-                    <Boxes size={13} />
-                    <span>在此处新建分组容器</span>
-                  </div>
-                  <div className="canvas-ctx-divider" />
-                </>
-              )}
-
-              <div className="canvas-ctx-section-label">📐 视图与选择</div>
-              <div
-                className="canvas-ctx-item"
-                onClick={() => {
-                  setIsBoxSelectMode((prev) => !prev);
-                  setContextMenu(null);
-                }}
-              >
-                <BoxSelect size={13} />
-                <span>{isBoxSelectMode ? "关闭框选模式" : "框选卡片 (Shift+拖动)"}</span>
-              </div>
-
-              <div className="canvas-ctx-item" onClick={handleSelectAll}>
-                <CheckSquare size={13} />
-                <span>全选所有卡片</span>
-                <span className="canvas-ctx-shortcut">Ctrl+A</span>
-              </div>
-
-              {data.edges.length > 0 && (
-                <div className="canvas-ctx-item" onClick={handleSelectAllEdges}>
-                  <Link size={13} color="#0284c7" />
-                  <span>全选所有连线 ({data.edges.length} 条)</span>
+                    <X size={12} />
+                  </button>
                 </div>
-              )}
 
-              {editable && (
-                <div className="canvas-ctx-item" onClick={handleAlignToGrid}>
-                  <Grid size={13} color="#0284c7" />
-                  <span>对齐所有卡片到网格 (20px)</span>
+                {editable && (
+                  <>
+                    <div className="canvas-ctx-section-label">🎯 新建与引入</div>
+                    <div
+                      className="canvas-ctx-item"
+                      onClick={() => handleAddTextCard(contextMenu.canvasX, contextMenu.canvasY)}
+                    >
+                      <Plus size={13} />
+                      <span>在此处新建文本卡片</span>
+                    </div>
+                    <div
+                      className="canvas-ctx-item"
+                      onClick={() =>
+                        handlePasteClipboardAsCard(contextMenu.canvasX, contextMenu.canvasY)
+                      }
+                    >
+                      <Clipboard size={13} color="#10b981" />
+                      <span>从剪贴板粘贴为卡片</span>
+                      <span className="canvas-ctx-shortcut">Ctrl+V</span>
+                    </div>
+                    <div
+                      className="canvas-ctx-item"
+                      onClick={() => {
+                        handleTriggerInsertImage(contextMenu.canvasX, contextMenu.canvasY);
+                        setContextMenu(null);
+                      }}
+                    >
+                      <ImageIcon size={13} color="#0284c7" />
+                      <span>插入图片...</span>
+                    </div>
+                    <div
+                      className="canvas-ctx-item"
+                      onClick={() => {
+                        handleTriggerInsertVideo(contextMenu.canvasX, contextMenu.canvasY);
+                        setContextMenu(null);
+                      }}
+                    >
+                      <Video size={13} color="#ef4444" />
+                      <span>插入视频...</span>
+                    </div>
+                    <div
+                      className="canvas-ctx-item"
+                      onClick={() => {
+                        handleTriggerInsertAudio(contextMenu.canvasX, contextMenu.canvasY);
+                        setContextMenu(null);
+                      }}
+                    >
+                      <Music size={13} color="#a855f7" />
+                      <span>插入音频...</span>
+                    </div>
+                    <div
+                      className="canvas-ctx-item"
+                      onClick={() => {
+                        setShowFilePicker(true);
+                        setContextMenu(null);
+                      }}
+                    >
+                      <FileText size={13} />
+                      <span>引入知识库笔记...</span>
+                    </div>
+                    <div
+                      className="canvas-ctx-item"
+                      onClick={() => handleAddGroup(contextMenu.canvasX, contextMenu.canvasY)}
+                    >
+                      <Boxes size={13} />
+                      <span>在此处新建分组容器</span>
+                    </div>
+                    <div className="canvas-ctx-divider" />
+                  </>
+                )}
+
+                <div className="canvas-ctx-section-label">📐 视图与选择</div>
+                <div
+                  className="canvas-ctx-item"
+                  onClick={() => {
+                    setIsBoxSelectMode((prev) => !prev);
+                    setContextMenu(null);
+                  }}
+                >
+                  <BoxSelect size={13} />
+                  <span>{isBoxSelectMode ? "关闭框选模式" : "框选卡片 (Shift+拖动)"}</span>
                 </div>
-              )}
 
-              <div
-                className="canvas-ctx-item"
-                onClick={() => {
-                  handleZoomToFit();
-                  setContextMenu(null);
-                }}
-              >
-                <Maximize2 size={13} />
-                <span>自适应全图</span>
-              </div>
-
-              <div
-                className="canvas-ctx-item"
-                onClick={() => {
-                  setViewport((prev) => ({ ...prev, zoom: 1.0 }));
-                  setContextMenu(null);
-                }}
-              >
-                <ZoomIn size={13} />
-                <span>重置为 100% 缩放</span>
-              </div>
-
-              <div className="canvas-ctx-divider" />
-              <div className="canvas-ctx-section-label">⚡ 历史与保存</div>
-
-              <div
-                className="canvas-ctx-item"
-                onClick={() => {
-                  handleUndo();
-                  setContextMenu(null);
-                }}
-                style={{ opacity: history.past.length > 0 ? 1 : 0.4 }}
-              >
-                <RotateCcw size={13} />
-                <span>撤销上一步</span>
-                <span className="canvas-ctx-shortcut">Ctrl+Z</span>
-              </div>
-
-              <div
-                className="canvas-ctx-item"
-                onClick={() => {
-                  handleRedo();
-                  setContextMenu(null);
-                }}
-                style={{ opacity: history.future.length > 0 ? 1 : 0.4 }}
-              >
-                <RotateCw size={13} />
-                <span>重做下一步</span>
-                <span className="canvas-ctx-shortcut">Ctrl+Y</span>
-              </div>
-
-              {onSave && (
-                <div className="canvas-ctx-item" onClick={handleSave}>
-                  <Save size={13} />
-                  <span>保存白板</span>
-                  <span className="canvas-ctx-shortcut">Ctrl+S</span>
+                <div className="canvas-ctx-item" onClick={handleSelectAll}>
+                  <CheckSquare size={13} />
+                  <span>全选所有卡片</span>
+                  <span className="canvas-ctx-shortcut">Ctrl+A</span>
                 </div>
-              )}
 
-              <div className="canvas-ctx-divider" />
-              <div className="canvas-ctx-section-label">📦 导出与发布</div>
+                {data.edges.length > 0 && (
+                  <div className="canvas-ctx-item" onClick={handleSelectAllEdges}>
+                    <Link size={13} color="#0284c7" />
+                    <span>全选所有连线 ({data.edges.length} 条)</span>
+                  </div>
+                )}
 
-              <div
-                className="canvas-ctx-item"
-                onClick={() => {
-                  handleOpenExtractModal();
-                  setContextMenu(null);
-                }}
-              >
-                <BookOpen size={13} color="#10b981" />
-                <span>萃取为长文专著...</span>
-              </div>
+                {editable && (
+                  <div className="canvas-ctx-item" onClick={handleAlignToGrid}>
+                    <Grid size={13} color="#0284c7" />
+                    <span>对齐所有卡片到网格 (20px)</span>
+                  </div>
+                )}
 
-              <div
-                className="canvas-ctx-item"
-                onClick={() => {
-                  setShowExportModal(true);
-                  setContextMenu(null);
-                }}
-              >
-                <ImageIcon size={13} color="#0284c7" />
-                <span>📸 导出白板为图片...</span>
-              </div>
-            </>
-          )}
+                <div
+                  className="canvas-ctx-item"
+                  onClick={() => {
+                    handleZoomToFit();
+                    setContextMenu(null);
+                  }}
+                >
+                  <Maximize2 size={13} />
+                  <span>自适应全图</span>
+                </div>
+
+                <div
+                  className="canvas-ctx-item"
+                  onClick={() => {
+                    setViewport((prev) => ({ ...prev, zoom: 1.0 }));
+                    setContextMenu(null);
+                  }}
+                >
+                  <ZoomIn size={13} />
+                  <span>重置为 100% 缩放</span>
+                </div>
+
+                <div className="canvas-ctx-divider" />
+                <div className="canvas-ctx-section-label">⚡ 历史与保存</div>
+
+                <div
+                  className="canvas-ctx-item"
+                  onClick={() => {
+                    handleUndo();
+                    setContextMenu(null);
+                  }}
+                  style={{ opacity: history.past.length > 0 ? 1 : 0.4 }}
+                >
+                  <RotateCcw size={13} />
+                  <span>撤销上一步</span>
+                  <span className="canvas-ctx-shortcut">Ctrl+Z</span>
+                </div>
+
+                <div
+                  className="canvas-ctx-item"
+                  onClick={() => {
+                    handleRedo();
+                    setContextMenu(null);
+                  }}
+                  style={{ opacity: history.future.length > 0 ? 1 : 0.4 }}
+                >
+                  <RotateCw size={13} />
+                  <span>重做下一步</span>
+                  <span className="canvas-ctx-shortcut">Ctrl+Y</span>
+                </div>
+
+                {onSave && (
+                  <div className="canvas-ctx-item" onClick={handleSave}>
+                    <Save size={13} />
+                    <span>保存白板</span>
+                    <span className="canvas-ctx-shortcut">Ctrl+S</span>
+                  </div>
+                )}
+
+                <div className="canvas-ctx-divider" />
+                <div className="canvas-ctx-section-label">📦 导出与发布</div>
+
+                <div
+                  className="canvas-ctx-item"
+                  onClick={() => {
+                    handleOpenExtractModal();
+                    setContextMenu(null);
+                  }}
+                >
+                  <BookOpen size={13} color="#10b981" />
+                  <span>萃取为长文专著...</span>
+                </div>
+
+                <div
+                  className="canvas-ctx-item"
+                  onClick={() => {
+                    setShowExportModal(true);
+                    setContextMenu(null);
+                  }}
+                >
+                  <ImageIcon size={13} color="#0284c7" />
+                  <span>📸 导出白板为图片...</span>
+                </div>
+              </>
+            )}
           </div>,
-          document.body
+          document.body,
         )}
 
       {/* 8.5 Floating Batch Toolbar for Multiple Selected Edges */}
       {selectedEdgeIds.size > 1 && (
-      <CanvasEdgeBatchToolbar count={selectedEdgeIds.size} theme={theme} isDark={isDark} colors={colors} onSetStyle={handleBatchSetEdgeStyle} onCycleStrokePattern={handleBatchCycleStrokePattern} onToggleArrow={handleBatchToggleArrow} onReverse={handleBatchReverseEdges} onSetColor={handleBatchSetEdgeColor} onDelete={handleBatchDeleteEdges} onClear={() => setSelectedEdgeIds(new Set())} />
+        <CanvasEdgeBatchToolbar
+          count={selectedEdgeIds.size}
+          theme={theme}
+          isDark={isDark}
+          colors={colors}
+          onSetStyle={handleBatchSetEdgeStyle}
+          onCycleStrokePattern={handleBatchCycleStrokePattern}
+          onToggleArrow={handleBatchToggleArrow}
+          onReverse={handleBatchReverseEdges}
+          onSetColor={handleBatchSetEdgeColor}
+          onDelete={handleBatchDeleteEdges}
+          onClear={() => setSelectedEdgeIds(new Set())}
+        />
       )}
 
       {/* 8.6 Suggestion popup for the card editor (`[[` for a note, `/` for a
@@ -6365,246 +6857,254 @@ export const CanvasView = memo(function CanvasView({
               setCardSuggest((prev) => (prev ? { ...prev, selectedIndex: index } : prev))
             }
           />,
-          document.body
+          document.body,
         )}
 
       {/* 9. Floating Toast Feedback */}
-      <CanvasToast
-        message={toastMessage}
-        lifted={selectedEdgeIds.size > 1}
-        isDark={isDark}
-      />
+      <CanvasToast message={toastMessage} lifted={selectedEdgeIds.size > 1} isDark={isDark} />
 
       {/* Media preview lightbox (double-click an image / video / audio card) */}
       <MediaLightbox media={lightboxMedia} onClose={() => setLightboxMedia(null)} />
 
       {/* 10. Presentation Mode Floating Controls & Slide Drawer */}
-      {isPresentationMode && presentationSequence.length > 0 && (() => {
-        const presentationAccent = isDark ? "#818cf8" : isEink ? "#1e293b" : "#6366f1";
-        const presentationAccentBg = isDark
-          ? "rgba(129, 140, 248, 0.22)"
-          : isEink
-          ? "rgba(30, 41, 59, 0.12)"
-          : "rgba(99, 102, 241, 0.15)";
-        return (
-          <>
-            {/* Slide Overview Drawer / Popover */}
-            {showSlideDrawer && (
+      {isPresentationMode &&
+        presentationSequence.length > 0 &&
+        (() => {
+          const presentationAccent = isDark ? "#818cf8" : isEink ? "#1e293b" : "#6366f1";
+          const presentationAccentBg = isDark
+            ? "rgba(129, 140, 248, 0.22)"
+            : isEink
+              ? "rgba(30, 41, 59, 0.12)"
+              : "rgba(99, 102, 241, 0.15)";
+          return (
+            <>
+              {/* Slide Overview Drawer / Popover */}
+              {showSlideDrawer && (
+                <div
+                  ref={slideDrawerRef}
+                  className="canvas-slide-drawer"
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                >
+                  <div className="canvas-slide-drawer-header">
+                    <div className="canvas-slide-drawer-title">
+                      <Film size={14} color={presentationAccent} />
+                      <span>分镜大纲 (共 {presentationSequence.length} 幕)</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="canvas-slide-drawer-close"
+                      onClick={() => setShowSlideDrawer(false)}
+                      title="关闭分镜大纲 (Esc / L)"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                  <div className="canvas-slide-drawer-list">
+                    {presentationSequence.map((nodeId, idx) => {
+                      const n = nodeMap.get(nodeId);
+                      if (!n) return null;
+                      const isActive = idx === currentSlideIndex;
+                      const parentContainer = findContainerForNode(n, data.nodes);
+                      let icon = <FileText size={13} />;
+                      let title = "";
+                      if (n.type === "text") {
+                        icon = (
+                          <FileText
+                            size={13}
+                            color={isActive ? presentationAccent : colors.cardText}
+                          />
+                        );
+                        title = n.text.trim().split("\n")[0] || "文本卡片";
+                      } else if (n.type === "file") {
+                        icon = <ImageIcon size={13} color="#0284c7" />;
+                        title = n.file ? n.file.split(/[/\\]/).pop() || n.file : "文件卡片";
+                      } else if (n.type === "link") {
+                        icon = <ExternalLink size={13} color="#10b981" />;
+                        title = n.url || "网页卡片";
+                      } else if (n.type === "group") {
+                        icon = <Boxes size={13} color="#f59e0b" />;
+                        title = (n as CanvasGroupNode).label || "独立分组帧";
+                      }
+
+                      return (
+                        <button
+                          key={nodeId}
+                          type="button"
+                          className={`canvas-slide-drawer-item ${isActive ? "active" : ""}`}
+                          onClick={() => {
+                            handleJumpToSlide(idx);
+                          }}
+                        >
+                          <span className="canvas-slide-index">
+                            {String(idx + 1).padStart(2, "0")}
+                          </span>
+                          <span className="canvas-slide-icon">{icon}</span>
+                          <span className="canvas-slide-name" title={title}>
+                            {title}
+                          </span>
+                          {parentContainer && parentContainer.label && (
+                            <span
+                              className="canvas-slide-group-tag"
+                              title={`所属分组: ${parentContainer.label}`}
+                            >
+                              {parentContainer.label}
+                            </span>
+                          )}
+                          {isActive && <span className="canvas-slide-playing-badge">演播中</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div
-                ref={slideDrawerRef}
-                className="canvas-slide-drawer"
+                className="canvas-presentation-bar"
+                style={{
+                  backgroundColor: isDark ? "rgba(15, 23, 42, 0.94)" : "rgba(255, 255, 255, 0.96)",
+                  backdropFilter: "blur(16px)",
+                  border: `1px solid ${isDark ? "rgba(255, 255, 255, 0.15)" : "rgba(0, 0, 0, 0.12)"}`,
+                  color: colors.cardText,
+                }}
                 onClick={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
               >
-                <div className="canvas-slide-drawer-header">
-                  <div className="canvas-slide-drawer-title">
-                    <Film size={14} color={presentationAccent} />
-                    <span>分镜大纲 (共 {presentationSequence.length} 幕)</span>
-                  </div>
-                  <button
-                    type="button"
-                    className="canvas-slide-drawer-close"
-                    onClick={() => setShowSlideDrawer(false)}
-                    title="关闭分镜大纲 (Esc / L)"
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-                <div className="canvas-slide-drawer-list">
-                  {presentationSequence.map((nodeId, idx) => {
-                    const n = nodeMap.get(nodeId);
-                    if (!n) return null;
-                    const isActive = idx === currentSlideIndex;
-                    const parentContainer = findContainerForNode(n, data.nodes);
-                    let icon = <FileText size={13} />;
-                    let title = "";
-                    if (n.type === "text") {
-                      icon = <FileText size={13} color={isActive ? presentationAccent : colors.cardText} />;
-                      title = n.text.trim().split("\n")[0] || "文本卡片";
-                    } else if (n.type === "file") {
-                      icon = <ImageIcon size={13} color="#0284c7" />;
-                      title = n.file ? n.file.split(/[/\\]/).pop() || n.file : "文件卡片";
-                    } else if (n.type === "link") {
-                      icon = <ExternalLink size={13} color="#10b981" />;
-                      title = n.url || "网页卡片";
-                    } else if (n.type === "group") {
-                      icon = <Boxes size={13} color="#f59e0b" />;
-                      title = (n as CanvasGroupNode).label || "独立分组帧";
-                    }
-
-                    return (
-                      <button
-                        key={nodeId}
-                        type="button"
-                        className={`canvas-slide-drawer-item ${isActive ? "active" : ""}`}
-                        onClick={() => {
-                          handleJumpToSlide(idx);
-                        }}
-                      >
-                        <span className="canvas-slide-index">{String(idx + 1).padStart(2, "0")}</span>
-                        <span className="canvas-slide-icon">{icon}</span>
-                        <span className="canvas-slide-name" title={title}>
-                          {title}
-                        </span>
-                        {parentContainer && parentContainer.label && (
-                          <span className="canvas-slide-group-tag" title={`所属分组: ${parentContainer.label}`}>
-                            {parentContainer.label}
-                          </span>
-                        )}
-                        {isActive && <span className="canvas-slide-playing-badge">演播中</span>}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            <div
-              className="canvas-presentation-bar"
-              style={{
-                backgroundColor: isDark ? "rgba(15, 23, 42, 0.94)" : "rgba(255, 255, 255, 0.96)",
-                backdropFilter: "blur(16px)",
-                border: `1px solid ${isDark ? "rgba(255, 255, 255, 0.15)" : "rgba(0, 0, 0, 0.12)"}`,
-                color: colors.cardText,
-              }}
-              onClick={(e) => e.stopPropagation()}
-              onMouseDown={(e) => e.stopPropagation()}
-            >
-              <span
-                style={{
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: presentationAccent,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 4,
-                }}
-              >
-                🪐 演示模式
-              </span>
-
-              <div style={{ width: 1, height: 18, background: colors.cardBorder }} />
-
-              <button
-                onClick={handlePrevSlide}
-                title="上一张 (← / PageUp)"
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: colors.cardText,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  padding: 4,
-                  borderRadius: 6,
-                }}
-              >
-                <ChevronLeft size={18} />
-              </button>
-
-              <button
-                type="button"
-                className={`canvas-presentation-counter-btn ${showSlideDrawer ? "active" : ""}`}
-                onClick={() => setShowSlideDrawer((prev) => !prev)}
-                title="点击展开分镜大纲抽屉 (快捷键 L)"
-              >
-                <List size={13} style={{ opacity: 0.8 }} />
-                <span>
-                  {currentSlideIndex + 1} / {presentationSequence.length}
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: presentationAccent,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                  }}
+                >
+                  🪐 演示模式
                 </span>
-              </button>
 
-              <button
-                onClick={handleNextSlide}
-                title="下一张 (→ / 空格 / PageDown)"
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: colors.cardText,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  padding: 4,
-                  borderRadius: 6,
-                }}
-              >
-                <ChevronRight size={18} />
-              </button>
+                <div style={{ width: 1, height: 18, background: colors.cardBorder }} />
 
-              <div style={{ width: 1, height: 18, background: colors.cardBorder }} />
+                <button
+                  onClick={handlePrevSlide}
+                  title="上一张 (← / PageUp)"
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: colors.cardText,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    padding: 4,
+                    borderRadius: 6,
+                  }}
+                >
+                  <ChevronLeft size={18} />
+                </button>
 
-              <button
-                onClick={() => setIsAutoPlaying((prev) => !prev)}
-                title={isAutoPlaying ? "暂停自动放映 (P)" : "自动放映 (每 3.5 秒切换, 快捷键 P)"}
-                style={{
-                  background: isAutoPlaying ? presentationAccentBg : "none",
-                  border: "none",
-                  color: isAutoPlaying ? presentationAccent : colors.cardText,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 4,
-                  fontSize: 12,
-                  fontWeight: 500,
-                  padding: "4px 8px",
-                  borderRadius: 6,
-                }}
-              >
-                {isAutoPlaying ? <Pause size={14} /> : <Play size={14} />}
-                <span>{isAutoPlaying ? "暂停" : "自动"}</span>
-              </button>
+                <button
+                  type="button"
+                  className={`canvas-presentation-counter-btn ${showSlideDrawer ? "active" : ""}`}
+                  onClick={() => setShowSlideDrawer((prev) => !prev)}
+                  title="点击展开分镜大纲抽屉 (快捷键 L)"
+                >
+                  <List size={13} style={{ opacity: 0.8 }} />
+                  <span>
+                    {currentSlideIndex + 1} / {presentationSequence.length}
+                  </span>
+                </button>
 
-              <button
-                onClick={handleToggleFullscreen}
-                title={isFullscreenActive ? "退出全屏 (F / F11)" : "全屏沉浸演示 (F / F11)"}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: isFullscreenActive ? presentationAccent : colors.cardText,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  padding: 4,
-                  borderRadius: 6,
-                }}
-              >
-                {isFullscreenActive ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-              </button>
+                <button
+                  onClick={handleNextSlide}
+                  title="下一张 (→ / 空格 / PageDown)"
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: colors.cardText,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    padding: 4,
+                    borderRadius: 6,
+                  }}
+                >
+                  <ChevronRight size={18} />
+                </button>
 
-              <button
-                onClick={handleTogglePresentation}
-                title="退出演示模式 (Esc)"
-                style={{
-                  background: "rgba(239, 68, 68, 0.12)",
-                  border: "none",
-                  color: "#ef4444",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 4,
-                  fontSize: 12,
-                  fontWeight: 600,
-                  padding: "4px 10px",
-                  borderRadius: 16,
-                  marginLeft: 4,
-                }}
-              >
-                <X size={13} />
-                <span>退出</span>
-              </button>
+                <div style={{ width: 1, height: 18, background: colors.cardBorder }} />
 
-              {isAutoPlaying && (
-                <div className="canvas-presentation-progress-track">
-                  <div
-                    key={`${currentSlideIndex}-${isAutoPlaying}`}
-                    className="canvas-presentation-progress-bar"
-                  />
-                </div>
-              )}
-            </div>
-          </>
-        );
-      })()}
+                <button
+                  onClick={() => setIsAutoPlaying((prev) => !prev)}
+                  title={isAutoPlaying ? "暂停自动放映 (P)" : "自动放映 (每 3.5 秒切换, 快捷键 P)"}
+                  style={{
+                    background: isAutoPlaying ? presentationAccentBg : "none",
+                    border: "none",
+                    color: isAutoPlaying ? presentationAccent : colors.cardText,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                    fontSize: 12,
+                    fontWeight: 500,
+                    padding: "4px 8px",
+                    borderRadius: 6,
+                  }}
+                >
+                  {isAutoPlaying ? <Pause size={14} /> : <Play size={14} />}
+                  <span>{isAutoPlaying ? "暂停" : "自动"}</span>
+                </button>
+
+                <button
+                  onClick={handleToggleFullscreen}
+                  title={isFullscreenActive ? "退出全屏 (F / F11)" : "全屏沉浸演示 (F / F11)"}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: isFullscreenActive ? presentationAccent : colors.cardText,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    padding: 4,
+                    borderRadius: 6,
+                  }}
+                >
+                  {isFullscreenActive ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+                </button>
+
+                <button
+                  onClick={handleTogglePresentation}
+                  title="退出演示模式 (Esc)"
+                  style={{
+                    background: "rgba(239, 68, 68, 0.12)",
+                    border: "none",
+                    color: "#ef4444",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    padding: "4px 10px",
+                    borderRadius: 16,
+                    marginLeft: 4,
+                  }}
+                >
+                  <X size={13} />
+                  <span>退出</span>
+                </button>
+
+                {isAutoPlaying && (
+                  <div className="canvas-presentation-progress-track">
+                    <div
+                      key={`${currentSlideIndex}-${isAutoPlaying}`}
+                      className="canvas-presentation-progress-bar"
+                    />
+                  </div>
+                )}
+              </div>
+            </>
+          );
+        })()}
     </div>
   );
 });
@@ -6647,7 +7147,7 @@ const resizeHandleStyle: React.CSSProperties = {
 
 function getAnchorDotStyle(
   side: CanvasNodeSide,
-  colors: ReturnType<typeof getCanvasThemeColors>
+  colors: ReturnType<typeof getCanvasThemeColors>,
 ): React.CSSProperties {
   const base: React.CSSProperties = {
     position: "absolute",

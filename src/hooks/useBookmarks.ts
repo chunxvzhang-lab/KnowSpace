@@ -79,7 +79,11 @@ export function useBookmarks({
       }
       pendingBookmarkRef.current = null;
       if (!renderedChapter) return;
-      const resolution = resolveBookmark(bookmark, renderedChapter.headings, renderedChapter.checksum);
+      const resolution = resolveBookmark(
+        bookmark,
+        renderedChapter.headings,
+        renderedChapter.checksum,
+      );
       if (resolution.message) setNotice(resolution.message);
       if (resolution.targetHeadingId) {
         jumpToHeading(resolution.targetHeadingId, "smooth", true);
@@ -95,7 +99,7 @@ export function useBookmarks({
       selectChapter,
       pendingBookmarkRef,
       setNotice,
-    ]
+    ],
   );
 
   const addBookmark = useCallback(() => {

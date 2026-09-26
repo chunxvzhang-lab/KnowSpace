@@ -42,7 +42,7 @@ function attributeText(value: string): string {
 export function exportMindmapToOpml(
   root: MindmapNode,
   docTitle?: string,
-  sidecar?: MindmapSidecar | null
+  sidecar?: MindmapSidecar | null,
 ): string {
   const title = docTitle || root.text || "Knowledge Mindmap";
   const nowRfc822 = new Date().toUTCString();
@@ -97,7 +97,7 @@ ${bodyContent}  </body>
 export function exportMindmapToFreeMind(
   root: MindmapNode,
   collapsedIds?: ReadonlySet<string>,
-  sidecar?: MindmapSidecar | null
+  sidecar?: MindmapSidecar | null,
 ): string {
   let counter = 1;
 
@@ -105,7 +105,8 @@ export function exportMindmapToFreeMind(
     const indent = "  ".repeat(indentLevel);
     const id = `ID_${counter++}`;
     const escapedText = escapeXml(node.text || "主题");
-    const colorAttr = node.color && node.color !== "transparent" ? ` COLOR="${escapeXml(node.color)}"` : "";
+    const colorAttr =
+      node.color && node.color !== "transparent" ? ` COLOR="${escapeXml(node.color)}"` : "";
 
     const hasChildren = Boolean(node.children && node.children.length > 0);
     // FOLDED belongs to a node that can be folded. It was read off the model's
@@ -207,7 +208,7 @@ export function exportMindmapToMarkdownOutline(root: MindmapNode): string {
  */
 export function exportMindmapToXmind(
   root: MindmapNode,
-  options: { sidecar?: MindmapSidecar | null; sheetTitle?: string } = {}
+  options: { sidecar?: MindmapSidecar | null; sheetTitle?: string } = {},
 ): Uint8Array {
   const sidecar = options.sidecar ?? null;
   const ids = new Map<string, string>();
@@ -347,7 +348,8 @@ function xmindMarkerIds(markers: { priority?: number; progress?: number }): stri
 
   // Five names for nine eighths: an eighth that is not one of them is not written,
   // because the file would otherwise carry a marker id that means nothing there.
-  const progressName = markers.progress !== undefined ? XMIND_PROGRESS[markers.progress] : undefined;
+  const progressName =
+    markers.progress !== undefined ? XMIND_PROGRESS[markers.progress] : undefined;
   if (progressName) ids.push(progressName);
 
   return ids;

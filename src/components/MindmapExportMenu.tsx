@@ -69,7 +69,11 @@ export function MindmapExportMenu({
       description: "带备注、标签、关系线与概要边界，可被本应用再读回来",
       run: onExportXmind,
     },
-    { title: "导出 OPML 2.0", description: "兼容 MindNode、OmniOutliner (.opml)", run: onExportOpml },
+    {
+      title: "导出 OPML 2.0",
+      description: "兼容 MindNode、OmniOutliner (.opml)",
+      run: onExportOpml,
+    },
     {
       title: "导出 FreeMind (.mm)",
       description: "兼容 XMind、FreeMind、Freeplane (.mm)",

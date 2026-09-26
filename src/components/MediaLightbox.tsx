@@ -1,5 +1,9 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import { downloadSvgAsPng, rasterizeRenderedSvgToPng, triggerDownload } from "../services/svgExport";
+import {
+  downloadSvgAsPng,
+  rasterizeRenderedSvgToPng,
+  triggerDownload,
+} from "../services/svgExport";
 
 // Moved to core/types so the UI store can reference it without importing from
 // components/. Re-exported here so existing import sites are unaffected.
@@ -11,10 +15,7 @@ type MediaLightboxProps = {
   onClose: () => void;
 };
 
-export const MediaLightbox = memo(function MediaLightbox({
-  media,
-  onClose,
-}: MediaLightboxProps) {
+export const MediaLightbox = memo(function MediaLightbox({ media, onClose }: MediaLightboxProps) {
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -57,22 +58,28 @@ export const MediaLightbox = memo(function MediaLightbox({
   }, []);
 
   // Pan with drag
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (e.button !== 0) return; // only left mouse button
-    setIsDragging(true);
-    dragStartRef.current = {
-      x: e.clientX - position.x,
-      y: e.clientY - position.y,
-    };
-  }, [position]);
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      if (e.button !== 0) return; // only left mouse button
+      setIsDragging(true);
+      dragStartRef.current = {
+        x: e.clientX - position.x,
+        y: e.clientY - position.y,
+      };
+    },
+    [position],
+  );
 
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!isDragging) return;
-    setPosition({
-      x: e.clientX - dragStartRef.current.x,
-      y: e.clientY - dragStartRef.current.y,
-    });
-  }, [isDragging]);
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      if (!isDragging) return;
+      setPosition({
+        x: e.clientX - dragStartRef.current.x,
+        y: e.clientY - dragStartRef.current.y,
+      });
+    },
+    [isDragging],
+  );
 
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
@@ -158,7 +165,9 @@ export const MediaLightbox = memo(function MediaLightbox({
     >
       <div className="lightbox-top-bar">
         <span className="lightbox-title">
-          {media.title || media.alt || (media.type === "mermaid" ? "Mermaid 架构图预览" : "图片预览")}
+          {media.title ||
+            media.alt ||
+            (media.type === "mermaid" ? "Mermaid 架构图预览" : "图片预览")}
         </span>
         <div className="lightbox-controls">
           <button
@@ -228,7 +237,12 @@ export const MediaLightbox = memo(function MediaLightbox({
               controls
               autoPlay
               draggable={false}
-              style={{ maxWidth: "92vw", maxHeight: "82vh", borderRadius: 8, boxShadow: "0 12px 48px rgba(0,0,0,0.5)" }}
+              style={{
+                maxWidth: "92vw",
+                maxHeight: "82vh",
+                borderRadius: 8,
+                boxShadow: "0 12px 48px rgba(0,0,0,0.5)",
+              }}
             />
           ) : null}
           {media.type === "audio" && media.src ? (

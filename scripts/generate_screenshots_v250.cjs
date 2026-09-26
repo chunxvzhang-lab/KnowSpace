@@ -220,9 +220,24 @@ const canvasData = {
 };
 
 const chapters = [
-  { id: "doc-1", title: "01-知识工作台使用手记", src: "01-知识工作台使用手记.md", absolutePath: "C:\\\\Docs\\\\01-知识工作台使用手记.md" },
-  { id: "doc-2", title: "02-FSRS间隔重复闪卡", src: "02-FSRS间隔重复闪卡.md", absolutePath: "C:\\\\Docs\\\\02-FSRS间隔重复闪卡.md" },
-  { id: "doc-3", title: "06-空间知识全景白板", src: "06-空间知识全景白板.canvas", absolutePath: "C:\\\\Docs\\\\06-空间知识全景白板.canvas" },
+  {
+    id: "doc-1",
+    title: "01-知识工作台使用手记",
+    src: "01-知识工作台使用手记.md",
+    absolutePath: "C:\\\\Docs\\\\01-知识工作台使用手记.md",
+  },
+  {
+    id: "doc-2",
+    title: "02-FSRS间隔重复闪卡",
+    src: "02-FSRS间隔重复闪卡.md",
+    absolutePath: "C:\\\\Docs\\\\02-FSRS间隔重复闪卡.md",
+  },
+  {
+    id: "doc-3",
+    title: "06-空间知识全景白板",
+    src: "06-空间知识全景白板.canvas",
+    absolutePath: "C:\\\\Docs\\\\06-空间知识全景白板.canvas",
+  },
 ];
 
 const contents = {
@@ -241,7 +256,12 @@ const flashNotes = [
     size: SPACE_NOTE_1.length,
     content: SPACE_NOTE_1,
     todos: [
-      { id: "2026-09-16_2130.md:9", lineIndex: 9, text: "整理 PACELC 的补充说明", completed: false },
+      {
+        id: "2026-09-16_2130.md:9",
+        lineIndex: 9,
+        text: "整理 PACELC 的补充说明",
+        completed: false,
+      },
       { id: "2026-09-16_2130.md:10", lineIndex: 10, text: "复习 Raft 日志复制", completed: true },
     ],
     tags: ["分布式", "闪卡"],
@@ -279,7 +299,12 @@ function installMock(payload) {
     getInitialSyncData: () => ({ filePath: initialPath, source: toSource(initialPath) }),
     getLaunchFilePath: async () => initialPath,
     getDirectoryForFile: async () => ({
-      directory: { id: "knowspace-demo-vault", title: "KnowSpace 示例知识库", rootPath: "C:\\\\Docs", chapters: chs },
+      directory: {
+        id: "knowspace-demo-vault",
+        title: "KnowSpace 示例知识库",
+        rootPath: "C:\\\\Docs",
+        chapters: chs,
+      },
     }),
     readMarkdownFile: async (p) => toSource(p),
     saveMarkdownFile: async () => ({ success: true, diskVersion: "v2.5.0" }),
@@ -345,7 +370,11 @@ async function newScene(browser, initialPath) {
 }
 
 async function useLightTheme(page) {
-  await page.locator('[aria-label="日光浅色"]').first().click({ timeout: 4000 }).catch(() => {});
+  await page
+    .locator('[aria-label="日光浅色"]')
+    .first()
+    .click({ timeout: 4000 })
+    .catch(() => {});
   await page.evaluate(() => document.documentElement.setAttribute("data-theme", "light"));
   await page.waitForTimeout(500);
 }
@@ -361,7 +390,11 @@ async function useLightTheme(page) {
       await useLightTheme(page);
 
       // 1) 分屏模式：左侧源码语法 + 右侧实时渲染
-      await page.locator('[data-tooltip="分屏模式"]').first().click({ timeout: 4000 }).catch(() => {});
+      await page
+        .locator('[data-tooltip="分屏模式"]')
+        .first()
+        .click({ timeout: 4000 })
+        .catch(() => {});
       await page.waitForTimeout(1400);
       await save(page, "36-fsrs-card-syntax.png");
 
@@ -394,7 +427,11 @@ async function useLightTheme(page) {
     try {
       await useLightTheme(page);
       await page.waitForTimeout(1200);
-      await page.locator('[title="自适应全图"]').first().click({ timeout: 4000 }).catch(() => {});
+      await page
+        .locator('[title="自适应全图"]')
+        .first()
+        .click({ timeout: 4000 })
+        .catch(() => {});
       await page.waitForTimeout(1200);
       await save(page, "40-canvas-media-cards.png");
 
@@ -409,14 +446,22 @@ async function useLightTheme(page) {
       // 收起菜单并自适应全图：展示真实圆形弧线闭环
       await page.keyboard.press("Escape");
       await page.waitForTimeout(400);
-      await page.locator('[title="自适应全图"]').first().click({ timeout: 4000 }).catch(() => {});
+      await page
+        .locator('[title="自适应全图"]')
+        .first()
+        .click({ timeout: 4000 })
+        .catch(() => {});
       await page.waitForTimeout(1400);
       await save(page, "41-canvas-ring-layout.png");
 
       // 加宽视口后重新全选并展开对齐菜单，让下拉面板完整展开（露出环半径拉杆）
       await page.setViewportSize({ width: 2560, height: 1100 });
       await page.waitForTimeout(800);
-      await page.locator('[title="自适应全图"]').first().click({ timeout: 4000 }).catch(() => {});
+      await page
+        .locator('[title="自适应全图"]')
+        .first()
+        .click({ timeout: 4000 })
+        .catch(() => {});
       await page.waitForTimeout(600);
       await page.keyboard.press("Control+a");
       await page.waitForTimeout(600);

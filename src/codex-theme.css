@@ -114,7 +114,10 @@ input {
 }
 
 button {
-  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
 }
 
 :focus-visible {
@@ -727,13 +730,15 @@ button {
    ========================================================================== */
 .markdown-body [data-source-line].sync-highlight-active {
   background: rgba(245, 158, 11, 0.12) !important;
-  box-shadow: 0 0 0 1.5px rgba(245, 158, 11, 0.55), 0 3px 12px rgba(245, 158, 11, 0.12) !important;
+  box-shadow:
+    0 0 0 1.5px rgba(245, 158, 11, 0.55),
+    0 3px 12px rgba(245, 158, 11, 0.12) !important;
   border-radius: 6px !important;
 }
 
 .markdown-body li[data-source-line].sync-highlight-active {
   background: rgba(245, 158, 11, 0.16) !important;
-  box-shadow: 0 0 0 1.5px rgba(245, 158, 11, 0.60) !important;
+  box-shadow: 0 0 0 1.5px rgba(245, 158, 11, 0.6) !important;
   border-radius: 6px !important;
   padding-left: 6px;
   padding-right: 6px;
@@ -743,13 +748,15 @@ button {
 :root[data-theme="twitter"] .markdown-body [data-source-line].sync-highlight-active,
 :root[data-theme="dark"] .markdown-body [data-source-line].sync-highlight-active {
   background: rgba(29, 155, 240, 0.16) !important;
-  box-shadow: 0 0 0 1.5px rgba(29, 155, 240, 0.70), 0 4px 18px rgba(29, 155, 240, 0.22) !important;
+  box-shadow:
+    0 0 0 1.5px rgba(29, 155, 240, 0.7),
+    0 4px 18px rgba(29, 155, 240, 0.22) !important;
   border-radius: 6px !important;
 }
 
 :root[data-theme="twitter"] .markdown-body li[data-source-line].sync-highlight-active,
 :root[data-theme="dark"] .markdown-body li[data-source-line].sync-highlight-active {
-  background: rgba(29, 155, 240, 0.20) !important;
+  background: rgba(29, 155, 240, 0.2) !important;
   box-shadow: 0 0 0 1.5px rgba(29, 155, 240, 0.75) !important;
   border-radius: 6px !important;
   padding-left: 6px;
@@ -760,11 +767,13 @@ button {
 @media (prefers-color-scheme: dark) {
   :root[data-theme="system"] .markdown-body [data-source-line].sync-highlight-active {
     background: rgba(29, 155, 240, 0.16) !important;
-    box-shadow: 0 0 0 1.5px rgba(29, 155, 240, 0.70), 0 4px 18px rgba(29, 155, 240, 0.22) !important;
+    box-shadow:
+      0 0 0 1.5px rgba(29, 155, 240, 0.7),
+      0 4px 18px rgba(29, 155, 240, 0.22) !important;
     border-radius: 6px !important;
   }
   :root[data-theme="system"] .markdown-body li[data-source-line].sync-highlight-active {
-    background: rgba(29, 155, 240, 0.20) !important;
+    background: rgba(29, 155, 240, 0.2) !important;
     box-shadow: 0 0 0 1.5px rgba(29, 155, 240, 0.75) !important;
     border-radius: 6px !important;
     padding-left: 6px;
@@ -776,7 +785,9 @@ button {
 /* Search Jump Highlight Overrides */
 .markdown-body .search-highlight-active {
   background: rgba(245, 158, 11, 0.12) !important;
-  box-shadow: 0 0 0 2px #d97706, 0 4px 18px rgba(245, 158, 11, 0.22) !important;
+  box-shadow:
+    0 0 0 2px #d97706,
+    0 4px 18px rgba(245, 158, 11, 0.22) !important;
   border-radius: 8px !important;
   padding: 8px 12px !important;
   margin-top: 4px;
@@ -786,13 +797,17 @@ button {
 :root[data-theme="twitter"] .markdown-body .search-highlight-active,
 :root[data-theme="dark"] .markdown-body .search-highlight-active {
   background: rgba(29, 155, 240, 0.18) !important;
-  box-shadow: 0 0 0 2px #1d9bf0, 0 6px 26px rgba(29, 155, 240, 0.38) !important;
+  box-shadow:
+    0 0 0 2px #1d9bf0,
+    0 6px 26px rgba(29, 155, 240, 0.38) !important;
 }
 
 @media (prefers-color-scheme: dark) {
   :root[data-theme="system"] .markdown-body .search-highlight-active {
     background: rgba(29, 155, 240, 0.18) !important;
-    box-shadow: 0 0 0 2px #1d9bf0, 0 6px 26px rgba(29, 155, 240, 0.38) !important;
+    box-shadow:
+      0 0 0 2px #1d9bf0,
+      0 6px 26px rgba(29, 155, 240, 0.38) !important;
   }
 }
 
@@ -842,7 +857,9 @@ button {
 :root[data-theme="eink"] .markdown-body [data-source-line].sync-highlight-active,
 .app-shell.theme-eink .markdown-body [data-source-line].sync-highlight-active {
   background: #ded9cd !important;
-  box-shadow: 0 0 0 1.5px #a8a090, 0 2px 8px rgba(0, 0, 0, 0.05) !important;
+  box-shadow:
+    0 0 0 1.5px #a8a090,
+    0 2px 8px rgba(0, 0, 0, 0.05) !important;
   border-radius: 6px !important;
 }
 
@@ -862,7 +879,9 @@ button {
 :root[data-theme="eink"] .markdown-body .search-highlight-active,
 .app-shell.theme-eink .markdown-body .search-highlight-active {
   background: #ded9cd !important;
-  box-shadow: 0 0 0 2px #9c9586, 0 2px 8px rgba(0, 0, 0, 0.05) !important;
+  box-shadow:
+    0 0 0 2px #9c9586,
+    0 2px 8px rgba(0, 0, 0, 0.05) !important;
   border-radius: 8px !important;
 }
 
@@ -885,7 +904,9 @@ button {
 
 .app-shell.theme-eink .markdown-body {
   color: #1a1a1a;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Source Han Serif SC", "Noto Serif CJK SC", "Songti SC", SimSun, Georgia, serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "Source Han Serif SC", "Noto Serif CJK SC",
+    "Songti SC", SimSun, Georgia, serif;
   line-height: 1.85;
   letter-spacing: 0.015em;
 }
@@ -895,7 +916,9 @@ button {
 .app-shell.theme-eink .markdown-body h3,
 .app-shell.theme-eink .markdown-body h4 {
   color: #111111;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Source Han Serif SC", "Noto Serif CJK SC", "Songti SC", SimSun, Georgia, serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "Source Han Serif SC", "Noto Serif CJK SC",
+    "Songti SC", SimSun, Georgia, serif;
   font-weight: 700;
   border-bottom-color: #d5cebf;
 }
@@ -930,4 +953,3 @@ button {
   background: #ded8cb;
   color: #111111;
 }
-

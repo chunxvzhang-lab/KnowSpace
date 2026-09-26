@@ -1,4 +1,17 @@
-const { app, BrowserWindow, Menu, Tray, dialog, ipcMain, nativeTheme, shell, globalShortcut, screen, nativeImage, clipboard } = require("electron");
+const {
+  app,
+  BrowserWindow,
+  Menu,
+  Tray,
+  dialog,
+  ipcMain,
+  nativeTheme,
+  shell,
+  globalShortcut,
+  screen,
+  nativeImage,
+  clipboard,
+} = require("electron");
 const fs = require("node:fs");
 const path = require("node:path");
 const { fileURLToPath, pathToFileURL } = require("node:url");
@@ -15,11 +28,7 @@ const {
   isValidMarkdownPath,
   setScanOptions,
 } = require("./markdown-files.cjs");
-const {
-  recordSnapshot,
-  listSnapshots,
-  readSnapshot,
-} = require("./snapshots.cjs");
+const { recordSnapshot, listSnapshots, readSnapshot } = require("./snapshots.cjs");
 
 // Hardware acceleration and performance optimization switches
 app.commandLine.appendSwitch("enable-gpu-rasterization");
@@ -83,9 +92,10 @@ function getAppConfig() {
 isFlashCapsulePinned = Boolean(getAppConfig().flashPinned);
 
 function getDefaultSpaceDir() {
-  let baseDir = lastActiveWorkspaceDir && fs.existsSync(lastActiveWorkspaceDir)
-    ? lastActiveWorkspaceDir
-    : path.join(app.getPath("userData"), "workspace");
+  let baseDir =
+    lastActiveWorkspaceDir && fs.existsSync(lastActiveWorkspaceDir)
+      ? lastActiveWorkspaceDir
+      : path.join(app.getPath("userData"), "workspace");
   if (path.basename(baseDir).toLowerCase() === "space") {
     return baseDir;
   }
@@ -94,7 +104,11 @@ function getDefaultSpaceDir() {
 
 function resolveFlashSpaceDir() {
   const config = getAppConfig();
-  if (config.flashSpaceDir && typeof config.flashSpaceDir === "string" && config.flashSpaceDir.trim()) {
+  if (
+    config.flashSpaceDir &&
+    typeof config.flashSpaceDir === "string" &&
+    config.flashSpaceDir.trim()
+  ) {
     const customDir = path.resolve(config.flashSpaceDir.trim());
     if (!fs.existsSync(customDir)) {
       try {
@@ -590,9 +604,12 @@ function getWindowFromEvent(event) {
 async function createWindow(initialFilePath = null) {
   const iconIco = path.join(__dirname, "icon.ico");
   const iconPng = path.join(__dirname, "icon.png");
-  const windowIcon = process.platform === "win32" && fs.existsSync(iconIco)
-    ? iconIco
-    : (fs.existsSync(iconPng) ? iconPng : undefined);
+  const windowIcon =
+    process.platform === "win32" && fs.existsSync(iconIco)
+      ? iconIco
+      : fs.existsSync(iconPng)
+        ? iconPng
+        : undefined;
 
   const win = new BrowserWindow({
     width: 1320,
@@ -941,7 +958,7 @@ ipcMain.on("bookmd:get-sync-launch-data", (event) => {
     filePath = launchFilePath;
   }
 
-  event.returnValue = cachedData ? cachedData : (filePath ? { filePath, source: null } : null);
+  event.returnValue = cachedData ? cachedData : filePath ? { filePath, source: null } : null;
 });
 
 ipcMain.handle("bookmd:get-launch-file-path", async (event) => {
@@ -970,11 +987,11 @@ ipcMain.handle("bookmd:get-launch-file-path", async (event) => {
 ipcMain.handle("bookmd:set-native-theme", (_event, theme) => {
   const isDark = theme === "twitter" || theme === "dark";
   const isLight = theme === "light" || theme === "eink";
-  nativeTheme.themeSource = isDark ? "dark" : (isLight ? "light" : "system");
+  nativeTheme.themeSource = isDark ? "dark" : isLight ? "light" : "system";
   for (const win of windows) {
     try {
       if (win && !win.isDestroyed()) {
-        win.setBackgroundColor(isDark ? "#000000" : (theme === "eink" ? "#f4f1ea" : "#f6f7f4"));
+        win.setBackgroundColor(isDark ? "#000000" : theme === "eink" ? "#f4f1ea" : "#f6f7f4");
       }
     } catch {}
   }
@@ -1080,7 +1097,13 @@ ipcMain.handle("bookmd:pick-review-folder", async (event) => {
       ...(manifest.scanUnreadable ? { scanUnreadable: manifest.scanUnreadable } : {}),
     };
   } catch (err) {
-    return { canceled: false, rootPath, name: path.basename(rootPath), paths: [], message: err?.message || "无法读取这个文件夹。" };
+    return {
+      canceled: false,
+      rootPath,
+      name: path.basename(rootPath),
+      paths: [],
+      message: err?.message || "无法读取这个文件夹。",
+    };
   }
 });
 
@@ -1131,7 +1154,10 @@ ipcMain.handle("bookmd:save-mindmap-sidecar", async (_event, params) => {
 });
 
 ipcMain.handle("bookmd:open-external", async (_event, url) => {
-  if (typeof url === "string" && (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("mailto:"))) {
+  if (
+    typeof url === "string" &&
+    (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("mailto:"))
+  ) {
     await shell.openExternal(url);
     return true;
   }
@@ -1160,7 +1186,7 @@ ipcMain.handle("bookmd:get-directory-for-file", async (_event, absolutePath) => 
   const directory = await buildDirectoryManifest(rootPath);
 
   const activeChapter = directory.chapters.find(
-    (c) => path.resolve(c.absolutePath) === path.resolve(absolutePath)
+    (c) => path.resolve(c.absolutePath) === path.resolve(absolutePath),
   );
 
   return {
@@ -1224,7 +1250,10 @@ ipcMain.handle("bookmd:set-flash-shortcut", (_event, newShortcut) => {
           });
         } catch {}
       }
-      return { success: false, error: `快捷键 "${cleanShortcut}" 注册失败，可能已被系统或其它软件占用。` };
+      return {
+        success: false,
+        error: `快捷键 "${cleanShortcut}" 注册失败，可能已被系统或其它软件占用。`,
+      };
     }
   } catch (err) {
     if (currentFlashShortcut) {
@@ -1281,7 +1310,11 @@ ipcMain.handle("bookmd:save-flash-note", async (_event, payload) => {
     for (const w of windows) {
       try {
         if (!w.isDestroyed()) {
-          w.webContents.send("bookmd:flash-note-saved", { filePath: targetFile, dateStr, fileName: minuteFileName });
+          w.webContents.send("bookmd:flash-note-saved", {
+            filePath: targetFile,
+            dateStr,
+            fileName: minuteFileName,
+          });
         }
       } catch {}
     }
@@ -1319,9 +1352,10 @@ ipcMain.handle("bookmd:get-flash-space-config", () => {
 ipcMain.handle("bookmd:select-flash-space-dir", async () => {
   isNativeDialogOpen = true;
   try {
-    const parentWin = (flashCapsuleWindow && !flashCapsuleWindow.isDestroyed() && flashCapsuleWindow.isVisible())
-      ? flashCapsuleWindow
-      : mainWindow;
+    const parentWin =
+      flashCapsuleWindow && !flashCapsuleWindow.isDestroyed() && flashCapsuleWindow.isVisible()
+        ? flashCapsuleWindow
+        : mainWindow;
     const result = await dialog.showOpenDialog(parentWin || undefined, {
       title: "选择闪念 Space 存储目录",
       properties: ["openDirectory", "createDirectory"],
@@ -1404,7 +1438,11 @@ ipcMain.handle("bookmd:get-flash-notes-summary", async () => {
       dirMtime = dirStat.mtimeMs;
     } catch {}
 
-    if (cachedFlashSummary && lastFlashSummaryMtime === dirMtime && cachedFlashSummary.spaceDir === spaceDir) {
+    if (
+      cachedFlashSummary &&
+      lastFlashSummaryMtime === dirMtime &&
+      cachedFlashSummary.spaceDir === spaceDir
+    ) {
       return cachedFlashSummary;
     }
 
@@ -1557,7 +1595,11 @@ ipcMain.handle("bookmd:save-pasted-image", async (_event, payload) => {
 
     // Determine target assets directory
     let targetDir = "";
-    if (currentFilePath && typeof currentFilePath === "string" && fs.existsSync(path.dirname(currentFilePath))) {
+    if (
+      currentFilePath &&
+      typeof currentFilePath === "string" &&
+      fs.existsSync(path.dirname(currentFilePath))
+    ) {
       targetDir = path.join(path.dirname(currentFilePath), "assets");
     } else if (lastActiveWorkspaceDir && fs.existsSync(lastActiveWorkspaceDir)) {
       targetDir = path.join(lastActiveWorkspaceDir, "assets");
@@ -1763,12 +1805,18 @@ ipcMain.handle("bookmd:create-markdown-file", async (event, options = {}) => {
   const targetPath = result.filePath;
   const saveRes = await saveMarkdownFile({
     absolutePath: targetPath,
-    content: options.initialContent ?? (isCanvas ? '{\n  "nodes": [],\n  "edges": []\n}' : "# 未命名\n\n"),
+    content:
+      options.initialContent ?? (isCanvas ? '{\n  "nodes": [],\n  "edges": []\n}' : "# 未命名\n\n"),
     force: true,
   });
 
   if (!saveRes.success) {
-    return { canceled: false, success: false, message: saveRes.message, errorCode: saveRes.errorCode };
+    return {
+      canceled: false,
+      success: false,
+      message: saveRes.message,
+      errorCode: saveRes.errorCode,
+    };
   }
 
   registerPath(targetPath);
@@ -1853,7 +1901,12 @@ ipcMain.handle("bookmd:save-markdown-file-as", async (event, request = {}) => {
   });
 
   if (!saveRes.success) {
-    return { canceled: false, success: false, message: saveRes.message, errorCode: saveRes.errorCode };
+    return {
+      canceled: false,
+      success: false,
+      message: saveRes.message,
+      errorCode: saveRes.errorCode,
+    };
   }
 
   registerPath(targetPath);
@@ -1927,14 +1980,14 @@ ipcMain.handle("bookmd:read-file-as-data-url", async (event, request = {}) => {
       ext === "jpg" || ext === "jpeg"
         ? "image/jpeg"
         : ext === "gif"
-        ? "image/gif"
-        : ext === "webp"
-        ? "image/webp"
-        : ext === "svg"
-        ? "image/svg+xml"
-        : ext === "bmp"
-        ? "image/bmp"
-        : "image/png";
+          ? "image/gif"
+          : ext === "webp"
+            ? "image/webp"
+            : ext === "svg"
+              ? "image/svg+xml"
+              : ext === "bmp"
+                ? "image/bmp"
+                : "image/png";
     return { success: true, dataUrl: `data:${mime};base64,${data.toString("base64")}` };
   } catch (err) {
     return { success: false, message: err.message };
@@ -2140,8 +2193,9 @@ ipcMain.handle("bookmd:export-svg-as-png", async (event, request = {}) => {
  * remote images used to produce an SVG instead of a PNG.
  */
 async function renderSvgToPngBuffer(svgMarkup, scale = 2) {
-  const viewBoxMatch =
-    /viewBox\s*=\s*"([-\d.eE]+)\s+([-\d.eE]+)\s+([\d.eE]+)\s+([\d.eE]+)"/i.exec(svgMarkup);
+  const viewBoxMatch = /viewBox\s*=\s*"([-\d.eE]+)\s+([-\d.eE]+)\s+([\d.eE]+)\s+([\d.eE]+)"/i.exec(
+    svgMarkup,
+  );
   let naturalWidth = viewBoxMatch ? parseFloat(viewBoxMatch[3]) : 0;
   let naturalHeight = viewBoxMatch ? parseFloat(viewBoxMatch[4]) : 0;
 
@@ -2178,7 +2232,7 @@ async function renderSvgToPngBuffer(svgMarkup, scale = 2) {
     // large boards (inlined base64 images) are not limited by URL length.
     await offscreenWin.loadURL("about:blank");
     await offscreenWin.webContents.executeJavaScript(
-      `document.open();document.write(${JSON.stringify(pageHtml)});document.close();true;`
+      `document.open();document.write(${JSON.stringify(pageHtml)});document.close();true;`,
     );
     await new Promise((resolve) => setTimeout(resolve, 300));
 
@@ -2261,7 +2315,7 @@ ipcMain.handle("bookmd:copy-png-to-clipboard", async (event, request = {}) => {
     // The native clipboard does not need window focus or a user gesture, both
     // of which make navigator.clipboard.write() unreliable inside Electron.
     const image = nativeImage.createFromBuffer(
-      Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer)
+      Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer),
     );
     if (image.isEmpty()) return { success: false, message: "图片数据无效" };
     clipboard.writeImage(image);
@@ -2297,7 +2351,11 @@ ipcMain.handle("bookmd:print-to-pdf", async (event, request = {}) => {
 
   let prevBg = "#ffffff";
   try {
-    if (targetWin && !targetWin.isDestroyed() && typeof targetWin.getBackgroundColor === "function") {
+    if (
+      targetWin &&
+      !targetWin.isDestroyed() &&
+      typeof targetWin.getBackgroundColor === "function"
+    ) {
       prevBg = targetWin.getBackgroundColor();
       targetWin.setBackgroundColor("#ffffff");
     }
@@ -2321,7 +2379,11 @@ ipcMain.handle("bookmd:print-to-pdf", async (event, request = {}) => {
     return { success: false, message: err.message };
   } finally {
     try {
-      if (targetWin && !targetWin.isDestroyed() && typeof targetWin.setBackgroundColor === "function") {
+      if (
+        targetWin &&
+        !targetWin.isDestroyed() &&
+        typeof targetWin.setBackgroundColor === "function"
+      ) {
         targetWin.setBackgroundColor(prevBg);
       }
     } catch {}
@@ -2341,5 +2403,3 @@ ipcMain.handle("bookmd:print-document", async (event) => {
     return { success: false, message: err.message };
   }
 });
-
-

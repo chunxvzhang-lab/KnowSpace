@@ -123,7 +123,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     icon: "💻",
     category: "代码与结构",
     keywords: ["code", "dm", "daima", "block", "fence", "kaifa"],
-    template: "```typescript\n// 在此编写代码\nconsole.log(\"Hello KnowSpace\");\n```\n",
+    template: '```typescript\n// 在此编写代码\nconsole.log("Hello KnowSpace");\n```\n',
     cursorOffset: 14,
   },
   {
@@ -133,7 +133,8 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     icon: "📊",
     category: "代码与结构",
     keywords: ["table", "bg", "biaoge", "grid", "sheet"],
-    template: "| 标题 1 | 标题 2 | 标题 3 |\n| :--- | :--- | :--- |\n| 单元格 1 | 单元格 2 | 单元格 3 |\n| 单元格 4 | 单元格 5 | 单元格 6 |\n\n",
+    template:
+      "| 标题 1 | 标题 2 | 标题 3 |\n| :--- | :--- | :--- |\n| 单元格 1 | 单元格 2 | 单元格 3 |\n| 单元格 4 | 单元格 5 | 单元格 6 |\n\n",
     cursorOffset: 2,
   },
 
@@ -165,7 +166,8 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     icon: "🔀",
     category: "图表与公式",
     keywords: ["flowchart", "lc", "liucheng", "mermaid", "graph"],
-    template: "```mermaid\nflowchart TD\n    A[开始] --> B{判断条件}\n    B -- 是 --> C[执行步骤]\n    B -- 否 --> D[回退处理]\n    C --> E[结束]\n```\n",
+    template:
+      "```mermaid\nflowchart TD\n    A[开始] --> B{判断条件}\n    B -- 是 --> C[执行步骤]\n    B -- 否 --> D[回退处理]\n    C --> E[结束]\n```\n",
     cursorOffset: 27,
   },
   {
@@ -175,7 +177,8 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     icon: "⏱️",
     category: "图表与公式",
     keywords: ["sequence", "sx", "shixu", "uml", "timing"],
-    template: "```mermaid\nsequenceDiagram\n    autonumber\n    Client->>Server: 发起请求 (Request)\n    Server-->>Database: 查询数据\n    Database-->>Server: 返回结果\n    Server-->>Client: 响应成功 (200 OK)\n```\n",
+    template:
+      "```mermaid\nsequenceDiagram\n    autonumber\n    Client->>Server: 发起请求 (Request)\n    Server-->>Database: 查询数据\n    Database-->>Server: 返回结果\n    Server-->>Client: 响应成功 (200 OK)\n```\n",
     cursorOffset: 31,
   },
   {
@@ -185,7 +188,8 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     icon: "🧠",
     category: "图表与公式",
     keywords: ["mindmap", "dt", "daotu", "naotu", "tree"],
-    template: "```mermaid\nmindmap\n  root((中心主题))\n    核心分支A\n      子要点 1\n      子要点 2\n    核心分支B\n      子要点 3\n```\n",
+    template:
+      "```mermaid\nmindmap\n  root((中心主题))\n    核心分支A\n      子要点 1\n      子要点 2\n    核心分支B\n      子要点 3\n```\n",
     cursorOffset: 25,
   },
 
@@ -237,7 +241,8 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     icon: "🔽",
     category: "高级卡片",
     keywords: ["details", "zd", "zhedie", "summary", "collapse", "accordion"],
-    template: "<details>\n<summary>点击展开查看详情</summary>\n\n在此输入折叠隐藏的内容...\n\n</details>\n\n",
+    template:
+      "<details>\n<summary>点击展开查看详情</summary>\n\n在此输入折叠隐藏的内容...\n\n</details>\n\n",
     cursorOffset: 19,
   },
 
@@ -304,17 +309,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     description: "把句子里的关键部分挖空（==高亮== 同样算挖空）",
     icon: "✂️",
     category: "复习闪卡",
-    keywords: [
-      "card",
-      "flashcard",
-      "shanqia",
-      "ka",
-      "wakong",
-      "cloze",
-      "tiankong",
-      "复习",
-      "fuxi",
-    ],
+    keywords: ["card", "flashcard", "shanqia", "ka", "wakong", "cloze", "tiankong", "复习", "fuxi"],
     template: "把要考的写成 {{c1::答案}}，其余照常。\n",
     cursorOffset: 13,
   },
@@ -398,7 +393,7 @@ export function applySlashCommand(
   text: string,
   trigger: SlashTrigger,
   caret: number,
-  command: SlashCommand
+  command: SlashCommand,
 ): { text: string; caret: number } {
   const { text: inserted, cursorOffset } = getCommandTemplate(command);
   return {

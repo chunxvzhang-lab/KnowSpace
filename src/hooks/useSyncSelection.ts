@@ -13,11 +13,9 @@ type SyncSelectionOptions = {
 export function findMatchingPreviewElements(
   container: HTMLElement,
   startLine: number,
-  endLine: number
+  endLine: number,
 ): HTMLElement[] {
-  const elements = Array.from(
-    container.querySelectorAll<HTMLElement>("[data-source-line]")
-  );
+  const elements = Array.from(container.querySelectorAll<HTMLElement>("[data-source-line]"));
 
   const rawMatched: HTMLElement[] = [];
 
@@ -70,18 +68,16 @@ export function findMatchingPreviewElements(
  * Clears highlight from all elements in the container.
  */
 export function clearAllHighlights(container: HTMLElement): void {
-  const activeElements = container.querySelectorAll(".sync-highlight-active, .search-highlight-active");
+  const activeElements = container.querySelectorAll(
+    ".sync-highlight-active, .search-highlight-active",
+  );
   activeElements.forEach((el) => {
     el.classList.remove("sync-highlight-active");
     el.classList.remove("search-highlight-active");
   });
 }
 
-export function useSyncSelection({
-  containerRef,
-  viewMode,
-  editorViewRef,
-}: SyncSelectionOptions) {
+export function useSyncSelection({ containerRef, viewMode, editorViewRef }: SyncSelectionOptions) {
   const lockRef = useRef<"editor" | "preview" | null>(null);
   const lockTimerRef = useRef<number | null>(null);
   const highlightRafRef = useRef<number | null>(null);
@@ -136,7 +132,7 @@ export function useSyncSelection({
         }
       });
     },
-    [viewMode, containerRef, setLock]
+    [viewMode, containerRef, setLock],
   );
 
   // 2. Preview -> Editor Selection Sync
@@ -199,7 +195,7 @@ export function useSyncSelection({
         effects: EditorView.scrollIntoView(targetFrom, { y: "nearest" }),
       });
     },
-    [viewMode, editorViewRef, containerRef, setLock]
+    [viewMode, editorViewRef, containerRef, setLock],
   );
 
   // Clear highlight when exiting split mode

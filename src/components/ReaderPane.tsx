@@ -61,9 +61,12 @@ export const ReaderPane = memo(function ReaderPane({
   // Mermaid mutates the sanitized article HTML after React commits it. Keep
   // this prop stable so unrelated renders do not restore the pre-render HTML.
   const articleHtml = useMemo(() => ({ __html: chapter?.html ?? "" }), [chapter?.html]);
-  const attachReader = useCallback((node: HTMLElement | null) => {
-    containerRef.current = node;
-  }, [containerRef]);
+  const attachReader = useCallback(
+    (node: HTMLElement | null) => {
+      containerRef.current = node;
+    },
+    [containerRef],
+  );
 
   const attachArticle = useCallback((node: HTMLElement | null) => {
     articleRef.current = node;
@@ -87,7 +90,9 @@ export const ReaderPane = memo(function ReaderPane({
         ? undefined
         : wikiLinkTargets?.find((t) => {
             const tTitle = t.title.trim().toLowerCase();
-            const tFile = (t.relativePath?.split("/").pop() ?? "").replace(/\.(md|markdown|canvas)$/i, "").toLowerCase();
+            const tFile = (t.relativePath?.split("/").pop() ?? "")
+              .replace(/\.(md|markdown|canvas)$/i, "")
+              .toLowerCase();
             return tTitle === cleanTarget || tFile === cleanTarget;
           });
       const exists = isAnchorOnly || Boolean(foundTarget);
@@ -103,7 +108,7 @@ export const ReaderPane = memo(function ReaderPane({
         });
       }, 240);
     },
-    [wikiLinkTargets]
+    [wikiLinkTargets],
   );
 
   const handleMouseOut = useCallback((e: React.MouseEvent<HTMLElement>) => {
@@ -217,7 +222,7 @@ export const ReaderPane = memo(function ReaderPane({
         }
       }
     },
-    [onOpenLightbox, onWikiLinkClick]
+    [onOpenLightbox, onWikiLinkClick],
   );
 
   const handleMouseUp = useCallback(
@@ -226,14 +231,18 @@ export const ReaderPane = memo(function ReaderPane({
       const target = e.target as HTMLElement | null;
       if (!target) return;
       // Don't trigger selection jump if clicking copy button or lightbox media
-      if (target.closest(".code-header-bar") || target.tagName.toLowerCase() === "img" || target.closest("pre.mermaid")) {
+      if (
+        target.closest(".code-header-bar") ||
+        target.tagName.toLowerCase() === "img" ||
+        target.closest("pre.mermaid")
+      ) {
         return;
       }
       const selection = window.getSelection();
       const selectedText = selection ? selection.toString() : "";
       onElementClick(target, selectedText);
     },
-    [onElementClick]
+    [onElementClick],
   );
 
   // Decorate code blocks with language badge and copy button
@@ -272,7 +281,10 @@ export const ReaderPane = memo(function ReaderPane({
     const node = articleRef.current;
     if (!node?.querySelector("pre.mermaid")) return undefined;
     const renderToken = `${chapter?.checksum ?? ""}:${mermaidTheme}`;
-    if (node.dataset.mermaidRenderToken === renderToken && node.dataset.mermaidRenderStatus === "scheduled") {
+    if (
+      node.dataset.mermaidRenderToken === renderToken &&
+      node.dataset.mermaidRenderStatus === "scheduled"
+    ) {
       return undefined;
     }
     node.dataset.mermaidRenderToken = renderToken;
@@ -282,7 +294,8 @@ export const ReaderPane = memo(function ReaderPane({
       node.dataset.mermaidRenderStatus = "running";
       renderMermaid(node, { theme: mermaidTheme })
         .then(() => {
-          if (node.dataset.mermaidRenderToken === renderToken) node.dataset.mermaidRenderStatus = "done";
+          if (node.dataset.mermaidRenderToken === renderToken)
+            node.dataset.mermaidRenderStatus = "done";
         })
         .catch(() => {
           if (node.dataset.mermaidRenderToken === renderToken) {
@@ -297,7 +310,11 @@ export const ReaderPane = memo(function ReaderPane({
   }, [chapter?.checksum, mermaidTheme, onMermaidError]);
 
   return (
-    <main className="reader-pane" ref={attachReader} style={{ "--reader-scale": fontScale } as React.CSSProperties}>
+    <main
+      className="reader-pane"
+      ref={attachReader}
+      style={{ "--reader-scale": fontScale } as React.CSSProperties}
+    >
       {chapter?.frontMatter ? <FrontMatterCard data={chapter.frontMatter} /> : null}
       <article
         key={documentKey}
@@ -316,7 +333,9 @@ export const ReaderPane = memo(function ReaderPane({
           title="在侧边栏打开反向链接面板"
         >
           <GitFork size={14} className="text-cyan" />
-          <span>本文已被引用 <strong>{backlinksCount}</strong> 次</span>
+          <span>
+            本文已被引用 <strong>{backlinksCount}</strong> 次
+          </span>
           <span className="article-backlinks-action">在侧栏查看 ➔</span>
         </div>
       ) : null}

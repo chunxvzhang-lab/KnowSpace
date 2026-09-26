@@ -96,7 +96,14 @@ export function useSearch({
     return renderedChapter
       ? findInChapter(trimmed, renderedChapter.plainText, renderedChapter.headings, session?.source)
       : [];
-  }, [searchScope, vaultSearchIndex, searchQuery, isSearchActive, renderedChapter, session?.source]);
+  }, [
+    searchScope,
+    vaultSearchIndex,
+    searchQuery,
+    isSearchActive,
+    renderedChapter,
+    session?.source,
+  ]);
 
   const jumpToHeading = useCallback(
     (headingId: string, behavior: ScrollBehavior = "smooth", highlight: boolean = false) => {
@@ -112,14 +119,15 @@ export function useSearch({
           ? extractHeadingsFromSource(session.source)
           : [];
       const heading = allHeadings.find(
-        (h) => h.id === headingId || h.text.trim().toLowerCase() === headingId.trim().toLowerCase()
+        (h) => h.id === headingId || h.text.trim().toLowerCase() === headingId.trim().toLowerCase(),
       );
 
       // 1. If Reader pane is present (read or split mode), scroll preview accurately and scoped
       const container = readerRef.current;
       if (container) {
         const cleanBlockId = headingId.replace(/^[#^]+/, "");
-        const isBlockJump = headingId.startsWith("^") || headingId.includes("^") || cleanBlockId.length > 0;
+        const isBlockJump =
+          headingId.startsWith("^") || headingId.includes("^") || cleanBlockId.length > 0;
         let target =
           container.querySelector<HTMLElement>(`[data-heading-id="${CSS.escape(headingId)}"]`) ||
           container.querySelector<HTMLElement>(`#${CSS.escape(headingId)}`) ||
@@ -128,13 +136,15 @@ export function useSearch({
           container.querySelector<HTMLElement>(`#${CSS.escape(cleanBlockId)}`);
 
         if (!target) {
-          const headingsInDom = Array.from(container.querySelectorAll<HTMLElement>("h1, h2, h3, h4, h5, h6"));
+          const headingsInDom = Array.from(
+            container.querySelectorAll<HTMLElement>("h1, h2, h3, h4, h5, h6"),
+          );
           target =
             headingsInDom.find(
               (el) =>
                 el.id === headingId ||
                 el.getAttribute("data-heading-id") === headingId ||
-                el.textContent?.trim().toLowerCase() === headingId.toLowerCase()
+                el.textContent?.trim().toLowerCase() === headingId.toLowerCase(),
             ) || null;
         }
 
@@ -143,13 +153,16 @@ export function useSearch({
         }
 
         if (!target && heading?.text) {
-          const headingsInDom = Array.from(container.querySelectorAll<HTMLElement>("h1, h2, h3, h4, h5, h6"));
-          target = headingsInDom.find((el) => el.textContent?.trim() === heading.text.trim()) || null;
+          const headingsInDom = Array.from(
+            container.querySelectorAll<HTMLElement>("h1, h2, h3, h4, h5, h6"),
+          );
+          target =
+            headingsInDom.find((el) => el.textContent?.trim() === heading.text.trim()) || null;
         }
 
         if (target) {
           const blockParent = target.closest<HTMLElement>(
-            "p, li, blockquote, tr, pre, .task-list-item, div.admonition, figure"
+            "p, li, blockquote, tr, pre, .task-list-item, div.admonition, figure",
           );
           const scrollTarget = blockParent || target;
           const containerRect = container.getBoundingClientRect();
@@ -178,12 +191,14 @@ export function useSearch({
             if (!readerRef.current) return;
             const retryContainer = readerRef.current;
             const retryTarget =
-              retryContainer.querySelector<HTMLElement>(`[data-block-id="${CSS.escape(cleanBlockId)}"]`) ||
+              retryContainer.querySelector<HTMLElement>(
+                `[data-block-id="${CSS.escape(cleanBlockId)}"]`,
+              ) ||
               retryContainer.querySelector<HTMLElement>(`[id="^${CSS.escape(cleanBlockId)}"]`) ||
               retryContainer.querySelector<HTMLElement>(`#${CSS.escape(cleanBlockId)}`);
             if (retryTarget) {
               const retryParent = retryTarget.closest<HTMLElement>(
-                "p, li, blockquote, tr, pre, .task-list-item, div.admonition, figure"
+                "p, li, blockquote, tr, pre, .task-list-item, div.admonition, figure",
               );
               const retryScroll = retryParent || retryTarget;
               const cRect = retryContainer.getBoundingClientRect();
@@ -240,19 +255,32 @@ export function useSearch({
         }
       }
     },
-    [renderedChapter?.headings, session?.source, viewMode, editorViewRef, navLockUntilRef, readerRef, setActiveHeadingId]
+    [
+      renderedChapter?.headings,
+      session?.source,
+      viewMode,
+      editorViewRef,
+      navLockUntilRef,
+      readerRef,
+      setActiveHeadingId,
+    ],
   );
 
-  const jumpToRatio = useCallback((ratio: number) => {
-    const container = readerRef.current;
-    if (!container) return;
-    const max = container.scrollHeight - container.clientHeight;
-    container.scrollTo({ top: Math.max(0, max * ratio), behavior: "smooth" });
-  }, [readerRef]);
+  const jumpToRatio = useCallback(
+    (ratio: number) => {
+      const container = readerRef.current;
+      if (!container) return;
+      const max = container.scrollHeight - container.clientHeight;
+      container.scrollTo({ top: Math.max(0, max * ratio), behavior: "smooth" });
+    },
+    [readerRef],
+  );
 
   const clearSearchHighlights = useCallback(() => {
     // 1. Globally remove all search and sync highlight classes across document
-    const activeHighlights = document.querySelectorAll(".search-highlight-active, .sync-highlight-active");
+    const activeHighlights = document.querySelectorAll(
+      ".search-highlight-active, .sync-highlight-active",
+    );
     activeHighlights.forEach((el) => {
       el.classList.remove("search-highlight-active");
       el.classList.remove("sync-highlight-active");
@@ -318,121 +346,145 @@ export function useSearch({
     }
   }, []);
 
-  const handleSearchJump = useCallback((result: SearchResult) => {
-    setActiveSearchMatchId(result.id ?? `match-${result.index}`);
+  const handleSearchJump = useCallback(
+    (result: SearchResult) => {
+      setActiveSearchMatchId(result.id ?? `match-${result.index}`);
 
-    if (result.chapterId && result.chapterId !== chapterId) {
-      pendingNavigationRef.current = {
-        headingId: result.headingId,
-        lineNumber: result.lineNumber,
-        highlight: true,
-        searchResult: result,
-      };
-      selectChapterRef.current(result.chapterId);
-      return;
-    }
-
-    // If editor is active, scroll editor to matching line
-    if (editorViewRef.current && result.lineNumber) {
-      const editor = editorViewRef.current;
-      const totalLines = editor.state.doc.lines;
-      const safeLineNum = Math.min(Math.max(1, result.lineNumber), totalLines);
-      const line = editor.state.doc.line(safeLineNum);
-      editor.dispatch({
-        selection: { anchor: line.from, head: line.from },
-        effects: EditorView.scrollIntoView(line.from, { y: "start", yMargin: 40 }),
-      });
-      if (viewMode === "source") {
-        editor.focus();
+      if (result.chapterId && result.chapterId !== chapterId) {
+        pendingNavigationRef.current = {
+          headingId: result.headingId,
+          lineNumber: result.lineNumber,
+          highlight: true,
+          searchResult: result,
+        };
+        selectChapterRef.current(result.chapterId);
+        return;
       }
-    }
 
-    const container = readerRef.current;
-    if (!container) return;
-
-    // 1. Immediately wipe all previous highlights and marks across the whole DOM
-    clearSearchHighlights();
-
-    let targetElement: HTMLElement | null = null;
-    const queryText = (result.matchedText || searchQuery || "").trim().toLowerCase();
-
-    // 2. Try finding by source line number
-    if (result.lineNumber) {
-      const lineElements = Array.from(container.querySelectorAll<HTMLElement>("[data-source-line]"));
-      const targetStart = result.lineNumber;
-      const targetEnd = result.lineEndNumber ?? targetStart;
-
-      const matched = lineElements.filter((el) => {
-        const start = parseInt(el.getAttribute("data-source-line") || "0", 10);
-        const end = parseInt(el.getAttribute("data-source-line-end") || String(start), 10);
-        return Math.max(targetStart, start) <= Math.min(targetEnd, end);
-      });
-
-      if (matched.length > 0) {
-        // Priority 1: Check if there is an overarching block container (ol, ul, blockquote, pre, table, p)
-        // that encompasses the list/paragraph block
-        const containerBlock = matched.find((el) => {
-          const tag = el.tagName.toLowerCase();
-          return (
-            ["ol", "ul", "blockquote", "pre", "table", "p"].includes(tag) &&
-            matched.some((child) => child !== el && el.contains(child))
-          );
+      // If editor is active, scroll editor to matching line
+      if (editorViewRef.current && result.lineNumber) {
+        const editor = editorViewRef.current;
+        const totalLines = editor.state.doc.lines;
+        const safeLineNum = Math.min(Math.max(1, result.lineNumber), totalLines);
+        const line = editor.state.doc.line(safeLineNum);
+        editor.dispatch({
+          selection: { anchor: line.from, head: line.from },
+          effects: EditorView.scrollIntoView(line.from, { y: "start", yMargin: 40 }),
         });
-
-        // Priority 2: If there's an overarching container, highlight the entire broad block!
-        // Otherwise, if any matched item directly contains the queryText, prefer it; else use matched[0]
-        if (containerBlock) {
-          targetElement = containerBlock;
-        } else {
-          targetElement =
-            matched.find((el) => queryText && el.textContent?.toLowerCase().includes(queryText)) || matched[0];
+        if (viewMode === "source") {
+          editor.focus();
         }
       }
-    }
 
-    // 3. Fallback: Search by content/excerpt matching
-    if (!targetElement && queryText) {
-      const candidateBlocks = Array.from(
-        container.querySelectorAll<HTMLElement>(
-          ".markdown-body p, .markdown-body ol, .markdown-body ul, .markdown-body li, .markdown-body blockquote, .markdown-body pre, .markdown-body table, .markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4, .markdown-body h5, .markdown-body h6"
-        )
-      );
-      targetElement = candidateBlocks.find((el) => el.textContent?.toLowerCase().includes(queryText)) || null;
-    }
+      const container = readerRef.current;
+      if (!container) return;
 
-    // 4. Fallback: Search by headingId
-    if (!targetElement && result.headingId) {
-      targetElement = container.querySelector(`#${CSS.escape(result.headingId)}`);
-    }
+      // 1. Immediately wipe all previous highlights and marks across the whole DOM
+      clearSearchHighlights();
 
-    if (targetElement) {
-      // Highlight the entire broad block ("大片对应文段")
-      targetElement.classList.add("search-highlight-active");
+      let targetElement: HTMLElement | null = null;
+      const queryText = (result.matchedText || searchQuery || "").trim().toLowerCase();
 
-      // Highlight all matching keywords inside the block
-      highlightKeywordsInNode(targetElement, searchQuery);
+      // 2. Try finding by source line number
+      if (result.lineNumber) {
+        const lineElements = Array.from(
+          container.querySelectorAll<HTMLElement>("[data-source-line]"),
+        );
+        const targetStart = result.lineNumber;
+        const targetEnd = result.lineEndNumber ?? targetStart;
 
-      // Determine the best scroll target: if a keyword was marked inside, center on the first mark
-      const firstMark = targetElement.querySelector("mark.search-keyword-match") as HTMLElement | null;
-      const scrollAnchor = firstMark || targetElement;
+        const matched = lineElements.filter((el) => {
+          const start = parseInt(el.getAttribute("data-source-line") || "0", 10);
+          const end = parseInt(el.getAttribute("data-source-line-end") || String(start), 10);
+          return Math.max(targetStart, start) <= Math.min(targetEnd, end);
+        });
 
-      const containerRect = container.getBoundingClientRect();
-      const elRect = scrollAnchor.getBoundingClientRect();
-      const targetScrollTop = container.scrollTop + (elRect.top - containerRect.top) - containerRect.height / 3;
+        if (matched.length > 0) {
+          // Priority 1: Check if there is an overarching block container (ol, ul, blockquote, pre, table, p)
+          // that encompasses the list/paragraph block
+          const containerBlock = matched.find((el) => {
+            const tag = el.tagName.toLowerCase();
+            return (
+              ["ol", "ul", "blockquote", "pre", "table", "p"].includes(tag) &&
+              matched.some((child) => child !== el && el.contains(child))
+            );
+          });
 
-      container.scrollTo({
-        top: Math.max(0, targetScrollTop),
-        behavior: "smooth",
-      });
+          // Priority 2: If there's an overarching container, highlight the entire broad block!
+          // Otherwise, if any matched item directly contains the queryText, prefer it; else use matched[0]
+          if (containerBlock) {
+            targetElement = containerBlock;
+          } else {
+            targetElement =
+              matched.find(
+                (el) => queryText && el.textContent?.toLowerCase().includes(queryText),
+              ) || matched[0];
+          }
+        }
+      }
 
-      // Trigger pulse animation
-      targetElement.style.animation = "none";
-      void targetElement.offsetHeight; // Force reflow
-      targetElement.style.animation = "searchPulse 1.8s cubic-bezier(0.16, 1, 0.3, 1)";
-    } else {
-      jumpToRatio(result.index / Math.max(1, renderedChapter?.plainText.length ?? 1));
-    }
-  }, [clearSearchHighlights, highlightKeywordsInNode, jumpToRatio, renderedChapter, searchQuery, chapterId, editorViewRef, pendingNavigationRef, readerRef, selectChapterRef, setActiveSearchMatchId, viewMode]);
+      // 3. Fallback: Search by content/excerpt matching
+      if (!targetElement && queryText) {
+        const candidateBlocks = Array.from(
+          container.querySelectorAll<HTMLElement>(
+            ".markdown-body p, .markdown-body ol, .markdown-body ul, .markdown-body li, .markdown-body blockquote, .markdown-body pre, .markdown-body table, .markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4, .markdown-body h5, .markdown-body h6",
+          ),
+        );
+        targetElement =
+          candidateBlocks.find((el) => el.textContent?.toLowerCase().includes(queryText)) || null;
+      }
+
+      // 4. Fallback: Search by headingId
+      if (!targetElement && result.headingId) {
+        targetElement = container.querySelector(`#${CSS.escape(result.headingId)}`);
+      }
+
+      if (targetElement) {
+        // Highlight the entire broad block ("大片对应文段")
+        targetElement.classList.add("search-highlight-active");
+
+        // Highlight all matching keywords inside the block
+        highlightKeywordsInNode(targetElement, searchQuery);
+
+        // Determine the best scroll target: if a keyword was marked inside, center on the first mark
+        const firstMark = targetElement.querySelector(
+          "mark.search-keyword-match",
+        ) as HTMLElement | null;
+        const scrollAnchor = firstMark || targetElement;
+
+        const containerRect = container.getBoundingClientRect();
+        const elRect = scrollAnchor.getBoundingClientRect();
+        const targetScrollTop =
+          container.scrollTop + (elRect.top - containerRect.top) - containerRect.height / 3;
+
+        container.scrollTo({
+          top: Math.max(0, targetScrollTop),
+          behavior: "smooth",
+        });
+
+        // Trigger pulse animation
+        targetElement.style.animation = "none";
+        void targetElement.offsetHeight; // Force reflow
+        targetElement.style.animation = "searchPulse 1.8s cubic-bezier(0.16, 1, 0.3, 1)";
+      } else {
+        jumpToRatio(result.index / Math.max(1, renderedChapter?.plainText.length ?? 1));
+      }
+    },
+    [
+      clearSearchHighlights,
+      highlightKeywordsInNode,
+      jumpToRatio,
+      renderedChapter,
+      searchQuery,
+      chapterId,
+      editorViewRef,
+      pendingNavigationRef,
+      readerRef,
+      selectChapterRef,
+      setActiveSearchMatchId,
+      viewMode,
+    ],
+  );
   return {
     searchResults,
     jumpToHeading,

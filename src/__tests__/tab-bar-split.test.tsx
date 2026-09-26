@@ -26,7 +26,7 @@ describe("TabBar Dual Split Context Menu & Indicators", () => {
         onCloseRightTabs={vi.fn()}
         onOpenDualSplit={onOpenDualSplit}
         onCloseDualSplit={onCloseDualSplit}
-      />
+      />,
     );
 
     expect(screen.getByText("Chapter 1")).toBeDefined();
@@ -62,7 +62,7 @@ describe("TabBar Dual Split Context Menu & Indicators", () => {
         onCloseRightTabs={vi.fn()}
         onOpenDualSplit={onOpenDualSplit}
         onCloseDualSplit={onCloseDualSplit}
-      />
+      />,
     );
 
     // Should display split badge
@@ -89,7 +89,7 @@ describe("TabBar Dual Split Context Menu & Indicators", () => {
         onCloseOtherTabs={vi.fn()}
         onCloseRightTabs={vi.fn()}
         onDetachTab={onDetachTab}
-      />
+      />,
     );
 
     const tab3 = screen.getByText("Chapter 3").closest(".tab-item");

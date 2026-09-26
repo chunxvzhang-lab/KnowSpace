@@ -65,8 +65,7 @@ describe("Command Palette & Quick Switcher Logic", () => {
     const query = "pdf";
     const matched = mockManifest.chapters.filter(
       (c) =>
-        c.title.toLowerCase().includes(query) ||
-        (c.src && c.src.toLowerCase().includes(query))
+        c.title.toLowerCase().includes(query) || (c.src && c.src.toLowerCase().includes(query)),
     );
 
     expect(matched.length).toBe(1);
@@ -83,7 +82,7 @@ describe("Command Palette & Quick Switcher Logic", () => {
       (a) =>
         a.title.toLowerCase().includes(term) ||
         (a.description && a.description.toLowerCase().includes(term)) ||
-        a.category.toLowerCase().includes(term)
+        a.category.toLowerCase().includes(term),
     );
 
     expect(matchedActions.length).toBe(1);
@@ -96,9 +95,7 @@ describe("Command Palette & Quick Switcher Logic", () => {
     expect(isHeadingMode).toBe(true);
 
     const term = rawQuery.slice(1).trim().toLowerCase();
-    const matchedHeadings = mockHeadings.filter((h) =>
-      h.text.toLowerCase().includes(term)
-    );
+    const matchedHeadings = mockHeadings.filter((h) => h.text.toLowerCase().includes(term));
 
     expect(matchedHeadings.length).toBe(1);
     expect(matchedHeadings[0].id).toBe("h-3");

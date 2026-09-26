@@ -15,10 +15,7 @@ import type {
 /**
  * Builds a hierarchical multi-way tree from linear document headings.
  */
-export function buildMindmapTree(
-  docTitle: string,
-  headings: Heading[]
-): MindmapNode {
+export function buildMindmapTree(docTitle: string, headings: Heading[]): MindmapNode {
   const cleanTitle = (docTitle || "无标题文档").replace(/\.md$/i, "").trim();
   const root: MindmapNode = {
     id: "root-mindmap-node",
@@ -115,7 +112,7 @@ export function parseStyleComment(line: string): {
         result.fontSize = num;
       }
     } else if (key === "fontweight" || key === "bold") {
-      result.fontWeight = (val === "bold" || val === "true") ? "bold" : "normal";
+      result.fontWeight = val === "bold" || val === "true" ? "bold" : "normal";
     } else if (key === "textcolor") {
       result.textColor = val;
     } else if (key === "bordercolor") {
@@ -162,10 +159,7 @@ export function formatStyleComment(node: Partial<MindmapNode>): string {
 /**
  * Parses markdown content (both indented bullet lists and headings) into an interactive MindmapNode tree.
  */
-export function parseMarkdownToMindmapTree(
-  source: string,
-  defaultTitle = "中心主题"
-): MindmapNode {
+export function parseMarkdownToMindmapTree(source: string, defaultTitle = "中心主题"): MindmapNode {
   if (!source || !source.trim()) {
     return {
       id: "root-mindmap-node",
@@ -220,7 +214,12 @@ export function parseMarkdownToMindmapTree(
       const level = match[1].length;
       const rawText = match[2].trim().replace(/\s\^[a-zA-Z0-9_-]+$/, "");
       const parsed = parseStyleComment(rawText);
-      if (level === 1 && parsed.cleanText === rootTitle && rootHeadingFound && subHeadingCount === 0) {
+      if (
+        level === 1 &&
+        parsed.cleanText === rootTitle &&
+        rootHeadingFound &&
+        subHeadingCount === 0
+      ) {
         continue;
       }
       subHeadingCount++;
@@ -289,7 +288,13 @@ export function parseMarkdownToMindmapTree(
   }
 
   // Step 4: Parse Markdown headings (#, ##, ###)
-  const headings: { id: string; text: string; level: number; line: number; style?: ReturnType<typeof parseStyleComment> }[] = [];
+  const headings: {
+    id: string;
+    text: string;
+    level: number;
+    line: number;
+    style?: ReturnType<typeof parseStyleComment>;
+  }[] = [];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     const match = line.match(headingRegex);
@@ -312,9 +317,7 @@ export function parseMarkdownToMindmapTree(
   }
 
   if (headings.length > 0) {
-    const stack: { node: MindmapNode; level: number }[] = [
-      { node: root, level: 0 },
-    ];
+    const stack: { node: MindmapNode; level: number }[] = [{ node: root, level: 0 }];
     for (const h of headings) {
       const node: MindmapNode = {
         id: h.id,
@@ -376,7 +379,7 @@ export function mindmapTreeToMarkdown(tree: MindmapNode): string {
 
 /**
  * Non-destructively synchronizes the MindmapNode tree back to the original Markdown document.
- * 
+ *
  * Preserves 100% of all section body content (paragraphs, code blocks, tables, LaTeX math,
  * block references, images, etc.) without mass rewriting or data destruction.
  * Only updates heading titles, levels, order, and handles adding/removing sections.
@@ -482,7 +485,7 @@ export function syncMindmapToDocument(originalMarkdown: string, tree: MindmapNod
     // Priority 1: Match by line
     if (node.line) {
       const idx = sections.findIndex(
-        (s, i) => !matchedSectionIndices.has(i) && s.originalLine === node.line
+        (s, i) => !matchedSectionIndices.has(i) && s.originalLine === node.line,
       );
       if (idx !== -1) return idx;
     }
@@ -492,7 +495,7 @@ export function syncMindmapToDocument(originalMarkdown: string, tree: MindmapNod
     if (idMatch) {
       const targetLine = parseInt(idMatch[1], 10);
       const idx = sections.findIndex(
-        (s, i) => !matchedSectionIndices.has(i) && s.originalLine === targetLine
+        (s, i) => !matchedSectionIndices.has(i) && s.originalLine === targetLine,
       );
       if (idx !== -1) return idx;
     }
@@ -501,7 +504,7 @@ export function syncMindmapToDocument(originalMarkdown: string, tree: MindmapNod
     const clean = node.text.trim().toLowerCase();
     if (clean) {
       const idx = sections.findIndex(
-        (s, i) => !matchedSectionIndices.has(i) && s.cleanTitle === clean
+        (s, i) => !matchedSectionIndices.has(i) && s.cleanTitle === clean,
       );
       if (idx !== -1) return idx;
     }
@@ -624,7 +627,7 @@ export function findSibling(tree: MindmapNode, id: string, delta: number): Mindm
 export function addChildNode(
   tree: MindmapNode,
   parentId: string,
-  text = "新建子主题"
+  text = "新建子主题",
 ): { nextTree: MindmapNode; newNodeId: string } {
   const nextTree = cloneTree(tree);
   const target = findNode(nextTree, parentId);
@@ -649,7 +652,7 @@ export function addChildNode(
 export function addSiblingNode(
   tree: MindmapNode,
   targetId: string,
-  text = "新建主题"
+  text = "新建主题",
 ): { nextTree: MindmapNode; newNodeId: string } {
   const nextTree = cloneTree(tree);
   const newNodeId = `node-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
@@ -683,7 +686,7 @@ export function addSiblingNode(
 
 export function deleteNode(
   tree: MindmapNode,
-  nodeId: string
+  nodeId: string,
 ): { nextTree: MindmapNode; fallbackSelectedId: string } {
   // Root node cannot be deleted
   if (nodeId === tree.id || nodeId === "root-mindmap-node") {
@@ -704,11 +707,7 @@ export function deleteNode(
   return { nextTree, fallbackSelectedId: parent.id };
 }
 
-export function updateNodeText(
-  tree: MindmapNode,
-  nodeId: string,
-  newText: string
-): MindmapNode {
+export function updateNodeText(tree: MindmapNode, nodeId: string, newText: string): MindmapNode {
   const nextTree = cloneTree(tree);
   const node = findNode(nextTree, nodeId);
   if (node) {
@@ -759,7 +758,7 @@ export function measureTextWidth(text: string, fontSize: number, bold = false): 
 export function wrapMindmapText(
   rawText: string,
   maxAvailableWidth: number,
-  fontSize: number
+  fontSize: number,
 ): string[] {
   if (!rawText) return [""];
   const safeMaxWidth = Math.max(40, maxAvailableWidth);
@@ -778,12 +777,7 @@ export function wrapMindmapText(
     for (let i = 0; i < para.length; i++) {
       const char = para[i];
       const code = char.charCodeAt(0);
-      const charW =
-        code === 32
-          ? fontSize * 0.35
-          : code > 127
-          ? fontSize * 1.05
-          : fontSize * 0.75;
+      const charW = code === 32 ? fontSize * 0.35 : code > 127 ? fontSize * 1.05 : fontSize * 0.75;
 
       if (currentLineWidth + charW > safeMaxWidth && currentLine.length > 0) {
         resultLines.push(currentLine);
@@ -806,9 +800,11 @@ export function wrapMindmapText(
 /**
  * Calculates adaptive or customized width, height, and wrapped text lines for a node.
  */
-export function calculateNodeDimensions(
-  node: MindmapNode
-): { width: number; height: number; lines: string[] } {
+export function calculateNodeDimensions(node: MindmapNode): {
+  width: number;
+  height: number;
+  lines: string[];
+} {
   const isRoot = node.level === 0;
   const basePadX = isRoot ? 40 : 28;
   const basePadY = isRoot ? 14 : 10;
@@ -832,7 +828,7 @@ export function calculateNodeDimensions(
     const rawParagraphs = (node.text || "").split(/\r?\n/);
     const maxParaWidth = Math.max(
       ...rawParagraphs.map((p) => measureTextWidth(p, effectiveSize, isBold)),
-      0
+      0,
     );
 
     if (maxParaWidth + basePadX <= maxAutoWidth) {
@@ -843,7 +839,7 @@ export function calculateNodeDimensions(
       lines = wrapMindmapText(node.text, innerWidth, effectiveSize);
       const maxLineWidth = Math.max(
         ...lines.map((l) => measureTextWidth(l, effectiveSize, isBold)),
-        0
+        0,
       );
       width = Math.max(minAutoWidth, Math.min(maxAutoWidth, Math.round(maxLineWidth + basePadX)));
     }
@@ -877,7 +873,7 @@ export function updateNodeStyle(
     textAlign?: MindmapTextAlign;
     customWidth?: number;
     customHeight?: number;
-  }
+  },
 ): MindmapNode {
   return updateNodesStyle(tree, [nodeId], styles);
 }
@@ -897,7 +893,7 @@ export function updateNodesStyle(
     textAlign?: MindmapTextAlign;
     customWidth?: number;
     customHeight?: number;
-  }
+  },
 ): MindmapNode {
   const nextTree = cloneTree(tree);
   const idSet = new Set(nodeIds);
@@ -914,10 +910,14 @@ export function updateNodesStyle(
       if ("borderColor" in styles) node.borderColor = styles.borderColor || undefined;
       if ("textAlign" in styles) node.textAlign = styles.textAlign || undefined;
       if ("customWidth" in styles) {
-        node.customWidth = styles.customWidth && styles.customWidth > 0 ? Math.round(styles.customWidth) : undefined;
+        node.customWidth =
+          styles.customWidth && styles.customWidth > 0 ? Math.round(styles.customWidth) : undefined;
       }
       if ("customHeight" in styles) {
-        node.customHeight = styles.customHeight && styles.customHeight > 0 ? Math.round(styles.customHeight) : undefined;
+        node.customHeight =
+          styles.customHeight && styles.customHeight > 0
+            ? Math.round(styles.customHeight)
+            : undefined;
       }
     }
     if (node.children) {
@@ -970,7 +970,7 @@ export function copySubtree(tree: MindmapNode, nodeId: string): MindmapNode | nu
 export function pasteSubtree(
   tree: MindmapNode,
   parentId: string | undefined,
-  subtree: MindmapNode
+  subtree: MindmapNode,
 ): { nextTree: MindmapNode; newNodeId: string } | null {
   if (!subtree) return null;
 
@@ -1011,7 +1011,7 @@ export function planDrop(
   tree: MindmapNode,
   movingNodeId: string,
   targetId: string,
-  position: "before" | "after" | "child"
+  position: "before" | "after" | "child",
 ): { parentId: string; index: number } | null {
   if (movingNodeId === targetId) return null;
 
@@ -1049,11 +1049,7 @@ export function planDrop(
  * including the shift correction, and having one implementation means the two
  * cannot disagree.
  */
-export function moveWithinSiblings(
-  tree: MindmapNode,
-  nodeId: string,
-  delta: number
-): MindmapNode {
+export function moveWithinSiblings(tree: MindmapNode, nodeId: string, delta: number): MindmapNode {
   const parent = findParent(tree, nodeId);
   if (!parent) return tree;
 
@@ -1078,7 +1074,7 @@ export function reparentNode(
   root: MindmapNode,
   movingNodeId: string,
   newParentId: string,
-  targetIndex?: number
+  targetIndex?: number,
 ): MindmapNode {
   // Root node cannot be moved, and cannot move node to itself
   if (movingNodeId === root.id || movingNodeId === newParentId) {
@@ -1143,7 +1139,11 @@ export function reparentNode(
   updateLevels(detachedNode, newParent.level + 1);
 
   // Insert into newParent's children
-  if (typeof targetIndex === "number" && targetIndex >= 0 && targetIndex <= newParent.children.length) {
+  if (
+    typeof targetIndex === "number" &&
+    targetIndex >= 0 &&
+    targetIndex <= newParent.children.length
+  ) {
     newParent.children.splice(targetIndex, 0, detachedNode);
   } else {
     newParent.children.push(detachedNode);
@@ -1164,7 +1164,7 @@ export function reparentNode(
 export function searchMindmapNodes(
   root: MindmapNode,
   query: string,
-  describeExtra?: (nodeId: string) => string
+  describeExtra?: (nodeId: string) => string,
 ): string[] {
   const clean = (query || "").trim().toLowerCase();
   if (!clean) return [];

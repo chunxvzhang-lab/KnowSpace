@@ -213,11 +213,19 @@ async function collectMarkdownFilesDetailed(rootPath, basePath) {
 
   for (let cursor = 0; cursor < directories.length;) {
     if (Date.now() - startedAt > DIRECTORY_SCAN_BUDGET_MS) {
-      truncated = { reason: "time", seen: files.length, remainingDirs: directories.length - cursor };
+      truncated = {
+        reason: "time",
+        seen: files.length,
+        remainingDirs: directories.length - cursor,
+      };
       break;
     }
     if (files.length >= MAX_DIRECTORY_SCAN_FILES) {
-      truncated = { reason: "files", seen: files.length, remainingDirs: directories.length - cursor };
+      truncated = {
+        reason: "files",
+        seen: files.length,
+        remainingDirs: directories.length - cursor,
+      };
       break;
     }
 
@@ -421,7 +429,12 @@ async function readMarkdownSource(absolutePath) {
   const rawBuffer = await fs.readFile(resolvedPath);
   let hasBom = false;
   let text = "";
-  if (rawBuffer.length >= 3 && rawBuffer[0] === 0xef && rawBuffer[1] === 0xbb && rawBuffer[2] === 0xbf) {
+  if (
+    rawBuffer.length >= 3 &&
+    rawBuffer[0] === 0xef &&
+    rawBuffer[1] === 0xbb &&
+    rawBuffer[2] === 0xbf
+  ) {
     hasBom = true;
     text = rawBuffer.subarray(3).toString("utf8");
   } else {
@@ -499,7 +512,11 @@ async function readOutlineFile(absolutePath) {
     // an unambiguous string cannot be mangled by however a given Electron version
     // chooses to serialize a typed array.
     const bytes = await fs.readFile(resolvedPath);
-    return { success: true, contentBase64: bytes.toString("base64"), fileName: path.basename(resolvedPath) };
+    return {
+      success: true,
+      contentBase64: bytes.toString("base64"),
+      fileName: path.basename(resolvedPath),
+    };
   } catch (error) {
     return { success: false, message: `无法读取文件：${error.message}` };
   }
@@ -525,7 +542,7 @@ async function readMarkdownSourcesBatch(absolutePaths) {
       } catch {
         return null;
       }
-    })
+    }),
   );
   return results.filter(Boolean);
 }
@@ -544,7 +561,10 @@ async function atomicWriteFile(filePath, content, options = {}) {
   const dir = path.dirname(resolvedPath);
   await fs.mkdir(dir, { recursive: true });
 
-  const tempPath = path.join(dir, `.bookmd-tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.tmp`);
+  const tempPath = path.join(
+    dir,
+    `.bookmd-tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.tmp`,
+  );
 
   let fileContent = content;
   if (options.lineEnding === "\r\n") {
@@ -574,7 +594,10 @@ async function atomicWriteFile(filePath, content, options = {}) {
     try {
       await fs.rename(tempPath, resolvedPath);
     } catch (renameErr) {
-      if (renameErr && (renameErr.code === "EPERM" || renameErr.code === "EEXIST" || renameErr.code === "EBUSY")) {
+      if (
+        renameErr &&
+        (renameErr.code === "EPERM" || renameErr.code === "EEXIST" || renameErr.code === "EBUSY")
+      ) {
         await fs.copyFile(tempPath, resolvedPath);
         await fs.unlink(tempPath).catch(() => {});
       } else {
@@ -587,7 +610,14 @@ async function atomicWriteFile(filePath, content, options = {}) {
   }
 }
 
-async function saveMarkdownFile({ absolutePath, content, expectedVersion, force = false, hasBom, lineEnding }) {
+async function saveMarkdownFile({
+  absolutePath,
+  content,
+  expectedVersion,
+  force = false,
+  hasBom,
+  lineEnding,
+}) {
   if (!isValidMarkdownPath(absolutePath)) {
     return {
       success: false,

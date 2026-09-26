@@ -47,7 +47,8 @@ export function buildZip(entries: ZipEntrySpec[], comment = ""): Uint8Array {
   const push32 = (value: number) =>
     bytes.push(value & 0xff, (value >> 8) & 0xff, (value >> 16) & 0xff, (value >> 24) & 0xff);
 
-  const directory: { entry: ZipEntrySpec; offset: number; stored: Uint8Array; checksum: number }[] = [];
+  const directory: { entry: ZipEntrySpec; offset: number; stored: Uint8Array; checksum: number }[] =
+    [];
 
   for (const entry of entries) {
     const raw = entry.deflate ? new Uint8Array(deflateRawSync(entry.data)) : entry.data;
@@ -113,7 +114,11 @@ export function buildZip(entries: ZipEntrySpec[], comment = ""): Uint8Array {
 /** An `.xmind` is an archive holding one `content.json`. */
 export function buildXmind(content: unknown, extra: ZipEntrySpec[] = []): Uint8Array {
   return buildZip([
-    { name: "content.json", data: new TextEncoder().encode(JSON.stringify(content)), deflate: true },
+    {
+      name: "content.json",
+      data: new TextEncoder().encode(JSON.stringify(content)),
+      deflate: true,
+    },
     { name: "metadata.json", data: new TextEncoder().encode("{}") },
     ...extra,
   ]);

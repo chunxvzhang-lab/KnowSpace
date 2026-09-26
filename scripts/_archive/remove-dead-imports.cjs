@@ -65,11 +65,15 @@ for (const [relFile, names] of targets) {
         .split(",")
         .map((p) => p.trim())
         .filter(Boolean)
-        .filter((p) => p.replace(/^type\s+/, "").split(/\s+as\s+/).pop() !== name);
+        .filter(
+          (p) =>
+            p
+              .replace(/^type\s+/, "")
+              .split(/\s+as\s+/)
+              .pop() !== name,
+        );
 
-      const rebuilt = kept.length
-        ? stmt.replace(braced[0], `{ ${kept.join(", ")} }`)
-        : ""; // nothing left, drop the whole statement
+      const rebuilt = kept.length ? stmt.replace(braced[0], `{ ${kept.join(", ")} }`) : ""; // nothing left, drop the whole statement
       edits.push({ from: m.index, to: m.index + stmt.length, text: rebuilt });
     }
 

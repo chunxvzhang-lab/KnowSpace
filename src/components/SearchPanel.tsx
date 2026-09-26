@@ -1,5 +1,16 @@
 import { useState, useRef, useMemo } from "react";
-import { Search, X, Hash, Tag, Link2, Quote, MinusCircle, FileText, Globe, BookOpen } from "lucide-react";
+import {
+  Search,
+  X,
+  Hash,
+  Tag,
+  Link2,
+  Quote,
+  MinusCircle,
+  FileText,
+  Globe,
+  BookOpen,
+} from "lucide-react";
 import type { SearchResult } from "../core/types";
 import { parseSearchQuery } from "../services/searchIndexService";
 
@@ -42,7 +53,9 @@ function renderHighlightedText(text: string, rawQuery: string) {
   }
 
   // Sort candidate terms by length descending to match longest matches first
-  const terms = Array.from(candidates).filter(Boolean).sort((a, b) => b.length - a.length);
+  const terms = Array.from(candidates)
+    .filter(Boolean)
+    .sort((a, b) => b.length - a.length);
   if (terms.length === 0) return text;
 
   // Build combined regex
@@ -137,7 +150,7 @@ export function SearchPanel({
           data-search-input
           placeholder={
             activeScope === "vault"
-              ? "全库混合检索 (支持 tag:#, link:[[, \"短语\")..."
+              ? '全库混合检索 (支持 tag:#, link:[[, "短语")...'
               : "搜索章节关键字 (支持 tag:#, link:[[)..."
           }
           value={query}
@@ -179,7 +192,7 @@ export function SearchPanel({
         <button
           type="button"
           className="search-syntax-chip"
-          title="执行严格连续短语检索，如 &quot;raft consensus&quot;"
+          title='执行严格连续短语检索，如 "raft consensus"'
           onClick={() => handleQuickInsert('""')}
         >
           <Quote size={10} />
@@ -202,7 +215,9 @@ export function SearchPanel({
           <span>
             共找到 <strong>{results.length}</strong> 处匹配
             {results.length > 100 ? "（已展示前 100 条最相关结果）" : ""}
-            {activeScope === "vault" && uniqueDocsCount > 0 ? ` · 涉及 ${uniqueDocsCount} 篇文档` : ""}
+            {activeScope === "vault" && uniqueDocsCount > 0
+              ? ` · 涉及 ${uniqueDocsCount} 篇文档`
+              : ""}
           </span>
         </div>
       ) : null}
@@ -230,9 +245,20 @@ export function SearchPanel({
               onClick={() => onJump(result)}
             >
               <div className="search-result-header">
-                <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0, overflow: "hidden" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    minWidth: 0,
+                    overflow: "hidden",
+                  }}
+                >
                   {activeScope === "vault" && result.chapterTitle && (
-                    <span className="search-chapter-badge" title={`所属章节: ${result.chapterTitle}`}>
+                    <span
+                      className="search-chapter-badge"
+                      title={`所属章节: ${result.chapterTitle}`}
+                    >
                       <FileText size={10} style={{ flexShrink: 0 }} />
                       <span className="search-chapter-badge-text">{result.chapterTitle}</span>
                     </span>
@@ -242,14 +268,16 @@ export function SearchPanel({
 
                 <div className="search-result-meta-row">
                   {result.matchCountInBlock && result.matchCountInBlock > 1 ? (
-                    <span className="search-block-count-tag" title={`该文段中包含 ${result.matchCountInBlock} 处匹配`}>
+                    <span
+                      className="search-block-count-tag"
+                      title={`该文段中包含 ${result.matchCountInBlock} 处匹配`}
+                    >
                       {result.matchCountInBlock} 处匹配
                     </span>
                   ) : null}
                   {result.lineNumber ? (
                     <span className="search-line-tag">
-                      <Hash size={10} style={{ marginRight: 2 }} />
-                      L{result.lineNumber}
+                      <Hash size={10} style={{ marginRight: 2 }} />L{result.lineNumber}
                       {result.lineEndNumber && result.lineEndNumber > result.lineNumber
                         ? `-${result.lineEndNumber}`
                         : ""}
@@ -259,7 +287,8 @@ export function SearchPanel({
               </div>
 
               {/* Tags & Links indicators on card */}
-              {((result.tags && result.tags.length > 0) || (result.links && result.links.length > 0)) && (
+              {((result.tags && result.tags.length > 0) ||
+                (result.links && result.links.length > 0)) && (
                 <div className="search-result-badges-row">
                   {result.tags?.slice(0, 3).map((t) => (
                     <span key={t} className="search-card-pill tag-pill">
@@ -282,7 +311,10 @@ export function SearchPanel({
         })}
 
         {results.length > 100 && (
-          <div className="muted-panel" style={{ textAlign: "center", padding: "10px 12px", fontSize: 11, opacity: 0.75 }}>
+          <div
+            className="muted-panel"
+            style={{ textAlign: "center", padding: "10px 12px", fontSize: 11, opacity: 0.75 }}
+          >
             仅展示前 100 条最相关结果。如需精确定位，请补充关键词或使用标签、双链语法。
           </div>
         )}

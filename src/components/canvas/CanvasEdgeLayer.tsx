@@ -69,7 +69,7 @@ type CanvasEdgeLayerProps = {
     event: ReactMouseEvent,
     edgeId: string,
     orientation: "horizontal" | "vertical",
-    offset: number
+    offset: number,
   ) => void;
   onResetStepOffset: (edgeId: string) => void;
 };
@@ -151,8 +151,8 @@ export const CanvasEdgeLayer = memo(function CanvasEdgeLayer({
           new Set(
             edges
               .map((e) => e.color)
-              .filter((c): c is string => typeof c === "string" && c.startsWith("#"))
-          )
+              .filter((c): c is string => typeof c === "string" && c.startsWith("#")),
+          ),
         ).map((hex) => (
           <marker
             key={hex}
@@ -187,7 +187,7 @@ export const CanvasEdgeLayer = memo(function CanvasEdgeLayer({
         const ringArc = edge.gridPath ? undefined : getEdgeRing(edge);
         const effectiveStyle = edge.gridPath ? "straight" : edge.style;
         const edgeObstacles = obstacles.filter(
-          (o) => o.id !== edge.fromNode && o.id !== edge.toNode
+          (o) => o.id !== edge.fromNode && o.id !== edge.toNode,
         );
         const pathData = computeEdgePath(
           p1,
@@ -197,7 +197,7 @@ export const CanvasEdgeLayer = memo(function CanvasEdgeLayer({
           effectiveStyle,
           edge.stepOffset,
           ringArc,
-          edgeObstacles
+          edgeObstacles,
         );
         // On a ring the origin dot must sit on the circle, not on the raw
         // card anchor point.
@@ -209,15 +209,16 @@ export const CanvasEdgeLayer = memo(function CanvasEdgeLayer({
           effectiveColorKey && CANVAS_COLOR_PALETTES[effectiveColorKey]
             ? CANVAS_COLOR_PALETTES[effectiveColorKey].stroke
             : effectiveColorKey?.startsWith("#")
-            ? effectiveColorKey
-            : colors.edgeColor;
+              ? effectiveColorKey
+              : colors.edgeColor;
 
         const getMarkerUrl = (col?: string, selected?: boolean) => {
           if (selected && !edge.color) return "url(#canvas-arrow-selected)";
           const activeCol = col || effectiveColorKey;
           if (!activeCol) return "url(#canvas-arrow-default)";
           if (CANVAS_COLOR_PALETTES[activeCol]) return `url(#canvas-arrow-${activeCol})`;
-          if (activeCol.startsWith("#")) return `url(#canvas-arrow-${activeCol.replace("#", "hex-")})`;
+          if (activeCol.startsWith("#"))
+            return `url(#canvas-arrow-${activeCol.replace("#", "hex-")})`;
           return "url(#canvas-arrow-default)";
         };
 
@@ -225,25 +226,21 @@ export const CanvasEdgeLayer = memo(function CanvasEdgeLayer({
           edge.strokePattern === "dashed"
             ? "7 4"
             : edge.strokePattern === "dotted"
-            ? "2.5 4"
-            : undefined;
+              ? "2.5 4"
+              : undefined;
 
         const isEdgeConnectedToCurrentSlide =
           presentation.active &&
           (edge.fromNode === presentation.sequence[presentation.index] ||
             edge.toNode === presentation.sequence[presentation.index]);
-        const edgeOpacity = presentation.active
-          ? isEdgeConnectedToCurrentSlide
-            ? 1
-            : 0.1
-          : 1;
+        const edgeOpacity = presentation.active ? (isEdgeConnectedToCurrentSlide ? 1 : 0.1) : 1;
         const edgeFilter = presentation.active
           ? isEdgeConnectedToCurrentSlide
             ? isDark
               ? "drop-shadow(0 0 4px rgba(129, 140, 248, 0.6))"
               : isEink
-              ? undefined
-              : "drop-shadow(0 0 4px rgba(99, 102, 241, 0.5))"
+                ? undefined
+                : "drop-shadow(0 0 4px rgba(99, 102, 241, 0.5))"
             : "blur(1.8px)"
           : undefined;
 
@@ -313,8 +310,8 @@ export const CanvasEdgeLayer = memo(function CanvasEdgeLayer({
                 filter: isSelected
                   ? "drop-shadow(0 0 5px rgba(245,158,11,0.5))"
                   : hoveredNodeId === edge.fromNode
-                  ? `drop-shadow(0 0 6px ${edgeColor})`
-                  : undefined,
+                    ? `drop-shadow(0 0 6px ${edgeColor})`
+                    : undefined,
               }}
             />
             {/* Source Origin Anchor Dot (起点端点指示器: 明确发起源) */}

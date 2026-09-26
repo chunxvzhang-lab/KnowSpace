@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { renderHook } from "@testing-library/react";
-import { useVaultOpening } from "../hooks/useVaultOpening";
+import { useVaultOpening } from "../hooks/useVaultOpening";
+
 import { useTabStore } from "../store/useTabStore";
 import { useVaultStore } from "../store/useVaultStore";
 import {
@@ -43,7 +44,7 @@ describe("useVaultOpening", () => {
         setViewMode,
         activeLoadedChapterIdRef,
         pendingBookmarkRef,
-      })
+      }),
     );
 
   describe("opening a folder", () => {
@@ -102,7 +103,10 @@ describe("useVaultOpening", () => {
       desktop.getDirectoryForFile.mockResolvedValue(null);
       let releaseFirst: (value: unknown) => void = () => {};
       desktop.readMarkdownFile.mockImplementationOnce(
-        () => new Promise((resolve) => { releaseFirst = resolve; })
+        () =>
+          new Promise((resolve) => {
+            releaseFirst = resolve;
+          }),
       );
 
       const { result } = mount();

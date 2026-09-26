@@ -10,7 +10,15 @@ export function useReadingTracker(input: {
   onScrollIdle?: () => void;
   navLockUntilRef?: React.MutableRefObject<number>;
 }) {
-  const { activeHeadingRef, containerRef, headings, onActiveHeadingChange, onScrollIdle, scrollRatioRef, navLockUntilRef } = input;
+  const {
+    activeHeadingRef,
+    containerRef,
+    headings,
+    onActiveHeadingChange,
+    onScrollIdle,
+    scrollRatioRef,
+    navLockUntilRef,
+  } = input;
 
   useEffect(() => {
     const container = containerRef.current;
@@ -40,7 +48,15 @@ export function useReadingTracker(input: {
       window.clearTimeout(idleTimer);
       container.removeEventListener("scroll", handleScroll);
     };
-  }, [activeHeadingRef, containerRef, headings, navLockUntilRef, onActiveHeadingChange, onScrollIdle, scrollRatioRef]);
+  }, [
+    activeHeadingRef,
+    containerRef,
+    headings,
+    navLockUntilRef,
+    onActiveHeadingChange,
+    onScrollIdle,
+    scrollRatioRef,
+  ]);
 
   useEffect(() => {
     const container = containerRef.current;

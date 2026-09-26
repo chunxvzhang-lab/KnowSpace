@@ -1,5 +1,25 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Zap, Settings, X, Check, Hash, Link, Clock, Lightbulb, Keyboard, AlertCircle, FileText, Pin, PinOff, Folder, RotateCcw, Copy, StickyNote, Sparkles, Trash2 } from "lucide-react";
+import {
+  Zap,
+  Settings,
+  X,
+  Check,
+  Hash,
+  Link,
+  Clock,
+  Lightbulb,
+  Keyboard,
+  AlertCircle,
+  FileText,
+  Pin,
+  PinOff,
+  Folder,
+  RotateCcw,
+  Copy,
+  StickyNote,
+  Sparkles,
+  Trash2,
+} from "lucide-react";
 import { loadPreferences, savePreferences } from "../services/storage";
 import { resolveThemeMode } from "../services/themeMode";
 import type { ThemeMode } from "../core/types";
@@ -13,7 +33,7 @@ export const FlashCapsule: React.FC = () => {
   const [targetDisplay, setTargetDisplay] = useState("Space/YYYY-MM-DD_HHmm.md");
   const [theme, setTheme] = useState<ThemeMode>("system");
   const [systemPrefersLight, setSystemPrefersLight] = useState(
-    () => window.matchMedia?.("(prefers-color-scheme: light)")?.matches ?? false
+    () => window.matchMedia?.("(prefers-color-scheme: light)")?.matches ?? false,
   );
   const resolvedTheme = resolveThemeMode(theme, systemPrefersLight);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -21,7 +41,11 @@ export const FlashCapsule: React.FC = () => {
   const [recordedShortcut, setRecordedShortcut] = useState("");
   const [autoLaunch, setAutoLaunch] = useState(false);
   const [runInBackground, setRunInBackground] = useState(true);
-  const [spaceConfig, setSpaceConfig] = useState<{ currentDir: string; isCustom: boolean; defaultDir: string }>({
+  const [spaceConfig, setSpaceConfig] = useState<{
+    currentDir: string;
+    isCustom: boolean;
+    defaultDir: string;
+  }>({
     currentDir: "",
     isCustom: false,
     defaultDir: "",
@@ -49,20 +73,27 @@ export const FlashCapsule: React.FC = () => {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const persistentTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const persistentSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const desktop = typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
+  const desktop =
+    typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
 
   const refreshSpaceConfig = () => {
     if (desktop?.getFlashSpaceConfig) {
-      desktop.getFlashSpaceConfig().then((cfg) => {
-        if (cfg) setSpaceConfig(cfg);
-      }).catch(() => {});
+      desktop
+        .getFlashSpaceConfig()
+        .then((cfg) => {
+          if (cfg) setSpaceConfig(cfg);
+        })
+        .catch(() => {});
     }
     if (desktop?.getFlashTargetPath) {
-      desktop.getFlashTargetPath().then((res) => {
-        if (res?.relativeDisplay) {
-          setTargetDisplay(res.relativeDisplay);
-        }
-      }).catch(() => {});
+      desktop
+        .getFlashTargetPath()
+        .then((res) => {
+          if (res?.relativeDisplay) {
+            setTargetDisplay(res.relativeDisplay);
+          }
+        })
+        .catch(() => {});
     }
   };
 
@@ -78,12 +109,15 @@ export const FlashCapsule: React.FC = () => {
 
     // Load initial hotkey
     if (desktop?.getFlashShortcut) {
-      desktop.getFlashShortcut().then((sc) => {
-        if (sc) {
-          setShortcut(sc);
-          setRecordedShortcut(sc);
-        }
-      }).catch(() => {});
+      desktop
+        .getFlashShortcut()
+        .then((sc) => {
+          if (sc) {
+            setShortcut(sc);
+            setRecordedShortcut(sc);
+          }
+        })
+        .catch(() => {});
     } else if (prefs.flashCapsuleShortcut) {
       setShortcut(prefs.flashCapsuleShortcut);
       setRecordedShortcut(prefs.flashCapsuleShortcut);
@@ -91,21 +125,27 @@ export const FlashCapsule: React.FC = () => {
 
     // Load pin status
     if (desktop?.getFlashPin) {
-      desktop.getFlashPin().then((res) => {
-        if (res && typeof res.pinned === "boolean") {
-          setIsPinned(res.pinned);
-        }
-      }).catch(() => {});
+      desktop
+        .getFlashPin()
+        .then((res) => {
+          if (res && typeof res.pinned === "boolean") {
+            setIsPinned(res.pinned);
+          }
+        })
+        .catch(() => {});
     }
 
     // Load app settings
     if (desktop?.getAppSettings) {
-      desktop.getAppSettings().then((st) => {
-        if (st) {
-          setAutoLaunch(st.autoLaunch);
-          setRunInBackground(st.runInBackground);
-        }
-      }).catch(() => {});
+      desktop
+        .getAppSettings()
+        .then((st) => {
+          if (st) {
+            setAutoLaunch(st.autoLaunch);
+            setRunInBackground(st.runInBackground);
+          }
+        })
+        .catch(() => {});
     }
 
     // Load Space path info
@@ -113,11 +153,14 @@ export const FlashCapsule: React.FC = () => {
 
     // Load persistent note / prompt template
     if (desktop?.getPersistentNote) {
-      desktop.getPersistentNote().then((res) => {
-        if (res && typeof res.text === "string") {
-          setPersistentContent(res.text);
-        }
-      }).catch(() => {});
+      desktop
+        .getPersistentNote()
+        .then((res) => {
+          if (res && typeof res.text === "string") {
+            setPersistentContent(res.text);
+          }
+        })
+        .catch(() => {});
     } else {
       try {
         const cached = localStorage.getItem("knowspace_persistent_note");
@@ -154,7 +197,8 @@ export const FlashCapsule: React.FC = () => {
         loadTargets();
         applyTheme();
         refreshSpaceConfig();
-        const targetTextarea = activeTab === "note" ? textareaRef.current : persistentTextareaRef.current;
+        const targetTextarea =
+          activeTab === "note" ? textareaRef.current : persistentTextareaRef.current;
         targetTextarea?.focus();
         requestAnimationFrame(() => targetTextarea?.focus());
       });
@@ -423,10 +467,22 @@ export const FlashCapsule: React.FC = () => {
   };
 
   const starterTemplates = [
-    { label: "📌 今日任务待办", text: "## 今日核心待办\n- [ ] 核心目标 1\n- [ ] 核心目标 2\n- [ ] 临时插入事项\n" },
-    { label: "💡 提示词审查模板", text: "作为资深工程师，请对以下代码或方案进行深度代码审查，指出潜在性能与逻辑隐患：\n\n" },
-    { label: "📝 会议与访谈速记", text: "## 沟通纪要\n- **参与人**：\n- **关键决议**：\n- **下一步行动 (Next Actions)**：\n  - [ ] " },
-    { label: "🔬 闪念知识卡片", text: "### 闪念知识卡片\n- **核心概念**：\n- **知识洞察**：\n- **双链关联**：[[]]\n" },
+    {
+      label: "📌 今日任务待办",
+      text: "## 今日核心待办\n- [ ] 核心目标 1\n- [ ] 核心目标 2\n- [ ] 临时插入事项\n",
+    },
+    {
+      label: "💡 提示词审查模板",
+      text: "作为资深工程师，请对以下代码或方案进行深度代码审查，指出潜在性能与逻辑隐患：\n\n",
+    },
+    {
+      label: "📝 会议与访谈速记",
+      text: "## 沟通纪要\n- **参与人**：\n- **关键决议**：\n- **下一步行动 (Next Actions)**：\n  - [ ] ",
+    },
+    {
+      label: "🔬 闪念知识卡片",
+      text: "### 闪念知识卡片\n- **核心概念**：\n- **知识洞察**：\n- **双链关联**：[[]]\n",
+    },
   ];
 
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -605,7 +661,10 @@ export const FlashCapsule: React.FC = () => {
             </span>
 
             {/* Segmented Tab Switcher */}
-            <div className="flash-tab-group" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
+            <div
+              className="flash-tab-group"
+              style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+            >
               <button
                 type="button"
                 className={`flash-tab-btn ${activeTab === "note" ? "active" : ""}`}
@@ -633,8 +692,14 @@ export const FlashCapsule: React.FC = () => {
             </div>
           </div>
 
-          <div className="flash-header-right" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
-            <span className="flash-target-path" title={`自动按分钟保存至: ${targetDisplay} (同一分钟追加)`}>
+          <div
+            className="flash-header-right"
+            style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+          >
+            <span
+              className="flash-target-path"
+              title={`自动按分钟保存至: ${targetDisplay} (同一分钟追加)`}
+            >
               <FileText size={12} />
               <span>{targetDisplay}</span>
             </span>
@@ -644,7 +709,11 @@ export const FlashCapsule: React.FC = () => {
               type="button"
               className={`flash-icon-btn ${isPinned ? "active pinned" : ""}`}
               onClick={handleTogglePin}
-              title={isPinned ? "已固定窗口：鼠标点击别处不会退出 (再次点击取消固定)" : "固定窗口：开启后鼠标点击外部不退出微窗"}
+              title={
+                isPinned
+                  ? "已固定窗口：鼠标点击别处不会退出 (再次点击取消固定)"
+                  : "固定窗口：开启后鼠标点击外部不退出微窗"
+              }
             >
               {isPinned ? <Pin size={15} className="text-orange" /> : <PinOff size={15} />}
             </button>
@@ -707,10 +776,15 @@ export const FlashCapsule: React.FC = () => {
                     <Folder size={13} className="text-orange" />
                     <strong>Space 存储目录：</strong>
                   </span>
-                  <span className="flash-dir-path" title={spaceConfig.currentDir || "工作区默认 Space 目录"}>
+                  <span
+                    className="flash-dir-path"
+                    title={spaceConfig.currentDir || "工作区默认 Space 目录"}
+                  >
                     {spaceConfig.currentDir || "加载中..."}
                   </span>
-                  <span className={`flash-dir-badge ${spaceConfig.isCustom ? "custom" : "default"}`}>
+                  <span
+                    className={`flash-dir-badge ${spaceConfig.isCustom ? "custom" : "default"}`}
+                  >
                     {spaceConfig.isCustom ? "已自定义" : "工作区默认"}
                   </span>
                 </div>
@@ -826,7 +900,14 @@ export const FlashCapsule: React.FC = () => {
                 <button
                   type="button"
                   className="flash-btn flash-btn-secondary"
-                  style={{ marginLeft: "auto", fontSize: "11px", padding: "4px 9px", display: "inline-flex", alignItems: "center", gap: "5px" }}
+                  style={{
+                    marginLeft: "auto",
+                    fontSize: "11px",
+                    padding: "4px 9px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "5px",
+                  }}
                   onClick={async () => {
                     if (desktop?.resetFlashSize) {
                       await desktop.resetFlashSize();
@@ -958,9 +1039,7 @@ export const FlashCapsule: React.FC = () => {
               <div className="flash-footer-left">
                 <span className="flash-char-count">{content.length} 字</span>
                 {statusMessage && (
-                  <span className={`flash-status-msg ${saveStatus}`}>
-                    {statusMessage}
-                  </span>
+                  <span className={`flash-status-msg ${saveStatus}`}>{statusMessage}</span>
                 )}
               </div>
 
@@ -990,12 +1069,11 @@ export const FlashCapsule: React.FC = () => {
             {/* Banner info */}
             <div className="flash-persistent-banner">
               <span className="flash-persistent-banner-text">
-                📌 <strong>常驻便签与提示模板</strong>：实时自动保存，在归档闪念时<strong>绝不清空</strong>，随时备查、复用或作为 AI 常用 Prompt 提示词使用。
+                📌 <strong>常驻便签与提示模板</strong>：实时自动保存，在归档闪念时
+                <strong>绝不清空</strong>，随时备查、复用或作为 AI 常用 Prompt 提示词使用。
               </span>
               {persistentFeedback && (
-                <span className="flash-persistent-badge-feedback">
-                  {persistentFeedback}
-                </span>
+                <span className="flash-persistent-badge-feedback">{persistentFeedback}</span>
               )}
             </div>
 

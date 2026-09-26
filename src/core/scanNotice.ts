@@ -51,7 +51,8 @@ export function describeScanUnreadable(
 ): string | null {
   if (!unreadable || unreadable.count === 0) return null;
 
-  const where = unreadable.samples.length > 0 ? `「${lastSegment(unreadable.samples[0])}」` : "部分目录";
+  const where =
+    unreadable.samples.length > 0 ? `「${lastSegment(unreadable.samples[0])}」` : "部分目录";
 
   if (unreadable.reason === "ENOENT") {
     return `有 ${unreadable.count} 个目录已不存在（${where} 等），可能已被移动或删除。`;

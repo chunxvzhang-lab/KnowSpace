@@ -20,7 +20,12 @@ export function FileConflictDialog({
   if (!isOpen) return null;
 
   return (
-    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="conflict-title">
+    <div
+      className="modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="conflict-title"
+    >
       <div className="modal-card modal-conflict">
         <div className="modal-header">
           <div className="modal-icon error">
@@ -29,7 +34,8 @@ export function FileConflictDialog({
           <div>
             <h3 id="conflict-title">检测到文件冲突</h3>
             <p className="modal-desc">
-              磁盘上的文件 <strong>{fileName}</strong> 已被外部编辑器修改。请选择如何处理当前编辑器的内容：
+              磁盘上的文件 <strong>{fileName}</strong>{" "}
+              已被外部编辑器修改。请选择如何处理当前编辑器的内容：
             </p>
           </div>
         </div>

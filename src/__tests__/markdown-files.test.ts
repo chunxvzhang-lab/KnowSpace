@@ -30,7 +30,7 @@ describe("electron/markdown-files.cjs", () => {
       const documentPath = path.join(tempDir, "笔记.md");
 
       expect(markdownFiles.sidecarPathFor(documentPath)).toBe(
-        path.join(tempDir, "笔记.md.mindmap.json")
+        path.join(tempDir, "笔记.md.mindmap.json"),
       );
     });
 
@@ -72,7 +72,10 @@ describe("electron/markdown-files.cjs", () => {
       const documentPath = path.join(tempDir, "a.md");
       await fs.writeFile(documentPath, "# a\n", "utf8");
 
-      const saved = await markdownFiles.saveMindmapSidecar({ documentPath, content: { notes: {} } });
+      const saved = await markdownFiles.saveMindmapSidecar({
+        documentPath,
+        content: { notes: {} },
+      });
 
       expect(saved.success).toBe(false);
       await expect(fs.stat(markdownFiles.sidecarPathFor(documentPath))).rejects.toThrow();
@@ -107,7 +110,11 @@ describe("electron/markdown-files.cjs", () => {
       // content and say what they found, and a reader whose exporter wrote .txt
       // should not be told their outline is not an outline.
       const filePath = path.join(tempDir, "大纲.txt");
-      await fs.writeFile(filePath, '<opml version="2.0"><body><outline text="甲"/></body></opml>', "utf8");
+      await fs.writeFile(
+        filePath,
+        '<opml version="2.0"><body><outline text="甲"/></body></opml>',
+        "utf8",
+      );
 
       expect((await markdownFiles.readOutlineFile(filePath)).success).toBe(true);
     });
@@ -208,8 +215,8 @@ describe("electron/markdown-files.cjs", () => {
       const total = 40;
       await Promise.all(
         Array.from({ length: total }, (_, index) =>
-          fs.writeFile(path.join(wideDir, `n${String(index).padStart(4, "0")}.md`), "x", "utf8")
-        )
+          fs.writeFile(path.join(wideDir, `n${String(index).padStart(4, "0")}.md`), "x", "utf8"),
+        ),
       );
 
       const manifest = await markdownFiles.buildDirectoryManifest(tempDir);
@@ -334,7 +341,9 @@ describe("electron/markdown-files.cjs", () => {
       expect(manifest.chapters.map((c: { src: string }) => c.src)).toEqual(["可见.md"]);
       // Nothing is marked hidden when nothing hidden is listed — the flag only
       // appears on documents that are actually in the tree.
-      expect(manifest.chapters.every((c: { hidden?: boolean }) => c.hidden === undefined)).toBe(true);
+      expect(manifest.chapters.every((c: { hidden?: boolean }) => c.hidden === undefined)).toBe(
+        true,
+      );
     });
 
     it("lists them when asked, and marks them", async () => {
@@ -356,7 +365,9 @@ describe("electron/markdown-files.cjs", () => {
         .map((c: { src: string }) => c.src);
       expect([...hidden].sort()).toEqual([".archive/旧稿.md", ".草稿.md"].sort());
       // The visible one is not marked.
-      expect(manifest.chapters.find((c: { src: string }) => c.src === "可见.md").hidden).toBeUndefined();
+      expect(
+        manifest.chapters.find((c: { src: string }) => c.src === "可见.md").hidden,
+      ).toBeUndefined();
     });
 
     it("sorts hidden documents after the visible ones", async () => {
@@ -364,7 +375,9 @@ describe("electron/markdown-files.cjs", () => {
       markdownFiles.setScanOptions({ includeHidden: true });
 
       const manifest = await markdownFiles.buildDirectoryManifest(tempDir);
-      const firstHidden = manifest.chapters.findIndex((c: { hidden?: boolean }) => c.hidden === true);
+      const firstHidden = manifest.chapters.findIndex(
+        (c: { hidden?: boolean }) => c.hidden === true,
+      );
       const lastVisible = manifest.chapters
         .map((c: { hidden?: boolean }) => c.hidden === true)
         .lastIndexOf(false);
@@ -499,7 +512,12 @@ describe("electron/markdown-files.cjs", () => {
     const { findInChapter } = await import("../services/markdown");
     const sourceMarkdown = `# Chapter 1\n\nFirst line with react.\nSecond line with nothing.\n\nThird line with another react keyword.\n`;
     const headings = [{ id: "chapter-1", text: "Chapter 1", level: 1 }];
-    const results = findInChapter("react", "Chapter 1 First line with react...", headings, sourceMarkdown);
+    const results = findInChapter(
+      "react",
+      "Chapter 1 First line with react...",
+      headings,
+      sourceMarkdown,
+    );
 
     expect(results.length).toBe(2);
     expect(results[0].lineNumber).toBe(3);
@@ -551,7 +569,12 @@ function initElectron() {
 \`\`\`
 `;
     const headings = [{ id: "code-example", text: "Code Example", level: 1 }];
-    const results = findInChapter("electron", "Code Example const electron...", headings, sourceMarkdown);
+    const results = findInChapter(
+      "electron",
+      "Code Example const electron...",
+      headings,
+      sourceMarkdown,
+    );
 
     expect(results.length).toBe(1);
     expect(results[0].title).toBe("Code Example");
@@ -569,7 +592,12 @@ function initElectron() {
     await fs.writeFile(fileB, "# Doc B\nHello B", "utf8");
     await fs.writeFile(fileC, "# Doc C\nHello C", "utf8");
 
-    const batch = await markdownFiles.readMarkdownSourcesBatch([fileA, fileB, fileC, path.join(tempDir, "missing.md")]);
+    const batch = await markdownFiles.readMarkdownSourcesBatch([
+      fileA,
+      fileB,
+      fileC,
+      path.join(tempDir, "missing.md"),
+    ]);
     expect(batch.length).toBe(3);
 
     const docA = batch.find((item: any) => item.absolutePath === fileA);

@@ -116,7 +116,7 @@ describe("节点链接", () => {
         source={SOURCE}
         documentKey={DOC}
         onJumpToHeading={onJumpToHeading}
-      />
+      />,
     );
     await settle();
     openPanelFor("父节点");
@@ -139,7 +139,12 @@ describe("节点链接", () => {
     });
 
     render(
-      <MindmapView title="测试" source={SOURCE} documentKey={DOC} onJumpToHeading={onJumpToHeading} />
+      <MindmapView
+        title="测试"
+        source={SOURCE}
+        documentKey={DOC}
+        onJumpToHeading={onJumpToHeading}
+      />,
     );
     await settle();
     openPanelFor("父节点");
@@ -160,7 +165,12 @@ describe("节点链接", () => {
     });
 
     render(
-      <MindmapView title="测试" source={SOURCE} documentKey={DOC} onWikiLinkClick={onWikiLinkClick} />
+      <MindmapView
+        title="测试"
+        source={SOURCE}
+        documentKey={DOC}
+        onWikiLinkClick={onWikiLinkClick}
+      />,
     );
     await settle();
     openPanelFor("父节点");

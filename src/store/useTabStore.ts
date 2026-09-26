@@ -61,7 +61,7 @@ export function findTabIndex(tabs: TabMeta[], tab: TabMeta): number {
     (candidate) =>
       candidate.id === tab.id ||
       samePath(candidate.absolutePath, tab.absolutePath) ||
-      (candidate.title === tab.title && (!candidate.absolutePath || !tab.absolutePath))
+      (candidate.title === tab.title && (!candidate.absolutePath || !tab.absolutePath)),
   );
 }
 
@@ -77,7 +77,7 @@ export function findTabIndex(tabs: TabMeta[], tab: TabMeta): number {
 export function tabsWithNewDocument(
   tabs: TabMeta[],
   chapter: { id: string; title: string; src: string; absolutePath?: string },
-  absolutePath: string | undefined
+  absolutePath: string | undefined,
 ): TabMeta[] {
   const tab: TabMeta = {
     id: chapter.id,
@@ -99,7 +99,7 @@ export function tabsWithNewDocument(
 export function tabsWithDirtyFlags(
   tabs: TabMeta[],
   activeTabId: string,
-  isDirty: boolean
+  isDirty: boolean,
 ): TabItem[] {
   return tabs.map((tab) => ({
     ...tab,

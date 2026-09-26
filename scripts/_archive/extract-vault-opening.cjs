@@ -25,7 +25,8 @@ const START_MARKER = "  const doOpenMarkdownFile = async (file: File) => {";
  * openMarkdownFile keeps the call out of the extraction — the dry run showed it
  * being swallowed otherwise, which would have deleted it.
  */
-const END_MARKER = "  const { doCreateNewFile, doCreateNewMindmap, doCreateNewCanvas } = useDocumentCreation({";
+const END_MARKER =
+  "  const { doCreateNewFile, doCreateNewMindmap, doCreateNewCanvas } = useDocumentCreation({";
 
 const REPLACEMENT = `  const { doOpenMarkdownFile, doOpenDesktopMarkdownPath, doOpenMarkdownDirectory } =
     useVaultOpening({
@@ -142,7 +143,9 @@ function main() {
   fs.writeFileSync(hookPath, HOOK_HEADER + body.join("\n") + HOOK_FOOTER);
   fs.writeFileSync(appPath, nextLines.join("\n"));
   console.log(`wrote ${path.relative(root, hookPath)}`);
-  console.log(`rewrote ${path.relative(root, appPath)}: ${lines.length} -> ${nextLines.length} lines`);
+  console.log(
+    `rewrote ${path.relative(root, appPath)}: ${lines.length} -> ${nextLines.length} lines`,
+  );
 }
 
 main();

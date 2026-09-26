@@ -35,8 +35,7 @@ export type StandaloneMindmapSvg = {
 };
 
 /** The font stack a file should carry, since the app's own does not travel. */
-const EXPORT_FONT_FAMILY =
-  "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+const EXPORT_FONT_FAMILY = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 
 /**
  * What a decoration looks like once the stylesheet is gone.
@@ -162,7 +161,11 @@ const DECORATION_RULES: DecorationRule[] = [
   },
   // Priority and progress, on the node. The badge's own fill is inline and
   // already survives; the numeral and the dial are not.
-  { selector: ".mindmap-priority-text", fill: { dark: "#ffffff", light: "#ffffff" }, font: { size: "9px", weight: "700" } },
+  {
+    selector: ".mindmap-priority-text",
+    fill: { dark: "#ffffff", light: "#ffffff" },
+    font: { size: "9px", weight: "700" },
+  },
   {
     selector: ".mindmap-node-marks .mindmap-progress-track",
     fill: { dark: "#0f172a", light: "#e2e8f0" },
@@ -203,7 +206,7 @@ const DECORATION_RULES: DecorationRule[] = [
  */
 export function buildStandaloneMindmapSvg(
   source: SVGSVGElement | null,
-  options: StandaloneMindmapSvgOptions
+  options: StandaloneMindmapSvgOptions,
 ): StandaloneMindmapSvg | null {
   if (!source) return null;
 
@@ -217,7 +220,10 @@ export function buildStandaloneMindmapSvg(
   // the element is in the SVG namespace, and setting it as well produces the
   // attribute twice — which is not valid XML, and a strict parser refuses the
   // file rather than ignoring the duplicate.
-  clone.setAttribute("viewBox", `${minX - padding} ${minY - padding} ${exportWidth} ${exportHeight}`);
+  clone.setAttribute(
+    "viewBox",
+    `${minX - padding} ${minY - padding} ${exportWidth} ${exportHeight}`,
+  );
   clone.setAttribute("width", `${exportWidth}`);
   clone.setAttribute("height", `${exportHeight}`);
 

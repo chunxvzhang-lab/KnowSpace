@@ -31,7 +31,8 @@ const layoutPath = path.join(root, "src", "services", "mindmapLayout.ts");
 /** Start of the types block: its own doc comment, found by walking back from the type. */
 const TYPES_ANCHOR = 'export type MindmapLayoutSide = "left" | "right" | "bottom";';
 /** Start of the implementation block. */
-const BLOCK_ANCHOR = "/** Horizontal gap between levels. Shared, so every layout spaces identically. */";
+const BLOCK_ANCHOR =
+  "/** Horizontal gap between levels. Shared, so every layout spaces identically. */";
 /** The block ends where updateNodeStyle begins. */
 const BLOCK_END = "export function updateNodeStyle(";
 /** The registry body starts here; its header comment is replaced by the new module's. */
@@ -103,19 +104,39 @@ function main() {
   const registryLines = fs.readFileSync(registryPath, "utf8").split(/\r?\n/);
 
   // ── Region A: the layout types ────────────────────────────────────────────
-  const typesLine = indexOf(serviceLines, (line) => line === TYPES_ANCHOR, 0, "the layout side type");
+  const typesLine = indexOf(
+    serviceLines,
+    (line) => line === TYPES_ANCHOR,
+    0,
+    "the layout side type",
+  );
   const typesStart = blockCommentStart(serviceLines, typesLine);
   const resultStart = indexOf(
     serviceLines,
     (line) => line.startsWith("export interface MindmapLayoutResult"),
     typesLine,
-    "MindmapLayoutResult"
+    "MindmapLayoutResult",
   );
-  const resultEnd = indexOf(serviceLines, (line) => line === "}", resultStart, "the end of MindmapLayoutResult");
+  const resultEnd = indexOf(
+    serviceLines,
+    (line) => line === "}",
+    resultStart,
+    "the end of MindmapLayoutResult",
+  );
 
   // ── Region B: the implementation ──────────────────────────────────────────
-  const blockStart = indexOf(serviceLines, (line) => line === BLOCK_ANCHOR, 0, "the spacing constants");
-  const blockEnd = indexOf(serviceLines, (line) => line.startsWith(BLOCK_END), blockStart, BLOCK_END);
+  const blockStart = indexOf(
+    serviceLines,
+    (line) => line === BLOCK_ANCHOR,
+    0,
+    "the spacing constants",
+  );
+  const blockEnd = indexOf(
+    serviceLines,
+    (line) => line.startsWith(BLOCK_END),
+    blockStart,
+    BLOCK_END,
+  );
 
   if (!(typesStart < typesLine && typesLine < resultStart && resultStart < resultEnd)) {
     console.error("FAIL: the types region is out of order");
@@ -133,23 +154,16 @@ function main() {
     registryLines,
     (line) => line === REGISTRY_ANCHOR,
     0,
-    "the layout id union"
+    "the layout id union",
   );
   const registryBlock = registryLines.slice(registryStart);
-  while (registryBlock.length && registryBlock[registryBlock.length - 1].trim() === "") registryBlock.pop();
+  while (registryBlock.length && registryBlock[registryBlock.length - 1].trim() === "")
+    registryBlock.pop();
   // The implementation block ends just before updateNodeStyle, so its last line
   // is the blank that separated the two.
   while (implBlock.length && implBlock[implBlock.length - 1].trim() === "") implBlock.pop();
 
-  const newModule = [
-    HEADER,
-    ...registryBlock,
-    "",
-    ...typesBlock,
-    "",
-    ...implBlock,
-    "",
-  ].join("\n");
+  const newModule = [HEADER, ...registryBlock, "", ...typesBlock, "", ...implBlock, ""].join("\n");
 
   const nextService = [
     ...serviceLines.slice(0, typesStart),
@@ -158,7 +172,9 @@ function main() {
     ...serviceLines.slice(blockEnd),
   ];
 
-  console.log(`types region:  lines ${typesStart + 1}-${resultEnd + 1} (${typesBlock.length} lines)`);
+  console.log(
+    `types region:  lines ${typesStart + 1}-${resultEnd + 1} (${typesBlock.length} lines)`,
+  );
   console.log(`  first: ${typesBlock[0]}`);
   console.log(`  last:  ${typesBlock[typesBlock.length - 1]}`);
   console.log(`impl region:   lines ${blockStart + 1}-${blockEnd} (${implBlock.length} lines)`);

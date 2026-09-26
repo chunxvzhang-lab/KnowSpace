@@ -13,18 +13,20 @@ export function listWebSnapshots(fileKey: string): SnapshotItem[] {
     const raw = localStorage.getItem(getStorageKey(fileKey));
     if (!raw) return [];
     const list: SnapshotDetail[] = JSON.parse(raw);
-    return list.map((item) => ({
-      id: item.id,
-      timestamp: item.timestamp,
-      filePath: item.filePath,
-      hash: item.hash,
-      charCount: item.charCount,
-      lineCount: item.content.split(/\r?\n/).length,
-      diffAdded: 0,
-      diffRemoved: 0,
-      charDelta: 0,
-      reason: item.reason,
-    })).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    return list
+      .map((item) => ({
+        id: item.id,
+        timestamp: item.timestamp,
+        filePath: item.filePath,
+        hash: item.hash,
+        charCount: item.charCount,
+        lineCount: item.content.split(/\r?\n/).length,
+        diffAdded: 0,
+        diffRemoved: 0,
+        charDelta: 0,
+        reason: item.reason,
+      }))
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   } catch {
     return [];
   }
@@ -45,7 +47,7 @@ export function readWebSnapshot(fileKey: string, snapshotId: string): SnapshotDe
 export function recordWebSnapshot(
   fileKey: string,
   content: string,
-  reason: string = "save"
+  reason: string = "save",
 ): { success: boolean; snapshotId?: string } {
   if (typeof localStorage === "undefined") return { success: false };
   try {

@@ -1,10 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type {
-  DiskVersion,
-  DocumentSession,
-  EditorViewMode,
-  RenderedChapter,
-} from "../core/types";
+import type { DiskVersion, DocumentSession, EditorViewMode, RenderedChapter } from "../core/types";
 import { renderMarkdown } from "../services/markdown";
 
 export type DocumentSessionState = {
@@ -78,7 +73,9 @@ export function useDocumentSession() {
   const [viewMode, setViewMode] = useState<EditorViewMode>("read");
   const [isPreviewPending, setIsPreviewPending] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [conflict, setConflict] = useState<{ diskVersion: DiskVersion; message: string } | null>(null);
+  const [conflict, setConflict] = useState<{ diskVersion: DiskVersion; message: string } | null>(
+    null,
+  );
   const [autoPreviewPaused, setAutoPreviewPaused] = useState(false);
 
   const previewTimerRef = useRef<number | null>(null);
@@ -137,7 +134,7 @@ export function useDocumentSession() {
     (key: string, rendered: RenderedChapter) => {
       rememberRendered(key, rendered);
     },
-    [rememberRendered]
+    [rememberRendered],
   );
   const viewModeRef = useRef<EditorViewMode>("read");
   viewModeRef.current = viewMode;
@@ -159,36 +156,39 @@ export function useDocumentSession() {
   }, [session?.absolutePath, isDirty]);
 
   // Execute rendering with revision tracking
-  const triggerRender = useCallback(async (sourceText: string, baseUrl: string, revision: number, cacheKey?: string) => {
-    currentRenderRevisionRef.current = revision;
-    setIsPreviewPending(true);
+  const triggerRender = useCallback(
+    async (sourceText: string, baseUrl: string, revision: number, cacheKey?: string) => {
+      currentRenderRevisionRef.current = revision;
+      setIsPreviewPending(true);
 
-    if (cacheKey && renderedCacheRef.current.has(cacheKey)) {
-      const cached = renderedCacheRef.current.get(cacheKey)!;
-      if (currentRenderRevisionRef.current === revision) {
-        setRenderedChapter(cached);
-        setIsPreviewPending(false);
+      if (cacheKey && renderedCacheRef.current.has(cacheKey)) {
+        const cached = renderedCacheRef.current.get(cacheKey)!;
+        if (currentRenderRevisionRef.current === revision) {
+          setRenderedChapter(cached);
+          setIsPreviewPending(false);
+        }
+        return cached;
       }
-      return cached;
-    }
 
-    try {
-      const rendered = await renderMarkdown(sourceText, baseUrl);
-      if (currentRenderRevisionRef.current === revision) {
-        setRenderedChapter(rendered);
-        if (cacheKey && sourceText.length <= LARGE_DOC_THRESHOLD) {
-          rememberRendered(cacheKey, rendered);
+      try {
+        const rendered = await renderMarkdown(sourceText, baseUrl);
+        if (currentRenderRevisionRef.current === revision) {
+          setRenderedChapter(rendered);
+          if (cacheKey && sourceText.length <= LARGE_DOC_THRESHOLD) {
+            rememberRendered(cacheKey, rendered);
+          }
+        }
+        return rendered;
+      } catch {
+        // Keep previous rendered chapter on error
+      } finally {
+        if (currentRenderRevisionRef.current === revision) {
+          setIsPreviewPending(false);
         }
       }
-      return rendered;
-    } catch {
-      // Keep previous rendered chapter on error
-    } finally {
-      if (currentRenderRevisionRef.current === revision) {
-        setIsPreviewPending(false);
-      }
-    }
-  }, [rememberRendered]);
+    },
+    [rememberRendered],
+  );
 
   const openSession = useCallback(
     (params: OpenSessionParams) => {
@@ -245,7 +245,7 @@ export function useDocumentSession() {
 
       triggerRender(params.source, params.baseUrl, 1, cacheKey);
     },
-    [triggerRender]
+    [triggerRender],
   );
 
   const updateSource = useCallback(
@@ -283,7 +283,7 @@ export function useDocumentSession() {
         return nextSession;
       });
     },
-    [triggerRender]
+    [triggerRender],
   );
 
   const handleSetViewMode = useCallback(
@@ -296,13 +296,13 @@ export function useDocumentSession() {
           triggerRender(
             sessionRef.current.source,
             sessionRef.current.baseUrl,
-            sessionRef.current.sourceRevision
+            sessionRef.current.sourceRevision,
           );
         }
         return nextMode;
       });
     },
-    [triggerRender]
+    [triggerRender],
   );
 
   const renderPreviewNow = useCallback(() => {
@@ -328,7 +328,8 @@ export function useDocumentSession() {
 
       setIsSaving(true);
       try {
-        const contentToSave = options.content !== undefined ? options.content : currentSession.source;
+        const contentToSave =
+          options.content !== undefined ? options.content : currentSession.source;
         const result = await window.bookMDDesktop.saveMarkdownFile({
           absolutePath: currentSession.absolutePath,
           content: contentToSave,
@@ -372,7 +373,7 @@ export function useDocumentSession() {
         setIsSaving(false);
       }
     },
-    [session, renderedChapter]
+    [session, renderedChapter],
   );
 
   const saveSessionAs = useCallback(async () => {

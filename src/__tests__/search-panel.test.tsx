@@ -45,7 +45,7 @@ describe("SearchPanel Component", () => {
         scope="current"
         onScopeChange={onScopeChange}
         vaultDocCount={12}
-      />
+      />,
     );
 
     expect(screen.getByText("当前章节")).toBeDefined();
@@ -63,14 +63,7 @@ describe("SearchPanel Component", () => {
     const onQueryChange = vi.fn();
     const onJump = vi.fn();
 
-    render(
-      <SearchPanel
-        query=""
-        results={[]}
-        onQueryChange={onQueryChange}
-        onJump={onJump}
-      />
-    );
+    render(<SearchPanel query="" results={[]} onQueryChange={onQueryChange} onJump={onJump} />);
 
     // Helper chips exist
     expect(screen.getByText("tag:#")).toBeDefined();
@@ -94,7 +87,7 @@ describe("SearchPanel Component", () => {
         onQueryChange={onQueryChange}
         onJump={onJump}
         scope="vault"
-      />
+      />,
     );
 
     // Vault badges

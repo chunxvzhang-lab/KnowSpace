@@ -35,7 +35,7 @@ export const FilePickerModal = memo(function FilePickerModal({
     (c) =>
       !searchKeyword ||
       c.title.toLowerCase().includes(keyword) ||
-      c.src.toLowerCase().includes(keyword)
+      c.src.toLowerCase().includes(keyword),
   );
 
   return (
@@ -63,7 +63,12 @@ export const FilePickerModal = memo(function FilePickerModal({
           </h3>
           <button
             onClick={onClose}
-            style={{ background: "none", border: "none", color: colors.cardText, cursor: "pointer" }}
+            style={{
+              background: "none",
+              border: "none",
+              color: colors.cardText,
+              cursor: "pointer",
+            }}
           >
             <X size={16} />
           </button>

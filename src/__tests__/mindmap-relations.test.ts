@@ -35,7 +35,8 @@ function pathNumbers(path: string): number[] {
 function onEdge(point: { x: number; y: number }, box: RelationBox): boolean {
   const withinX = point.x >= box.x - 1e-6 && point.x <= box.x + box.width + 1e-6;
   const withinY = point.y >= box.y - 1e-6 && point.y <= box.y + box.height + 1e-6;
-  const onVertical = Math.abs(point.x - box.x) < 1e-6 || Math.abs(point.x - (box.x + box.width)) < 1e-6;
+  const onVertical =
+    Math.abs(point.x - box.x) < 1e-6 || Math.abs(point.x - (box.x + box.width)) < 1e-6;
   const onHorizontal =
     Math.abs(point.y - box.y) < 1e-6 || Math.abs(point.y - (box.y + box.height)) < 1e-6;
   return withinX && withinY && (onVertical || onHorizontal);
@@ -97,7 +98,9 @@ describe("关系线的两端", () => {
     // what makes a relation distinguishable from the outline's own connectors.
     const [startX, startY, controlX, controlY, endX, endY] = pathNumbers(path);
     const along = Math.hypot(endX - startX, endY - startY);
-    const off = Math.abs((endX - startX) * (startY - controlY) - (startX - controlX) * (endY - startY)) / along;
+    const off =
+      Math.abs((endX - startX) * (startY - controlY) - (startX - controlX) * (endY - startY)) /
+      along;
     expect(off).toBeGreaterThan(1);
   });
 });
@@ -194,10 +197,10 @@ describe("关系线的标签与箭头", () => {
     // dash to the stylesheet — which is exactly what "solid" must not do.
     expect(findRelationStyle("solid").dash).toBe("none");
     expect(new Set(MINDMAP_RELATION_ARROWS.map((a) => a.id)).size).toBe(
-      MINDMAP_RELATION_ARROWS.length
+      MINDMAP_RELATION_ARROWS.length,
     );
     expect(new Set(MINDMAP_RELATION_STYLES.map((s) => s.id)).size).toBe(
-      MINDMAP_RELATION_STYLES.length
+      MINDMAP_RELATION_STYLES.length,
     );
   });
 });

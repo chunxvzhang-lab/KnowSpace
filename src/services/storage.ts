@@ -64,7 +64,10 @@ export function saveBookmarks(bookId: string, items: Bookmark[]): void {
   writeRecord(BOOKMARKS_V2_KEY, all);
 }
 
-export function loadReadingPosition(bookId: string, chapters?: ChapterManifest[]): ReadingPosition | null {
+export function loadReadingPosition(
+  bookId: string,
+  chapters?: ChapterManifest[],
+): ReadingPosition | null {
   const allV2 = readRecord<ReadingPosition>(POSITIONS_V2_KEY);
   if (allV2[bookId]) {
     return allV2[bookId];
@@ -103,10 +106,12 @@ export function loadPreferences(): Preferences {
     const raw = JSON.parse(localStorage.getItem(PREFS_KEY) ?? "{}");
     const theme: ThemeMode = raw.theme === "dark" ? "twitter" : (raw.theme ?? "system");
     const showLineNumbers = raw.showLineNumbers !== undefined ? Boolean(raw.showLineNumbers) : true;
-    const showHiddenFiles = raw.showHiddenFiles !== undefined ? Boolean(raw.showHiddenFiles) : false;
-    const flashCapsuleShortcut = typeof raw.flashCapsuleShortcut === "string" && raw.flashCapsuleShortcut.trim()
-      ? raw.flashCapsuleShortcut.trim()
-      : "Alt+Space";
+    const showHiddenFiles =
+      raw.showHiddenFiles !== undefined ? Boolean(raw.showHiddenFiles) : false;
+    const flashCapsuleShortcut =
+      typeof raw.flashCapsuleShortcut === "string" && raw.flashCapsuleShortcut.trim()
+        ? raw.flashCapsuleShortcut.trim()
+        : "Alt+Space";
     return { ...fallback, ...raw, theme, showLineNumbers, showHiddenFiles, flashCapsuleShortcut };
   } catch {
     return fallback;
@@ -260,7 +265,10 @@ function migrateBookmarks(bookmarks: Bookmark[], chapters?: ChapterManifest[]): 
   });
 }
 
-function migrateReadingPosition(position: ReadingPosition, chapters?: ChapterManifest[]): ReadingPosition | null {
+function migrateReadingPosition(
+  position: ReadingPosition,
+  chapters?: ChapterManifest[],
+): ReadingPosition | null {
   if (!chapters || chapters.length === 0) return position;
   const legacyMatch = position.chapterId.match(/^chapter-(\d+)$/);
   if (legacyMatch) {
@@ -274,7 +282,9 @@ function migrateReadingPosition(position: ReadingPosition, chapters?: ChapterMan
       };
     }
   }
-  const matchingChapter = chapters.find((c) => c.id === position.chapterId || c.src === position.chapterSrc);
+  const matchingChapter = chapters.find(
+    (c) => c.id === position.chapterId || c.src === position.chapterSrc,
+  );
   if (matchingChapter) {
     return {
       ...position,

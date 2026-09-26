@@ -59,7 +59,7 @@ describe("printToPDF options & filename sanitization", () => {
     // The same elements the PNG and SVG exports strip: controls, not drawing.
     const hidden = printBlock.slice(
       printBlock.indexOf(".mindmap-node-selection-ring"),
-      printBlock.indexOf("display: none", printBlock.indexOf(".mindmap-node-selection-ring"))
+      printBlock.indexOf("display: none", printBlock.indexOf(".mindmap-node-selection-ring")),
     );
     for (const control of [
       ".mindmap-node-add-btn",

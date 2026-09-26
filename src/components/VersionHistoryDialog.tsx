@@ -1,5 +1,15 @@
 import { memo, useEffect, useMemo, useState, useCallback } from "react";
-import { RotateCcw, Copy, Check, X, Columns, ListFilter, Plus, AlertTriangle, History } from "lucide-react";
+import {
+  RotateCcw,
+  Copy,
+  Check,
+  X,
+  Columns,
+  ListFilter,
+  Plus,
+  AlertTriangle,
+  History,
+} from "lucide-react";
 import type { ThemeMode } from "../core/types";
 import type { SnapshotItem, SnapshotDetail } from "../types/desktop";
 import {
@@ -52,11 +62,15 @@ export const VersionHistoryDialog = memo(function VersionHistoryDialog({
       if (window.bookMDDesktop?.listSnapshots && filePath) {
         const list = await window.bookMDDesktop.listSnapshots({ filePath, rootPath });
         setSnapshots(list);
-        setSelectedSnapshotId((prev) => (prev && list.some((s) => s.id === prev) ? prev : (list[0]?.id || null)));
+        setSelectedSnapshotId((prev) =>
+          prev && list.some((s) => s.id === prev) ? prev : list[0]?.id || null,
+        );
       } else {
         const list = listWebSnapshots(filePath || fileName);
         setSnapshots(list);
-        setSelectedSnapshotId((prev) => (prev && list.some((s) => s.id === prev) ? prev : (list[0]?.id || null)));
+        setSelectedSnapshotId((prev) =>
+          prev && list.some((s) => s.id === prev) ? prev : list[0]?.id || null,
+        );
       }
     } finally {
       setLoading(false);
@@ -254,7 +268,8 @@ export const VersionHistoryDialog = memo(function VersionHistoryDialog({
                   fontSize: 12,
                   border: "none",
                   borderRadius: 4,
-                  backgroundColor: viewMode === "side-by-side" ? (isDark ? "#38bdf8" : "#0284c7") : "transparent",
+                  backgroundColor:
+                    viewMode === "side-by-side" ? (isDark ? "#38bdf8" : "#0284c7") : "transparent",
                   color: viewMode === "side-by-side" ? "#ffffff" : "inherit",
                   cursor: "pointer",
                   display: "flex",
@@ -272,7 +287,8 @@ export const VersionHistoryDialog = memo(function VersionHistoryDialog({
                   fontSize: 12,
                   border: "none",
                   borderRadius: 4,
-                  backgroundColor: viewMode === "unified" ? (isDark ? "#38bdf8" : "#0284c7") : "transparent",
+                  backgroundColor:
+                    viewMode === "unified" ? (isDark ? "#38bdf8" : "#0284c7") : "transparent",
                   color: viewMode === "unified" ? "#ffffff" : "inherit",
                   cursor: "pointer",
                   display: "flex",
@@ -384,7 +400,13 @@ export const VersionHistoryDialog = memo(function VersionHistoryDialog({
                         transition: "all 0.15s ease",
                       }}
                     >
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                        }}
+                      >
                         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                           <span style={{ fontSize: 13, fontWeight: isSelected ? 700 : 600 }}>
                             {formatRelativeTime(date)}
@@ -404,9 +426,7 @@ export const VersionHistoryDialog = memo(function VersionHistoryDialog({
                             </span>
                           )}
                         </div>
-                        <span style={{ fontSize: 11, opacity: 0.5 }}>
-                          {formatClockTime(date)}
-                        </span>
+                        <span style={{ fontSize: 11, opacity: 0.5 }}>{formatClockTime(date)}</span>
                       </div>
 
                       <div
@@ -423,10 +443,14 @@ export const VersionHistoryDialog = memo(function VersionHistoryDialog({
                         <span>·</span>
                         <span>{snap.lineCount} 行</span>
                         {snap.diffAdded > 0 && (
-                          <span style={{ color: "#10b981", fontWeight: 600 }}>+{snap.diffAdded}</span>
+                          <span style={{ color: "#10b981", fontWeight: 600 }}>
+                            +{snap.diffAdded}
+                          </span>
                         )}
                         {snap.diffRemoved > 0 && (
-                          <span style={{ color: "#ef4444", fontWeight: 600 }}>-{snap.diffRemoved}</span>
+                          <span style={{ color: "#ef4444", fontWeight: 600 }}>
+                            -{snap.diffRemoved}
+                          </span>
                         )}
                       </div>
 
@@ -479,8 +503,12 @@ export const VersionHistoryDialog = memo(function VersionHistoryDialog({
                     ? new Date(selectedDetail.timestamp).toLocaleString("zh-CN")
                     : "请选择快照"}
                 </span>
-                <span style={{ color: "#10b981", fontWeight: 600 }}>+{diffSummary.addedLines} 行新增</span>
-                <span style={{ color: "#ef4444", fontWeight: 600 }}>-{diffSummary.removedLines} 行删除</span>
+                <span style={{ color: "#10b981", fontWeight: 600 }}>
+                  +{diffSummary.addedLines} 行新增
+                </span>
+                <span style={{ color: "#ef4444", fontWeight: 600 }}>
+                  -{diffSummary.removedLines} 行删除
+                </span>
                 <span style={{ opacity: 0.5 }}>{diffSummary.totalNewLines} 行 (当前)</span>
               </div>
 
@@ -577,24 +605,31 @@ export const VersionHistoryDialog = memo(function VersionHistoryDialog({
                         >
                           {row.left?.lineNumber ?? ""}
                         </span>
-                        <div style={{ padding: "2px 8px", flex: 1, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
-                          {row.left?.inlineDiffs ? (
-                            row.left.inlineDiffs.map((part, pIdx) => (
-                              <span
-                                key={pIdx}
-                                style={{
-                                  backgroundColor:
-                                    part.type === "delete"
-                                      ? (isDark ? "rgba(239, 68, 68, 0.45)" : "#fca5a5")
-                                      : "transparent",
-                                }}
-                              >
-                                {part.text}
-                              </span>
-                            ))
-                          ) : (
-                            row.left?.text ?? ""
-                          )}
+                        <div
+                          style={{
+                            padding: "2px 8px",
+                            flex: 1,
+                            whiteSpace: "pre-wrap",
+                            wordBreak: "break-all",
+                          }}
+                        >
+                          {row.left?.inlineDiffs
+                            ? row.left.inlineDiffs.map((part, pIdx) => (
+                                <span
+                                  key={pIdx}
+                                  style={{
+                                    backgroundColor:
+                                      part.type === "delete"
+                                        ? isDark
+                                          ? "rgba(239, 68, 68, 0.45)"
+                                          : "#fca5a5"
+                                        : "transparent",
+                                  }}
+                                >
+                                  {part.text}
+                                </span>
+                              ))
+                            : (row.left?.text ?? "")}
                         </div>
                       </div>
                     ))}
@@ -644,24 +679,31 @@ export const VersionHistoryDialog = memo(function VersionHistoryDialog({
                         >
                           {row.right?.lineNumber ?? ""}
                         </span>
-                        <div style={{ padding: "2px 8px", flex: 1, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
-                          {row.right?.inlineDiffs ? (
-                            row.right.inlineDiffs.map((part, pIdx) => (
-                              <span
-                                key={pIdx}
-                                style={{
-                                  backgroundColor:
-                                    part.type === "insert"
-                                      ? (isDark ? "rgba(16, 185, 129, 0.45)" : "#86efac")
-                                      : "transparent",
-                                }}
-                              >
-                                {part.text}
-                              </span>
-                            ))
-                          ) : (
-                            row.right?.text ?? ""
-                          )}
+                        <div
+                          style={{
+                            padding: "2px 8px",
+                            flex: 1,
+                            whiteSpace: "pre-wrap",
+                            wordBreak: "break-all",
+                          }}
+                        >
+                          {row.right?.inlineDiffs
+                            ? row.right.inlineDiffs.map((part, pIdx) => (
+                                <span
+                                  key={pIdx}
+                                  style={{
+                                    backgroundColor:
+                                      part.type === "insert"
+                                        ? isDark
+                                          ? "rgba(16, 185, 129, 0.45)"
+                                          : "#86efac"
+                                        : "transparent",
+                                  }}
+                                >
+                                  {part.text}
+                                </span>
+                              ))
+                            : (row.right?.text ?? "")}
                         </div>
                       </div>
                     ))}
@@ -678,10 +720,10 @@ export const VersionHistoryDialog = memo(function VersionHistoryDialog({
                         ? "rgba(16, 185, 129, 0.18)"
                         : "#d1fae5"
                       : isDelete
-                      ? isDark
-                        ? "rgba(239, 68, 68, 0.18)"
-                        : "#fee2e2"
-                      : "transparent";
+                        ? isDark
+                          ? "rgba(239, 68, 68, 0.18)"
+                          : "#fee2e2"
+                        : "transparent";
 
                     return (
                       <div
@@ -728,26 +770,31 @@ export const VersionHistoryDialog = memo(function VersionHistoryDialog({
                         >
                           {isInsert ? "+" : isDelete ? "-" : " "}
                         </span>
-                        <div style={{ padding: "2px 8px", flex: 1, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
-                          {line.inlineDiffs ? (
-                            line.inlineDiffs.map((part, pIdx) => (
-                              <span
-                                key={pIdx}
-                                style={{
-                                  backgroundColor:
-                                    part.type === "insert"
-                                      ? "rgba(16, 185, 129, 0.4)"
-                                      : part.type === "delete"
-                                      ? "rgba(239, 68, 68, 0.4)"
-                                      : "transparent",
-                                }}
-                              >
-                                {part.text}
-                              </span>
-                            ))
-                          ) : (
-                            line.text
-                          )}
+                        <div
+                          style={{
+                            padding: "2px 8px",
+                            flex: 1,
+                            whiteSpace: "pre-wrap",
+                            wordBreak: "break-all",
+                          }}
+                        >
+                          {line.inlineDiffs
+                            ? line.inlineDiffs.map((part, pIdx) => (
+                                <span
+                                  key={pIdx}
+                                  style={{
+                                    backgroundColor:
+                                      part.type === "insert"
+                                        ? "rgba(16, 185, 129, 0.4)"
+                                        : part.type === "delete"
+                                          ? "rgba(239, 68, 68, 0.4)"
+                                          : "transparent",
+                                  }}
+                                >
+                                  {part.text}
+                                </span>
+                              ))
+                            : line.text}
                         </div>
                       </div>
                     );
@@ -785,7 +832,15 @@ export const VersionHistoryDialog = memo(function VersionHistoryDialog({
                 boxShadow: "0 16px 40px rgba(0,0,0,0.5)",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 10, color: "#f59e0b", marginBottom: 14 }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  color: "#f59e0b",
+                  marginBottom: 14,
+                }}
+              >
                 <AlertTriangle size={24} />
                 <h3 style={{ margin: 0, fontSize: 16 }}>确认还原至历史快照？</h3>
               </div>

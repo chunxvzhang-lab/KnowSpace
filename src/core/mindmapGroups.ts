@@ -42,7 +42,10 @@ export function summaryBracketPath(bounds: Bounds, gap = SUMMARY_BRACKET_GAP): s
 }
 
 /** Where a summary's label starts: past the bracket, centred on the group. */
-export function summaryLabelAnchor(bounds: Bounds, gap = SUMMARY_BRACKET_GAP): { x: number; y: number } {
+export function summaryLabelAnchor(
+  bounds: Bounds,
+  gap = SUMMARY_BRACKET_GAP,
+): { x: number; y: number } {
   return { x: bounds.minX + bounds.width + gap + 6, y: bounds.minY + bounds.height / 2 };
 }
 
@@ -84,7 +87,10 @@ export function boundaryRect(bounds: Bounds, padding = BOUNDARY_PADDING): Bounda
 }
 
 /** Where a boundary's title starts, in the band above its top edge. */
-export function boundaryTitleAnchor(bounds: Bounds, padding = BOUNDARY_PADDING): { x: number; y: number } {
+export function boundaryTitleAnchor(
+  bounds: Bounds,
+  padding = BOUNDARY_PADDING,
+): { x: number; y: number } {
   return { x: bounds.minX - padding + 10, y: bounds.minY - padding - BOUNDARY_TITLE_BAND / 2 };
 }
 

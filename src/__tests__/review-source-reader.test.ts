@@ -11,7 +11,11 @@ import { readReviewDocuments, type ReviewSourceReader } from "../services/review
  * card's source path is what a rating writes to, "wrong text" becomes "progress saved
  * into the wrong document".
  */
-const source = (absolutePath: string, markdown: string) => ({ absolutePath, markdown, baseUrl: "" });
+const source = (absolutePath: string, markdown: string) => ({
+  absolutePath,
+  markdown,
+  baseUrl: "",
+});
 
 function reader(overrides: Partial<ReviewSourceReader> = {}): ReviewSourceReader {
   return {
@@ -28,7 +32,10 @@ describe("复习来源的读取", () => {
     const bridge = reader({
       readMarkdownBatch: vi
         .fn()
-        .mockResolvedValue([source("C:/Vault/c2.md", "第二篇"), source("C:/Vault/c3.md", "第三篇")]),
+        .mockResolvedValue([
+          source("C:/Vault/c2.md", "第二篇"),
+          source("C:/Vault/c3.md", "第三篇"),
+        ]),
     });
 
     const documents = await readReviewDocuments(bridge, [
@@ -107,7 +114,9 @@ describe("复习来源的读取", () => {
 
   it("结果里有路径但没有正文的，按没有处理", async () => {
     const bridge = reader({
-      readMarkdownBatch: vi.fn().mockResolvedValue([{ absolutePath: "C:/Vault/c1.md", baseUrl: "" }]),
+      readMarkdownBatch: vi
+        .fn()
+        .mockResolvedValue([{ absolutePath: "C:/Vault/c1.md", baseUrl: "" }]),
     });
 
     expect(await readReviewDocuments(bridge, ["C:/Vault/c1.md"])).toEqual([]);

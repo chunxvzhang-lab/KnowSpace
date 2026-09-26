@@ -166,7 +166,7 @@ describe("折叠状态持久化", () => {
       saveMindmapCollapsed("/vault/a.md", [ROOT_ID]);
 
       const { rerender } = render(
-        <MindmapView title="测试" source={SOURCE} documentKey="/vault/a.md" />
+        <MindmapView title="测试" source={SOURCE} documentKey="/vault/a.md" />,
       );
       expect(screen.queryByText("父节点")).toBeNull();
 

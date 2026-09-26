@@ -147,9 +147,7 @@ function main() {
     process.exit(1);
   }
 
-  const end = lines.findIndex(
-    (line, index) => index > start && line === END_MARKER
-  );
+  const end = lines.findIndex((line, index) => index > start && line === END_MARKER);
   if (end === -1) {
     console.error(`FAIL: end marker not found: ${END_MARKER}`);
     process.exit(1);
@@ -181,7 +179,9 @@ function main() {
   fs.writeFileSync(hookPath, HOOK_HEADER + body.join("\n") + HOOK_FOOTER);
   fs.writeFileSync(appPath, nextLines.join("\n"));
   console.log(`wrote ${path.relative(root, hookPath)}`);
-  console.log(`rewrote ${path.relative(root, appPath)}: ${lines.length} -> ${nextLines.length} lines`);
+  console.log(
+    `rewrote ${path.relative(root, appPath)}: ${lines.length} -> ${nextLines.length} lines`,
+  );
 }
 
 main();

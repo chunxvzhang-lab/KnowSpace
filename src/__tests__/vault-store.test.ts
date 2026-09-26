@@ -1,9 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import {
-  chapterForFile,
-  listingWithNewChapter,
-  useVaultStore,
-} from "../store/useVaultStore";
+import { chapterForFile, listingWithNewChapter, useVaultStore } from "../store/useVaultStore";
 import { loadBookmarks } from "../services/storage";
 import type { BookManifest, Bookmark, ChapterManifest } from "../core/types";
 
@@ -194,7 +190,7 @@ describe("新的文件写进清单之后", () => {
     const listed = listingWithNewChapter(
       { ...manifest, description: "一本测试用的书" },
       newChapter,
-      "C:\\Vault\\ch-2.md"
+      "C:\\Vault\\ch-2.md",
     );
 
     expect(listed.chapters.map((chapter) => chapter.id)).toEqual(["ch-1", "ch-2"]);
@@ -230,9 +226,7 @@ describe("新的文件写进清单之后", () => {
 describe("刚写下的文件是哪一章", () => {
   const listed: BookManifest = {
     ...manifest,
-    chapters: [
-      { id: "ch-1", title: "第一章", src: "ch-1.md", absolutePath: "C:\\Vault\\ch-1.md" },
-    ],
+    chapters: [{ id: "ch-1", title: "第一章", src: "ch-1.md", absolutePath: "C:\\Vault\\ch-1.md" }],
   };
 
   it("按路径找到它，大小写不算区别", () => {

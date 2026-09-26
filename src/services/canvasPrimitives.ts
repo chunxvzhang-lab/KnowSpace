@@ -23,20 +23,21 @@ import type { CanvasNode, CanvasGroupNode, MediaFileType } from "../types/canvas
  * Colour is resolved through this table only; nothing hard-codes the count, so
  * every palette picker picks new entries up automatically.
  */
-export const CANVAS_COLOR_PALETTES: Record<string, { label: string; stroke: string; bg: string }> = {
-  "1": { label: "珊瑚红", stroke: "#ef4444", bg: "rgba(239, 68, 68, 0.12)" },
-  "2": { label: "活力橙", stroke: "#f97316", bg: "rgba(249, 115, 22, 0.12)" },
-  "3": { label: "琥珀黄", stroke: "#eab308", bg: "rgba(234, 179, 8, 0.12)" },
-  "4": { label: "翡翠绿", stroke: "#10b981", bg: "rgba(16, 185, 129, 0.12)" },
-  "5": { label: "天青蓝", stroke: "#06b6d4", bg: "rgba(6, 182, 212, 0.12)" },
-  "6": { label: "罗兰紫", stroke: "#a855f7", bg: "rgba(168, 85, 247, 0.12)" },
-  "7": { label: "靛蓝", stroke: "#6366f1", bg: "rgba(99, 102, 241, 0.12)" },
-  "8": { label: "粉樱", stroke: "#ec4899", bg: "rgba(236, 72, 153, 0.12)" },
-  "9": { label: "玫瑰红", stroke: "#f43f5e", bg: "rgba(244, 63, 94, 0.12)" },
-  "10": { label: "青碧", stroke: "#14b8a6", bg: "rgba(20, 184, 166, 0.12)" },
-  "11": { label: "青柠", stroke: "#84cc16", bg: "rgba(132, 204, 22, 0.12)" },
-  "12": { label: "石板灰", stroke: "#64748b", bg: "rgba(100, 116, 139, 0.12)" },
-};
+export const CANVAS_COLOR_PALETTES: Record<string, { label: string; stroke: string; bg: string }> =
+  {
+    "1": { label: "珊瑚红", stroke: "#ef4444", bg: "rgba(239, 68, 68, 0.12)" },
+    "2": { label: "活力橙", stroke: "#f97316", bg: "rgba(249, 115, 22, 0.12)" },
+    "3": { label: "琥珀黄", stroke: "#eab308", bg: "rgba(234, 179, 8, 0.12)" },
+    "4": { label: "翡翠绿", stroke: "#10b981", bg: "rgba(16, 185, 129, 0.12)" },
+    "5": { label: "天青蓝", stroke: "#06b6d4", bg: "rgba(6, 182, 212, 0.12)" },
+    "6": { label: "罗兰紫", stroke: "#a855f7", bg: "rgba(168, 85, 247, 0.12)" },
+    "7": { label: "靛蓝", stroke: "#6366f1", bg: "rgba(99, 102, 241, 0.12)" },
+    "8": { label: "粉樱", stroke: "#ec4899", bg: "rgba(236, 72, 153, 0.12)" },
+    "9": { label: "玫瑰红", stroke: "#f43f5e", bg: "rgba(244, 63, 94, 0.12)" },
+    "10": { label: "青碧", stroke: "#14b8a6", bg: "rgba(20, 184, 166, 0.12)" },
+    "11": { label: "青柠", stroke: "#84cc16", bg: "rgba(132, 204, 22, 0.12)" },
+    "12": { label: "石板灰", stroke: "#64748b", bg: "rgba(100, 116, 139, 0.12)" },
+  };
 
 /**
  * The six colours defined by the JSON Canvas standard, in order.
@@ -64,7 +65,17 @@ export const CANVAS_RELATION_PRESETS = [
 /**
  * Recognizes media file types (images, audio, video, PDF) supported on the canvas
  */
-const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "ico", "avif"]);
+const IMAGE_EXTENSIONS = new Set([
+  "png",
+  "jpg",
+  "jpeg",
+  "gif",
+  "webp",
+  "svg",
+  "bmp",
+  "ico",
+  "avif",
+]);
 const AUDIO_EXTENSIONS = new Set(["mp3", "wav", "ogg", "m4a", "flac", "aac"]);
 const VIDEO_EXTENSIONS = new Set(["mp4", "webm", "mov", "m4v", "ogv"]);
 const PDF_EXTENSIONS = new Set(["pdf"]);
@@ -182,7 +193,7 @@ export function getNodesInsideGroup(nodes: CanvasNode[], group: CanvasGroupNode)
  */
 export function findContainerForNode(
   node: CanvasNode,
-  allNodes: CanvasNode[]
+  allNodes: CanvasNode[],
 ): CanvasGroupNode | undefined {
   if (node.type === "group") return undefined;
   const groups = allNodes.filter((n): n is CanvasGroupNode => n.type === "group");

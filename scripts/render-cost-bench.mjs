@@ -127,16 +127,22 @@ function row(label, input, oldFn, newFn, newMs) {
   const speedup = (a.ms / Math.max(b.ms, 0.0001)).toFixed(1);
   console.log(
     label.padEnd(38) +
-      " 旧 " + a.ms.toFixed(1).padStart(9) + " ms" +
-      "  新 " + b.ms.toFixed(2).padStart(7) + " ms" +
-      "  提速 " + speedup.padStart(7) + "x"
+      " 旧 " +
+      a.ms.toFixed(1).padStart(9) +
+      " ms" +
+      "  新 " +
+      b.ms.toFixed(2).padStart(7) +
+      " ms" +
+      "  提速 " +
+      speedup.padStart(7) +
+      "x",
   );
 }
 
 console.log("=== ChapterList.buildTree（宽目录：一个文件夹下的文档数）===");
 for (const perFolder of [200, 1000, 3000]) {
   const chapters = makeChapters(3, perFolder);
-  row(`${(perFolder * 3)} 篇 / 3 个文件夹`, chapters, buildTreeOld, buildTreeNew);
+  row(`${perFolder * 3} 篇 / 3 个文件夹`, chapters, buildTreeOld, buildTreeNew);
 }
 
 console.log("");
@@ -152,7 +158,12 @@ for (const n of [500, 2000, 5000]) {
   const queue = makeQueue(n);
   // Half the session done — the realistic mid-review state.
   const rated = new Set(queue.slice(0, Math.floor(n / 2)).map((item) => item.card.id));
-  row(`${n} 张卡 / 已评一半`, { queue, rated }, (x) => scanOld(x.queue, x.rated), (x) => scanNew(x.queue, x.rated));
+  row(
+    `${n} 张卡 / 已评一半`,
+    { queue, rated },
+    (x) => scanOld(x.queue, x.rated),
+    (x) => scanNew(x.queue, x.rated),
+  );
 }
 
 console.log("");
@@ -170,5 +181,8 @@ console.log("=== 一致性 ===");
   const rated = new Set(queue.slice(0, 40).map((i) => i.card.id));
   const so = scanOld(queue, rated);
   const sn = scanNew(queue, rated);
-  console.log("扫描结果一致:", so.remaining === sn.remaining && so.current.card.id === sn.current.card.id);
+  console.log(
+    "扫描结果一致:",
+    so.remaining === sn.remaining && so.current.card.id === sn.current.card.id,
+  );
 }

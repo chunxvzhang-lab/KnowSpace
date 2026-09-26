@@ -89,7 +89,9 @@ describe("解压 raw DEFLATE", () => {
     // zlib splits a large input into several blocks; the decoder has to keep going
     // until the block that says it is the last one.
     const text = `${"第一段。".repeat(5000)}${"第二段。".repeat(5000)}`;
-    const compressed = new Uint8Array(deflateRawSync(encoder.encode(text), { level: 1, chunkSize: 1024 }));
+    const compressed = new Uint8Array(
+      deflateRawSync(encoder.encode(text), { level: 1, chunkSize: 1024 }),
+    );
 
     expectSameBytes(inflate(compressed), encoder.encode(text));
   });

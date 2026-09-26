@@ -29,21 +29,33 @@ import type { ChapterSource } from "../core/types";
 
 describe("fenced code blocks are skipped", () => {
   it("does not read cards out of a fenced block", () => {
-    const note = ["# 标题", "", "```md", "Q: 示例问题", "A: 示例答案", "前 :: 后", "==高亮==", "```", ""].join(
-      "\n"
-    );
+    const note = [
+      "# 标题",
+      "",
+      "```md",
+      "Q: 示例问题",
+      "A: 示例答案",
+      "前 :: 后",
+      "==高亮==",
+      "```",
+      "",
+    ].join("\n");
     expect(parseFlashcards(note)).toHaveLength(0);
   });
 
   it("reads cards after the fence closes", () => {
-    const note = ["```", "Q: 围栏里的问题", "```", "", "Q: 围栏外的问题", "A: 围栏外的答案"].join("\n");
+    const note = ["```", "Q: 围栏里的问题", "```", "", "Q: 围栏外的问题", "A: 围栏外的答案"].join(
+      "\n",
+    );
     const cards = parseFlashcards(note);
     expect(cards).toHaveLength(1);
     expect(cards[0].front).toBe("围栏外的问题");
   });
 
   it("treats ~~~ as a fence as well", () => {
-    const note = ["~~~", "Q: 波浪围栏里的问题", "~~~", "", "Q: 外面的问题", "A: 外面的答案"].join("\n");
+    const note = ["~~~", "Q: 波浪围栏里的问题", "~~~", "", "Q: 外面的问题", "A: 外面的答案"].join(
+      "\n",
+    );
     const cards = parseFlashcards(note);
     expect(cards).toHaveLength(1);
     expect(cards[0].front).toBe("外面的问题");
@@ -52,18 +64,30 @@ describe("fenced code blocks are skipped", () => {
   it("stays inside an unclosed fence to the end of the note", () => {
     // The old per-line walk and the new one-pass mask have to agree on the
     // pathological case too: an opening marker with no closing one.
-    const note = ["Q: 围栏前的问题", "A: 答案", "", "```", "Q: 未闭合围栏里的问题", "A: 不该被读到"].join(
-      "\n"
-    );
+    const note = [
+      "Q: 围栏前的问题",
+      "A: 答案",
+      "",
+      "```",
+      "Q: 未闭合围栏里的问题",
+      "A: 不该被读到",
+    ].join("\n");
     const cards = parseFlashcards(note);
     expect(cards).toHaveLength(1);
     expect(cards[0].front).toBe("围栏前的问题");
   });
 
   it("does not close a ``` fence with a ~~~ marker", () => {
-    const note = ["```", "Q: 问题一", "~~~", "Q: 问题二", "```", "", "Q: 外面的问题", "A: 答案"].join(
-      "\n"
-    );
+    const note = [
+      "```",
+      "Q: 问题一",
+      "~~~",
+      "Q: 问题二",
+      "```",
+      "",
+      "Q: 外面的问题",
+      "A: 答案",
+    ].join("\n");
     const cards = parseFlashcards(note);
     expect(cards.map((card) => card.front)).toEqual(["外面的问题"]);
   });
@@ -80,14 +104,7 @@ describe("fenced code blocks are skipped", () => {
 
 describe("parseNote reuses one parse", () => {
   it("returns the same cards and progress as parsing each part separately", () => {
-    const content = [
-      "Q: 问题一",
-      "A: 答案一",
-      "",
-      "前 :: 后",
-      "",
-      "{{c1::挖空答案}}",
-    ].join("\n");
+    const content = ["Q: 问题一", "A: 答案一", "", "前 :: 后", "", "{{c1::挖空答案}}"].join("\n");
 
     const note = parseNote({ path: "C:/vault/a.md", content });
 

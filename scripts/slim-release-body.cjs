@@ -21,7 +21,7 @@ const CLOSING = '"""';
 const REPLACEMENT = [
   "    # The release body is read from the maintained notes document rather than",
   "    # embedded here, so the two cannot drift apart.",
-  '    notes_path = os.path.join(',
+  "    notes_path = os.path.join(",
   '        os.path.dirname(os.path.abspath(__file__)), "..", "docs", "RELEASE_NOTES_v2.5.0.md"',
   "    )",
   '    with open(notes_path, "r", encoding="utf-8") as notes_file:',

@@ -65,7 +65,11 @@ for (const file of sources) {
     if (defaultMatch) names.push(defaultMatch[1]);
     if (bracedMatch) {
       for (const part of bracedMatch[1].split(",")) {
-        const name = part.trim().replace(/^type\s+/, "").split(/\s+as\s+/).pop();
+        const name = part
+          .trim()
+          .replace(/^type\s+/, "")
+          .split(/\s+as\s+/)
+          .pop();
         if (name && /^[A-Za-z_$][\w$]*$/.test(name)) names.push(name);
       }
     }
@@ -102,7 +106,9 @@ let m;
 while ((m = classRe.exec(css)) !== null) declared.add(m[1]);
 
 // Every source file plus the HTML shell, since a class can be set from either.
-const haystack = sources.map((f) => contents.get(f)).join("\n") + fs.readFileSync(path.join(root, "index.html"), "utf8");
+const haystack =
+  sources.map((f) => contents.get(f)).join("\n") +
+  fs.readFileSync(path.join(root, "index.html"), "utf8");
 
 const unusedClasses = [];
 for (const name of [...declared].sort()) {

@@ -50,7 +50,7 @@ describe("节点上的链接徽章", () => {
       success: true,
       exists: true,
       content: serializeSidecar(
-        setNodeLink(emptySidecar(), firstBranchId(), "https://example.com/docs")
+        setNodeLink(emptySidecar(), firstBranchId(), "https://example.com/docs"),
       ),
     });
 
@@ -71,7 +71,7 @@ describe("节点上的链接徽章", () => {
       success: true,
       exists: true,
       content: serializeSidecar(
-        setNodeLink(emptySidecar(), firstBranchId(), "https://example.com/docs")
+        setNodeLink(emptySidecar(), firstBranchId(), "https://example.com/docs"),
       ),
     });
 

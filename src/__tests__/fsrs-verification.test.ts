@@ -46,7 +46,7 @@ describe("闪卡验证 - 同一天再次评分（短时权重）", () => {
       { id: "x", kind: "qa", front: "f", back: "b", line: 1 },
       progress,
       1,
-      today
+      today,
     );
 
     // w17 is the same-day stability weight; using the 30-day lapse formula here

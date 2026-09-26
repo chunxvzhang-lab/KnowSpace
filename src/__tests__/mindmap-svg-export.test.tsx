@@ -42,51 +42,57 @@ function el(tag: string, attrs: Record<string, string>, children: Element[] = []
 
 /** A canvas shaped like the real one, with one of everything the reader sees. */
 function canvasFixture(): SVGSVGElement {
-  const viewport = el("g", { class: "mindmap-viewport", transform: "translate(120, 40) scale(1.5)" }, [
-    el("rect", {
-      class: "mindmap-node-rect",
-      width: "80",
-      height: "36",
-      style: "fill: #ff0000; stroke: #00ff00; stroke-width: 2",
-    }),
-    el("rect", { class: "mindmap-node-rect-underline", width: "80", height: "36" }),
-    el("circle", { class: "mindmap-collapse-circle", r: "7" }),
-    el("text", { class: "mindmap-node-title-text root-title", style: "" }, [el("tspan", {}, [])]),
-    el("text", { class: "mindmap-node-title-text", style: "font-size: 11px" }, [el("tspan", {}, [])]),
-    el("rect", { class: "mindmap-node-selection-ring", width: "86", height: "42" }),
-    el("rect", { class: "mindmap-node-add-btn", width: "14", height: "14" }),
-    el("g", { class: "mindmap-node-resize-handle" }),
-    // Everything the reader can attach to a node, drawn with no colour of its
-    // own: on screen a stylesheet paints all of it, and a stylesheet does not
-    // travel with a file.
-    el("g", { class: "mindmap-note-marker" }, [
-      el("circle", { r: "4.6" }),
-      el("path", { d: "M -2 -0.8 H 2" }),
-    ]),
-    el("g", { class: "mindmap-link-marker" }, [
-      el("circle", { r: "4.6" }),
-      el("path", { d: "M -1.7 1.7 L 1.5 -1.5" }),
-    ]),
-    el("svg", { class: "mindmap-node-icon", viewBox: "0 0 24 24", stroke: "currentColor" }, [
-      el("path", { d: "M 0 0" }),
-    ]),
-    el("text", { class: "mindmap-node-number" }, []),
-    el("g", { class: "mindmap-node-marks" }, [
-      el("path", { class: "mindmap-progress-fill", d: "M 0 0" }),
-      el("circle", { class: "mindmap-progress-track", r: "5.5" }),
-      el("text", { class: "mindmap-priority-text" }, []),
-    ]),
-    el("g", { class: "mindmap-node-tags" }, [
-      el("g", {}, [
-        el("rect", { class: "mindmap-tag-chip", width: "40", height: "13" }),
+  const viewport = el(
+    "g",
+    { class: "mindmap-viewport", transform: "translate(120, 40) scale(1.5)" },
+    [
+      el("rect", {
+        class: "mindmap-node-rect",
+        width: "80",
+        height: "36",
+        style: "fill: #ff0000; stroke: #00ff00; stroke-width: 2",
+      }),
+      el("rect", { class: "mindmap-node-rect-underline", width: "80", height: "36" }),
+      el("circle", { class: "mindmap-collapse-circle", r: "7" }),
+      el("text", { class: "mindmap-node-title-text root-title", style: "" }, [el("tspan", {}, [])]),
+      el("text", { class: "mindmap-node-title-text", style: "font-size: 11px" }, [
+        el("tspan", {}, []),
+      ]),
+      el("rect", { class: "mindmap-node-selection-ring", width: "86", height: "42" }),
+      el("rect", { class: "mindmap-node-add-btn", width: "14", height: "14" }),
+      el("g", { class: "mindmap-node-resize-handle" }),
+      // Everything the reader can attach to a node, drawn with no colour of its
+      // own: on screen a stylesheet paints all of it, and a stylesheet does not
+      // travel with a file.
+      el("g", { class: "mindmap-note-marker" }, [
+        el("circle", { r: "4.6" }),
+        el("path", { d: "M -2 -0.8 H 2" }),
+      ]),
+      el("g", { class: "mindmap-link-marker" }, [
+        el("circle", { r: "4.6" }),
+        el("path", { d: "M -1.7 1.7 L 1.5 -1.5" }),
+      ]),
+      el("svg", { class: "mindmap-node-icon", viewBox: "0 0 24 24", stroke: "currentColor" }, [
+        el("path", { d: "M 0 0" }),
+      ]),
+      el("text", { class: "mindmap-node-number" }, []),
+      el("g", { class: "mindmap-node-marks" }, [
+        el("path", { class: "mindmap-progress-fill", d: "M 0 0" }),
+        el("circle", { class: "mindmap-progress-track", r: "5.5" }),
+        el("text", { class: "mindmap-priority-text" }, []),
+      ]),
+      el("g", { class: "mindmap-node-tags" }, [
+        el("g", {}, [
+          el("rect", { class: "mindmap-tag-chip", width: "40", height: "13" }),
+          el("text", { class: "mindmap-tag-chip-text" }, []),
+        ]),
+        // The overflow chip and its label are siblings on purpose: that adjacency
+        // is what the stylesheet's rule for it matches on.
+        el("rect", { class: "mindmap-tag-chip is-more", width: "20", height: "13" }),
         el("text", { class: "mindmap-tag-chip-text" }, []),
       ]),
-      // The overflow chip and its label are siblings on purpose: that adjacency
-      // is what the stylesheet's rule for it matches on.
-      el("rect", { class: "mindmap-tag-chip is-more", width: "20", height: "13" }),
-      el("text", { class: "mindmap-tag-chip-text" }, []),
-    ]),
-  ]);
+    ],
+  );
 
   return el("svg", { width: "100%", height: "100%" }, [viewport]) as SVGSVGElement;
 }
@@ -137,7 +143,7 @@ describe("导出的独立 SVG", () => {
     const parse = (svg: string) => new DOMParser().parseFromString(svg, "image/svg+xml");
 
     const dark = parse(
-      buildStandaloneMindmapSvg(canvasFixture(), { bounds: BOUNDS, dark: true })!.svg
+      buildStandaloneMindmapSvg(canvasFixture(), { bounds: BOUNDS, dark: true })!.svg,
     );
     expect(dark.querySelector(".mindmap-note-marker circle")?.getAttribute("fill")).toBe("#16405a");
     expect(dark.querySelector(".mindmap-link-marker path")?.getAttribute("stroke")).toBe("#c084fc");
@@ -155,14 +161,16 @@ describe("导出的独立 SVG", () => {
     expect(dark.querySelector(".mindmap-tag-chip-text")?.getAttribute("font-family")).toBeTruthy();
 
     const light = parse(
-      buildStandaloneMindmapSvg(canvasFixture(), { bounds: BOUNDS, dark: false })!.svg
+      buildStandaloneMindmapSvg(canvasFixture(), { bounds: BOUNDS, dark: false })!.svg,
     );
-    expect(light.querySelector(".mindmap-note-marker circle")?.getAttribute("fill")).toBe("#dcecf8");
+    expect(light.querySelector(".mindmap-note-marker circle")?.getAttribute("fill")).toBe(
+      "#dcecf8",
+    );
     expect(light.querySelector(".mindmap-node-number")?.getAttribute("fill")).toBe("#0369a1");
 
     // Nothing is left depending on a class name having been painted for it.
     for (const element of light.querySelectorAll(
-      ".mindmap-note-marker circle, .mindmap-link-marker circle, .mindmap-tag-chip"
+      ".mindmap-note-marker circle, .mindmap-link-marker circle, .mindmap-tag-chip",
     )) {
       expect(element.getAttribute("fill")).toBeTruthy();
     }
@@ -257,7 +265,7 @@ describe("打印 / 导出 PDF", () => {
 
     const expected = layoutMindmap(parseMarkdownToMindmapTree(SOURCE, "测试")).bounds;
     expect(canvas().getAttribute("viewBox")).toBe(
-      `${expected.minX} ${expected.minY} ${expected.width} ${expected.height}`
+      `${expected.minX} ${expected.minY} ${expected.width} ${expected.height}`,
     );
 
     fire("afterprint");
@@ -375,7 +383,7 @@ describe("标注与导出", () => {
 
     const built = buildStandaloneMindmapSvg(
       document.querySelector(".mindmap-svg-canvas") as SVGSVGElement,
-      { bounds: layoutMindmap(parseMarkdownToMindmapTree(SOURCE, "测试")).bounds, dark: true }
+      { bounds: layoutMindmap(parseMarkdownToMindmapTree(SOURCE, "测试")).bounds, dark: true },
     )!;
     const doc = new DOMParser().parseFromString(built.svg, "image/svg+xml");
 

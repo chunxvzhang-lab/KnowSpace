@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  SLASH_COMMANDS,
-  matchSlashCommands,
-  getCommandTemplate,
-} from "../services/slashCommands";
+import { SLASH_COMMANDS, matchSlashCommands, getCommandTemplate } from "../services/slashCommands";
 import { parseFlashcards } from "../services/fsrsService";
 
 describe("slashCommands service", () => {

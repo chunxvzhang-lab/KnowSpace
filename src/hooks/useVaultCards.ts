@@ -1,10 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { samePath } from "../core/paths";
 import { useVaultStore } from "../store/useVaultStore";
-import {
-  readReviewDocumentsChunked,
-  type ReviewSourceDocument,
-} from "../services/reviewSources";
+import { readReviewDocumentsChunked, type ReviewSourceDocument } from "../services/reviewSources";
 
 /**
  * The open knowledge base as a card source.
@@ -48,9 +45,7 @@ export function useVaultCards() {
 
   const load = useCallback(async () => {
     const bridge =
-      typeof window !== "undefined"
-        ? window.knowSpaceDesktop || window.bookMDDesktop
-        : undefined;
+      typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
 
     const paths = (manifest?.chapters ?? [])
       .map((chapter) => chapter.absolutePath)
@@ -108,7 +103,7 @@ export function useVaultCards() {
    */
   const applySaved = useCallback((filePath: string, content: string) => {
     setDocuments((prev) =>
-      prev.map((doc) => (samePath(doc.filePath, filePath) ? { ...doc, content } : doc))
+      prev.map((doc) => (samePath(doc.filePath, filePath) ? { ...doc, content } : doc)),
     );
   }, []);
 

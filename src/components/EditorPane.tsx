@@ -25,10 +25,21 @@ import {
 import { tags } from "@lezer/highlight";
 import { markdown } from "@codemirror/lang-markdown";
 import { oneDark } from "@codemirror/theme-one-dark";
-import { autocompletion, closeBrackets, closeBracketsKeymap, startCompletion, type CompletionContext, type CompletionResult } from "@codemirror/autocomplete";
+import {
+  autocompletion,
+  closeBrackets,
+  closeBracketsKeymap,
+  startCompletion,
+  type CompletionContext,
+  type CompletionResult,
+} from "@codemirror/autocomplete";
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
 import type { ThemeMode } from "../core/types";
-import { matchSlashCommands, getCommandTemplate, detectSlashTrigger } from "../services/slashCommands";
+import {
+  matchSlashCommands,
+  getCommandTemplate,
+  detectSlashTrigger,
+} from "../services/slashCommands";
 import { EditorContextMenu } from "./EditorContextMenu";
 
 export type WikiLinkTarget = {
@@ -64,23 +75,50 @@ const lightHighlightStyle = HighlightStyle.define([
   { tag: tags.heading1, color: "#d97706", fontWeight: "800" },
   { tag: tags.heading2, color: "#1f2328", fontWeight: "700" },
   { tag: tags.heading3, color: "#1f2328", fontWeight: "600" },
-  { tag: [tags.keyword, tags.controlKeyword, tags.definitionKeyword], color: "#cf222e", fontWeight: "600" },
+  {
+    tag: [tags.keyword, tags.controlKeyword, tags.definitionKeyword],
+    color: "#cf222e",
+    fontWeight: "600",
+  },
   { tag: [tags.name, tags.deleted, tags.character, tags.macroName], color: "#cf222e" },
   { tag: [tags.propertyName], color: "#116329" },
   { tag: [tags.variableName, tags.definition(tags.variableName)], color: "#953800" },
   { tag: [tags.function(tags.variableName), tags.labelName], color: "#8250df" },
   { tag: [tags.color, tags.constant(tags.name), tags.standard(tags.name)], color: "#0550ae" },
   { tag: [tags.definition(tags.typeName), tags.typeName], color: "#953800" },
-  { tag: [tags.number, tags.changed, tags.annotation, tags.modifier, tags.self, tags.namespace], color: "#0550ae", fontWeight: "600" },
-  { tag: [tags.operator, tags.operatorKeyword, tags.url, tags.escape, tags.regexp, tags.special(tags.string)], color: "#0550ae" },
+  {
+    tag: [tags.number, tags.changed, tags.annotation, tags.modifier, tags.self, tags.namespace],
+    color: "#0550ae",
+    fontWeight: "600",
+  },
+  {
+    tag: [
+      tags.operator,
+      tags.operatorKeyword,
+      tags.url,
+      tags.escape,
+      tags.regexp,
+      tags.special(tags.string),
+    ],
+    color: "#0550ae",
+  },
   { tag: [tags.meta, tags.comment], color: "#6e7781", fontStyle: "italic" },
   { tag: tags.strong, fontWeight: "700" },
   { tag: tags.emphasis, fontStyle: "italic" },
   { tag: tags.strikethrough, textDecoration: "line-through" },
   { tag: tags.link, color: "#d97706", textDecoration: "underline" },
-  { tag: tags.monospace, color: "#c2410c", backgroundColor: "rgba(245, 158, 11, 0.12)", borderRadius: "3px" },
+  {
+    tag: tags.monospace,
+    color: "#c2410c",
+    backgroundColor: "rgba(245, 158, 11, 0.12)",
+    borderRadius: "3px",
+  },
   { tag: [tags.string, tags.inserted], color: "#0a3069" },
-  { tag: [tags.atom, tags.bool, tags.special(tags.variableName)], color: "#0550ae", fontWeight: "600" },
+  {
+    tag: [tags.atom, tags.bool, tags.special(tags.variableName)],
+    color: "#0550ae",
+    fontWeight: "600",
+  },
   { tag: tags.invalid, color: "#cf222e" },
 ]);
 
@@ -90,23 +128,57 @@ const einkHighlightStyle = HighlightStyle.define([
   { tag: tags.heading1, color: "#000000", fontWeight: "800", textDecoration: "underline" },
   { tag: tags.heading2, color: "#1a1a1a", fontWeight: "700" },
   { tag: tags.heading3, color: "#222222", fontWeight: "600" },
-  { tag: [tags.keyword, tags.controlKeyword, tags.definitionKeyword], color: "#111111", fontWeight: "700" },
-  { tag: [tags.name, tags.deleted, tags.character, tags.macroName], color: "#222222", fontWeight: "600" },
+  {
+    tag: [tags.keyword, tags.controlKeyword, tags.definitionKeyword],
+    color: "#111111",
+    fontWeight: "700",
+  },
+  {
+    tag: [tags.name, tags.deleted, tags.character, tags.macroName],
+    color: "#222222",
+    fontWeight: "600",
+  },
   { tag: [tags.propertyName], color: "#1a1a1a" },
   { tag: [tags.variableName, tags.definition(tags.variableName)], color: "#262626" },
   { tag: [tags.function(tags.variableName), tags.labelName], color: "#111111", fontWeight: "600" },
-  { tag: [tags.color, tags.constant(tags.name), tags.standard(tags.name)], color: "#333333", fontWeight: "600" },
+  {
+    tag: [tags.color, tags.constant(tags.name), tags.standard(tags.name)],
+    color: "#333333",
+    fontWeight: "600",
+  },
   { tag: [tags.definition(tags.typeName), tags.typeName], color: "#111111", fontWeight: "600" },
-  { tag: [tags.number, tags.changed, tags.annotation, tags.modifier, tags.self, tags.namespace], color: "#222222" },
-  { tag: [tags.operator, tags.operatorKeyword, tags.url, tags.escape, tags.regexp, tags.special(tags.string)], color: "#333333" },
+  {
+    tag: [tags.number, tags.changed, tags.annotation, tags.modifier, tags.self, tags.namespace],
+    color: "#222222",
+  },
+  {
+    tag: [
+      tags.operator,
+      tags.operatorKeyword,
+      tags.url,
+      tags.escape,
+      tags.regexp,
+      tags.special(tags.string),
+    ],
+    color: "#333333",
+  },
   { tag: [tags.meta, tags.comment], color: "#666666", fontStyle: "italic" },
   { tag: tags.strong, fontWeight: "700", color: "#000000" },
   { tag: tags.emphasis, fontStyle: "italic" },
   { tag: tags.strikethrough, textDecoration: "line-through" },
   { tag: tags.link, color: "#111111", textDecoration: "underline" },
-  { tag: tags.monospace, color: "#1a1a1a", backgroundColor: "rgba(0, 0, 0, 0.05)", borderRadius: "3px" },
+  {
+    tag: tags.monospace,
+    color: "#1a1a1a",
+    backgroundColor: "rgba(0, 0, 0, 0.05)",
+    borderRadius: "3px",
+  },
   { tag: [tags.string, tags.inserted], color: "#3a3a3a", fontStyle: "italic" },
-  { tag: [tags.atom, tags.bool, tags.special(tags.variableName)], color: "#111111", fontWeight: "600" },
+  {
+    tag: [tags.atom, tags.bool, tags.special(tags.variableName)],
+    color: "#111111",
+    fontWeight: "600",
+  },
   { tag: tags.invalid, color: "#555555", textDecoration: "underline wavy" },
 ]);
 
@@ -124,37 +196,41 @@ function buildCustomTheme(theme: ThemeMode, fontScale: number, typewriterMode = 
   const textColor = isDarkMode ? "#f1f5f9" : isEink ? "#1a1a1a" : "#1f2328";
   const gutterBg = isDarkMode ? "#0a0d12" : isEink ? "#ede8df" : "#ffffff";
   const gutterColor = isDarkMode ? "#71767b" : isEink ? "#7c776e" : "#64748b";
-  const gutterBorder = isDarkMode ? "1px solid rgba(255, 255, 255, 0.08)" : isEink ? "1px solid #d5cfc0" : "1px solid #e2e8f0";
+  const gutterBorder = isDarkMode
+    ? "1px solid rgba(255, 255, 255, 0.08)"
+    : isEink
+      ? "1px solid #d5cfc0"
+      : "1px solid #e2e8f0";
   const activeLineBg = isDarkMode
     ? "rgba(29, 155, 240, 0.16) !important"
     : isEink
-    ? "#ded9cd !important"
-    : "rgba(245, 158, 11, 0.10) !important";
+      ? "#ded9cd !important"
+      : "rgba(245, 158, 11, 0.10) !important";
   const activeGutterBg = isDarkMode
     ? "rgba(29, 155, 240, 0.22) !important"
     : isEink
-    ? "#ded9cd !important"
-    : "rgba(245, 158, 11, 0.16) !important";
+      ? "#ded9cd !important"
+      : "rgba(245, 158, 11, 0.16) !important";
   const activeGutterColor = isDarkMode
     ? "#1d9bf0 !important"
     : isEink
-    ? "#1a1a1a !important"
-    : "#d97706 !important";
+      ? "#1a1a1a !important"
+      : "#d97706 !important";
   const selectionBg = isDarkMode
     ? "rgba(29, 155, 240, 0.35) !important"
     : isEink
-    ? "rgba(0, 0, 0, 0.10) !important"
-    : "rgba(245, 158, 11, 0.25) !important";
+      ? "rgba(0, 0, 0, 0.10) !important"
+      : "rgba(245, 158, 11, 0.25) !important";
   const matchBg = isDarkMode
     ? "rgba(29, 155, 240, 0.25) !important"
     : isEink
-    ? "#d5cebf !important"
-    : "rgba(245, 158, 11, 0.18) !important";
+      ? "#d5cebf !important"
+      : "rgba(245, 158, 11, 0.18) !important";
   const matchOutline = isDarkMode
     ? "1px solid rgba(29, 155, 240, 0.6) !important"
     : isEink
-    ? "1px solid #a8a090 !important"
-    : "1px solid rgba(217, 119, 6, 0.45) !important";
+      ? "1px solid #a8a090 !important"
+      : "1px solid rgba(217, 119, 6, 0.45) !important";
 
   return EditorView.theme(
     {
@@ -202,7 +278,7 @@ function buildCustomTheme(theme: ThemeMode, fontScale: number, typewriterMode = 
         outline: matchOutline,
       },
     },
-    { dark: isDarkMode }
+    { dark: isDarkMode },
   );
 }
 
@@ -217,9 +293,17 @@ function resolveHighlightExtensions(theme: ThemeMode, customBaseTheme: Extension
     return [oneDark, customBaseTheme];
   }
   if (theme === "eink") {
-    return [customBaseTheme, syntaxHighlighting(einkHighlightStyle), syntaxHighlighting(defaultHighlightStyle, { fallback: true })];
+    return [
+      customBaseTheme,
+      syntaxHighlighting(einkHighlightStyle),
+      syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+    ];
   }
-  return [customBaseTheme, syntaxHighlighting(lightHighlightStyle), syntaxHighlighting(defaultHighlightStyle, { fallback: true })];
+  return [
+    customBaseTheme,
+    syntaxHighlighting(lightHighlightStyle),
+    syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+  ];
 }
 
 export const EditorPane = memo(function EditorPane({
@@ -266,7 +350,8 @@ export const EditorPane = memo(function EditorPane({
   typewriterModeRef.current = typewriterMode;
 
   const saveAndInsertImage = (file: File, view: EditorView) => {
-    const desktop = typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
+    const desktop =
+      typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
     if (!desktop?.savePastedImage) return;
 
     try {
@@ -376,7 +461,10 @@ export const EditorPane = memo(function EditorPane({
         // Case 2: markers sit just outside the selection → unwrap outer markers
         const preFrom = Math.max(0, sel.from - marker.length);
         const postTo = Math.min(doc.length, sel.to + marker.length);
-        if (doc.sliceString(preFrom, sel.from) === marker && doc.sliceString(sel.to, postTo) === marker) {
+        if (
+          doc.sliceString(preFrom, sel.from) === marker &&
+          doc.sliceString(sel.to, postTo) === marker
+        ) {
           view.dispatch({
             changes: [
               { from: preFrom, to: sel.from, insert: "" },
@@ -390,7 +478,10 @@ export const EditorPane = memo(function EditorPane({
         const wrapped = `${marker}${selectedText}${marker}`;
         view.dispatch({
           changes: { from: sel.from, to: sel.to, insert: wrapped },
-          selection: { anchor: sel.from + marker.length, head: sel.from + marker.length + selectedText.length },
+          selection: {
+            anchor: sel.from + marker.length,
+            head: sel.from + marker.length + selectedText.length,
+          },
         });
         return true;
       }
@@ -423,7 +514,10 @@ export const EditorPane = memo(function EditorPane({
       const insert = `${marker}${placeholder}${marker}`;
       view.dispatch({
         changes: { from: sel.from, to: sel.to, insert },
-        selection: { anchor: sel.from + marker.length, head: sel.from + marker.length + placeholder.length },
+        selection: {
+          anchor: sel.from + marker.length,
+          head: sel.from + marker.length + placeholder.length,
+        },
       });
       return true;
     };
@@ -608,7 +702,7 @@ export const EditorPane = memo(function EditorPane({
         fontSizeCompartment.current.of(
           EditorView.theme({
             "&": { fontSize: `${14 * fontScale}px` },
-          })
+          }),
         ),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
@@ -651,7 +745,7 @@ export const EditorPane = memo(function EditorPane({
             }
             const files = Array.from(dataTransfer.files);
             const imageFiles = files.filter(
-              (f) => f.type.startsWith("image/") || /\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(f.name)
+              (f) => f.type.startsWith("image/") || /\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(f.name),
             );
             if (imageFiles.length > 0) {
               event.preventDefault();
@@ -717,7 +811,9 @@ export const EditorPane = memo(function EditorPane({
     if (!view) return;
     const customBaseTheme = buildCustomTheme(theme, fontScale, typewriterMode);
     view.dispatch({
-      effects: themeCompartment.current.reconfigure(resolveHighlightExtensions(theme, customBaseTheme)),
+      effects: themeCompartment.current.reconfigure(
+        resolveHighlightExtensions(theme, customBaseTheme),
+      ),
     });
     if (typewriterMode) {
       triggerSmoothTypewriterScroll(view);
@@ -732,7 +828,7 @@ export const EditorPane = memo(function EditorPane({
       effects: fontSizeCompartment.current.reconfigure(
         EditorView.theme({
           "&": { fontSize: `${14 * fontScale}px` },
-        })
+        }),
       ),
     });
   }, [fontScale]);

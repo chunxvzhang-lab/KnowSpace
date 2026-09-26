@@ -68,7 +68,10 @@ function byId(layout: MindmapLayoutResult): Map<string, MindmapLayoutResult["nod
   return new Map(layout.nodes.map((node) => [node.id, node]));
 }
 
-function boxesOverlap(a: MindmapLayoutResult["nodes"][number], b: MindmapLayoutResult["nodes"][number]) {
+function boxesOverlap(
+  a: MindmapLayoutResult["nodes"][number],
+  b: MindmapLayoutResult["nodes"][number],
+) {
   return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 }
 
@@ -88,7 +91,7 @@ function onPerimeter(
   box: MindmapLayoutResult["nodes"][number],
   x: number,
   y: number,
-  tolerance = 0.01
+  tolerance = 0.01,
 ): boolean {
   const inside =
     x >= box.x - tolerance &&
@@ -239,7 +242,7 @@ describe("思维导图布局", () => {
       const tree = parseMarkdownToMindmapTree(SOURCE, "测试");
 
       expect(geometry(layoutMindmap(tree, new Set(), DEFAULT_LAYOUT_ID))).toEqual(
-        geometry(layoutMindmap(tree))
+        geometry(layoutMindmap(tree)),
       );
     });
 
@@ -335,7 +338,7 @@ describe("思维导图布局", () => {
             Math.max(...nodes.map((node) => node.y + node.height)) -
             Math.min(...nodes.map((node) => node.y))
           );
-        })
+        }),
       );
 
       expect(Math.abs(extent("left") - extent("right"))).toBeLessThanOrEqual(tallest);
@@ -343,10 +346,12 @@ describe("思维导图布局", () => {
 
     it("根居中，两侧各隔一个层间距", () => {
       const leftReach = Math.max(
-        ...layout.nodes.filter((node) => node.side === "left").map((node) => node.x + node.width)
+        ...layout.nodes.filter((node) => node.side === "left").map((node) => node.x + node.width),
       );
       const rightStart = Math.min(
-        ...layout.nodes.filter((node) => node.side === "right" && node.id !== root.id).map((node) => node.x)
+        ...layout.nodes
+          .filter((node) => node.side === "right" && node.id !== root.id)
+          .map((node) => node.x),
       );
 
       expect(leftReach).toBeLessThanOrEqual(root.x - LEVEL_GAP + 0.001);
@@ -368,7 +373,7 @@ describe("思维导图布局", () => {
         for (let j = i + 1; j < layout.nodes.length; j++) {
           expect(
             boxesOverlap(layout.nodes[i], layout.nodes[j]),
-            `重叠: ${layout.nodes[i].id} 与 ${layout.nodes[j].id}`
+            `重叠: ${layout.nodes[i].id} 与 ${layout.nodes[j].id}`,
           ).toBe(false);
         }
       }
@@ -494,7 +499,7 @@ describe("思维导图布局", () => {
         for (let j = i + 1; j < layout.nodes.length; j++) {
           expect(
             boxesOverlap(layout.nodes[i], layout.nodes[j]),
-            `重叠: ${layout.nodes[i].id} 与 ${layout.nodes[j].id}`
+            `重叠: ${layout.nodes[i].id} 与 ${layout.nodes[j].id}`,
           ).toBe(false);
         }
       }
@@ -636,7 +641,7 @@ describe("思维导图布局", () => {
         for (let j = i + 1; j < layout.nodes.length; j++) {
           expect(
             boxesOverlap(layout.nodes[i], layout.nodes[j]),
-            `重叠: ${layout.nodes[i].id} 与 ${layout.nodes[j].id}`
+            `重叠: ${layout.nodes[i].id} 与 ${layout.nodes[j].id}`,
           ).toBe(false);
         }
       }
@@ -666,7 +671,7 @@ describe("思维导图布局", () => {
           "  - 重乙三",
           "  - 重乙四",
         ].join("\n"),
-        "测试"
+        "测试",
       );
       const mixLayout = layoutMindmap(mixTree, new Set(), "radial");
       const mixCentre = centreOf(mixTree, mixLayout);
@@ -676,7 +681,7 @@ describe("思维导图布局", () => {
         const node = mixLayout.nodes.find((candidate) => candidate.id === child.id)!;
         let angle = Math.atan2(
           node.y + node.height / 2 - mixCentre.y,
-          node.x + node.width / 2 - mixCentre.x
+          node.x + node.width / 2 - mixCentre.x,
         );
         // Unwrapped in document order: the assignment runs clockwise from the
         // top, so the sequence only ever ascends.
@@ -711,11 +716,11 @@ describe("思维导图布局", () => {
         const childCentre = centreOfNode(child);
         expect(
           (childCentre.x - parentCentre.x) * (fromX - parentCentre.x) +
-            (childCentre.y - parentCentre.y) * (fromY - parentCentre.y)
+            (childCentre.y - parentCentre.y) * (fromY - parentCentre.y),
         ).toBeGreaterThan(0);
         expect(
           (parentCentre.x - childCentre.x) * (toX - childCentre.x) +
-            (parentCentre.y - childCentre.y) * (toY - childCentre.y)
+            (parentCentre.y - childCentre.y) * (toY - childCentre.y),
         ).toBeGreaterThan(0);
       }
     });
@@ -859,7 +864,7 @@ describe("思维导图布局", () => {
         for (let j = i + 1; j < layout.nodes.length; j++) {
           expect(
             boxesOverlap(layout.nodes[i], layout.nodes[j]),
-            `重叠: ${layout.nodes[i].id} 与 ${layout.nodes[j].id}`
+            `重叠: ${layout.nodes[i].id} 与 ${layout.nodes[j].id}`,
           ).toBe(false);
         }
       }

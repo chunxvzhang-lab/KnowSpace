@@ -28,7 +28,7 @@ export function unionBounds(a: Bounds, b: Bounds): Bounds {
 /** The bounds of a set of boxes, in the shape the layout's own bounds come in. */
 export function boundsOfBoxes(
   boxes: { x: number; y: number; width: number; height: number }[],
-  padding: number
+  padding: number,
 ): Bounds | null {
   if (boxes.length === 0) return null;
 

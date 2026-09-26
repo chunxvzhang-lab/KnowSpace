@@ -147,7 +147,7 @@ type ToolbarBlocks = {
 function measureRequirement(
   toolbar: HTMLElement,
   blocks: ToolbarBlocks,
-  variant: ToolbarVariant
+  variant: ToolbarVariant,
 ): number {
   const style = getComputedStyle(toolbar);
   const padding = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
@@ -323,7 +323,7 @@ export function MindmapToolbar({
               settings: settingsRef.current,
               view: viewRef.current,
             },
-            candidate
+            candidate,
           ) <= available
         ) {
           chosen = candidate;
@@ -400,7 +400,10 @@ export function MindmapToolbar({
                     : "导图架构与文档内容保持一致"
                 }
               >
-                <RefreshCw size={13} className={hasUnsyncedChanges ? "sync-icon-spin" : "text-muted"} />
+                <RefreshCw
+                  size={13}
+                  className={hasUnsyncedChanges ? "sync-icon-spin" : "text-muted"}
+                />
                 <span>{hasUnsyncedChanges ? "同步到文档" : "已同步"}</span>
                 {hasUnsyncedChanges && <span className="sync-dirty-dot" />}
               </button>
@@ -564,7 +567,6 @@ export function MindmapToolbar({
             <div className="mindmap-toolbar-divider" />
           </>
         )}
-
       </div>
 
       {/* The settings row: search, theme, layout, numbering.
@@ -635,7 +637,6 @@ export function MindmapToolbar({
           <ListOrdered size={14} />
           <span>编号</span>
         </button>
-
       </div>
 
       {/* What the reader is looking at, and what they take away from it: zoom and export,

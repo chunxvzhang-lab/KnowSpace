@@ -84,7 +84,7 @@ describe("DailyReviewPanel - 卡片来源", () => {
       batch([
         ["C:/Vault/c1.md", "知识库问题 :: 知识库答案"],
         ["C:/Vault/c2.md", "这一篇只是普通段落，没有卡片。"],
-      ])
+      ]),
     );
     render(<DailyReviewPanel notes={[SPACE_NOTE]} />);
 
@@ -176,7 +176,7 @@ describe("DailyReviewPanel - 卡片来源", () => {
     // the first one's text, and — because the card's source path is what a rating
     // writes to — how progress is saved into the wrong document.
     readMarkdownBatch.mockResolvedValue(
-      batch([["C:/Vault/c2.md", "第二章的问题 :: 第二章的答案"]])
+      batch([["C:/Vault/c2.md", "第二章的问题 :: 第二章的答案"]]),
     );
     render(<DailyReviewPanel notes={[]} />);
 
@@ -192,7 +192,7 @@ describe("DailyReviewPanel - 卡片来源", () => {
 
     // The card came out of c2, so c2 is the file that gets its progress.
     expect(saveMarkdownFile).toHaveBeenCalledWith(
-      expect.objectContaining({ absolutePath: "C:/Vault/c2.md" })
+      expect.objectContaining({ absolutePath: "C:/Vault/c2.md" }),
     );
   });
 });
@@ -288,8 +288,7 @@ describe("DailyReviewPanel - 当前文档来源", () => {
     localStorage.clear();
   });
 
-  const documentTab = () =>
-    screen.getByRole("button", { name: "当前文档" }) as HTMLButtonElement;
+  const documentTab = () => screen.getByRole("button", { name: "当前文档" }) as HTMLButtonElement;
 
   it("没有打开文档时不可选，并说明原因", () => {
     render(<DailyReviewPanel notes={[]} />);
@@ -299,12 +298,7 @@ describe("DailyReviewPanel - 当前文档来源", () => {
   });
 
   it("打开且已保存时：只复习这一篇的卡片", async () => {
-    render(
-      <DailyReviewPanel
-        notes={[SPACE_NOTE]}
-        currentDocument={{ ...NOTE, dirty: false }}
-      />
-    );
+    render(<DailyReviewPanel notes={[SPACE_NOTE]} currentDocument={{ ...NOTE, dirty: false }} />);
 
     await act(async () => {
       fireEvent.click(documentTab());
@@ -346,7 +340,7 @@ describe("DailyReviewPanel - 当前文档来源", () => {
     // unsaved changes, rather than continuing and losing the progress at the next
     // save — which is a thing the reader would only find out afterwards.
     const { rerender } = render(
-      <DailyReviewPanel notes={[]} currentDocument={{ ...NOTE, dirty: false }} />
+      <DailyReviewPanel notes={[]} currentDocument={{ ...NOTE, dirty: false }} />,
     );
     await act(async () => {
       fireEvent.click(documentTab());
@@ -364,7 +358,7 @@ describe("DailyReviewPanel - 当前文档来源", () => {
       <DailyReviewPanel
         notes={[]}
         currentDocument={{ filePath: "C:/Vault/open.md", content: "只有正文。", dirty: false }}
-      />
+      />,
     );
 
     await act(async () => {
@@ -444,7 +438,7 @@ describe("DailyReviewPanel - 自定义文件夹来源", () => {
     // review that cannot see this week's cards would be worse than one that looks.
     localStorage.setItem(
       "knowspace.review-folder",
-      JSON.stringify({ ...folderRow, paths: ["C:/Notes/复习/旧.md"] })
+      JSON.stringify({ ...folderRow, paths: ["C:/Notes/复习/旧.md"] }),
     );
     listReviewFolder.mockResolvedValue({ paths: ["C:/Notes/复习/新.md"] });
     readMarkdownBatch.mockResolvedValue(batch([["C:/Notes/复习/新.md", "新写的卡 :: 答案"]]));
@@ -472,7 +466,7 @@ describe("DailyReviewPanel - 自定义文件夹来源", () => {
     // is what matters, so the outcome is what is asserted — including that the folder was
     // read once, not once per rating.
     readMarkdownBatch.mockResolvedValue(
-      batch([["C:/Notes/复习/a.md", "文件夹里的第一张 :: 答案一\n\n文件夹里的第二张 :: 答案二"]])
+      batch([["C:/Notes/复习/a.md", "文件夹里的第一张 :: 答案一\n\n文件夹里的第二张 :: 答案二"]]),
     );
     render(<DailyReviewPanel notes={[]} />);
 
@@ -549,7 +543,7 @@ describe("DailyReviewPanel - 自定义文件夹来源", () => {
       batch([
         ["C:/Notes/复习/a.md", "复习里的卡 :: 答案"],
         ["C:/Notes/英语/b.md", "英语里的卡 :: 答案"],
-      ])
+      ]),
     );
     render(<DailyReviewPanel notes={[]} />);
 
@@ -594,7 +588,7 @@ describe("DailyReviewPanel - 自定义文件夹来源", () => {
       JSON.stringify([
         folderRow,
         { rootPath: "C:/Notes/复习/子集", name: "子集", paths: ["C:/Notes/复习/a.md"] },
-      ])
+      ]),
     );
     listReviewFolder.mockResolvedValue({ paths: ["C:/Notes/复习/a.md"] });
     readMarkdownBatch.mockResolvedValue(batch([["C:/Notes/复习/a.md", "卡 :: 答案"]]));

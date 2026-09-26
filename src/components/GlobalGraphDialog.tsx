@@ -137,7 +137,10 @@ export function GlobalGraphDialog({
       }
       if (e.code === "Space" && !e.repeat) {
         const target = e.target as HTMLElement;
-        if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+        if (
+          target &&
+          (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)
+        ) {
           return;
         }
         e.preventDefault();
@@ -180,13 +183,19 @@ export function GlobalGraphDialog({
   useEffect(() => {
     if (!isOpen || !containerRef.current) return;
 
-    const isDark = theme === "twitter" || (theme === "system" && window.matchMedia?.("(prefers-color-scheme: dark)").matches);
+    const isDark =
+      theme === "twitter" ||
+      (theme === "system" && window.matchMedia?.("(prefers-color-scheme: dark)").matches);
     const isEink = theme === "eink";
 
     const currentBg = isEink ? "#000000" : isDark ? "#38bdf8" : "#0284c7";
     const normalBg = isEink ? "#444444" : isDark ? "#334155" : "#94a3b8";
     const spaceBg = isEink ? "#777777" : "#f59e0b";
-    const edgeColor = isEink ? "rgba(0, 0, 0, 0.45)" : isDark ? "rgba(148, 163, 184, 0.28)" : "rgba(100, 116, 139, 0.25)";
+    const edgeColor = isEink
+      ? "rgba(0, 0, 0, 0.45)"
+      : isDark
+        ? "rgba(148, 163, 184, 0.28)"
+        : "rgba(100, 116, 139, 0.25)";
     const crossFolderEdgeColor = isEink ? "#000000" : isDark ? "#38bdf8" : "#0284c7";
     const nodeTextColor = isEink ? "#000000" : isDark ? "#f8fafc" : "#0f172a";
     const textOutlineColor = isEink ? "#ffffff" : isDark ? "#0b0f19" : "#ffffff";
@@ -221,7 +230,8 @@ export function GlobalGraphDialog({
           style: {
             label: "data(label)",
             "font-size": "11px",
-            "font-family": "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+            "font-family":
+              "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
             "font-weight": 600,
             color: nodeTextColor,
             "text-valign": "bottom",
@@ -497,7 +507,9 @@ export function GlobalGraphDialog({
     if (initialTarget && initialTarget.length > 0) {
       cy.center(initialTarget);
       const crossCount = initialTarget.isNode()
-        ? (initialTarget as any).connectedEdges().filter((e: any) => Boolean(e.data("isCrossFolder"))).length
+        ? (initialTarget as any)
+            .connectedEdges()
+            .filter((e: any) => Boolean(e.data("isCrossFolder"))).length
         : 0;
       setSelectedNode({
         id: initialTarget.data("id"),
@@ -674,12 +686,8 @@ export function GlobalGraphDialog({
             <Network size={20} className="text-cyan" />
             <h2 className="global-graph-title">知识网络全景图谱</h2>
             <div className="global-graph-badges">
-              <span className="graph-stat-badge">
-                {filteredData.nodes.length} 节点
-              </span>
-              <span className="graph-stat-badge">
-                {filteredData.edges.length} 条关联
-              </span>
+              <span className="graph-stat-badge">{filteredData.nodes.length} 节点</span>
+              <span className="graph-stat-badge">{filteredData.edges.length} 条关联</span>
             </div>
           </div>
 
@@ -771,15 +779,13 @@ export function GlobalGraphDialog({
                 <span>聚焦当前</span>
               </button>
             )}
-            <button
-              type="button"
-              className="graph-action-btn"
-              onClick={handleZoomIn}
-              title="放大"
-            >
+            <button type="button" className="graph-action-btn" onClick={handleZoomIn} title="放大">
               <ZoomIn size={14} />
             </button>
-            <div className="graph-zoom-input-wrapper" title="可手动输入缩放比例 (10% - 500%)，回车或失焦生效">
+            <div
+              className="graph-zoom-input-wrapper"
+              title="可手动输入缩放比例 (10% - 500%)，回车或失焦生效"
+            >
               <input
                 type="text"
                 className="graph-zoom-input"
@@ -800,12 +806,7 @@ export function GlobalGraphDialog({
                 aria-label="图谱缩放百分比"
               />
             </div>
-            <button
-              type="button"
-              className="graph-action-btn"
-              onClick={handleZoomOut}
-              title="缩小"
-            >
+            <button type="button" className="graph-action-btn" onClick={handleZoomOut} title="缩小">
               <ZoomOut size={14} />
             </button>
             <button
@@ -840,9 +841,7 @@ export function GlobalGraphDialog({
                       📁 {selectedNode.folderGroup}
                     </span>
                   )}
-                  {selectedNode.isCurrent && (
-                    <span className="node-current-badge">当前阅读</span>
-                  )}
+                  {selectedNode.isCurrent && <span className="node-current-badge">当前阅读</span>}
                 </div>
                 <button
                   type="button"
@@ -878,7 +877,9 @@ export function GlobalGraphDialog({
                   <span className="stat-label">引出</span>
                 </div>
                 <div className="inspector-stat-cell" title="跨越不同文件夹的双链连线数">
-                  <span className="stat-num highlight-cyan">{selectedNode.crossFolderCount ?? 0}</span>
+                  <span className="stat-num highlight-cyan">
+                    {selectedNode.crossFolderCount ?? 0}
+                  </span>
                   <span className="stat-label">跨目录</span>
                 </div>
               </div>
@@ -909,11 +910,10 @@ export function GlobalGraphDialog({
               <span className="legend-dot dot-space" /> 闪念 Space
             </div>
             <div className="legend-item">
-              <span className="legend-dot" style={{ background: "#38bdf8", borderRadius: 2 }} /> 跨文件夹连线
+              <span className="legend-dot" style={{ background: "#38bdf8", borderRadius: 2 }} />{" "}
+              跨文件夹连线
             </div>
-            <div className="legend-item hint-text">
-              提示：双击节点直接打开
-            </div>
+            <div className="legend-item hint-text">提示：双击节点直接打开</div>
           </div>
         </div>
       </div>

@@ -89,17 +89,13 @@ export const DocumentWorkspace = memo(function DocumentWorkspace({
   const [isDragging, setIsDragging] = useState(false);
   const workspaceRef = useRef<HTMLDivElement | null>(null);
 
-  const {
-    syncEnabled,
-    toggleSync,
-    editorViewRef,
-    handleEditorScroll,
-  } = useSyncScroll({ containerRef, viewMode, navLockUntilRef });
+  const { syncEnabled, toggleSync, editorViewRef, handleEditorScroll } = useSyncScroll({
+    containerRef,
+    viewMode,
+    navLockUntilRef,
+  });
 
-  const {
-    handleEditorSelectionChange,
-    handlePreviewSelectionChange,
-  } = useSyncSelection({
+  const { handleEditorSelectionChange, handlePreviewSelectionChange } = useSyncSelection({
     containerRef,
     viewMode,
     editorViewRef,
@@ -163,11 +159,7 @@ export const DocumentWorkspace = memo(function DocumentWorkspace({
       {viewMode !== "read" && (
         <div
           className="workspace-pane editor-section"
-          style={
-            viewMode === "split"
-              ? { flex: `0 0 ${splitRatio * 100}%` }
-              : { flex: "1 1 100%" }
-          }
+          style={viewMode === "split" ? { flex: `0 0 ${splitRatio * 100}%` } : { flex: "1 1 100%" }}
         >
           {viewMode === "split" && (
             <div className="pane-header-bar">
@@ -176,7 +168,11 @@ export const DocumentWorkspace = memo(function DocumentWorkspace({
                 type="button"
                 className={`sync-scroll-badge ${syncEnabled ? "active" : ""}`}
                 onClick={toggleSync}
-                title={syncEnabled ? "分屏同步滚动：已开启（点击关闭）" : "分屏同步滚动：已关闭（点击开启）"}
+                title={
+                  syncEnabled
+                    ? "分屏同步滚动：已开启（点击关闭）"
+                    : "分屏同步滚动：已关闭（点击开启）"
+                }
               >
                 {syncEnabled ? <Link2 size={12} /> : <Link2Off size={12} />}
                 <span>同步滚动</span>
@@ -233,9 +229,7 @@ export const DocumentWorkspace = memo(function DocumentWorkspace({
       <div
         className={`workspace-pane reader-section ${viewMode === "source" ? "source-mode-reader print-only-reader" : ""}`}
         style={
-          viewMode === "split"
-            ? { flex: `1 1 ${(1 - splitRatio) * 100}%` }
-            : { flex: "1 1 100%" }
+          viewMode === "split" ? { flex: `1 1 ${(1 - splitRatio) * 100}%` } : { flex: "1 1 100%" }
         }
       >
         {viewMode === "split" && (

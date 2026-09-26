@@ -292,9 +292,17 @@ describe("fsrsService - 调度闭环", () => {
     const now = new Date(2026, 0, 1);
     const result = review(
       card,
-      { stability: 30, difficulty: 5, due: "2026-01-01", reps: 3, lapses: 0, state: "review", last: "2025-12-20" },
+      {
+        stability: 30,
+        difficulty: 5,
+        due: "2026-01-01",
+        reps: 3,
+        lapses: 0,
+        state: "review",
+        last: "2025-12-20",
+      },
       3,
-      now
+      now,
     );
 
     expect(result.progress.last).toBe("2026-01-01");
@@ -330,9 +338,24 @@ describe("fsrsService - 调度闭环", () => {
 
   it("isDue 只对到期或过期的卡片返回 true", () => {
     const now = new Date(2026, 8, 17);
-    expect(isDue({ stability: 1, difficulty: 5, due: "2026-09-17", reps: 1, lapses: 0, state: "review" }, now)).toBe(true);
-    expect(isDue({ stability: 1, difficulty: 5, due: "2026-09-16", reps: 1, lapses: 0, state: "review" }, now)).toBe(true);
-    expect(isDue({ stability: 1, difficulty: 5, due: "2026-09-18", reps: 1, lapses: 0, state: "review" }, now)).toBe(false);
+    expect(
+      isDue(
+        { stability: 1, difficulty: 5, due: "2026-09-17", reps: 1, lapses: 0, state: "review" },
+        now,
+      ),
+    ).toBe(true);
+    expect(
+      isDue(
+        { stability: 1, difficulty: 5, due: "2026-09-16", reps: 1, lapses: 0, state: "review" },
+        now,
+      ),
+    ).toBe(true);
+    expect(
+      isDue(
+        { stability: 1, difficulty: 5, due: "2026-09-18", reps: 1, lapses: 0, state: "review" },
+        now,
+      ),
+    ).toBe(false);
     expect(isDue(undefined, now)).toBe(false);
   });
 
@@ -591,9 +614,15 @@ describe("fsrsService - 复习队列与统计", () => {
     const content = upsertFsrsMetadata(
       "到期 :: 答案\n未到期 :: 答案",
       new Map([
-        [cards[0].id, { stability: 1, difficulty: 5, due: "2026-09-17", reps: 1, lapses: 0, state: "review" }],
-        [cards[1].id, { stability: 1, difficulty: 5, due: "2026-12-01", reps: 1, lapses: 0, state: "review" }],
-      ])
+        [
+          cards[0].id,
+          { stability: 1, difficulty: 5, due: "2026-09-17", reps: 1, lapses: 0, state: "review" },
+        ],
+        [
+          cards[1].id,
+          { stability: 1, difficulty: 5, due: "2026-12-01", reps: 1, lapses: 0, state: "review" },
+        ],
+      ]),
     );
 
     const queue = buildReviewQueue([{ path: "x.md", content }], today);
@@ -612,8 +641,19 @@ describe("fsrsService - 复习队列与统计", () => {
     const content = upsertFsrsMetadata(
       "老卡 :: 答案",
       new Map([
-        [cards[0].id, { stability: 1, difficulty: 5, due: "2026-09-10", reps: 1, lapses: 0, state: "review", last: "2026-09-09" }],
-      ])
+        [
+          cards[0].id,
+          {
+            stability: 1,
+            difficulty: 5,
+            due: "2026-09-10",
+            reps: 1,
+            lapses: 0,
+            state: "review",
+            last: "2026-09-09",
+          },
+        ],
+      ]),
     );
 
     const queue = buildReviewQueue([{ path: "old.md", content }, freshNote], today);
@@ -626,9 +666,31 @@ describe("fsrsService - 复习队列与统计", () => {
     const content = upsertFsrsMetadata(
       "稳固 :: 答案\n模糊 :: 答案",
       new Map([
-        [cards[0].id, { stability: 100, difficulty: 5, due: "2026-09-16", reps: 5, lapses: 0, state: "review", last: "2026-09-10" }],
-        [cards[1].id, { stability: 3, difficulty: 5, due: "2026-09-16", reps: 5, lapses: 0, state: "review", last: "2026-08-20" }],
-      ])
+        [
+          cards[0].id,
+          {
+            stability: 100,
+            difficulty: 5,
+            due: "2026-09-16",
+            reps: 5,
+            lapses: 0,
+            state: "review",
+            last: "2026-09-10",
+          },
+        ],
+        [
+          cards[1].id,
+          {
+            stability: 3,
+            difficulty: 5,
+            due: "2026-09-16",
+            reps: 5,
+            lapses: 0,
+            state: "review",
+            last: "2026-08-20",
+          },
+        ],
+      ]),
     );
 
     const queue = buildReviewQueue([{ path: "two.md", content }], today);
@@ -640,9 +702,15 @@ describe("fsrsService - 复习队列与统计", () => {
     const content = upsertFsrsMetadata(
       "已有 :: 答案\n未到期 :: 答案",
       new Map([
-        [cards[0].id, { stability: 5, difficulty: 5, due: "2026-09-17", reps: 2, lapses: 0, state: "review" }],
-        [cards[1].id, { stability: 5, difficulty: 5, due: "2026-11-01", reps: 2, lapses: 0, state: "review" }],
-      ])
+        [
+          cards[0].id,
+          { stability: 5, difficulty: 5, due: "2026-09-17", reps: 2, lapses: 0, state: "review" },
+        ],
+        [
+          cards[1].id,
+          { stability: 5, difficulty: 5, due: "2026-11-01", reps: 2, lapses: 0, state: "review" },
+        ],
+      ]),
     );
 
     const stats = summarize([{ path: "s.md", content }, freshNote], today);
@@ -662,8 +730,9 @@ describe("fsrsService - 复习队列与统计", () => {
 describe("fsrsService - 性能（验收标准：评分响应 < 50ms）", () => {
   const notes = Array.from({ length: 20 }, (_, noteIndex) => ({
     path: `note-${noteIndex}.md`,
-    content: Array.from({ length: 5 }, (_, cardIndex) =>
-      `问题 ${noteIndex}-${cardIndex} :: 答案 ${noteIndex}-${cardIndex}`
+    content: Array.from(
+      { length: 5 },
+      (_, cardIndex) => `问题 ${noteIndex}-${cardIndex} :: 答案 ${noteIndex}-${cardIndex}`,
     ).join("\n"),
   }));
 

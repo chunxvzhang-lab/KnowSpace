@@ -69,10 +69,7 @@ describe("胶囊窗口解析 data-theme 的前提", () => {
     expect(end, "找不到区块结束标记").toBeGreaterThan(marker);
     // 用未剥注释的原文切片（标记本身就在注释里），切完再剥——否则注释里的散文
     // `var(--flash-accent)` 会被当成真实引用。
-    return RAW_CSS.slice(RAW_CSS.lastIndexOf("/*", marker), end).replace(
-      /\/\*[\s\S]*?\*\//g,
-      ""
-    );
+    return RAW_CSS.slice(RAW_CSS.lastIndexOf("/*", marker), end).replace(/\/\*[\s\S]*?\*\//g, "");
   }
 
   /**
@@ -85,9 +82,8 @@ describe("胶囊窗口解析 data-theme 的前提", () => {
     const src = readFileSync(resolve(__dirname, "../components/FlashCapsule.tsx"), "utf8");
     const out = new Set<string>();
     for (const m of src.matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`\}|\{([^}]*)\})/g)) {
-      const chunk = (m[1] ?? m[2] ?? m[3] ?? "").replace(
-        /\$\{([^}]*)\}/g,
-        (_all, expr: string) => (expr.match(/"([^"]*)"/g) ?? []).join(" ")
+      const chunk = (m[1] ?? m[2] ?? m[3] ?? "").replace(/\$\{([^}]*)\}/g, (_all, expr: string) =>
+        (expr.match(/"([^"]*)"/g) ?? []).join(" "),
       );
       for (const token of chunk.replace(/["'`]/g, " ").split(/\s+/)) {
         if (/^[a-z][\w-]*$/.test(token)) out.add(token);
@@ -109,7 +105,7 @@ describe("胶囊窗口解析 data-theme 的前提", () => {
     const capsuleClasses = capsuleClassNames();
     expect(
       [...capsuleClasses].filter((c) => c.startsWith("flash-")).length,
-      "没扫到 flash- 类名，说明类名提取坏了"
+      "没扫到 flash- 类名，说明类名提取坏了",
     ).toBeGreaterThan(40);
 
     // 带 `flash-` 的选择器是**期望内**的——`[data-theme="light"] .flash-title` 这类规则
@@ -127,7 +123,7 @@ describe("胶囊窗口解析 data-theme 的前提", () => {
 
     expect(
       [...new Set(offenders)],
-      `这些非 flash 的 [data-theme] 规则能命中胶囊元素，解析 data-theme 会改变它的外观：\n${[...new Set(offenders)].join("\n")}`
+      `这些非 flash 的 [data-theme] 规则能命中胶囊元素，解析 data-theme 会改变它的外观：\n${[...new Set(offenders)].join("\n")}`,
     ).toEqual([]);
   });
 
@@ -138,7 +134,7 @@ describe("胶囊窗口解析 data-theme 的前提", () => {
     const targets = [...new Set(classless.map((s) => s.split(" ").pop() ?? s))];
     expect(
       targets.filter((t) => !/^(:root|html|body)\b/.test(t)),
-      `出现了非 :root/html/body 的无类名主题规则，需要单独判断它会不会命中胶囊：${targets.join(", ")}`
+      `出现了非 :root/html/body 的无类名主题规则，需要单独判断它会不会命中胶囊：${targets.join(", ")}`,
     ).toEqual([]);
 
     const refs = [...capsuleSection().matchAll(/var\(\s*(--[\w-]+)/g)].map((m) => m[1]);
@@ -146,7 +142,7 @@ describe("胶囊窗口解析 data-theme 的前提", () => {
     const globalRefs = [...new Set(refs.filter((r) => !r.startsWith("--flash-")))];
     expect(
       globalRefs,
-      `胶囊引用了全局变量，解析 data-theme 会连带改变它的外观：${globalRefs.join(", ")}`
+      `胶囊引用了全局变量，解析 data-theme 会连带改变它的外观：${globalRefs.join(", ")}`,
     ).toEqual([]);
   });
 });

@@ -65,11 +65,11 @@ export function GraphWorkspaceLayout({
 }: GraphWorkspaceLayoutProps) {
   // Determine orientation: restore user choice or smart default by viewMode
   const [orientation, setOrientation] = useState<"row" | "column">(() =>
-    getStoredOrientation(viewMode)
+    getStoredOrientation(viewMode),
   );
 
   const [splitRatio, setSplitRatio] = useState<number>(() =>
-    getStoredRatio(getStoredOrientation(viewMode))
+    getStoredRatio(getStoredOrientation(viewMode)),
   );
 
   // Sync orientation & ratio automatically when viewMode changes
@@ -111,7 +111,7 @@ export function GraphWorkspaceLayout({
         // ignore
       }
     },
-    [orientation]
+    [orientation],
   );
 
   useEffect(() => {
@@ -187,7 +187,9 @@ export function GraphWorkspaceLayout({
           onDoubleClick={() => handleSetRatio(getDefaultRatio(orientation))}
           role="separator"
           aria-orientation={isCol ? "horizontal" : "vertical"}
-          title={isCol ? "拖拽调整上下高度（双击重置默认高度）" : "拖拽调整左右分栏（双击重置默认比例）"}
+          title={
+            isCol ? "拖拽调整上下高度（双击重置默认高度）" : "拖拽调整左右分栏（双击重置默认比例）"
+          }
         >
           <div className="splitter-handle" />
           <div
@@ -263,4 +265,3 @@ export function GraphWorkspaceLayout({
     </div>
   );
 }
-

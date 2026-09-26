@@ -11,7 +11,9 @@ describe("ChapterList Space filtering logic", () => {
 
   it("filters out Space notes from the document directory by default", () => {
     const activeChapter = chapters[0]; // docs/guide.md
-    const isCurrentInSpace = Boolean(activeChapter?.src && activeChapter.src.toLowerCase().startsWith("space/"));
+    const isCurrentInSpace = Boolean(
+      activeChapter?.src && activeChapter.src.toLowerCase().startsWith("space/"),
+    );
     const filtered = chapters.filter((ch) => {
       const isSpace = ch.src.toLowerCase().startsWith("space/");
       return !isSpace || isCurrentInSpace;
@@ -23,7 +25,9 @@ describe("ChapterList Space filtering logic", () => {
 
   it("retains Space notes when the user is actively viewing a Space note", () => {
     const activeChapter = chapters[2]; // Space/2026-08-28_1000.md
-    const isCurrentInSpace = Boolean(activeChapter?.src && activeChapter.src.toLowerCase().startsWith("space/"));
+    const isCurrentInSpace = Boolean(
+      activeChapter?.src && activeChapter.src.toLowerCase().startsWith("space/"),
+    );
     const filtered = chapters.filter((ch) => {
       const isSpace = ch.src.toLowerCase().startsWith("space/");
       return !isSpace || isCurrentInSpace;
@@ -98,4 +102,3 @@ describe("Graph Workspace Split & Node Style Rules", () => {
     expect(currentNode.width).toBe(18);
   });
 });
-

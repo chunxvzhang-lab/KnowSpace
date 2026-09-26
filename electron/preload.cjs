@@ -27,7 +27,8 @@ const desktopApi = {
   // The mind map's companion file: what a Markdown document cannot hold.
   readMindmapSidecar: (params) => ipcRenderer.invoke("bookmd:read-mindmap-sidecar", params),
   saveMindmapSidecar: (params) => ipcRenderer.invoke("bookmd:save-mindmap-sidecar", params),
-  getDirectoryForFile: (absolutePath) => ipcRenderer.invoke("bookmd:get-directory-for-file", absolutePath),
+  getDirectoryForFile: (absolutePath) =>
+    ipcRenderer.invoke("bookmd:get-directory-for-file", absolutePath),
   saveMarkdownFile: (request) => ipcRenderer.invoke("bookmd:save-markdown-file", request),
   createMarkdownFile: (options) => ipcRenderer.invoke("bookmd:create-markdown-file", options),
   renameMarkdownFile: (params) => ipcRenderer.invoke("bookmd:rename-markdown-file", params),

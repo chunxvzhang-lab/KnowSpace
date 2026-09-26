@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo } from "react";
 
-import { convertUnlinkedMentionInText, getLinkedReferences, getUnlinkedMentions, updateDocumentInIndex, type UnlinkedMention } from "../services/backlinkIndex";
+import {
+  convertUnlinkedMentionInText,
+  getLinkedReferences,
+  getUnlinkedMentions,
+  updateDocumentInIndex,
+  type UnlinkedMention,
+} from "../services/backlinkIndex";
 import { buildGraphDataFromIndex } from "../services/graphService";
 import { updateVaultSearchIndexForDocument } from "../services/searchIndexService";
 import { useTabStore } from "../store/useTabStore";
@@ -83,7 +89,7 @@ export function useBacklinkIndex({
    */
   const chaptersSignature = useMemo(
     () => manifest?.chapters.map((chapter) => chapter.id).join("|") ?? "",
-    [manifest]
+    [manifest],
   );
 
   useEffect(() => {
@@ -99,7 +105,7 @@ export function useBacklinkIndex({
         currentSession.chapterId,
         activeChapter?.title || currentSession.fileName,
         currentSession.source,
-        currentSession.absolutePath || currentSession.fileName
+        currentSession.absolutePath || currentSession.fileName,
       );
       setBacklinkIndex({ ...backlinkIndex });
       setVaultSearchIndex((prev) =>
@@ -108,8 +114,8 @@ export function useBacklinkIndex({
           currentSession.chapterId,
           activeChapter?.title || currentSession.fileName,
           currentSession.source,
-          currentSession.absolutePath || currentSession.fileName
-        )
+          currentSession.absolutePath || currentSession.fileName,
+        ),
       );
     }
 
@@ -182,7 +188,7 @@ export function useBacklinkIndex({
                   update.id,
                   update.title,
                   update.content,
-                  update.src
+                  update.src,
                 );
               }
               return next;
@@ -207,9 +213,12 @@ export function useBacklinkIndex({
     debounceTimer = window.setTimeout(() => {
       if (!active) return;
       if (typeof window.requestIdleCallback === "function") {
-        window.requestIdleCallback(() => {
-          if (active) startIdleIndexing();
-        }, { timeout: 1000 });
+        window.requestIdleCallback(
+          () => {
+            if (active) startIdleIndexing();
+          },
+          { timeout: 1000 },
+        );
       } else {
         startIdleIndexing();
       }
@@ -238,7 +247,7 @@ export function useBacklinkIndex({
         session.chapterId,
         activeChapter?.title || session.fileName,
         session.source,
-        session.absolutePath || session.fileName
+        session.absolutePath || session.fileName,
       );
       setBacklinkIndex({ ...backlinkIndex });
       setVaultSearchIndex((prev) =>
@@ -247,8 +256,8 @@ export function useBacklinkIndex({
           session.chapterId,
           activeChapter?.title || session.fileName,
           session.source,
-          session.absolutePath || session.fileName
-        )
+          session.absolutePath || session.fileName,
+        ),
       );
     }, 400);
     return () => clearTimeout(timer);
@@ -257,7 +266,13 @@ export function useBacklinkIndex({
     // backlinkIndex is mutated in place (then written back via setBacklinkIndex),
     // so adding it would loop; the setters are stable.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally keyed on session content primitives only
-  }, [session?.source, session?.chapterId, activeChapter?.title, session?.fileName, session?.absolutePath]);
+  }, [
+    session?.source,
+    session?.chapterId,
+    activeChapter?.title,
+    session?.fileName,
+    session?.absolutePath,
+  ]);
 
   const currentDocTitle = activeChapter?.title || session?.fileName?.replace(/\.md$/i, "") || "";
   const currentLinkedReferences = useMemo(() => {
@@ -272,7 +287,8 @@ export function useBacklinkIndex({
   }, [isBacklinksVisible, backlinkIndex, currentDocTitle, session?.chapterId]);
 
   const isGraphVisible = isGraphPaneOpen || isBacklinksVisible;
-  const currentActiveId = chapterId || session?.chapterId || session?.absolutePath || session?.fileName;
+  const currentActiveId =
+    chapterId || session?.chapterId || session?.absolutePath || session?.fileName;
   const graphData = useMemo(() => {
     if (!isGraphVisible) {
       return { nodes: [], edges: [] };
@@ -309,38 +325,58 @@ export function useBacklinkIndex({
         }, 120);
       }
     },
-    [manifest?.chapters, backlinkIndex, selectChapter, editorViewRef, openDesktopMarkdownPathRef]
+    [manifest?.chapters, backlinkIndex, selectChapter, editorViewRef, openDesktopMarkdownPathRef],
   );
 
   const handleConvertMention = useCallback(
     async (mention: UnlinkedMention) => {
       if (session && session.chapterId === mention.sourceId) {
-        const updated = convertUnlinkedMentionInText(session.source, mention.line, mention.mentionText);
+        const updated = convertUnlinkedMentionInText(
+          session.source,
+          mention.line,
+          mention.mentionText,
+        );
         updateSource(updated);
         setNotice(`已将第 ${mention.line} 行的「${mention.mentionText}」转换为双向链接`);
         return;
       }
 
       const targetCh = manifest?.chapters.find((c) => c.id === mention.sourceId);
-      if (targetCh?.absolutePath && window.bookMDDesktop?.saveMarkdownFile && window.bookMDDesktop?.readMarkdownFile) {
+      if (
+        targetCh?.absolutePath &&
+        window.bookMDDesktop?.saveMarkdownFile &&
+        window.bookMDDesktop?.readMarkdownFile
+      ) {
         try {
           const fileRes = await window.bookMDDesktop.readMarkdownFile(targetCh.absolutePath);
           if (fileRes?.markdown) {
-            const updated = convertUnlinkedMentionInText(fileRes.markdown, mention.line, mention.mentionText);
+            const updated = convertUnlinkedMentionInText(
+              fileRes.markdown,
+              mention.line,
+              mention.mentionText,
+            );
             await window.bookMDDesktop.saveMarkdownFile({
               absolutePath: targetCh.absolutePath,
               content: updated,
             });
-            updateDocumentInIndex(backlinkIndex, mention.sourceId, mention.sourceTitle, updated, targetCh.src);
+            updateDocumentInIndex(
+              backlinkIndex,
+              mention.sourceId,
+              mention.sourceTitle,
+              updated,
+              targetCh.src,
+            );
             setBacklinkIndex({ ...backlinkIndex });
-            setNotice(`已将文档「${mention.sourceTitle}」中的「${mention.mentionText}」转换为双向链接`);
+            setNotice(
+              `已将文档「${mention.sourceTitle}」中的「${mention.mentionText}」转换为双向链接`,
+            );
           }
         } catch (err: any) {
           setNotice(err?.message || "转换双链失败");
         }
       }
     },
-    [session, manifest?.chapters, updateSource, backlinkIndex, setBacklinkIndex, setNotice]
+    [session, manifest?.chapters, updateSource, backlinkIndex, setBacklinkIndex, setNotice],
   );
   return {
     currentLinkedReferences,

@@ -63,7 +63,11 @@ export function CanvasCardSuggestMenu({
   onPick,
   onHover,
 }: CanvasCardSuggestMenuProps) {
-  const accent = isEink ? "rgba(0,0,0,0.10)" : !isDark ? "rgba(245,158,11,0.15)" : "rgba(56,189,248,0.2)";
+  const accent = isEink
+    ? "rgba(0,0,0,0.10)"
+    : !isDark
+      ? "rgba(245,158,11,0.15)"
+      : "rgba(56,189,248,0.2)";
   const accentText = isEink ? "#000000" : !isDark ? "#b45309" : "#38bdf8";
   const menuRef = useRef<HTMLDivElement | null>(null);
 
@@ -87,7 +91,7 @@ export function CanvasCardSuggestMenu({
    */
   useEffect(() => {
     const active = menuRef.current?.querySelector<HTMLElement>(
-      '[role="option"][aria-selected="true"]'
+      '[role="option"][aria-selected="true"]',
     );
     active?.scrollIntoView({ block: "nearest" });
   }, [selectedIndex, items.length]);
@@ -172,7 +176,9 @@ export function CanvasCardSuggestMenu({
               }}
             >
               {item.icon && (
-                <span style={{ flex: "0 0 auto", width: 16, textAlign: "center" }}>{item.icon}</span>
+                <span style={{ flex: "0 0 auto", width: 16, textAlign: "center" }}>
+                  {item.icon}
+                </span>
               )}
               <span
                 style={{

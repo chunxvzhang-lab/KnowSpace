@@ -68,7 +68,9 @@ function main() {
     process.exit(1);
   }
 
-  console.log(`Found block at lines ${startIndex + 1}-${endIndex + 1} (${endIndex - startIndex + 1} lines)`);
+  console.log(
+    `Found block at lines ${startIndex + 1}-${endIndex + 1} (${endIndex - startIndex + 1} lines)`,
+  );
   console.log(`First line: ${lines[startIndex].trim().slice(0, 80)}`);
   console.log(`Last line:  ${lines[endIndex].trim().slice(0, 80)}`);
 
@@ -89,15 +91,11 @@ function main() {
     .split("\\n")
     .map((line) => `${pad}${line}`);
 
-  const next = [
-    ...lines.slice(0, startIndex),
-    ...replacementLines,
-    ...lines.slice(endIndex + 1),
-  ];
+  const next = [...lines.slice(0, startIndex), ...replacementLines, ...lines.slice(endIndex + 1)];
 
   fs.writeFileSync(targetPath, next.join("\n"), "utf8");
   console.log(
-    `\nReplaced. File is now ${next.length} lines (was ${lines.length}, ${lines.length - next.length} fewer).`
+    `\nReplaced. File is now ${next.length} lines (was ${lines.length}, ${lines.length - next.length} fewer).`,
   );
 }
 

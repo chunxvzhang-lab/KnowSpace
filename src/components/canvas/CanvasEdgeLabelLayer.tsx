@@ -88,7 +88,7 @@ export const CanvasEdgeLabelLayer = memo(function CanvasEdgeLabelLayer({
         const p1 = getNodeAnchorPoint(fromNode, fromSide);
         const p2 = getNodeAnchorPoint(toNode, toSide);
         const edgeObstacles = obstacles.filter(
-          (o) => o.id !== edge.fromNode && o.id !== edge.toNode
+          (o) => o.id !== edge.fromNode && o.id !== edge.toNode,
         );
         // Place label exactly at geometric midpoint — the connection line passes THROUGH the label center
         const rawMid = computeEdgeMidpoint(
@@ -99,7 +99,7 @@ export const CanvasEdgeLabelLayer = memo(function CanvasEdgeLabelLayer({
           edge.gridPath ? "straight" : edge.style,
           edge.stepOffset,
           getEdgeRing(edge),
-          edgeObstacles
+          edgeObstacles,
         );
 
         const isSelected = selectedEdgeIds.has(edge.id);
@@ -108,8 +108,8 @@ export const CanvasEdgeLabelLayer = memo(function CanvasEdgeLabelLayer({
           effectiveColorKey && CANVAS_COLOR_PALETTES[effectiveColorKey]
             ? CANVAS_COLOR_PALETTES[effectiveColorKey].stroke
             : effectiveColorKey?.startsWith("#")
-            ? effectiveColorKey
-            : colors.edgeColor;
+              ? effectiveColorKey
+              : colors.edgeColor;
 
         const shape = edge.labelShape || "pill";
         const badgeBg = isDark ? "rgba(30, 41, 59, 0.98)" : "rgba(255, 255, 255, 0.98)";
@@ -120,11 +120,7 @@ export const CanvasEdgeLabelLayer = memo(function CanvasEdgeLabelLayer({
           presentation.active &&
           (edge.fromNode === presentation.sequence[presentation.index] ||
             edge.toNode === presentation.sequence[presentation.index]);
-        const labelOpacity = presentation.active
-          ? isEdgeConnectedToCurrentSlide
-            ? 1
-            : 0.1
-          : 1;
+        const labelOpacity = presentation.active ? (isEdgeConnectedToCurrentSlide ? 1 : 0.1) : 1;
         const labelFilter = presentation.active
           ? isEdgeConnectedToCurrentSlide
             ? "none"

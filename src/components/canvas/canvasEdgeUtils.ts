@@ -9,7 +9,7 @@ import type { CanvasEdge } from "../../types/canvasTypes";
  * same thing. Extracted from CanvasView during the R2 split so all three agree.
  */
 export function getEdgeRing(
-  edge: CanvasEdge
+  edge: CanvasEdge,
 ): { center: { x: number; y: number }; radius: number } | undefined {
   return edge.ringCenter && edge.ringRadius
     ? { center: edge.ringCenter, radius: edge.ringRadius }

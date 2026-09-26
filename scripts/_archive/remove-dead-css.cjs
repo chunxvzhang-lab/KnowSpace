@@ -74,7 +74,13 @@ for (let i = 0; i < lines.length; i += 1) {
   const selector = lines
     .slice(from, i + 1)
     .join(" ")
-    .slice(0, lines.slice(from, i + 1).join(" ").indexOf("{"))
+    .slice(
+      0,
+      lines
+        .slice(from, i + 1)
+        .join(" ")
+        .indexOf("{"),
+    )
     .trim();
   if (!selector || selector.startsWith("@")) continue;
 
@@ -132,8 +138,12 @@ if (before !== after) {
 }
 
 if (dry) {
-  console.log(`\nwould remove ${doomed.length} rule(s), ${css.split("\n").length - kept.length} line(s)`);
+  console.log(
+    `\nwould remove ${doomed.length} rule(s), ${css.split("\n").length - kept.length} line(s)`,
+  );
 } else {
   fs.writeFileSync(target, output);
-  console.log(`\nremoved ${doomed.length} rule(s), ${css.split("\n").length - kept.length} line(s)`);
+  console.log(
+    `\nremoved ${doomed.length} rule(s), ${css.split("\n").length - kept.length} line(s)`,
+  );
 }

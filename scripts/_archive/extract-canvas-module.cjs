@@ -79,7 +79,12 @@ function main() {
 
   parts.push(config.footer);
 
-  const outPath = path.join(root, "src", "services", `canvas${name[0].toUpperCase()}${name.slice(1)}.ts`);
+  const outPath = path.join(
+    root,
+    "src",
+    "services",
+    `canvas${name[0].toUpperCase()}${name.slice(1)}.ts`,
+  );
   fs.writeFileSync(outPath, parts.join("\n").replace(/\n{4,}/g, "\n\n\n"), "utf8");
 
   const outLines = fs.readFileSync(outPath, "utf8").split(/\r?\n/).length;

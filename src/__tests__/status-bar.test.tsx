@@ -12,7 +12,7 @@ describe("StatusBar Component Sub-function Tests", () => {
         writable={true}
         viewMode="split"
         lineEnding="LF"
-      />
+      />,
     );
 
     expect(screen.getByText("已保存")).toBeDefined();
@@ -31,7 +31,7 @@ describe("StatusBar Component Sub-function Tests", () => {
         isDirty={true}
         writable={true}
         viewMode="source"
-      />
+      />,
     );
 
     expect(screen.getByText("未保存")).toBeDefined();
@@ -47,7 +47,7 @@ describe("StatusBar Component Sub-function Tests", () => {
         isDirty={false}
         writable={false}
         viewMode="read"
-      />
+      />,
     );
 
     expect(screen.getByText("只读")).toBeDefined();
@@ -57,13 +57,7 @@ describe("StatusBar Component Sub-function Tests", () => {
   it("calculates characters, words, and reading time accurately", () => {
     // 800 characters => approx 2 minutes reading
     const text = "A".repeat(800);
-    render(
-      <StatusBar
-        fileName="stats.md"
-        source={text}
-        viewMode="canvas"
-      />
-    );
+    render(<StatusBar fileName="stats.md" source={text} viewMode="canvas" />);
 
     expect(screen.getByText("800 字符")).toBeDefined();
     expect(screen.getByText("1 词")).toBeDefined();
@@ -72,14 +66,7 @@ describe("StatusBar Component Sub-function Tests", () => {
   });
 
   it("shows large document optimization warning badge", () => {
-    render(
-      <StatusBar
-        fileName="big.md"
-        source="大文档"
-        viewMode="split"
-        isLargeDocument={true}
-      />
-    );
+    render(<StatusBar fileName="big.md" source="大文档" viewMode="split" isLargeDocument={true} />);
 
     expect(screen.getByText("大文档优化")).toBeDefined();
   });

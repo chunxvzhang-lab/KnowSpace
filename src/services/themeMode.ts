@@ -25,10 +25,7 @@ export type ResolvedThemeMode = Exclude<ThemeMode, "system">;
  * @param theme 用户设置的主题，可能是 `"system"`
  * @param prefersLight 操作系统当前是否浅色（`prefers-color-scheme: light`）
  */
-export function resolveThemeMode(
-  theme: ThemeMode,
-  prefersLight: boolean
-): ResolvedThemeMode {
+export function resolveThemeMode(theme: ThemeMode, prefersLight: boolean): ResolvedThemeMode {
   if (theme !== "system") return theme;
   // 深色走 "twitter"：它就是主题表里的深色项，胶囊区块没有 `.theme-twitter`
   // 规则，因此落到基线（也就是现在的深色外观），视觉上与改前一致。

@@ -41,13 +41,19 @@ export function LocalGraphView({
     const elements = toCytoscapeElements(localSubgraph);
 
     // 2. Resolve colors based on theme
-    const isDark = theme === "twitter" || (theme === "system" && window.matchMedia?.("(prefers-color-scheme: dark)").matches);
+    const isDark =
+      theme === "twitter" ||
+      (theme === "system" && window.matchMedia?.("(prefers-color-scheme: dark)").matches);
     const isEink = theme === "eink";
 
     const currentBg = isEink ? "#000000" : isDark ? "#38bdf8" : "#0284c7";
     const normalBg = isEink ? "#555555" : isDark ? "#475569" : "#94a3b8";
     const spaceBg = isEink ? "#777777" : "#f59e0b";
-    const edgeColor = isEink ? "rgba(0, 0, 0, 0.45)" : isDark ? "rgba(148, 163, 184, 0.3)" : "rgba(100, 116, 139, 0.3)";
+    const edgeColor = isEink
+      ? "rgba(0, 0, 0, 0.45)"
+      : isDark
+        ? "rgba(148, 163, 184, 0.3)"
+        : "rgba(100, 116, 139, 0.3)";
     const crossFolderEdgeColor = isEink ? "#000000" : isDark ? "#38bdf8" : "#0284c7";
     const textColor = isEink ? "#000000" : isDark ? "#cbd5e1" : "#334155";
 

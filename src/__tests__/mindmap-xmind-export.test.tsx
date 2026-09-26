@@ -4,7 +4,11 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { writeZip, readZipEntry } from "../core/zip";
 import { exportMindmapToXmind } from "../services/mindmapExport";
 import { MindmapExportMenu } from "../components/MindmapExportMenu";
-import { parseOutlineBytes, outlineToMarkdown, annotationsFromOutline } from "../services/mindmapImport";
+import {
+  parseOutlineBytes,
+  outlineToMarkdown,
+  annotationsFromOutline,
+} from "../services/mindmapImport";
 import { parseMarkdownToMindmapTree } from "../services/mindmapService";
 import {
   addBoundary,
@@ -177,10 +181,7 @@ describe("导出再读回来：同一个导图", () => {
 
     const back = parseMarkdownToMindmapTree(outlineToMarkdown(parsed.outline), "中心主题");
 
-    const texts = (node: MindmapNode): string[] => [
-      node.text,
-      ...node.children.flatMap(texts),
-    ];
+    const texts = (node: MindmapNode): string[] => [node.text, ...node.children.flatMap(texts)];
     expect(texts(back)).toEqual(texts(tree));
 
     const annotations = annotationsFromOutline(parsed.outline, back);
@@ -210,9 +211,7 @@ describe("导出再读回来：同一个导图", () => {
     // differently by design — the ids are the document's own, not the file's.
     expect(Object.values(annotations.notes)).toEqual(Object.values(sidecar.notes));
     expect(Object.values(annotations.tags)).toEqual(Object.values(sidecar.tags));
-    expect(annotations.markers[back.children[2].id]).toEqual(
-      sidecar.markers[tree.children[2].id]
-    );
+    expect(annotations.markers[back.children[2].id]).toEqual(sidecar.markers[tree.children[2].id]);
     expect(annotations.summaries).toHaveLength(Object.keys(sidecar.summaries).length);
     expect(annotations.boundaries).toHaveLength(Object.keys(sidecar.boundaries).length);
     expect(annotations.relations).toHaveLength(sidecar.relations.length);
@@ -251,7 +250,7 @@ describe("导出菜单里的这一行", () => {
         onExportOpml={() => {}}
         onExportFreeMind={() => {}}
         onExportMarkdownOutline={() => {}}
-      />
+      />,
     );
 
     const row = screen.getByText("导出 XMind (.xmind)");

@@ -13,13 +13,7 @@ type Params = Parameters<typeof useSearch>[0];
 
 /** A vault index holding one document, built the same way the app builds it. */
 function indexWith(docId: string, title: string, content: string, path?: string) {
-  return updateVaultSearchIndexForDocument(
-    buildVaultSearchIndex([]),
-    docId,
-    title,
-    content,
-    path
-  );
+  return updateVaultSearchIndexForDocument(buildVaultSearchIndex([]), docId, title, content, path);
 }
 
 const defaults: Params = {
@@ -55,9 +49,9 @@ describe("useSearch", () => {
   describe("results", () => {
     it("returns nothing for a blank query", () => {
       showSearchPanel();
-      useVaultStore.getState().setVaultSearchIndex(
-        indexWith("doc-1", "文档一", "# 标题\n\n这里有关键词")
-      );
+      useVaultStore
+        .getState()
+        .setVaultSearchIndex(indexWith("doc-1", "文档一", "# 标题\n\n这里有关键词"));
       useVaultStore.getState().setSearchScope("vault");
 
       expect(mount().result.current.searchResults).toEqual([]);
@@ -65,9 +59,9 @@ describe("useSearch", () => {
 
     it("returns nothing for a query that is only whitespace", () => {
       showSearchPanel();
-      useVaultStore.getState().setVaultSearchIndex(
-        indexWith("doc-1", "文档一", "# 标题\n\n这里有关键词")
-      );
+      useVaultStore
+        .getState()
+        .setVaultSearchIndex(indexWith("doc-1", "文档一", "# 标题\n\n这里有关键词"));
       useVaultStore.getState().setSearchScope("vault");
       useVaultStore.getState().setSearchQuery("   ");
 
@@ -79,9 +73,9 @@ describe("useSearch", () => {
       // last time must not produce anything.
       useUiStore.getState().setSidebarOpen(false);
       useUiStore.getState().setSidebarTab("toc");
-      useVaultStore.getState().setVaultSearchIndex(
-        indexWith("doc-1", "文档一", "# 标题\n\n这里有关键词")
-      );
+      useVaultStore
+        .getState()
+        .setVaultSearchIndex(indexWith("doc-1", "文档一", "# 标题\n\n这里有关键词"));
       useVaultStore.getState().setSearchScope("vault");
       useVaultStore.getState().setSearchQuery("关键词");
 
@@ -90,9 +84,11 @@ describe("useSearch", () => {
 
     it("searches the whole vault in vault scope", () => {
       showSearchPanel();
-      useVaultStore.getState().setVaultSearchIndex(
-        indexWith("doc-1", "文档一", "# 标题\n\n这里有关键词出现", "doc-1.md")
-      );
+      useVaultStore
+        .getState()
+        .setVaultSearchIndex(
+          indexWith("doc-1", "文档一", "# 标题\n\n这里有关键词出现", "doc-1.md"),
+        );
       useVaultStore.getState().setSearchScope("vault");
       useVaultStore.getState().setSearchQuery("关键词");
 
@@ -107,9 +103,11 @@ describe("useSearch", () => {
       useUiStore.getState().setSidebarOpen(false);
       useUiStore.getState().setSidebarTab("toc");
       useUiStore.getState().setCommandPaletteOpen(true);
-      useVaultStore.getState().setVaultSearchIndex(
-        indexWith("doc-1", "文档一", "# 标题\n\n这里有关键词出现", "doc-1.md")
-      );
+      useVaultStore
+        .getState()
+        .setVaultSearchIndex(
+          indexWith("doc-1", "文档一", "# 标题\n\n这里有关键词出现", "doc-1.md"),
+        );
       useVaultStore.getState().setSearchScope("vault");
       useVaultStore.getState().setSearchQuery("关键词");
 

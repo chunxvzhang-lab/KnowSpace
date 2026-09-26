@@ -127,7 +127,7 @@ describe("Flash Capsule (闪念胶囊) & Hotkey Customization", () => {
       fsMap: MockFileSystem,
       fileName: string,
       content: string,
-      timeDisplay: string
+      timeDisplay: string,
     ) {
       const isNew = !fsMap[fileName];
       if (isNew) {

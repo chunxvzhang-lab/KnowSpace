@@ -95,7 +95,7 @@ describe("App - shell smoke tests", () => {
     // match the text rather than the raw source line.
     await waitFor(() => {
       expect(
-        screen.getAllByText(new RegExp(`loaded ${SAMPLE_CHAPTERS[0].absolutePath}`)).length
+        screen.getAllByText(new RegExp(`loaded ${SAMPLE_CHAPTERS[0].absolutePath}`)).length,
       ).toBeGreaterThan(0);
     });
   });

@@ -1,6 +1,18 @@
 import { describe, expect, it } from "vitest";
 import type { Heading } from "../core/types";
-import { buildMindmapTree, parseMarkdownToMindmapTree, mindmapTreeToMarkdown, addChildNode, addSiblingNode, deleteNode, updateNodeText, updateNodeStyle, updateNodesStyle, parseStyleComment, syncMindmapToDocument } from "../services/mindmapService";
+import {
+  buildMindmapTree,
+  parseMarkdownToMindmapTree,
+  mindmapTreeToMarkdown,
+  addChildNode,
+  addSiblingNode,
+  deleteNode,
+  updateNodeText,
+  updateNodeStyle,
+  updateNodesStyle,
+  parseStyleComment,
+  syncMindmapToDocument,
+} from "../services/mindmapService";
 import { layoutMindmap } from "../services/mindmapLayout";
 
 describe("mindmapService", () => {
@@ -174,7 +186,7 @@ describe("mindmapService", () => {
       const { nextTree: treeWithChild, newNodeId: childId } = addChildNode(
         root,
         topic1.id,
-        "子主题 1.1"
+        "子主题 1.1",
       );
       const updatedTopic1 = treeWithChild.children[0];
       expect(updatedTopic1.children.length).toBe(1);
@@ -185,7 +197,7 @@ describe("mindmapService", () => {
       const { nextTree: treeWithSibling, newNodeId: siblingId } = addSiblingNode(
         treeWithChild,
         childId,
-        "子主题 1.2"
+        "子主题 1.2",
       );
       const topic1AfterSibling = treeWithSibling.children[0];
       expect(topic1AfterSibling.children.length).toBe(2);
@@ -219,7 +231,9 @@ describe("mindmapService", () => {
     });
 
     it("parses style comments from markdown nodes", () => {
-      const parsed = parseStyleComment("核心业务 <!-- style: color=#10b981,shape=capsule,lineStyle=step,lineColor=#38bdf8 -->");
+      const parsed = parseStyleComment(
+        "核心业务 <!-- style: color=#10b981,shape=capsule,lineStyle=step,lineColor=#38bdf8 -->",
+      );
       expect(parsed.cleanText).toBe("核心业务");
       expect(parsed.color).toBe("#10b981");
       expect(parsed.shape).toBe("capsule");
@@ -254,7 +268,9 @@ describe("mindmapService", () => {
     });
 
     it("generates correct edge paths for different line styles", () => {
-      const tree = parseMarkdownToMindmapTree("# 根\n\n- 曲线分支 <!-- style: lineStyle=bezier -->\n- 折线分支 <!-- style: lineStyle=step -->\n- 直线分支 <!-- style: lineStyle=straight -->\n");
+      const tree = parseMarkdownToMindmapTree(
+        "# 根\n\n- 曲线分支 <!-- style: lineStyle=bezier -->\n- 折线分支 <!-- style: lineStyle=step -->\n- 直线分支 <!-- style: lineStyle=straight -->\n",
+      );
       const layout = layoutMindmap(tree);
 
       const bezierEdge = layout.edges.find((e) => e.style === "bezier");
@@ -274,7 +290,9 @@ describe("mindmapService", () => {
     });
 
     it("verifies layout bounds have valid non-negative dimensions and padding", () => {
-      const tree = parseMarkdownToMindmapTree("# 认知框架\n\n- 知识节点 A\n  - 子节点 1\n  - 子节点 2\n- 知识节点 B\n");
+      const tree = parseMarkdownToMindmapTree(
+        "# 认知框架\n\n- 知识节点 A\n  - 子节点 1\n  - 子节点 2\n- 知识节点 B\n",
+      );
       const layout = layoutMindmap(tree);
 
       expect(layout.nodes.length).toBe(5);
@@ -486,7 +504,7 @@ Docker 与 Kubernetes 自动化部署流程。
       // Verify table preserved 100%
       expect(syncedDoc).toContain("| React | 19 | 流式渲染 |");
       // Verify code block preserved 100%
-      expect(syncedDoc).toContain("console.log(\"App ready\");");
+      expect(syncedDoc).toContain('console.log("App ready");');
       // Verify sub-section preserved 100%
       expect(syncedDoc).toContain("### 1.1 前端工程化");
       expect(syncedDoc).toContain("- 自动化构建");
@@ -524,7 +542,7 @@ Docker 与 Kubernetes 自动化部署流程。
       // Chapters 1 and 2 and their full bodies remain
       expect(syncedDoc).toContain("## 第一章：技术选型");
       expect(syncedDoc).toContain("## 第二章：架构设计");
-      expect(syncedDoc).toContain("console.log(\"App ready\");");
+      expect(syncedDoc).toContain('console.log("App ready");');
     });
 
     it("reorders sections in mindmap and reflects the new section order in document with their bodies", () => {
@@ -566,7 +584,3 @@ Docker 与 Kubernetes 自动化部署流程。
     });
   });
 });
-
-
-
-

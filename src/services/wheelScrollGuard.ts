@@ -58,7 +58,7 @@ export function wheelBelongsToInnerScroller(
   target: EventTarget | null,
   deltaX: number,
   deltaY: number,
-  boundary: Element | null
+  boundary: Element | null,
 ): boolean {
   let el = target instanceof Element ? target : null;
   while (el && el !== boundary) {

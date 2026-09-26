@@ -51,12 +51,7 @@ export function MindmapFloatingAnnotationMenu({
           <StickyNote size={13} className="text-cyan" />
           {topicText || "自由主题"}
         </span>
-        <button
-          type="button"
-          className="mindmap-ctx-close"
-          onClick={() => onClose()}
-          title="关闭"
-        >
+        <button type="button" className="mindmap-ctx-close" onClick={() => onClose()} title="关闭">
           <X size={13} />
         </button>
       </div>

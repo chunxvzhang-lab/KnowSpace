@@ -212,13 +212,13 @@ export const useUiStore = create<UiStore>()((set, get) => ({
     DIR_WIDTH_KEY,
     DIRECTORY_WIDTH_DEFAULT,
     DIRECTORY_WIDTH_MIN,
-    DIRECTORY_WIDTH_MAX
+    DIRECTORY_WIDTH_MAX,
   ),
   sidebarWidth: readStoredWidth(
     SIDEBAR_WIDTH_KEY,
     SIDEBAR_WIDTH_DEFAULT,
     SIDEBAR_WIDTH_MIN,
-    SIDEBAR_WIDTH_MAX
+    SIDEBAR_WIDTH_MAX,
   ),
   resizingType: null,
   isGraphPaneOpen: false,
@@ -276,8 +276,7 @@ export const useUiStore = create<UiStore>()((set, get) => ({
   // side effects is legal but surprising, and it would also make the write run
   // twice when a caller passes one that saves on its own.
   setPreferences: (preferences) => {
-    const next =
-      typeof preferences === "function" ? preferences(get().preferences) : preferences;
+    const next = typeof preferences === "function" ? preferences(get().preferences) : preferences;
     persistPreferences(next);
     set({ preferences: next });
   },
@@ -317,8 +316,7 @@ export const useUiStore = create<UiStore>()((set, get) => ({
 
   setCommandPaletteOpen: (open) =>
     set((state) => ({
-      commandPaletteOpen:
-        typeof open === "function" ? open(state.commandPaletteOpen) : open,
+      commandPaletteOpen: typeof open === "function" ? open(state.commandPaletteOpen) : open,
     })),
 
   setVersionHistoryOpen: (open) => set({ versionHistoryOpen: open }),

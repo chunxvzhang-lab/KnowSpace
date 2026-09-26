@@ -203,7 +203,7 @@ const ICON_BY_ID = new Map(
   [...MINDMAP_NODE_TYPES, ...MINDMAP_ICON_GROUPS.flatMap((group) => group.icons)].map((icon) => [
     icon.id,
     icon,
-  ])
+  ]),
 );
 
 /**

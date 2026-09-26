@@ -105,7 +105,7 @@ describe("导图伴生文件", () => {
         JSON.stringify({
           version: 1,
           notes: { "node-a": "第一条备注", "node-b": "   ", "node-c": 42, "node-d": null },
-        })
+        }),
       );
 
       expect(sidecar?.notes).toEqual({ "node-a": "第一条备注" });
@@ -124,7 +124,7 @@ describe("导图伴生文件", () => {
       // The rule that makes a second file safe across versions: an older build
       // must not destroy what a newer one wrote. It writes back what it read.
       const sidecar = parseSidecar(
-        JSON.stringify({ version: 7, icons: { "node-a": "star" }, notes: { "node-a": "备注" } })
+        JSON.stringify({ version: 7, icons: { "node-a": "star" }, notes: { "node-a": "备注" } }),
       );
 
       expect(sidecar?.version).toBe(7);
@@ -151,7 +151,7 @@ describe("导图伴生文件", () => {
       const sidecar = setNodeNote(emptySidecar(), "node-a", "备注");
 
       expect(serializeSidecar(sidecar)).toBe(
-        ['{', '  "version": 1,', '  "notes": {', '    "node-a": "备注"', "  }", "}", ""].join("\n")
+        ["{", '  "version": 1,', '  "notes": {', '    "node-a": "备注"', "  }", "}", ""].join("\n"),
       );
     });
 
@@ -296,7 +296,7 @@ describe("导图伴生文件", () => {
             "node-b": { priority: 2.5 },
             "node-c": { priority: 4 },
           },
-        })
+        }),
       );
 
       expect(markersFor(parsed, "node-a")).toEqual({ priority: 3 });
@@ -309,7 +309,7 @@ describe("导图伴生文件", () => {
       // The same rule as unknown sections, one level down: a node's markers are
       // only partly this build's business.
       const parsed = parseSidecar(
-        JSON.stringify({ version: 1, markers: { "node-a": { priority: 1, review: "pending" } } })
+        JSON.stringify({ version: 1, markers: { "node-a": { priority: 1, review: "pending" } } }),
       );
 
       expect(markersFor(parsed, "node-a")).toEqual({ priority: 1, review: "pending" });
@@ -320,7 +320,7 @@ describe("导图伴生文件", () => {
       const sidecar = setNodeProgress(
         setNodeIcon(setNodeNote(emptySidecar(), "node-a", "备注"), "node-b", "star"),
         "node-c",
-        3
+        3,
       );
 
       const back = parseSidecar(serializeSidecar(sidecar)) as MindmapSidecar;
@@ -398,7 +398,7 @@ describe("导图伴生文件", () => {
             "node-b": "不是一个列表",
             "node-c": [],
           },
-        })
+        }),
       );
 
       expect(tagsFor(parsed, "node-a")).toEqual(["api", "紧急"]);
@@ -428,7 +428,7 @@ describe("导图伴生文件", () => {
       // The same agreement for parsing, which is what makes its table-driven
       // dispatch's cast safe: whatever the table says, parsing produces.
       expect(Object.keys(parseSidecar("{}") ?? {}).sort()).toEqual(
-        [...SIDECAR_SECTIONS, "version"].sort()
+        [...SIDECAR_SECTIONS, "version"].sort(),
       );
       expect(sidecarIsEmpty(setNodeTags(emptySidecar(), "node-a", ["api"]))).toBe(false);
     });
@@ -518,7 +518,7 @@ describe("导图伴生文件", () => {
       const linked = toggleRelation(
         toggleRelation(emptySidecar(), "node-a", "node-b"),
         "node-c",
-        "node-a"
+        "node-a",
       );
 
       expect(relationsFor(linked, "node-a")).toHaveLength(2);
@@ -542,7 +542,7 @@ describe("导图伴生文件", () => {
             { fromId: 1, toId: "f" },
             { fromId: "g", toId: "h" },
           ],
-        })
+        }),
       );
 
       expect(parsed?.relations).toEqual([
@@ -632,7 +632,7 @@ describe("导图伴生文件", () => {
             "floating-3": { text: "坏坐标", x: "左边", y: null },
             "floating-4": "不是对象",
           },
-        })
+        }),
       );
 
       expect(parsed?.floating["floating-1"]).toEqual({
@@ -719,7 +719,7 @@ describe("导图伴生文件", () => {
             },
             { fromId: "c", toId: "d", label: 7, arrow: "", color: null },
           ],
-        })
+        }),
       );
 
       expect(parsed?.relations[0]).toEqual({
@@ -787,9 +787,7 @@ describe("导图伴生文件", () => {
       expect(sidecar.links).toEqual({ "node-b": "https://example.com" });
       expect(sidecar.tags).toEqual({ "node-c": ["api", "待办"] });
       expect(sidecar.markers).toEqual({ "node-d": { priority: 3, progress: 4 } });
-      expect(sidecar.relations).toEqual([
-        { fromId: "node-e", toId: "node-f", label: "取决于" },
-      ]);
+      expect(sidecar.relations).toEqual([{ fromId: "node-e", toId: "node-f", label: "取决于" }]);
       expect(sidecar.summaries["summary-1"]).toEqual({
         nodeIds: ["node-g", "node-h"],
         text: "总述",
@@ -887,7 +885,7 @@ describe("导图伴生文件", () => {
       const sidecar = setNodeNote(
         addFloatingTopic(emptySidecar(), "想法", 10, 20).sidecar,
         "floating-1",
-        "写过的"
+        "写过的",
       );
 
       expect(removeFloatingTopic(sidecar, "floating-不存在")).toBe(sidecar);
@@ -949,7 +947,7 @@ describe("导图伴生文件", () => {
             "summary-4": { text: "没有跨度" },
             "summary-5": "不是对象",
           },
-        })
+        }),
       );
 
       expect(parsed?.summaries["summary-1"]).toEqual({
@@ -997,7 +995,7 @@ describe("导图伴生文件", () => {
             "boundary-2": { nodeIds: ["b"], text: "", color: 7 },
             "boundary-3": { nodeIds: [], text: "空跨度" },
           },
-        })
+        }),
       );
 
       expect(parsed?.boundaries["boundary-1"]).toEqual({
@@ -1093,7 +1091,11 @@ describe("导图伴生文件", () => {
       api.readMindmapSidecar.mockResolvedValueOnce({ success: false, message: "权限不足" });
       expect(await loadSidecar("/vault/a.md")).toBeNull();
 
-      api.readMindmapSidecar.mockResolvedValueOnce({ success: true, exists: true, content: "{ 坏" });
+      api.readMindmapSidecar.mockResolvedValueOnce({
+        success: true,
+        exists: true,
+        content: "{ 坏",
+      });
       expect(await loadSidecar("/vault/a.md")).toBeNull();
 
       api.readMindmapSidecar.mockRejectedValueOnce(new Error("通道断了"));

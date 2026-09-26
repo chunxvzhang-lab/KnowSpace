@@ -143,14 +143,27 @@ export function GraphViewPane({
       clusterByFolder,
       crossFolderOnly,
     });
-  }, [graphData, hideIsolates, searchQuery, typeFilter, hopDepth, currentDocId, viewFilter, clusterByFolder, crossFolderOnly]);
+  }, [
+    graphData,
+    hideIsolates,
+    searchQuery,
+    typeFilter,
+    hopDepth,
+    currentDocId,
+    viewFilter,
+    clusterByFolder,
+    crossFolderOnly,
+  ]);
 
   // Handle Spacebar panning mode inside graph pane
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code === "Space" && !e.repeat) {
         const target = e.target as HTMLElement;
-        if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+        if (
+          target &&
+          (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)
+        ) {
           return;
         }
         setIsSpacePanning(true);
@@ -184,14 +197,20 @@ export function GraphViewPane({
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const isDark = theme === "twitter" || (theme === "system" && window.matchMedia?.("(prefers-color-scheme: dark)").matches);
+    const isDark =
+      theme === "twitter" ||
+      (theme === "system" && window.matchMedia?.("(prefers-color-scheme: dark)").matches);
     const isEink = theme === "eink";
 
     // Obsidian style colors: clean solid nodes without outer border circles
     const currentBg = isEink ? "#000000" : isDark ? "#8b5cf6" : "#7c3aed"; // Obsidian vivid purple for active node
     const normalBg = isEink ? "#444444" : isDark ? "#64748b" : "#94a3b8"; // Slate grey for regular notes
     const spaceBg = isEink ? "#777777" : "#f59e0b"; // Warm amber for space notes
-    const edgeColor = isEink ? "rgba(0, 0, 0, 0.4)" : isDark ? "rgba(148, 163, 184, 0.22)" : "rgba(100, 116, 139, 0.2)";
+    const edgeColor = isEink
+      ? "rgba(0, 0, 0, 0.4)"
+      : isDark
+        ? "rgba(148, 163, 184, 0.22)"
+        : "rgba(100, 116, 139, 0.2)";
     const crossFolderEdgeColor = isEink ? "#000000" : isDark ? "#38bdf8" : "#0284c7"; // Cyan/sky blue for cross-folder links
     const nodeTextColor = isEink ? "#000000" : isDark ? "#f8fafc" : "#0f172a";
     const textOutlineColor = isEink ? "#ffffff" : isDark ? "#0b0f19" : "#ffffff";
@@ -228,7 +247,8 @@ export function GraphViewPane({
           style: {
             label: "data(label)",
             "font-size": "11px",
-            "font-family": "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+            "font-family":
+              "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
             "font-weight": 500,
             color: nodeTextColor,
             "text-valign": "bottom",
@@ -537,7 +557,9 @@ export function GraphViewPane({
 
       if (liveTarget && liveTarget.length > 0) {
         const crossCount = liveTarget.isNode()
-          ? (liveTarget as any).connectedEdges().filter((e: any) => Boolean(e.data("isCrossFolder"))).length
+          ? (liveTarget as any)
+              .connectedEdges()
+              .filter((e: any) => Boolean(e.data("isCrossFolder"))).length
           : 0;
         setSelectedNode({
           id: liveTarget.data("id"),
@@ -602,7 +624,7 @@ export function GraphViewPane({
       cy.destroy();
       cyRef.current = null;
     };
-  // Only re-init Cytoscape when graph data or visual theme changes — NOT on currentDocId/isSpacePanning
+    // Only re-init Cytoscape when graph data or visual theme changes — NOT on currentDocId/isSpacePanning
   }, [filteredData, theme, clusterByFolder]);
 
   // Lightweight effect: update node highlight/data when active document changes
@@ -655,7 +677,9 @@ export function GraphViewPane({
     });
 
     const targetEdges = targetNode.connectedEdges();
-    const targetCrossCount = targetEdges.filter((e: any) => Boolean(e.data("isCrossFolder"))).length;
+    const targetCrossCount = targetEdges.filter((e: any) =>
+      Boolean(e.data("isCrossFolder")),
+    ).length;
     setSelectedNode({
       id: targetNode.data("id"),
       label: targetNode.data("label"),
@@ -756,12 +780,7 @@ export function GraphViewPane({
 
           {/* Zoom controls */}
           <div className="graph-zoom-group">
-            <button
-              type="button"
-              className="graph-action-btn"
-              onClick={handleZoomIn}
-              title="放大"
-            >
+            <button type="button" className="graph-action-btn" onClick={handleZoomIn} title="放大">
               <ZoomIn size={13} />
             </button>
             <input
@@ -784,12 +803,7 @@ export function GraphViewPane({
               title="输入百分比缩放 (10%~500%)"
               aria-label="图谱缩放百分比"
             />
-            <button
-              type="button"
-              className="graph-action-btn"
-              onClick={handleZoomOut}
-              title="缩小"
-            >
+            <button type="button" className="graph-action-btn" onClick={handleZoomOut} title="缩小">
               <ZoomOut size={13} />
             </button>
             <button
@@ -808,7 +822,11 @@ export function GraphViewPane({
               type="button"
               className="graph-action-btn"
               onClick={onToggleOrientation}
-              title={splitOrientation === "row" ? "切换为上下分栏 (推荐思维导图/白板)" : "切换为左右并排分栏"}
+              title={
+                splitOrientation === "row"
+                  ? "切换为上下分栏 (推荐思维导图/白板)"
+                  : "切换为左右并排分栏"
+              }
             >
               {splitOrientation === "row" ? <Rows size={13} /> : <Columns size={13} />}
             </button>
@@ -1000,9 +1018,7 @@ export function GraphViewPane({
                   📁 {selectedNode.folderGroup}
                 </span>
               )}
-              {selectedNode.isCurrent && (
-                <span className="node-current-badge">当前</span>
-              )}
+              {selectedNode.isCurrent && <span className="node-current-badge">当前</span>}
             </div>
             <button
               type="button"

@@ -60,9 +60,12 @@ function sourceFiles(dir: string): { css: string[]; ts: string[] } {
  * （在同类守卫上实测差了 25 行）。行号是这个测试唯一的定位手段，错了等于没有。
  */
 function stripComments(text: string): string {
-  return text.replace(/\/\*[\s\S]*?\*\//g, (m) => "\n".repeat((m.match(/\n/g) || []).length))
-    // TS/TSX 的行注释：只处理**行首**（避免误伤 `http://`）
-    .replace(/^[ \t]*\/\/.*$/gm, "");
+  return (
+    text
+      .replace(/\/\*[\s\S]*?\*\//g, (m) => "\n".repeat((m.match(/\n/g) || []).length))
+      // TS/TSX 的行注释：只处理**行首**（避免误伤 `http://`）
+      .replace(/^[ \t]*\/\/.*$/gm, "")
+  );
 }
 
 /** 行号换算（stripComments 保持了行数，所以偏移可直接换算）。 */
@@ -92,7 +95,8 @@ for (const f of TS_FILES) {
   const src = stripComments(readFileSync(f, "utf8"));
   // 内联 style 对象里的键：`"--name": value` —— 这是本项目**唯一**的 JS 侧注入方式
   // （`setProperty` 只有两处，且都是 `cursor`，不涉及自定义属性）
-  for (const m of src.matchAll(/["'`](--[A-Za-z][\w-]*)["'`]\s*:/g)) define(m[1], rel(f) + " (inline)");
+  for (const m of src.matchAll(/["'`](--[A-Za-z][\w-]*)["'`]\s*:/g))
+    define(m[1], rel(f) + " (inline)");
 }
 
 // ---------------------------------------------------------------- 引用
@@ -126,7 +130,7 @@ const ALLOW_UNDEFINED = new Map<string, string>([
   [
     "--surface-1",
     "命令面板 / 快速工具条：兜底 #1e293b 是自洽深色面板的一部分，浅色与 eink 配色由 " +
-      "`[data-theme=\"light\"] .command-palette-*` 等显式覆盖兜住，实测不漏",
+      '`[data-theme="light"] .command-palette-*` 等显式覆盖兜住，实测不漏',
   ],
   [
     "--text-normal",
@@ -147,8 +151,12 @@ describe("CSS 自定义属性（令牌）守卫", () => {
   it("扫描器本身有效（否则会静默全绿）", () => {
     expect(CSS_FILES.length, "没扫到任何 css 文件").toBeGreaterThan(0);
     expect(TS_FILES.length, "没扫到任何 ts/tsx 文件").toBeGreaterThan(10);
-    expect(DEFINED.size, `扫到的令牌定义太少（${DEFINED.size}），解析器可能坏了`).toBeGreaterThan(40);
-    expect(REFS.length, `扫到的 var() 引用太少（${REFS.length}），解析器可能坏了`).toBeGreaterThan(600);
+    expect(DEFINED.size, `扫到的令牌定义太少（${DEFINED.size}），解析器可能坏了`).toBeGreaterThan(
+      40,
+    );
+    expect(REFS.length, `扫到的 var() 引用太少（${REFS.length}），解析器可能坏了`).toBeGreaterThan(
+      600,
+    );
   });
 
   it("没有兜底值的 var() 引用，其令牌必须有定义", () => {
@@ -162,13 +170,13 @@ describe("CSS 自定义属性（令牌）守卫", () => {
     });
     expect(
       uniq.map((b) => `${b.file}:${b.line}  var(${b.name}) 无兜底且未定义`),
-      "var() 解析不出时整条声明会被丢弃（不是回退到默认值）——这条属性等于没写"
+      "var() 解析不出时整条声明会被丢弃（不是回退到默认值）——这条属性等于没写",
     ).toEqual([]);
   });
 
   it("有兜底值的引用也必须已定义，除非在允许清单里", () => {
     const bad = REFS.filter(
-      (r) => r.hasFallback && !DEFINED.has(r.name) && !ALLOW_UNDEFINED.has(r.name)
+      (r) => r.hasFallback && !DEFINED.has(r.name) && !ALLOW_UNDEFINED.has(r.name),
     );
     const seen = new Set<string>();
     const uniq = bad.filter((b) => {
@@ -180,7 +188,7 @@ describe("CSS 自定义属性（令牌）守卫", () => {
     expect(
       uniq.map((b) => `${b.file}:${b.line}  var(${b.name}, …) 未定义且不在允许清单`),
       "有兜底不会报错，只会「永远是那个写死的值」——永远拿不到主题值。" +
-        "若确实安全（有主题覆盖兜住），把它连同理由加进 ALLOW_UNDEFINED"
+        "若确实安全（有主题覆盖兜住），把它连同理由加进 ALLOW_UNDEFINED",
     ).toEqual([]);
   });
 
@@ -188,10 +196,9 @@ describe("CSS 自定义属性（令牌）守卫", () => {
     // 成对断言（规则 5）。没有这一条，清单会慢慢变成「一堆早就修好了的名字」，
     // 而它掩盖的范围就没人知道了。
     const stale = [...ALLOW_UNDEFINED.keys()].filter((n) => DEFINED.has(n));
-    expect(
-      stale,
-      `这些令牌已经有定义了，请从 ALLOW_UNDEFINED 里删掉：${stale.join(", ")}`
-    ).toEqual([]);
+    expect(stale, `这些令牌已经有定义了，请从 ALLOW_UNDEFINED 里删掉：${stale.join(", ")}`).toEqual(
+      [],
+    );
   });
 
   it("允许清单里的每一条都写了理由", () => {

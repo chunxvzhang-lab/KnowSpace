@@ -38,8 +38,8 @@ describe("取景边界", () => {
           { x: 100, y: 100, width: 50, height: 30 },
           { x: -20, y: 40, width: 10, height: 10 },
         ],
-        60
-      )
+        60,
+      ),
     ).toEqual({ minX: -80, minY: -20, width: 290, height: 210 });
   });
 });

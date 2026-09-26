@@ -27,12 +27,7 @@ const outDir = path.join(root, "src", "services");
  * reads in the same sequence it used to.
  */
 const ASSIGNMENT = {
-  serialization: [
-    "parseCanvasData",
-    "serializeCanvasData",
-    "createDefaultCanvas",
-    "isNodeSide",
-  ],
+  serialization: ["parseCanvasData", "serializeCanvasData", "createDefaultCanvas", "isNodeSide"],
   geometry: [
     "computeBoundingBox",
     "getNodeAnchorPoint",
@@ -367,19 +362,29 @@ function main() {
   const gaps = [];
   const headerEnd = decls.length > 0 ? decls[0].start : lines.length;
   if (headerEnd > 0) {
-    const header = lines.slice(0, headerEnd).filter((l) => l.trim() && !l.trim().startsWith("//") && !l.trim().startsWith("*") && !l.trim().startsWith("/*"));
+    const header = lines
+      .slice(0, headerEnd)
+      .filter(
+        (l) =>
+          l.trim() &&
+          !l.trim().startsWith("//") &&
+          !l.trim().startsWith("*") &&
+          !l.trim().startsWith("/*"),
+      );
     if (header.length > 0) console.log(`  header block: ${headerEnd} lines (imports + re-exports)`);
   }
   for (const r of ranges) {
     if (r.start > cursor) {
       const skipped = lines.slice(cursor, r.start).filter((l) => l.trim() !== "");
-      if (skipped.length > 0) gaps.push(`lines ${cursor + 1}-${r.start}: ${skipped.length} non-blank`);
+      if (skipped.length > 0)
+        gaps.push(`lines ${cursor + 1}-${r.start}: ${skipped.length} non-blank`);
     }
     cursor = r.end + 1;
   }
   if (cursor < lines.length) {
     const tail = lines.slice(cursor).filter((l) => l.trim() !== "");
-    if (tail.length > 0) gaps.push(`tail lines ${cursor + 1}-${lines.length}: ${tail.length} non-blank`);
+    if (tail.length > 0)
+      gaps.push(`tail lines ${cursor + 1}-${lines.length}: ${tail.length} non-blank`);
   }
   if (gaps.length === 0) console.log("  ✅ every non-blank line is inside a declaration block");
   else for (const g of gaps) console.log("  ⚠️ " + g);
@@ -388,7 +393,9 @@ function main() {
     console.log("\n(dry run — pass --write to generate files)");
     console.log("\nPer-symbol spans:");
     for (const r of ranges) {
-      console.log(`  ${String(r.start + 1).padStart(5)}-${String(r.end + 1).padStart(5)}  ${r.module.padEnd(15)} ${r.name}`);
+      console.log(
+        `  ${String(r.start + 1).padStart(5)}-${String(r.end + 1).padStart(5)}  ${r.module.padEnd(15)} ${r.name}`,
+      );
     }
     return;
   }

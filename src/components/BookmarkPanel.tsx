@@ -28,7 +28,11 @@ export function BookmarkPanel({ bookmarks, manifest, onJump, onDelete }: Bookmar
                 <em>{bookmark.excerpt}</em>
               </span>
             </button>
-            <button className="icon-button small" title="删除书签" onClick={() => onDelete(bookmark.id)}>
+            <button
+              className="icon-button small"
+              title="删除书签"
+              onClick={() => onDelete(bookmark.id)}
+            >
               <Trash2 size={15} />
             </button>
           </article>

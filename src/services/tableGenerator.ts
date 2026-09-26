@@ -12,18 +12,12 @@ export interface TableGenerationResult {
  * @param rows Total number of rows including header (e.g. rows=3 => 1 header + 2 content rows)
  * @param cols Number of columns
  */
-export function generateMarkdownTable(
-  rows: number,
-  cols: number
-): TableGenerationResult {
+export function generateMarkdownTable(rows: number, cols: number): TableGenerationResult {
   const safeCols = Math.max(1, Math.min(Math.round(cols) || 1, 30));
   const safeRows = Math.max(1, Math.min(Math.round(rows) || 1, 100));
 
   // 1. Header row
-  const headerCells = Array.from(
-    { length: safeCols },
-    (_, i) => ` 标题 ${i + 1} `
-  );
+  const headerCells = Array.from({ length: safeCols }, (_, i) => ` 标题 ${i + 1} `);
   const headerLine = `|${headerCells.join("|")}|`;
 
   // 2. Separator row
@@ -35,10 +29,7 @@ export function generateMarkdownTable(
   const contentLines: string[] = [];
 
   for (let r = 1; r <= contentRowCount; r++) {
-    const rowCells = Array.from(
-      { length: safeCols },
-      (_, c) => ` 内容 ${r}-${c + 1} `
-    );
+    const rowCells = Array.from({ length: safeCols }, (_, c) => ` 内容 ${r}-${c + 1} `);
     contentLines.push(`|${rowCells.join("|")}|`);
   }
 
@@ -72,7 +63,7 @@ export function clampMenuPosition(
     width: typeof window !== "undefined" ? window.innerWidth : 1280,
     height: typeof window !== "undefined" ? window.innerHeight : 800,
   },
-  padding = 12
+  padding = 12,
 ): ViewportCoords {
   const maxLeft = Math.max(padding, viewport.width - menuWidth - padding);
   const maxTop = Math.max(padding, viewport.height - menuHeight - padding);
@@ -95,7 +86,7 @@ export function calculateSubmenuPosition(
     width: typeof window !== "undefined" ? window.innerWidth : 1280,
     height: typeof window !== "undefined" ? window.innerHeight : 800,
   },
-  padding = 12
+  padding = 12,
 ): ViewportCoords {
   // Horizontal: prefer right of anchor, flip to left if overflows
   let left = anchorRect.right + 4;

@@ -11,7 +11,7 @@ import react from "@vitejs/plugin-react";
  * shows is the version that was built, and bumping one file is enough.
  */
 const { version } = JSON.parse(
-  readFileSync(new URL("./package.json", import.meta.url), "utf8")
+  readFileSync(new URL("./package.json", import.meta.url), "utf8"),
 ) as { version: string };
 
 export default defineConfig({

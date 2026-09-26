@@ -52,7 +52,7 @@ export function computeBoundingBox(nodes: CanvasNode[]): {
  */
 export function getNodeAnchorPoint(
   node: CanvasNode,
-  side: CanvasNodeSide = "right"
+  side: CanvasNodeSide = "right",
 ): { x: number; y: number } {
   switch (side) {
     case "top":
@@ -67,7 +67,6 @@ export function getNodeAnchorPoint(
   }
 }
 
-
 /**
 
 /**
@@ -78,7 +77,7 @@ export function computeBezierControlPoints(
   p1: { x: number; y: number },
   side1: CanvasNodeSide = "right",
   p2: { x: number; y: number },
-  side2: CanvasNodeSide = "left"
+  side2: CanvasNodeSide = "left",
 ): { cp1: { x: number; y: number }; cp2: { x: number; y: number } } {
   const dx = p2.x - p1.x;
   const dy = p2.y - p1.y;
@@ -171,7 +170,7 @@ export function getStepBendHandleInfo(
   side1: CanvasNodeSide = "right",
   p2: { x: number; y: number },
   side2: CanvasNodeSide = "left",
-  stepOffset?: number
+  stepOffset?: number,
 ): StepBendHandleInfo {
   const dx = p2.x - p1.x;
   const dy = p2.y - p1.y;
@@ -221,7 +220,7 @@ export function getStepBendHandleInfo(
  */
 export function projectPointOntoRing(
   point: { x: number; y: number },
-  ring: { center: { x: number; y: number }; radius: number }
+  ring: { center: { x: number; y: number }; radius: number },
 ): { x: number; y: number } {
   const ox = point.x - ring.center.x;
   const oy = point.y - ring.center.y;
@@ -247,7 +246,7 @@ export function projectPointOntoRing(
  */
 export function getOptimalAnchorSides(
   fromNode: CanvasNode,
-  toNode: CanvasNode
+  toNode: CanvasNode,
 ): { fromSide: CanvasNodeSide; toSide: CanvasNodeSide } {
   const fromRight = fromNode.x + fromNode.width;
   const fromBottom = fromNode.y + fromNode.height;
@@ -262,8 +261,14 @@ export function getOptimalAnchorSides(
   const dx = toCenterX - fromCenterX;
   const dy = toCenterY - fromCenterY;
 
-  const gapX = toNode.x >= fromRight ? toNode.x - fromRight : fromNode.x >= toRight ? fromNode.x - toRight : 0;
-  const gapY = toNode.y >= fromBottom ? toNode.y - fromBottom : fromNode.y >= toBottom ? fromNode.y - toBottom : 0;
+  const gapX =
+    toNode.x >= fromRight ? toNode.x - fromRight : fromNode.x >= toRight ? fromNode.x - toRight : 0;
+  const gapY =
+    toNode.y >= fromBottom
+      ? toNode.y - fromBottom
+      : fromNode.y >= toBottom
+        ? fromNode.y - toBottom
+        : 0;
 
   const overlapX = Math.max(0, Math.min(fromRight, toRight) - Math.max(fromNode.x, toNode.x));
   const overlapY = Math.max(0, Math.min(fromBottom, toBottom) - Math.max(fromNode.y, toNode.y));
@@ -271,17 +276,13 @@ export function getOptimalAnchorSides(
   // 1. Nodes share a horizontal band (overlap in Y) and horizontal gap exists:
   //    Cards in the same row/container connecting side-by-side.
   if (overlapY > 0 && gapX > 0) {
-    return dx >= 0
-      ? { fromSide: "right", toSide: "left" }
-      : { fromSide: "left", toSide: "right" };
+    return dx >= 0 ? { fromSide: "right", toSide: "left" } : { fromSide: "left", toSide: "right" };
   }
 
   // 2. Nodes share a vertical band (overlap in X) and vertical gap exists:
   //    Cards in the same column connecting vertically.
   if (overlapX > 0 && gapY > 0) {
-    return dy >= 0
-      ? { fromSide: "bottom", toSide: "top" }
-      : { fromSide: "top", toSide: "bottom" };
+    return dy >= 0 ? { fromSide: "bottom", toSide: "top" } : { fromSide: "top", toSide: "bottom" };
   }
 
   // 3. Clear vertical separation (one node is above the other, gapY > 0):
@@ -295,27 +296,19 @@ export function getOptimalAnchorSides(
         ? { fromSide: "right", toSide: "left" }
         : { fromSide: "left", toSide: "right" };
     }
-    return dy >= 0
-      ? { fromSide: "bottom", toSide: "top" }
-      : { fromSide: "top", toSide: "bottom" };
+    return dy >= 0 ? { fromSide: "bottom", toSide: "top" } : { fromSide: "top", toSide: "bottom" };
   }
 
   // 4. Nodes have horizontal gap (no vertical gap):
   if (gapX > 0) {
-    return dx >= 0
-      ? { fromSide: "right", toSide: "left" }
-      : { fromSide: "left", toSide: "right" };
+    return dx >= 0 ? { fromSide: "right", toSide: "left" } : { fromSide: "left", toSide: "right" };
   }
 
   // 5. Overlapping nodes (no gap in either direction) → use center-delta direction
   if (Math.abs(dx) >= Math.abs(dy)) {
-    return dx >= 0
-      ? { fromSide: "right", toSide: "left" }
-      : { fromSide: "left", toSide: "right" };
+    return dx >= 0 ? { fromSide: "right", toSide: "left" } : { fromSide: "left", toSide: "right" };
   } else {
-    return dy >= 0
-      ? { fromSide: "bottom", toSide: "top" }
-      : { fromSide: "top", toSide: "bottom" };
+    return dy >= 0 ? { fromSide: "bottom", toSide: "top" } : { fromSide: "top", toSide: "bottom" };
   }
 }
 
@@ -386,8 +379,7 @@ export interface CircleAlignOptions {
 export function computeMinRingRadius(nodes: CanvasNode[]): number {
   const count = nodes.length;
   if (count < 3) return 0;
-  const avgDiagonal =
-    nodes.reduce((sum, n) => sum + Math.hypot(n.width, n.height), 0) / count;
+  const avgDiagonal = nodes.reduce((sum, n) => sum + Math.hypot(n.width, n.height), 0) / count;
   const requiredChord = avgDiagonal * 0.9;
   return requiredChord / (2 * Math.sin(Math.PI / count));
 }
@@ -398,7 +390,7 @@ function orderByExplicitIds(
   orderedIds: string[],
   centerOf: (n: CanvasNode) => { x: number; y: number },
   cx: number,
-  cy: number
+  cy: number,
 ): CanvasNode[] {
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const out: CanvasNode[] = [];
@@ -426,7 +418,7 @@ function convexHull(points: Array<{ x: number; y: number }>): Array<{ x: number;
   const cross = (
     o: { x: number; y: number },
     a: { x: number; y: number },
-    b: { x: number; y: number }
+    b: { x: number; y: number },
   ) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
 
   const build = (input: Array<{ x: number; y: number }>) => {
@@ -449,7 +441,7 @@ function convexHull(points: Array<{ x: number; y: number }>): Array<{ x: number;
 /** Ray-casting point-in-polygon test. */
 function isPointInPolygon(
   point: { x: number; y: number },
-  polygon: Array<{ x: number; y: number }>
+  polygon: Array<{ x: number; y: number }>,
 ): boolean {
   let inside = false;
   for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
@@ -480,7 +472,7 @@ function isPointInPolygon(
  */
 export function isPointInsideNodeHull(
   point: { x: number; y: number },
-  nodes: CanvasNode[]
+  nodes: CanvasNode[],
 ): boolean {
   if (nodes.length < 3) return false;
   const centres = nodes.map((n) => ({ x: n.x + n.width / 2, y: n.y + n.height / 2 }));
@@ -512,7 +504,7 @@ export interface RingSpacingLayout {
  */
 export function computeRingSpacingLayout(
   nodes: CanvasNode[],
-  tolerance = 0.18
+  tolerance = 0.18,
 ): RingSpacingLayout | null {
   if (nodes.length < 3) return null;
 
@@ -556,11 +548,11 @@ export function resizeRingSpacing(
   allNodes: CanvasNode[],
   layout: RingSpacingLayout,
   draggedNodeId: string,
-  draggedCenter: { x: number; y: number }
+  draggedCenter: { x: number; y: number },
 ): CanvasNode[] {
   const radius = Math.max(
     layout.minRadius,
-    Math.hypot(draggedCenter.x - layout.center.x, draggedCenter.y - layout.center.y)
+    Math.hypot(draggedCenter.x - layout.center.x, draggedCenter.y - layout.center.y),
   );
 
   return alignNodesInCircle(allNodes, new Set(layout.orderedIds), {
@@ -591,7 +583,7 @@ export function resizeRingSpacing(
 export function alignNodesInCircle(
   allNodes: CanvasNode[],
   selectedNodeIds: Set<string> | string[],
-  options?: CircleAlignOptions
+  options?: CircleAlignOptions,
 ): CanvasNode[] {
   const selSet = selectedNodeIds instanceof Set ? selectedNodeIds : new Set(selectedNodeIds);
   const selNodes = allNodes.filter((n) => selSet.has(n.id));
@@ -634,7 +626,7 @@ export function alignNodesInCircle(
       ...ordered.map((n) => {
         const p = centerOf(n);
         return Math.hypot(p.x - cx, p.y - cy);
-      })
+      }),
     );
     radius = Math.max(currentSpread, minRadius);
   } else if (options?.clampToMinRadius) {
@@ -691,7 +683,7 @@ export interface GridAlignOptions {
 export function alignNodesInGrid(
   allNodes: CanvasNode[],
   selectedNodeIds: Set<string> | string[],
-  options?: GridAlignOptions
+  options?: GridAlignOptions,
 ): CanvasNode[] {
   const selSet = selectedNodeIds instanceof Set ? selectedNodeIds : new Set(selectedNodeIds);
   const selNodes = allNodes.filter((n) => selSet.has(n.id));
@@ -784,10 +776,7 @@ export interface GridLayoutInfo {
  * Returns null for free-form layouts so callers can fall back to normal
  * behaviour.
  */
-export function computeGridLayout(
-  nodes: CanvasNode[],
-  tolerance = 10
-): GridLayoutInfo | null {
+export function computeGridLayout(nodes: CanvasNode[], tolerance = 10): GridLayoutInfo | null {
   if (nodes.length < 4) return null;
 
   const clusterValues = (values: number[]): number[] => {
@@ -862,7 +851,7 @@ export function resizeGridSpacing(
   deltaY: number,
   baseGapX: number,
   baseGapY: number,
-  minGap = 4
+  minGap = 4,
 ): CanvasNode[] {
   const ids = new Set(layout.orderedIds);
   const spreadX = Math.max(1, layout.cols - 1);
@@ -889,7 +878,7 @@ export function resizeGridSpacing(
  */
 export function computeRingLayout(
   nodes: CanvasNode[],
-  tolerance = 0.18
+  tolerance = 0.18,
 ): { center: { x: number; y: number }; radius: number } | null {
   if (nodes.length < 3) return null;
 
@@ -912,7 +901,7 @@ export function computeRingLayout(
 export function alignNodes(
   allNodes: CanvasNode[],
   selectedNodeIds: Set<string> | string[],
-  direction: CanvasAlignDirection
+  direction: CanvasAlignDirection,
 ): CanvasNode[] {
   const selSet = selectedNodeIds instanceof Set ? selectedNodeIds : new Set(selectedNodeIds);
   const selNodes = allNodes.filter((n) => selSet.has(n.id));
@@ -932,7 +921,7 @@ export function alignNodes(
     const maxY = Math.max(...selNodes.map((n) => n.y + n.height));
     const centerY = minY + (maxY - minY) / 2;
     return allNodes.map((n) =>
-      selSet.has(n.id) ? { ...n, y: Math.round(centerY - n.height / 2) } : n
+      selSet.has(n.id) ? { ...n, y: Math.round(centerY - n.height / 2) } : n,
     );
   }
 
@@ -941,36 +930,28 @@ export function alignNodes(
     const maxX = Math.max(...selNodes.map((n) => n.x + n.width));
     const centerX = minX + (maxX - minX) / 2;
     return allNodes.map((n) =>
-      selSet.has(n.id) ? { ...n, x: Math.round(centerX - n.width / 2) } : n
+      selSet.has(n.id) ? { ...n, x: Math.round(centerX - n.width / 2) } : n,
     );
   }
 
   if (direction === "left") {
     const minX = Math.min(...selNodes.map((n) => n.x));
-    return allNodes.map((n) =>
-      selSet.has(n.id) ? { ...n, x: minX } : n
-    );
+    return allNodes.map((n) => (selSet.has(n.id) ? { ...n, x: minX } : n));
   }
 
   if (direction === "right") {
     const maxX = Math.max(...selNodes.map((n) => n.x + n.width));
-    return allNodes.map((n) =>
-      selSet.has(n.id) ? { ...n, x: maxX - n.width } : n
-    );
+    return allNodes.map((n) => (selSet.has(n.id) ? { ...n, x: maxX - n.width } : n));
   }
 
   if (direction === "top") {
     const minY = Math.min(...selNodes.map((n) => n.y));
-    return allNodes.map((n) =>
-      selSet.has(n.id) ? { ...n, y: minY } : n
-    );
+    return allNodes.map((n) => (selSet.has(n.id) ? { ...n, y: minY } : n));
   }
 
   if (direction === "bottom") {
     const maxY = Math.max(...selNodes.map((n) => n.y + n.height));
-    return allNodes.map((n) =>
-      selSet.has(n.id) ? { ...n, y: maxY - n.height } : n
-    );
+    return allNodes.map((n) => (selSet.has(n.id) ? { ...n, y: maxY - n.height } : n));
   }
 
   if (direction === "distribute-h") {
@@ -990,9 +971,7 @@ export function alignNodes(
       curX += sorted[i].width + gap;
     }
 
-    return allNodes.map((n) =>
-      newXMap.has(n.id) ? { ...n, x: newXMap.get(n.id)! } : n
-    );
+    return allNodes.map((n) => (newXMap.has(n.id) ? { ...n, x: newXMap.get(n.id)! } : n));
   }
 
   if (direction === "distribute-v") {
@@ -1012,9 +991,7 @@ export function alignNodes(
       curY += sorted[i].height + gap;
     }
 
-    return allNodes.map((n) =>
-      newYMap.has(n.id) ? { ...n, y: newYMap.get(n.id)! } : n
-    );
+    return allNodes.map((n) => (newYMap.has(n.id) ? { ...n, y: newYMap.get(n.id)! } : n));
   }
 
   return allNodes;

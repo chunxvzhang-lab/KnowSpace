@@ -91,266 +91,271 @@ export function ActivityBar({
 
   return (
     <>
-    <nav
-      className="activity-bar"
-      aria-label="快捷工具栏"
-      onPointerOver={handlePointerOver}
-      onPointerLeave={handlePointerLeave}
-      onScroll={handleScroll}
-    >
-      {/* Top Brand Logo */}
-      <div className="activity-brand" data-tooltip="KnowSpace · 个人知识工作台 (摸鱼Lab)">
-        <div className="brand-badge">
-          <img src={appLogo} alt="KnowSpace Logo" className="brand-logo-img" />
+      <nav
+        className="activity-bar"
+        aria-label="快捷工具栏"
+        onPointerOver={handlePointerOver}
+        onPointerLeave={handlePointerLeave}
+        onScroll={handleScroll}
+      >
+        {/* Top Brand Logo */}
+        <div className="activity-brand" data-tooltip="KnowSpace · 个人知识工作台 (摸鱼Lab)">
+          <div className="brand-badge">
+            <img src={appLogo} alt="KnowSpace Logo" className="brand-logo-img" />
+          </div>
         </div>
-      </div>
 
-      {/* Main Feature Icons */}
-      <div className="activity-group">
-        <button
-          type="button"
-          className={`activity-btn ${directoryOpen ? "active" : ""}`}
-          onClick={onToggleDirectory}
-          data-tooltip="文档目录 (Ctrl+\)"
-          aria-label="文档目录"
-        >
-          <FolderOpen size={18} />
-          {isDirty && <span className="activity-dot" />}
-        </button>
-
-        {onOpenCommandPalette && (
+        {/* Main Feature Icons */}
+        <div className="activity-group">
           <button
             type="button"
-            className="activity-btn"
-            onClick={onOpenCommandPalette}
-            data-tooltip="全局命令中枢 (Ctrl+K)"
-            aria-label="全局命令中枢"
+            className={`activity-btn ${directoryOpen ? "active" : ""}`}
+            onClick={onToggleDirectory}
+            data-tooltip="文档目录 (Ctrl+\)"
+            aria-label="文档目录"
           >
-            <Command size={18} />
+            <FolderOpen size={18} />
+            {isDirty && <span className="activity-dot" />}
           </button>
-        )}
 
-        <button
-          type="button"
-          className={`activity-btn ${sidebarOpen && activeSidebarTab === "toc" ? "active" : ""}`}
-          onClick={() => onSelectSidebarTab("toc")}
-          data-tooltip="大纲目录"
-          aria-label="大纲目录"
-        >
-          <ListTree size={18} />
-        </button>
-
-        <button
-          type="button"
-          className={`activity-btn ${sidebarOpen && activeSidebarTab === "bookmarks" ? "active" : ""}`}
-          onClick={() => onSelectSidebarTab("bookmarks")}
-          data-tooltip="精选书签 (Ctrl+B)"
-          aria-label="书签列表"
-        >
-          <Bookmark size={18} />
-        </button>
-
-        <button
-          type="button"
-          className={`activity-btn ${sidebarOpen && activeSidebarTab === "search" ? "active" : ""}`}
-          onClick={() => onSelectSidebarTab("search")}
-          data-tooltip="全文搜索 (Ctrl+F)"
-          aria-label="全文搜索"
-        >
-          <Search size={18} />
-        </button>
-
-        <button
-          type="button"
-          className={`activity-btn ${sidebarOpen && activeSidebarTab === "space" ? "active" : ""}`}
-          onClick={() => onSelectSidebarTab("space")}
-          data-tooltip="闪念 Space 时间线"
-          aria-label="闪念 Space 时间线看板"
-        >
-          <Zap size={18} style={{ color: "#f59e0b" }} />
-        </button>
-
-        <button
-          type="button"
-          className={`activity-btn ${sidebarOpen && activeSidebarTab === "backlinks" ? "active" : ""}`}
-          onClick={() => onSelectSidebarTab("backlinks")}
-          data-tooltip="反向链接与引用"
-          aria-label="反向链接与引用"
-        >
-          <GitFork size={18} style={{ color: "#38bdf8" }} />
-          {backlinksCount > 0 && (
-            <span className="activity-badge">{backlinksCount}</span>
+          {onOpenCommandPalette && (
+            <button
+              type="button"
+              className="activity-btn"
+              onClick={onOpenCommandPalette}
+              data-tooltip="全局命令中枢 (Ctrl+K)"
+              aria-label="全局命令中枢"
+            >
+              <Command size={18} />
+            </button>
           )}
-        </button>
-      </div>
 
-      {/* Middle Quick Actions */}
-      <div className="activity-divider" />
-      <div className="activity-group">
-        {onNewFile && (
           <button
             type="button"
-            className="activity-btn"
-            onClick={onNewFile}
-            data-tooltip="新建文件 (Ctrl+N)"
-            aria-label="新建文件"
+            className={`activity-btn ${sidebarOpen && activeSidebarTab === "toc" ? "active" : ""}`}
+            onClick={() => onSelectSidebarTab("toc")}
+            data-tooltip="大纲目录"
+            aria-label="大纲目录"
           >
-            <FilePlus2 size={18} />
+            <ListTree size={18} />
           </button>
-        )}
 
-        {onOpenDirectory && (
           <button
             type="button"
-            className="activity-btn"
-            onClick={onOpenDirectory}
-            data-tooltip="打开目录 (Ctrl+Shift+O)"
-            aria-label="打开文件夹"
+            className={`activity-btn ${sidebarOpen && activeSidebarTab === "bookmarks" ? "active" : ""}`}
+            onClick={() => onSelectSidebarTab("bookmarks")}
+            data-tooltip="精选书签 (Ctrl+B)"
+            aria-label="书签列表"
           >
-            <FileText size={18} />
+            <Bookmark size={18} />
           </button>
-        )}
 
-        <button
-          type="button"
-          className="activity-btn flash-notes-activity-btn"
-          onClick={() => {
-            const desktop = typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
-            if (desktop?.openFlashCapsule) {
-              desktop.openFlashCapsule();
-            }
-          }}
-          data-tooltip="闪念胶囊 (全局热键唤起)"
-          aria-label="闪念胶囊速记"
-        >
-          <Zap size={18} style={{ color: "#f59e0b" }} />
-        </button>
+          <button
+            type="button"
+            className={`activity-btn ${sidebarOpen && activeSidebarTab === "search" ? "active" : ""}`}
+            onClick={() => onSelectSidebarTab("search")}
+            data-tooltip="全文搜索 (Ctrl+F)"
+            aria-label="全文搜索"
+          >
+            <Search size={18} />
+          </button>
 
-        {onOpenGlobalGraph && (
           <button
             type="button"
-            className={`activity-btn ${isGraphOpen ? "active" : ""}`}
-            onClick={onOpenGlobalGraph}
-            data-tooltip="知识网络全景图谱 (Ctrl+G)"
-            aria-label="知识网络全景图谱"
+            className={`activity-btn ${sidebarOpen && activeSidebarTab === "space" ? "active" : ""}`}
+            onClick={() => onSelectSidebarTab("space")}
+            data-tooltip="闪念 Space 时间线"
+            aria-label="闪念 Space 时间线看板"
           >
-            <Network size={18} style={{ color: "#38bdf8" }} />
+            <Zap size={18} style={{ color: "#f59e0b" }} />
           </button>
-        )}
-      </div>
 
-      {/* Bottom Controls: View Mode & Fullscreen & Theme Switch & About */}
-      <div className="activity-bottom">
-        <div className="activity-viewmodes" role="group" aria-label="视图模式">
           <button
             type="button"
-            className={`activity-btn mini ${viewMode === "read" ? "active" : ""}`}
-            onClick={() => onViewModeChange("read")}
-            data-tooltip="阅读模式"
+            className={`activity-btn ${sidebarOpen && activeSidebarTab === "backlinks" ? "active" : ""}`}
+            onClick={() => onSelectSidebarTab("backlinks")}
+            data-tooltip="反向链接与引用"
+            aria-label="反向链接与引用"
           >
-            <BookOpen size={16} />
-          </button>
-          <button
-            type="button"
-            className={`activity-btn mini ${viewMode === "split" ? "active" : ""}`}
-            onClick={() => onViewModeChange("split")}
-            data-tooltip="分屏模式"
-          >
-            <Columns size={16} />
-          </button>
-          <button
-            type="button"
-            className={`activity-btn mini ${viewMode === "source" ? "active" : ""}`}
-            onClick={() => onViewModeChange("source")}
-            data-tooltip="源码模式"
-          >
-            <Code2 size={16} />
-          </button>
-          <button
-            type="button"
-            className={`activity-btn mini ${viewMode === "mindmap" ? "active" : ""}`}
-            onClick={() => onViewModeChange("mindmap")}
-            data-tooltip="思维导图模式 (Ctrl+M)"
-          >
-            <ListTree size={16} />
-          </button>
-          <button
-            type="button"
-            className={`activity-btn mini ${viewMode === "canvas" ? "active" : ""}`}
-            onClick={() => onViewModeChange("canvas")}
-            data-tooltip="空间白板模式"
-          >
-            <Boxes size={16} />
+            <GitFork size={18} style={{ color: "#38bdf8" }} />
+            {backlinksCount > 0 && <span className="activity-badge">{backlinksCount}</span>}
           </button>
         </div>
 
-        {onToggleFullscreen && (
-          <button
-            type="button"
-            className={`activity-btn ${isFullscreen ? "active" : ""}`}
-            onClick={onToggleFullscreen}
-            data-tooltip={isFullscreen ? "退出全屏 (F11 / Esc)" : "全屏模式 (F11)"}
-            aria-label="全屏切换"
-          >
-            {isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
-          </button>
-        )}
+        {/* Middle Quick Actions */}
+        <div className="activity-divider" />
+        <div className="activity-group">
+          {onNewFile && (
+            <button
+              type="button"
+              className="activity-btn"
+              onClick={onNewFile}
+              data-tooltip="新建文件 (Ctrl+N)"
+              aria-label="新建文件"
+            >
+              <FilePlus2 size={18} />
+            </button>
+          )}
 
-        {onOpenAbout && (
-          <button
-            type="button"
-            className="activity-btn"
-            onClick={onOpenAbout}
-            data-tooltip="关于应用"
-            aria-label="关于应用"
-          >
-            <Info size={18} />
-          </button>
-        )}
+          {onOpenDirectory && (
+            <button
+              type="button"
+              className="activity-btn"
+              onClick={onOpenDirectory}
+              data-tooltip="打开目录 (Ctrl+Shift+O)"
+              aria-label="打开文件夹"
+            >
+              <FileText size={18} />
+            </button>
+          )}
 
-        <div className="activity-viewmodes activity-thememodes" role="group" aria-label="主题模式">
           <button
             type="button"
-            className={`activity-btn mini ${theme === "light" ? "active" : ""}`}
-            onClick={() => onThemeChange("light")}
-            data-tooltip="日光浅色 (Light)"
-            aria-label="日光浅色"
+            className="activity-btn flash-notes-activity-btn"
+            onClick={() => {
+              const desktop =
+                typeof window !== "undefined"
+                  ? window.knowSpaceDesktop || window.bookMDDesktop
+                  : undefined;
+              if (desktop?.openFlashCapsule) {
+                desktop.openFlashCapsule();
+              }
+            }}
+            data-tooltip="闪念胶囊 (全局热键唤起)"
+            aria-label="闪念胶囊速记"
           >
-            <Sun size={15} />
+            <Zap size={18} style={{ color: "#f59e0b" }} />
           </button>
-          <button
-            type="button"
-            className={`activity-btn mini ${theme === "eink" ? "active theme-eink-active" : ""}`}
-            onClick={() => onThemeChange("eink")}
-            data-tooltip="仿电子墨水屏 (E-ink Paper)"
-            aria-label="仿电子墨水屏"
-          >
-            <Feather size={15} />
-          </button>
-          <button
-            type="button"
-            className={`activity-btn mini ${theme === "twitter" ? "active theme-twitter-active" : ""}`}
-            onClick={() => onThemeChange("twitter")}
-            data-tooltip="极客暗黑 (Geek Dark)"
-            aria-label="极客暗黑"
-          >
-            <Sparkles size={15} />
-          </button>
+
+          {onOpenGlobalGraph && (
+            <button
+              type="button"
+              className={`activity-btn ${isGraphOpen ? "active" : ""}`}
+              onClick={onOpenGlobalGraph}
+              data-tooltip="知识网络全景图谱 (Ctrl+G)"
+              aria-label="知识网络全景图谱"
+            >
+              <Network size={18} style={{ color: "#38bdf8" }} />
+            </button>
+          )}
         </div>
-      </div>
-    </nav>
-    {tooltip &&
-      typeof document !== "undefined" &&
-      createPortal(
-        <div
-          className="activity-tooltip"
-          role="tooltip"
-          style={{ top: tooltip.top, left: tooltip.left }}
-        >
-          {tooltip.text}
-        </div>,
-        document.body
-      )}
+
+        {/* Bottom Controls: View Mode & Fullscreen & Theme Switch & About */}
+        <div className="activity-bottom">
+          <div className="activity-viewmodes" role="group" aria-label="视图模式">
+            <button
+              type="button"
+              className={`activity-btn mini ${viewMode === "read" ? "active" : ""}`}
+              onClick={() => onViewModeChange("read")}
+              data-tooltip="阅读模式"
+            >
+              <BookOpen size={16} />
+            </button>
+            <button
+              type="button"
+              className={`activity-btn mini ${viewMode === "split" ? "active" : ""}`}
+              onClick={() => onViewModeChange("split")}
+              data-tooltip="分屏模式"
+            >
+              <Columns size={16} />
+            </button>
+            <button
+              type="button"
+              className={`activity-btn mini ${viewMode === "source" ? "active" : ""}`}
+              onClick={() => onViewModeChange("source")}
+              data-tooltip="源码模式"
+            >
+              <Code2 size={16} />
+            </button>
+            <button
+              type="button"
+              className={`activity-btn mini ${viewMode === "mindmap" ? "active" : ""}`}
+              onClick={() => onViewModeChange("mindmap")}
+              data-tooltip="思维导图模式 (Ctrl+M)"
+            >
+              <ListTree size={16} />
+            </button>
+            <button
+              type="button"
+              className={`activity-btn mini ${viewMode === "canvas" ? "active" : ""}`}
+              onClick={() => onViewModeChange("canvas")}
+              data-tooltip="空间白板模式"
+            >
+              <Boxes size={16} />
+            </button>
+          </div>
+
+          {onToggleFullscreen && (
+            <button
+              type="button"
+              className={`activity-btn ${isFullscreen ? "active" : ""}`}
+              onClick={onToggleFullscreen}
+              data-tooltip={isFullscreen ? "退出全屏 (F11 / Esc)" : "全屏模式 (F11)"}
+              aria-label="全屏切换"
+            >
+              {isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+            </button>
+          )}
+
+          {onOpenAbout && (
+            <button
+              type="button"
+              className="activity-btn"
+              onClick={onOpenAbout}
+              data-tooltip="关于应用"
+              aria-label="关于应用"
+            >
+              <Info size={18} />
+            </button>
+          )}
+
+          <div
+            className="activity-viewmodes activity-thememodes"
+            role="group"
+            aria-label="主题模式"
+          >
+            <button
+              type="button"
+              className={`activity-btn mini ${theme === "light" ? "active" : ""}`}
+              onClick={() => onThemeChange("light")}
+              data-tooltip="日光浅色 (Light)"
+              aria-label="日光浅色"
+            >
+              <Sun size={15} />
+            </button>
+            <button
+              type="button"
+              className={`activity-btn mini ${theme === "eink" ? "active theme-eink-active" : ""}`}
+              onClick={() => onThemeChange("eink")}
+              data-tooltip="仿电子墨水屏 (E-ink Paper)"
+              aria-label="仿电子墨水屏"
+            >
+              <Feather size={15} />
+            </button>
+            <button
+              type="button"
+              className={`activity-btn mini ${theme === "twitter" ? "active theme-twitter-active" : ""}`}
+              onClick={() => onThemeChange("twitter")}
+              data-tooltip="极客暗黑 (Geek Dark)"
+              aria-label="极客暗黑"
+            >
+              <Sparkles size={15} />
+            </button>
+          </div>
+        </div>
+      </nav>
+      {tooltip &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            className="activity-tooltip"
+            role="tooltip"
+            style={{ top: tooltip.top, left: tooltip.left }}
+          >
+            {tooltip.text}
+          </div>,
+          document.body,
+        )}
     </>
   );
 }

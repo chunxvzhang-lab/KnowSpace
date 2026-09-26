@@ -147,18 +147,39 @@ describe("tableGenerator and menu positioning algorithms", () => {
     const viewport = { width: 1000, height: 700 };
 
     // Case 1: plenty of space on right
-    const anchor1 = { left: 200, right: 450, top: 300, bottom: 330, width: 250, height: 30 } as DOMRect;
+    const anchor1 = {
+      left: 200,
+      right: 450,
+      top: 300,
+      bottom: 330,
+      width: 250,
+      height: 30,
+    } as DOMRect;
     const pos1 = calculateSubmenuPosition(anchor1, 200, 250, viewport, 12);
     expect(pos1.left).toBe(454); // anchor.right + 4
     expect(pos1.top).toBe(296); // anchor.top - 4
 
     // Case 2: right edge would overflow -> flips to left
-    const anchor2 = { left: 850, right: 980, top: 200, bottom: 230, width: 130, height: 30 } as DOMRect;
+    const anchor2 = {
+      left: 850,
+      right: 980,
+      top: 200,
+      bottom: 230,
+      width: 130,
+      height: 30,
+    } as DOMRect;
     const pos2 = calculateSubmenuPosition(anchor2, 200, 250, viewport, 12);
     expect(pos2.left).toBe(850 - 200 - 4); // 646 (anchor.left - submenuWidth - 4)
 
     // Case 3: bottom edge would overflow -> shifts up to fit inside viewport
-    const anchor3 = { left: 200, right: 450, top: 600, bottom: 630, width: 250, height: 30 } as DOMRect;
+    const anchor3 = {
+      left: 200,
+      right: 450,
+      top: 600,
+      bottom: 630,
+      width: 250,
+      height: 30,
+    } as DOMRect;
     const pos3 = calculateSubmenuPosition(anchor3, 200, 250, viewport, 12);
     expect(pos3.top).toBe(700 - 250 - 12); // 438
   });

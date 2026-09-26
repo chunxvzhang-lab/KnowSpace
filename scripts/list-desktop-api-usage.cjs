@@ -16,7 +16,8 @@ const root = path.resolve(__dirname, "..");
 const defaultTargets = ["src/App.tsx"];
 
 /** Matches `desktop.foo`, `desktop?.foo`, `window.knowSpaceDesktop.foo`, … */
-const CALL_RE = /(?:desktop|knowSpaceDesktop|bookMDDesktop)\??\s*\.\s*([A-Za-z_$][\w$]*)\s*(?:\?\.)?\(/g;
+const CALL_RE =
+  /(?:desktop|knowSpaceDesktop|bookMDDesktop)\??\s*\.\s*([A-Za-z_$][\w$]*)\s*(?:\?\.)?\(/g;
 
 function collect(file) {
   const text = fs.readFileSync(path.join(root, file), "utf8");

@@ -178,7 +178,7 @@ export function initialDifficulty(rating: FsrsRating, params = FSRS_DEFAULT_PARA
 export function nextDifficulty(
   difficulty: number,
   rating: FsrsRating,
-  params = FSRS_DEFAULT_PARAMS
+  params = FSRS_DEFAULT_PARAMS,
 ): number {
   const delta = -params[6] * (rating - 3);
   const damped = difficulty + (delta * (FSRS_MAX_DIFFICULTY - difficulty)) / 9;
@@ -199,7 +199,7 @@ export function nextStabilityOnSuccess(
   difficulty: number,
   retrievability: number,
   rating: FsrsRating,
-  params = FSRS_DEFAULT_PARAMS
+  params = FSRS_DEFAULT_PARAMS,
 ): number {
   const hardPenalty = rating === 2 ? params[15] : 1;
   const easyBonus = rating === 4 ? params[16] : 1;
@@ -228,7 +228,7 @@ export function nextStabilityOnLapse(
   stability: number,
   difficulty: number,
   retrievability: number,
-  params = FSRS_DEFAULT_PARAMS
+  params = FSRS_DEFAULT_PARAMS,
 ): number {
   const next =
     params[11] *
@@ -250,7 +250,7 @@ export function nextStabilityOnLapse(
 export function nextInterval(
   stability: number,
   requestRetention = FSRS_DEFAULT_RETENTION,
-  maximumInterval = FSRS_MAX_INTERVAL_DAYS
+  maximumInterval = FSRS_MAX_INTERVAL_DAYS,
 ): number {
   const retention = clamp(requestRetention, 0.7, 0.98);
   const raw = (stability / FSRS_FACTOR) * (Math.pow(retention, 1 / FSRS_DECAY) - 1);
@@ -258,7 +258,11 @@ export function nextInterval(
 }
 
 /** Current recall probability of a card. */
-export function currentRetrievability(lastReview: string, stability: number, now = new Date()): number {
+export function currentRetrievability(
+  lastReview: string,
+  stability: number,
+  now = new Date(),
+): number {
   const elapsed = daysBetween(lastReview, toDateKey(now));
   return forgettingCurve(elapsed, stability);
 }
@@ -331,7 +335,7 @@ export function review(
   progress: FsrsProgress,
   rating: FsrsRating,
   now = new Date(),
-  options: FsrsOptions = {}
+  options: FsrsOptions = {},
 ): FsrsReviewResult {
   const params = options.parameters ?? FSRS_DEFAULT_PARAMS;
   const today = toDateKey(now);
@@ -363,7 +367,7 @@ export function review(
         progress.difficulty,
         retrievability,
         rating,
-        params
+        params,
       );
       difficulty = nextDifficulty(progress.difficulty, rating, params);
     }
@@ -709,7 +713,7 @@ export function parseFsrsMetadata(
    * parsing every note twice, which for a vault-sized source was half the work
    * of the scan.
    */
-  parsedCards?: FsrsCard[]
+  parsedCards?: FsrsCard[],
 ): Map<string, FsrsProgress> {
   const result = new Map<string, FsrsProgress>();
   if (!markdown) return result;
@@ -778,7 +782,7 @@ export function serializeFsrsMetadata(
   markdown: string,
   progress: Map<string, FsrsProgress>,
   /** The note's cards, when the caller has already parsed them. */
-  parsedCards?: FsrsCard[]
+  parsedCards?: FsrsCard[],
 ): string {
   // An empty map is not "nothing to say" — it is "nothing to keep", and what the
   // document still holds belongs to cards that are no longer in the map, so it goes.
@@ -833,14 +837,14 @@ export function stripFsrsMetadata(markdown: string): string {
   // Trailing blank lines go too, so a note that has had its last rating taken back
   // reads exactly like a note that was never rated — the block was appended after a
   // blank line, and leaving that blank line behind is a mark of its own.
-  return kept.join("\n").replace(/\n{3,}/g, "\n\n").replace(/\s+$/, "");
+  return kept
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/\s+$/, "");
 }
 
 /** Merges updated progress into a note, replacing any previous metadata. */
-export function upsertFsrsMetadata(
-  markdown: string,
-  updates: Map<string, FsrsProgress>
-): string {
+export function upsertFsrsMetadata(markdown: string, updates: Map<string, FsrsProgress>): string {
   // Parsed once for both halves. Each used to parse the note itself, so rating a
   // single card walked the whole note twice to write one line.
   const cards = parseFlashcards(markdown);
@@ -931,7 +935,9 @@ export function addParsedNote(source: ParsedReviewSource, note: ParsedNote): voi
  * to show progress — tests, mostly. Anything that reads a vault the reader is
  * waiting on should build the source in pieces instead.
  */
-export function parseReviewSource(notes: Array<{ path: string; content: string }>): ParsedReviewSource {
+export function parseReviewSource(
+  notes: Array<{ path: string; content: string }>,
+): ParsedReviewSource {
   const source = emptyParsedSource();
   for (const note of notes) addParsedNote(source, parseNote(note));
   return source;
@@ -944,7 +950,10 @@ export function parseReviewSource(notes: Array<{ path: string; content: string }
  * forgotten come first — with never-seen cards placed ahead of everything else
  * so new material is never starved by a backlog.
  */
-export function buildQueueFromParsed(source: ParsedReviewSource, now = new Date()): FsrsQueueItem[] {
+export function buildQueueFromParsed(
+  source: ParsedReviewSource,
+  now = new Date(),
+): FsrsQueueItem[] {
   const today = toDateKey(now);
   const items: FsrsQueueItem[] = [];
   const seen = new Set<string>();
@@ -990,7 +999,7 @@ export function buildQueueFromParsed(source: ParsedReviewSource, now = new Date(
  */
 export function buildReviewQueue(
   notes: Array<{ path: string; content: string }>,
-  now = new Date()
+  now = new Date(),
 ): FsrsQueueItem[] {
   return buildQueueFromParsed(parseReviewSource(notes), now);
 }
@@ -1045,6 +1054,9 @@ export function summarizeParsed(source: ParsedReviewSource, now = new Date()): F
  * Parses everything it is given, so a caller that is about to build a queue as
  * well should parse once and use the two `…FromParsed` functions instead.
  */
-export function summarize(notes: Array<{ path: string; content: string }>, now = new Date()): FsrsStats {
+export function summarize(
+  notes: Array<{ path: string; content: string }>,
+  now = new Date(),
+): FsrsStats {
   return summarizeParsed(parseReviewSource(notes), now);
 }

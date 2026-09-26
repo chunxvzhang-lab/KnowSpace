@@ -42,7 +42,10 @@ function main() {
 
     // Print the declaration plus up to 6 following lines, which is enough to
     // capture the parameter list of a useCallback even when it is wrapped.
-    const chunk = lines.slice(index, index + 7).join("\n").trimEnd();
+    const chunk = lines
+      .slice(index, index + 7)
+      .join("\n")
+      .trimEnd();
     console.log(`${name}  (line ${index + 1}):`);
     console.log(chunk);
     console.log("");

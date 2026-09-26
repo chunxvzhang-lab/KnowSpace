@@ -31,7 +31,7 @@ function installBridge(read?: { exists?: boolean; content?: string }) {
       .mockResolvedValue(
         read?.content
           ? { success: true, exists: true, content: read.content }
-          : { success: true, exists: read?.exists ?? false }
+          : { success: true, exists: read?.exists ?? false },
       ),
     saveMindmapSidecar: vi.fn().mockResolvedValue({ success: true }),
   };
@@ -134,7 +134,7 @@ describe("自由主题的标注", () => {
     const sidecar = setNodeNote(
       addFloatingTopic(emptySidecar(), "要删掉的", 100, 100).sidecar,
       "floating-1",
-      "写过的"
+      "写过的",
     );
     const api = installBridge({ content: serializeSidecar(sidecar) });
     render(<MindmapView title="测试" source={SOURCE} documentKey={DOC} />);
@@ -162,7 +162,7 @@ describe("自由主题的标注", () => {
     const sidecar = setNodeNote(
       addFloatingTopic(emptySidecar(), "原名", 100, 100).sidecar,
       "floating-1",
-      "写过的"
+      "写过的",
     );
     const api = installBridge({ content: serializeSidecar(sidecar) });
     render(<MindmapView title="测试" source={SOURCE} documentKey={DOC} />);

@@ -136,6 +136,8 @@ Line 3 with [快速开始](https://example.com) and \`快速开始\` and actual 
     expect(updated).not.toContain("[[OtherDoc|[[快速开始]]]]");
 
     const updated2 = convertUnlinkedMentionInText(content, 3, "快速开始");
-    expect(updated2).toContain("Line 3 with [快速开始](https://example.com) and `快速开始` and actual [[快速开始]] here");
+    expect(updated2).toContain(
+      "Line 3 with [快速开始](https://example.com) and `快速开始` and actual [[快速开始]] here",
+    );
   });
 });

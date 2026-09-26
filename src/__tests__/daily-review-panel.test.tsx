@@ -19,7 +19,7 @@ function pressKey(key: string, code?: string, modifiers: KeyboardEventInit = {})
 
 /** Builds a Space note carrying a single inline flashcard. */
 function makeNote(
-  overrides: Partial<FlashNoteSummaryItem> & { content: string; filePath: string }
+  overrides: Partial<FlashNoteSummaryItem> & { content: string; filePath: string },
 ): FlashNoteSummaryItem {
   return {
     fileName: overrides.filePath.split(/[\\/]/).pop() ?? "note.md",
@@ -66,7 +66,11 @@ describe("DailyReviewPanel - 每日复盘视图", () => {
   });
 
   it("没有闪卡时显示引导空态", () => {
-    render(<DailyReviewPanel notes={[makeNote({ filePath: "a.md", content: "普通段落，没有卡片。" })]} />);
+    render(
+      <DailyReviewPanel
+        notes={[makeNote({ filePath: "a.md", content: "普通段落，没有卡片。" })]}
+      />,
+    );
 
     expect(screen.getByText("Space 里还没有闪卡")).toBeDefined();
     // The guidance names all three supported syntaxes
@@ -293,7 +297,7 @@ describe("DailyReviewPanel - 每日复盘视图", () => {
       <div>
         <input data-testid="probe" />
         <DailyReviewPanel notes={THREE_CARDS} />
-      </div>
+      </div>,
     );
 
     const input = screen.getByTestId("probe");
@@ -337,7 +341,7 @@ describe("DailyReviewPanel - 每日复盘视图", () => {
     const future = new Date();
     future.setDate(future.getDate() + 30);
     const futureKey = `${future.getFullYear()}-${String(future.getMonth() + 1).padStart(2, "0")}-${String(
-      future.getDate()
+      future.getDate(),
     ).padStart(2, "0")}`;
 
     // The metadata entry must carry the card's real content-derived id, which
@@ -410,7 +414,7 @@ describe("DailyReviewPanel - 撤销上一次评分", () => {
 
   const installDisk = (note: FlashNoteSummaryItem) => {
     readMarkdownFile.mockImplementation(() =>
-      Promise.resolve({ markdown: onDisk() || note.content, baseUrl: "" })
+      Promise.resolve({ markdown: onDisk() || note.content, baseUrl: "" }),
     );
   };
 

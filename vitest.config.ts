@@ -11,7 +11,7 @@ import react from "@vitejs/plugin-react";
  * that renders the About dialog should see the version the build would show.
  */
 const { version } = JSON.parse(
-  readFileSync(new URL("./package.json", import.meta.url), "utf8")
+  readFileSync(new URL("./package.json", import.meta.url), "utf8"),
 ) as { version: string };
 
 export default defineConfig({

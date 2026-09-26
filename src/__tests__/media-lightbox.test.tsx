@@ -4,9 +4,7 @@ import { MediaLightbox, type LightboxMedia } from "../components/MediaLightbox";
 
 describe("MediaLightbox Component Sub-function Tests", () => {
   it("renders null when media is null", () => {
-    const { container } = render(
-      <MediaLightbox media={null} onClose={vi.fn()} />
-    );
+    const { container } = render(<MediaLightbox media={null} onClose={vi.fn()} />);
     expect(container.firstChild).toBeNull();
   });
 
@@ -19,9 +17,7 @@ describe("MediaLightbox Component Sub-function Tests", () => {
     };
 
     const onClose = vi.fn();
-    render(
-      <MediaLightbox media={media} onClose={onClose} />
-    );
+    render(<MediaLightbox media={media} onClose={onClose} />);
 
     const img = screen.getByAltText("架构设计图");
     expect(img).toBeDefined();

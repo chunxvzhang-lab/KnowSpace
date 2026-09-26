@@ -22,7 +22,7 @@ function installStubs() {
   const names: string[] = [];
 
   vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (
-    this: HTMLAnchorElement
+    this: HTMLAnchorElement,
   ) {
     names.push(this.download);
   });

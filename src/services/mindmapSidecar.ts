@@ -192,7 +192,7 @@ export interface MindmapSummary {
  * has no referent — and a span written twice is a span of one, so duplicates go.
  */
 function readSpanSection<T extends { nodeIds: string[]; text: string }>(
-  value: unknown
+  value: unknown,
 ): Record<string, T> {
   const section: Record<string, T> = {};
   if (!isPlainObject(value)) return section;
@@ -474,7 +474,7 @@ export function parseSidecar(text: string | null | undefined): MindmapSidecar | 
   if (!isPlainObject(parsed)) return null;
 
   const sections = Object.fromEntries(
-    SECTIONS.map((section) => [section.name, section.read(parsed[section.name])])
+    SECTIONS.map((section) => [section.name, section.read(parsed[section.name])]),
   );
 
   const version = typeof parsed.version === "number" ? parsed.version : SIDECAR_VERSION;
@@ -554,7 +554,7 @@ export function sideFor(sidecar: MindmapSidecar | null, nodeId: string): Mindmap
 export function setNodeSide(
   sidecar: MindmapSidecar,
   nodeId: string,
-  side: MindmapSide | null
+  side: MindmapSide | null,
 ): MindmapSidecar {
   const sides = { ...sidecar.sides };
   if (side) sides[nodeId] = side;
@@ -569,7 +569,11 @@ export function setNodeSide(
  * to keep: the id is either one the table knows or the empty string that means
  * none. Returns a new sidecar, like every other edit here.
  */
-export function setNodeIcon(sidecar: MindmapSidecar, nodeId: string, iconId: string): MindmapSidecar {
+export function setNodeIcon(
+  sidecar: MindmapSidecar,
+  nodeId: string,
+  iconId: string,
+): MindmapSidecar {
   const icons = { ...sidecar.icons };
   if (iconId) {
     icons[nodeId] = iconId;
@@ -614,7 +618,11 @@ export function tagsFor(sidecar: MindmapSidecar | null, nodeId: string): string[
  * store a tag the file could not have produced. An empty result removes the
  * entry rather than storing a list with nothing in it.
  */
-export function setNodeTags(sidecar: MindmapSidecar, nodeId: string, tags: string[]): MindmapSidecar {
+export function setNodeTags(
+  sidecar: MindmapSidecar,
+  nodeId: string,
+  tags: string[],
+): MindmapSidecar {
   const next: Record<string, string[]> = { ...sidecar.tags };
   const cleaned = parseTagInput(Array.isArray(tags) ? tags.join(" ") : "");
 
@@ -673,7 +681,7 @@ function setMarker(
   nodeId: string,
   field: "priority" | "progress",
   value: number | null,
-  isValid: (candidate: unknown) => boolean
+  isValid: (candidate: unknown) => boolean,
 ): MindmapSidecar {
   const markers: Record<string, NodeMarkers> = { ...sidecar.markers };
   const current: NodeMarkers = { ...(markers[nodeId] ?? {}) };
@@ -698,7 +706,7 @@ function setMarker(
 export function setNodePriority(
   sidecar: MindmapSidecar,
   nodeId: string,
-  priority: number | null
+  priority: number | null,
 ): MindmapSidecar {
   return setMarker(sidecar, nodeId, "priority", priority, isPriorityInRange);
 }
@@ -707,7 +715,7 @@ export function setNodePriority(
 export function setNodeProgress(
   sidecar: MindmapSidecar,
   nodeId: string,
-  progress: number | null
+  progress: number | null,
 ): MindmapSidecar {
   return setMarker(sidecar, nodeId, "progress", progress, isProgressInRange);
 }
@@ -738,7 +746,7 @@ function nextSpanId(ids: string[], prefix: string): string {
 
 /** Every boundary, with its id. */
 export function boundariesIn(
-  sidecar: MindmapSidecar | null
+  sidecar: MindmapSidecar | null,
 ): { id: string; boundary: MindmapBoundary }[] {
   if (!sidecar) return [];
   return Object.entries(sidecar.boundaries).map(([id, boundary]) => ({ id, boundary }));
@@ -752,7 +760,7 @@ export function nextBoundaryId(sidecar: MindmapSidecar | null): string {
 export function addBoundary(
   sidecar: MindmapSidecar,
   nodeIds: string[],
-  text = ""
+  text = "",
 ): { sidecar: MindmapSidecar; id: string } {
   const id = nextBoundaryId(sidecar);
   const boundary: MindmapBoundary = { nodeIds: [...nodeIds], text: text.trim() };
@@ -779,7 +787,7 @@ export function setBoundaryText(sidecar: MindmapSidecar, id: string, text: strin
 export function setBoundaryColor(
   sidecar: MindmapSidecar,
   id: string,
-  color: string
+  color: string,
 ): MindmapSidecar {
   const boundary = sidecar.boundaries[id];
   if (!boundary) return sidecar;
@@ -800,7 +808,9 @@ export function removeBoundary(sidecar: MindmapSidecar, id: string): MindmapSide
 }
 
 /** Every summary, with its id. */
-export function summariesIn(sidecar: MindmapSidecar | null): { id: string; summary: MindmapSummary }[] {
+export function summariesIn(
+  sidecar: MindmapSidecar | null,
+): { id: string; summary: MindmapSummary }[] {
   if (!sidecar) return [];
   return Object.entries(sidecar.summaries).map(([id, summary]) => ({ id, summary }));
 }
@@ -814,7 +824,7 @@ export function nextSummaryId(sidecar: MindmapSidecar | null): string {
 export function addSummary(
   sidecar: MindmapSidecar,
   nodeIds: string[],
-  text = ""
+  text = "",
 ): { sidecar: MindmapSidecar; id: string } {
   const id = nextSummaryId(sidecar);
   const summary: MindmapSummary = { nodeIds: [...nodeIds], text: text.trim() };
@@ -879,7 +889,9 @@ export function removeFloatingTopic(sidecar: MindmapSidecar, id: string): Mindma
 }
 
 /** Every floating topic, with its id. */
-export function floatingTopics(sidecar: MindmapSidecar | null): { id: string; topic: FloatingTopic }[] {
+export function floatingTopics(
+  sidecar: MindmapSidecar | null,
+): { id: string; topic: FloatingTopic }[] {
   if (!sidecar) return [];
   return Object.entries(sidecar.floating).map(([id, topic]) => ({ id, topic }));
 }
@@ -908,7 +920,7 @@ export function addFloatingTopic(
   sidecar: MindmapSidecar,
   text: string,
   x: number,
-  y: number
+  y: number,
 ): { sidecar: MindmapSidecar; id: string } {
   const id = nextFloatingId(sidecar);
   const floating = { ...sidecar.floating, [id]: { text: text.trim(), x, y } };
@@ -920,7 +932,7 @@ export function moveFloatingTopic(
   sidecar: MindmapSidecar,
   id: string,
   x: number,
-  y: number
+  y: number,
 ): MindmapSidecar {
   const topic = sidecar.floating[id];
   if (!topic) return sidecar;
@@ -955,7 +967,7 @@ export function setFloatingText(sidecar: MindmapSidecar, id: string, text: strin
 export function mergeSidecar(
   fromDisk: MindmapSidecar | null,
   edited: MindmapSidecar | null,
-  touched: ReadonlySet<SidecarSection>
+  touched: ReadonlySet<SidecarSection>,
 ): MindmapSidecar | null {
   if (!edited) return fromDisk;
   if (!fromDisk) return edited;
@@ -971,7 +983,7 @@ export function mergeSidecar(
 export function relationsFor(sidecar: MindmapSidecar | null, nodeId: string): MindmapRelation[] {
   if (!sidecar) return [];
   return sidecar.relations.filter(
-    (relation) => relation.fromId === nodeId || relation.toId === nodeId
+    (relation) => relation.fromId === nodeId || relation.toId === nodeId,
   );
 }
 
@@ -989,7 +1001,7 @@ export function setRelationFields(
   sidecar: MindmapSidecar,
   a: string,
   b: string,
-  patch: { label?: string; arrow?: string; style?: string; color?: string }
+  patch: { label?: string; arrow?: string; style?: string; color?: string },
 ): MindmapSidecar {
   const relations = sidecar.relations.map((relation) => {
     if (!isSameRelation(relation, a, b)) return relation;
@@ -1008,7 +1020,7 @@ export function setRelationFields(
 export function relationBetween(
   sidecar: MindmapSidecar | null,
   a: string,
-  b: string
+  b: string,
 ): MindmapRelation | null {
   return sidecar?.relations.find((relation) => isSameRelation(relation, a, b)) ?? null;
 }
@@ -1049,7 +1061,7 @@ export interface ImportedAnnotations {
  */
 export function applyImportedAnnotations(
   sidecar: MindmapSidecar,
-  annotations: ImportedAnnotations
+  annotations: ImportedAnnotations,
 ): MindmapSidecar {
   let next = sidecar;
 
@@ -1157,7 +1169,9 @@ function bridge() {
  * the caller — show the tree, forget the extras — and none of them is worth
  * interrupting the reader over.
  */
-export async function loadSidecar(documentKey: string | null | undefined): Promise<MindmapSidecar | null> {
+export async function loadSidecar(
+  documentKey: string | null | undefined,
+): Promise<MindmapSidecar | null> {
   if (!documentKey) return null;
 
   const api = bridge();
@@ -1182,7 +1196,7 @@ export async function loadSidecar(documentKey: string | null | undefined): Promi
  */
 export async function saveSidecar(
   documentKey: string | null | undefined,
-  sidecar: MindmapSidecar
+  sidecar: MindmapSidecar,
 ): Promise<boolean> {
   if (!documentKey) return false;
 

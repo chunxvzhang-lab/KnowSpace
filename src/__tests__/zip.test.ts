@@ -40,11 +40,11 @@ describe("从 ZIP 里取一项", () => {
     ]);
 
     expect(new TextDecoder().decode((read(zip, "stored.txt") as { bytes: Uint8Array }).bytes)).toBe(
-      "存下来的内容"
+      "存下来的内容",
     );
-    expect(new TextDecoder().decode((read(zip, "content.json") as { bytes: Uint8Array }).bytes)).toBe(
-      '{"hello":"世界"}'
-    );
+    expect(
+      new TextDecoder().decode((read(zip, "content.json") as { bytes: Uint8Array }).bytes),
+    ).toBe('{"hello":"世界"}');
   });
 
   it("取的是名字对上的那一项，不按顺序猜", () => {
@@ -54,7 +54,9 @@ describe("从 ZIP 里取一项", () => {
       { name: "c.txt", data: bytesOf("丙") },
     ]);
 
-    expect(new TextDecoder().decode((read(zip, "content.json") as { bytes: Uint8Array }).bytes)).toBe("乙");
+    expect(
+      new TextDecoder().decode((read(zip, "content.json") as { bytes: Uint8Array }).bytes),
+    ).toBe("乙");
   });
 
   it("目录后面跟着注释也找得到", () => {
@@ -62,15 +64,17 @@ describe("从 ZIP 里取一项", () => {
     // comment may be up to 64KB — so "at the end" is not a position to compute.
     const zip = buildZip([{ name: "content.json", data: bytesOf("有注释") }], "x".repeat(300));
 
-    expect(new TextDecoder().decode((read(zip, "content.json") as { bytes: Uint8Array }).bytes)).toBe(
-      "有注释"
-    );
+    expect(
+      new TextDecoder().decode((read(zip, "content.json") as { bytes: Uint8Array }).bytes),
+    ).toBe("有注释");
   });
 
   it("本地头里的大小是零（流式写入）也照样读得出", () => {
     // The case a reader that trusts the local header gets wrong: it takes zero
     // bytes and reports success.
-    const zip = buildZip([{ name: "content.json", data: bytesOf("流式写入的内容"), deflate: true, streamed: true }]);
+    const zip = buildZip([
+      { name: "content.json", data: bytesOf("流式写入的内容"), deflate: true, streamed: true },
+    ]);
 
     const result = read(zip, "content.json");
     expect(result.ok).toBe(true);

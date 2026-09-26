@@ -213,7 +213,7 @@ function indexOfLine(lines, marker, from = 0, what = "marker") {
  */
 function takePreset(lines, name, alreadyTaken) {
   const start = lines.findIndex(
-    (line) => line.startsWith(`const ${name}`) && line.trimEnd().endsWith("= [")
+    (line) => line.startsWith(`const ${name}`) && line.trimEnd().endsWith("= ["),
   );
   if (start === -1) {
     console.error(`FAIL: could not find the declaration of ${name}`);
@@ -285,7 +285,7 @@ function main() {
   const icons = usedIcons(
     lines,
     start,
-    [...presets.flatMap((preset) => [preset.declaration, ...preset.body]), moved].join("\n")
+    [...presets.flatMap((preset) => [preset.declaration, ...preset.body]), moved].join("\n"),
   );
   const component = [
     prelude(icons),

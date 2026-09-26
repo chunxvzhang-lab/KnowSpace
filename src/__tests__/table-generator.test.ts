@@ -25,7 +25,7 @@ function renderTable(markdown: string): string[][] {
   const html = md.render(markdown);
   const rows = html.split("<tr>").slice(1);
   return rows.map((row) =>
-    Array.from(row.matchAll(/<t[hd][^>]*>(.*?)<\/t[hd]>/g)).map((cell) => cell[1])
+    Array.from(row.matchAll(/<t[hd][^>]*>(.*?)<\/t[hd]>/g)).map((cell) => cell[1]),
   );
 }
 
@@ -122,7 +122,7 @@ describe("菜单与子菜单的位置", () => {
 
     const cramped = { right: 100, left: 40, top: 200 } as DOMRect;
     expect(calculateSubmenuPosition(cramped, 264, 310, { width: 200, height: 800 }, 12).left).toBe(
-      12
+      12,
     );
   });
 

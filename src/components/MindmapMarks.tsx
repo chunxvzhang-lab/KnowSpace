@@ -125,9 +125,7 @@ export function NodeIcon({ iconId }: { iconId: string }) {
   const icon = findMindmapIcon(iconId);
   if (!icon) return null;
   const Icon = icon.Icon;
-  return (
-    <Icon className="mindmap-node-icon" size={16} x={-22} y={-18} strokeWidth={1.8} />
-  );
+  return <Icon className="mindmap-node-icon" size={16} x={-22} y={-18} strokeWidth={1.8} />;
 }
 
 /**
@@ -190,10 +188,18 @@ export function ProgressGlyph({ value, size = 14 }: { value: number; size?: numb
   const centre = size / 2;
 
   return (
-    <svg className="mindmap-progress-glyph" width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+    <svg
+      className="mindmap-progress-glyph"
+      width={size}
+      height={size}
+      viewBox={`0 0 ${size} ${size}`}
+    >
       <circle className="mindmap-progress-track" cx={centre} cy={centre} r={radius} />
       {value > 0 ? (
-        <path className="mindmap-progress-fill" d={progressSlicePath(value, radius, centre, centre)} />
+        <path
+          className="mindmap-progress-fill"
+          d={progressSlicePath(value, radius, centre, centre)}
+        />
       ) : null}
     </svg>
   );

@@ -1,4 +1,14 @@
-import { ChevronRight, FileText, Folder, FolderOpen, FolderMinus, Edit3, Import, ListTree, Boxes } from "lucide-react";
+import {
+  ChevronRight,
+  FileText,
+  Folder,
+  FolderOpen,
+  FolderMinus,
+  Edit3,
+  Import,
+  ListTree,
+  Boxes,
+} from "lucide-react";
 import { memo, useEffect, useMemo, useState } from "react";
 import { describeScanTruncation, describeScanUnreadable } from "../core/scanNotice";
 import type { BookManifest, ChapterManifest } from "../core/types";
@@ -53,7 +63,10 @@ export const ChapterList = memo(function ChapterList({
   );
   // By default, hide Space flash notes from the main document directory tree unless currently opened
   const filteredChapters = useMemo(() => {
-    const isCurrentInSpace = Boolean(activeChapter?.src && activeChapter.src.replace(/\\/g, "/").toLowerCase().startsWith("space/"));
+    const isCurrentInSpace = Boolean(
+      activeChapter?.src &&
+      activeChapter.src.replace(/\\/g, "/").toLowerCase().startsWith("space/"),
+    );
     return manifest.chapters.filter((ch) => {
       const isSpace = ch.src.replace(/\\/g, "/").toLowerCase().startsWith("space/");
       return !isSpace || isCurrentInSpace;
@@ -61,7 +74,10 @@ export const ChapterList = memo(function ChapterList({
   }, [manifest.chapters, activeChapter?.src]);
 
   const tree = useMemo(() => buildTree(filteredChapters), [filteredChapters]);
-  const defaultOpen = useMemo(() => collectParentFolderPaths(activeChapter?.src), [activeChapter?.src]);
+  const defaultOpen = useMemo(
+    () => collectParentFolderPaths(activeChapter?.src),
+    [activeChapter?.src],
+  );
   const [openFolders, setOpenFolders] = useState<Set<string>>(() => new Set(defaultOpen));
 
   useEffect(() => {

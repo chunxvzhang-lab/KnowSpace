@@ -12,7 +12,17 @@ import reactHooks from "eslint-plugin-react-hooks";
  */
 
 export default tseslint.config(
-  { ignores: ["dist", "release", "release-next", "node_modules", "web", "coverage", "scripts/_archive"] },
+  {
+    ignores: [
+      "dist",
+      "release",
+      "release-next",
+      "node_modules",
+      "web",
+      "coverage",
+      "scripts/_archive",
+    ],
+  },
 
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -123,13 +133,20 @@ export default tseslint.config(
           paths: [
             { name: "react", message: "L2 domain kernel must stay framework-free (plan 3.1)." },
             { name: "react-dom", message: "L2 domain kernel must stay framework-free (plan 3.1)." },
-            { name: "react/jsx-runtime", message: "L2 domain kernel must stay framework-free (plan 3.1)." },
-            { name: "zustand", message: "State belongs to L3 stores, not the domain kernel (plan 3.1)." },
+            {
+              name: "react/jsx-runtime",
+              message: "L2 domain kernel must stay framework-free (plan 3.1).",
+            },
+            {
+              name: "zustand",
+              message: "State belongs to L3 stores, not the domain kernel (plan 3.1).",
+            },
           ],
           patterns: [
             {
               group: ["electron", "electron/*"],
-              message: "L2 must not reach the platform layer directly - go through L3/L4 (plan 3.1).",
+              message:
+                "L2 must not reach the platform layer directly - go through L3/L4 (plan 3.1).",
             },
           ],
         },
@@ -161,8 +178,14 @@ export default tseslint.config(
     rules: {
       "no-restricted-globals": [
         "error",
-        { name: "window", message: "L2 must run in a worker (plan 3.5) - inject or move this to L4." },
-        { name: "document", message: "L2 must run in a worker (plan 3.5) - inject or move this to L4." },
+        {
+          name: "window",
+          message: "L2 must run in a worker (plan 3.5) - inject or move this to L4.",
+        },
+        {
+          name: "document",
+          message: "L2 must run in a worker (plan 3.5) - inject or move this to L4.",
+        },
       ],
     },
   },
@@ -178,7 +201,8 @@ export default tseslint.config(
           patterns: [
             {
               group: ["electron", "electron/*"],
-              message: "Renderer code must not import electron - use the preload bridge (plan 3.1).",
+              message:
+                "Renderer code must not import electron - use the preload bridge (plan 3.1).",
             },
           ],
         },

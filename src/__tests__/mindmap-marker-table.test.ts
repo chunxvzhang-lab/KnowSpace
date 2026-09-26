@@ -24,7 +24,9 @@ import {
 
 /** The rim point of the wedge, read back out of the path. */
 function rimPoint(value: number, radius: number) {
-  const numbers = (progressSlicePath(value, radius, 0, 0).match(/-?\d*\.?\d+(?:e[-+]?\d+)?/gi) ?? []).map(Number);
+  const numbers = (
+    progressSlicePath(value, radius, 0, 0).match(/-?\d*\.?\d+(?:e[-+]?\d+)?/gi) ?? []
+  ).map(Number);
   return { x: numbers[numbers.length - 2], y: numbers[numbers.length - 1] };
 }
 
@@ -43,19 +45,21 @@ function arcFlags(value: number, radius: number) {
 describe("优先级与进度的取值", () => {
   it("优先级 1–9，颜色两两不同", () => {
     expect(MINDMAP_PRIORITIES.map((mark) => mark.value)).toEqual(
-      Array.from({ length: PRIORITY_MAX - PRIORITY_MIN + 1 }, (_, i) => PRIORITY_MIN + i)
+      Array.from({ length: PRIORITY_MAX - PRIORITY_MIN + 1 }, (_, i) => PRIORITY_MIN + i),
     );
     expect(MINDMAP_PRIORITIES.map((mark) => mark.label)).toEqual(
-      MINDMAP_PRIORITIES.map((mark) => String(mark.value))
+      MINDMAP_PRIORITIES.map((mark) => String(mark.value)),
     );
-    expect(new Set(MINDMAP_PRIORITIES.map((mark) => mark.color)).size).toBe(MINDMAP_PRIORITIES.length);
+    expect(new Set(MINDMAP_PRIORITIES.map((mark) => mark.color)).size).toBe(
+      MINDMAP_PRIORITIES.length,
+    );
   });
 
   it("进度 1/8 到 8/8，没有 0", () => {
     // 0/8 is a mark that says nothing, which is the same as no mark at all; the
     // picker says that by being empty rather than by drawing an empty dial.
     expect(MINDMAP_PROGRESS_STEPS.map((mark) => mark.value)).toEqual(
-      Array.from({ length: PROGRESS_MAX - PROGRESS_MIN + 1 }, (_, i) => PROGRESS_MIN + i)
+      Array.from({ length: PROGRESS_MAX - PROGRESS_MIN + 1 }, (_, i) => PROGRESS_MIN + i),
     );
     expect(MINDMAP_PROGRESS_STEPS[0].label).toBe("1/8");
     expect(MINDMAP_PROGRESS_STEPS.at(-1)?.label).toBe("8/8");

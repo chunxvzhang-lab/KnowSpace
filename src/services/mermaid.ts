@@ -64,14 +64,11 @@ export async function renderMermaid(
   container: HTMLElement,
   options: RenderMermaidOptions = {},
 ): Promise<void> {
-  const diagrams = Array.from(
-    container.querySelectorAll<HTMLElement>("pre.mermaid"),
-  );
+  const diagrams = Array.from(container.querySelectorAll<HTMLElement>("pre.mermaid"));
   if (diagrams.length === 0) return;
 
   const theme =
-    options.theme ??
-    (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "default");
+    options.theme ?? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "default");
 
   ensureInitialized(theme);
 

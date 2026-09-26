@@ -131,7 +131,7 @@ describe("节点样式菜单", () => {
 
     expect(document.querySelector(".mindmap-context-menu")).toBeNull();
     expect(
-      document.querySelector(".mindmap-node-interactive.is-selected")?.getAttribute("transform")
+      document.querySelector(".mindmap-node-interactive.is-selected")?.getAttribute("transform"),
     ).toBe(selectionBefore);
   });
 

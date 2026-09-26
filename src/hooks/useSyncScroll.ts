@@ -23,9 +23,7 @@ function buildScrollKeyframes(view: EditorView, readerElem: HTMLElement): Scroll
 
   const keyframes: ScrollKeyframe[] = [{ editorY: 0, readerY: 0 }];
 
-  const mappedElements = Array.from(
-    readerElem.querySelectorAll<HTMLElement>("[data-source-line]")
-  );
+  const mappedElements = Array.from(readerElem.querySelectorAll<HTMLElement>("[data-source-line]"));
 
   const readerRect = readerElem.getBoundingClientRect();
   const doc = view.state.doc;
@@ -79,7 +77,7 @@ function interpolateCoordinate(
   sourceY: number,
   keyframes: ScrollKeyframe[],
   fromKey: "editorY" | "readerY",
-  toKey: "editorY" | "readerY"
+  toKey: "editorY" | "readerY",
 ): number {
   if (keyframes.length <= 1) return sourceY;
 
@@ -134,7 +132,7 @@ export function useSyncScroll({ containerRef, viewMode, navLockUntilRef }: SyncS
         lockTimerRef.current = null;
       }, durationMs);
     },
-    [navLockUntilRef]
+    [navLockUntilRef],
   );
 
   const clearLock = useCallback(() => {
@@ -174,7 +172,7 @@ export function useSyncScroll({ containerRef, viewMode, navLockUntilRef }: SyncS
 
       readerElem.scrollTop = targetReaderY;
     },
-    [syncEnabled, viewMode, navLockUntilRef, containerRef, setLock]
+    [syncEnabled, viewMode, navLockUntilRef, containerRef, setLock],
   );
 
   // Sync from Reader Preview -> Editor
@@ -226,7 +224,12 @@ export function useSyncScroll({ containerRef, viewMode, navLockUntilRef }: SyncS
       const readerScrollTop = readerElem.scrollTop;
       if (readerScrollTop > 0) {
         const keyframes = buildScrollKeyframes(view, readerElem);
-        const targetEditorY = interpolateCoordinate(readerScrollTop, keyframes, "readerY", "editorY");
+        const targetEditorY = interpolateCoordinate(
+          readerScrollTop,
+          keyframes,
+          "readerY",
+          "editorY",
+        );
         view.scrollDOM.scrollTop = targetEditorY;
       }
     }, 60);

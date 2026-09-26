@@ -187,7 +187,12 @@ export function computeLineDiff(oldText: string, newText: string): DiffLine[] {
 /**
  * Fast fallback comparison for very large documents.
  */
-function simpleLineDiff(oldLines: string[], newLines: string[], oldOffset = 0, newOffset = 0): DiffLine[] {
+function simpleLineDiff(
+  oldLines: string[],
+  newLines: string[],
+  oldOffset = 0,
+  newOffset = 0,
+): DiffLine[] {
   const result: DiffLine[] = [];
   let i = 0;
   let j = 0;
@@ -242,7 +247,10 @@ function simpleLineDiff(oldLines: string[], newLines: string[], oldOffset = 0, n
 /**
  * Computes character-level inline differences between two lines.
  */
-export function computeInlineDiff(oldLine: string, newLine: string): {
+export function computeInlineDiff(
+  oldLine: string,
+  newLine: string,
+): {
   oldInline: InlineDiff[];
   newInline: InlineDiff[];
 } {

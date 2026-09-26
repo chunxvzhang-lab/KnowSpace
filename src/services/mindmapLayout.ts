@@ -192,7 +192,7 @@ export function layoutMindmap(
   rootNode: MindmapNode,
   collapsedIds: ReadonlySet<string> = new Set(),
   layoutId: MindmapLayoutId = DEFAULT_LAYOUT_ID,
-  sides: Readonly<Record<string, MindmapSide>> = {}
+  sides: Readonly<Record<string, MindmapSide>> = {},
 ): MindmapLayoutResult {
   switch (layoutId) {
     case "bidirectional":
@@ -252,7 +252,7 @@ function measureSubtreeWidth(node: MindmapNode, collapsedIds: ReadonlySet<string
 function stackHeight(children: MindmapNode[], collapsedIds: ReadonlySet<string>): number {
   return children.reduce(
     (sum, child, i) => sum + measureSubtree(child, collapsedIds) + (i > 0 ? SIBLING_GAP : 0),
-    0
+    0,
   );
 }
 
@@ -260,7 +260,7 @@ function stackHeight(children: MindmapNode[], collapsedIds: ReadonlySet<string>)
 function stackWidth(children: MindmapNode[], collapsedIds: ReadonlySet<string>): number {
   return children.reduce(
     (sum, child, i) => sum + measureSubtreeWidth(child, collapsedIds) + (i > 0 ? SIBLING_GAP : 0),
-    0
+    0,
   );
 }
 
@@ -278,7 +278,7 @@ function makeLayoutNode(
   dimensions: { width: number; height: number; lines: string[] },
   side: MindmapLayoutSide,
   colorIndex: number,
-  collapsedIds: ReadonlySet<string>
+  collapsedIds: ReadonlySet<string>,
 ): MindmapLayoutNode {
   return {
     id: node.id,
@@ -349,7 +349,7 @@ function buildEdgePath(
   toX: number,
   toY: number,
   style: MindmapLineStyle,
-  axis: "horizontal" | "vertical" = "horizontal"
+  axis: "horizontal" | "vertical" = "horizontal",
 ): string {
   if (style === "straight") {
     return `M ${fromX} ${fromY} L ${toX} ${toY}`;
@@ -399,7 +399,7 @@ function layoutBounds(nodes: MindmapLayoutNode[]): MindmapLayoutResult["bounds"]
  */
 function layoutLogicTree(
   rootNode: MindmapNode,
-  collapsedIds: ReadonlySet<string>
+  collapsedIds: ReadonlySet<string>,
 ): MindmapLayoutResult {
   const allNodes: MindmapLayoutNode[] = [];
   const allEdges: MindmapLayoutResult["edges"] = [];
@@ -409,7 +409,7 @@ function layoutLogicTree(
     node: MindmapNode,
     startX: number,
     topY: number,
-    colorIndex: number
+    colorIndex: number,
   ): MindmapLayoutNode {
     const isCollapsed = collapsedIds.has(node.id);
     const hasChildren = node.children && node.children.length > 0;
@@ -425,7 +425,7 @@ function layoutLogicTree(
       { width, height, lines },
       "right",
       colorIndex,
-      collapsedIds
+      collapsedIds,
     );
     allNodes.push(layoutNode);
 
@@ -437,12 +437,7 @@ function layoutLogicTree(
         const child = node.children[i];
         // Each top-level child gets its own branch color; deeper descendants inherit parent's branch color
         const childColorIndex = node.level === 0 ? i % BRANCH_COLORS.length : colorIndex;
-        const childLayout = positionSubtree(
-          child,
-          childStartX,
-          currentChildTopY,
-          childColorIndex
-        );
+        const childLayout = positionSubtree(child, childStartX, currentChildTopY, childColorIndex);
         layoutNode.children.push(childLayout);
 
         // Generate connector path according to lineStyle
@@ -504,7 +499,7 @@ function layoutLogicTree(
 function layoutBidirectionalTree(
   rootNode: MindmapNode,
   collapsedIds: ReadonlySet<string>,
-  sides: Readonly<Record<string, MindmapSide>> = {}
+  sides: Readonly<Record<string, MindmapSide>> = {},
 ): MindmapLayoutResult {
   type Branch = { node: MindmapNode; colorIndex: number; height: number };
 
@@ -520,7 +515,7 @@ function layoutBidirectionalTree(
     x: number,
     y: number,
     side: MindmapLayoutSide,
-    colorIndex: number
+    colorIndex: number,
   ): MindmapLayoutNode {
     const dimensions = calculateNodeDimensions(node);
     const layoutNode = makeLayoutNode(node, { x, y }, dimensions, side, colorIndex, collapsedIds);
@@ -542,7 +537,7 @@ function layoutBidirectionalTree(
     topY: number,
     direction: 1 | -1,
     side: MindmapLayoutSide,
-    colorIndex: number
+    colorIndex: number,
   ): MindmapLayoutNode {
     const { width, height } = calculateNodeDimensions(node);
     const subtreeHeight = measureSubtree(node, collapsedIds);
@@ -552,8 +547,7 @@ function layoutBidirectionalTree(
     const isCollapsed = collapsedIds.has(node.id);
     if (!isCollapsed && node.children && node.children.length > 0) {
       const childAnchorX = direction === 1 ? x + width + LEVEL_GAP : x - LEVEL_GAP;
-      let childTop =
-        layoutNode.y + height / 2 - stackHeight(node.children, collapsedIds) / 2;
+      let childTop = layoutNode.y + height / 2 - stackHeight(node.children, collapsedIds) / 2;
       for (const child of node.children) {
         placeSubtree(child, childAnchorX, childTop, direction, side, colorIndex);
         childTop += measureSubtree(child, collapsedIds) + SIBLING_GAP;
@@ -633,7 +627,7 @@ function layoutBidirectionalTree(
           parent.y + parent.height / 2,
           toX,
           childLayout.y + childLayout.height / 2,
-          style
+          style,
         ),
         colorIndex: childLayout.colorIndex,
         color: child.lineColor || node.lineColor,
@@ -661,7 +655,7 @@ function layoutBidirectionalTree(
  */
 function layoutVerticalTree(
   rootNode: MindmapNode,
-  collapsedIds: ReadonlySet<string>
+  collapsedIds: ReadonlySet<string>,
 ): MindmapLayoutResult {
   const allNodes: MindmapLayoutNode[] = [];
   /** Placed nodes by id, so the connector pass can read final coordinates. */
@@ -671,7 +665,7 @@ function layoutVerticalTree(
     node: MindmapNode,
     centreX: number,
     topY: number,
-    colorIndex: number
+    colorIndex: number,
   ): MindmapLayoutNode {
     const dimensions = calculateNodeDimensions(node);
     const isCollapsed = collapsedIds.has(node.id);
@@ -681,7 +675,7 @@ function layoutVerticalTree(
       dimensions,
       "bottom",
       colorIndex,
-      collapsedIds
+      collapsedIds,
     );
     allNodes.push(layoutNode);
     placed.set(node.id, layoutNode);
@@ -724,7 +718,7 @@ function layoutVerticalTree(
  */
 function collectVerticalEdges(
   rootNode: MindmapNode,
-  placed: Map<string, MindmapLayoutNode>
+  placed: Map<string, MindmapLayoutNode>,
 ): MindmapLayoutResult["edges"] {
   const allEdges: MindmapLayoutResult["edges"] = [];
 
@@ -746,7 +740,7 @@ function collectVerticalEdges(
           childLayout.x + childLayout.width / 2,
           childLayout.y,
           style,
-          "vertical"
+          "vertical",
         ),
         colorIndex: childLayout.colorIndex,
         color: child.lineColor || node.lineColor,
@@ -792,7 +786,7 @@ function radialHalfExtent(dimensions: { width: number; height: number }, angle: 
 function boxEdgePoint(
   box: { x: number; y: number; width: number; height: number },
   towardsX: number,
-  towardsY: number
+  towardsY: number,
 ): { x: number; y: number } {
   const centreX = box.x + box.width / 2;
   const centreY = box.y + box.height / 2;
@@ -839,7 +833,7 @@ function buildRadialEdgePath(
   centre: { x: number; y: number },
   from: { x: number; y: number },
   to: { x: number; y: number },
-  style: MindmapLineStyle
+  style: MindmapLineStyle,
 ): string {
   if (style === "straight") {
     return `M ${from.x} ${from.y} L ${to.x} ${to.y}`;
@@ -885,7 +879,7 @@ function buildRadialEdgePath(
  */
 function layoutRadialTree(
   rootNode: MindmapNode,
-  collapsedIds: ReadonlySet<string>
+  collapsedIds: ReadonlySet<string>,
 ): MindmapLayoutResult {
   type Entry = {
     node: MindmapNode;
@@ -906,7 +900,7 @@ function layoutRadialTree(
     depth: number,
     angle: number,
     colorIndex: number,
-    sector: number
+    sector: number,
   ): void {
     entries.push({ node, dimensions, depth, angle, colorIndex });
     if (collapsedIds.has(node.id) || !node.children || node.children.length === 0) return;
@@ -917,8 +911,16 @@ function layoutRadialTree(
     let start = angle - sector / 2;
     node.children.forEach((child, index) => {
       const share =
-        sector * (SECTOR_WEIGHT_MIX * (weights[index] / total) + (1 - SECTOR_WEIGHT_MIX) * equalShare);
-      assign(child, calculateNodeDimensions(child), depth + 1, start + share / 2, colorIndex, share);
+        sector *
+        (SECTOR_WEIGHT_MIX * (weights[index] / total) + (1 - SECTOR_WEIGHT_MIX) * equalShare);
+      assign(
+        child,
+        calculateNodeDimensions(child),
+        depth + 1,
+        start + share / 2,
+        colorIndex,
+        share,
+      );
       start += share;
     });
   }
@@ -935,10 +937,19 @@ function layoutRadialTree(
     let angle = -Math.PI / 2;
     children.forEach((child, index) => {
       const share =
-        Math.PI * 2 * (SECTOR_WEIGHT_MIX * (weights[index] / total) + (1 - SECTOR_WEIGHT_MIX) * equalShare);
+        Math.PI *
+        2 *
+        (SECTOR_WEIGHT_MIX * (weights[index] / total) + (1 - SECTOR_WEIGHT_MIX) * equalShare);
       // Each first-level branch carries its own colour; deeper nodes inherit the
       // branch's, exactly as in the other layouts.
-      assign(child, calculateNodeDimensions(child), 1, angle + share / 2, index % BRANCH_COLORS.length, share);
+      assign(
+        child,
+        calculateNodeDimensions(child),
+        1,
+        angle + share / 2,
+        index % BRANCH_COLORS.length,
+        share,
+      );
       angle += share;
     });
   }
@@ -984,11 +995,11 @@ function layoutRadialTree(
   for (let depth = 1; byDepth.has(depth); depth += 1) {
     const ring = byDepth.get(depth)!;
     const extent = Math.max(
-      ...ring.map((entry) => radialHalfExtent(entry.dimensions, entry.angle))
+      ...ring.map((entry) => radialHalfExtent(entry.dimensions, entry.angle)),
     );
     const radius = Math.max(
       previousRadius + previousExtent + extent + SIBLING_GAP,
-      ringRadius(ring)
+      ringRadius(ring),
     );
     radii.set(depth, radius);
     previousRadius = radius;
@@ -1001,7 +1012,7 @@ function layoutRadialTree(
     rootDimensions,
     "right",
     0,
-    collapsedIds
+    collapsedIds,
   );
   allNodes.push(rootLayout);
   placed.set(rootNode.id, rootLayout);
@@ -1016,7 +1027,7 @@ function layoutRadialTree(
       entry.dimensions,
       radialSide(centreX, centreY),
       entry.colorIndex,
-      collapsedIds
+      collapsedIds,
     );
     allNodes.push(layoutNode);
     placed.set(entry.node.id, layoutNode);
@@ -1043,7 +1054,7 @@ function layoutRadialTree(
     const edge = boxEdgePoint(
       node,
       nodeCentreX + (awayX / length) * 1000,
-      nodeCentreY + (awayY / length) * 1000
+      nodeCentreY + (awayY / length) * 1000,
     );
     // Two pixels past the edge, so the circle sits beside the box rather than on
     // top of its border.
@@ -1065,12 +1076,12 @@ function layoutRadialTree(
       const from = boxEdgePoint(
         parent,
         childLayout.x + childLayout.width / 2,
-        childLayout.y + childLayout.height / 2
+        childLayout.y + childLayout.height / 2,
       );
       const to = boxEdgePoint(
         childLayout,
         parent.x + parent.width / 2,
-        parent.y + parent.height / 2
+        parent.y + parent.height / 2,
       );
 
       allEdges.push({
@@ -1122,7 +1133,7 @@ const SPINE_GAP = 26;
  */
 function layoutTimelineTree(
   rootNode: MindmapNode,
-  collapsedIds: ReadonlySet<string>
+  collapsedIds: ReadonlySet<string>,
 ): MindmapLayoutResult {
   const allNodes: MindmapLayoutNode[] = [];
   /** Placed nodes by id, so the connector pass can read final coordinates. */
@@ -1140,7 +1151,7 @@ function layoutTimelineTree(
     centreX: number,
     innerEdge: number,
     outward: -1 | 1,
-    colorIndex: number
+    colorIndex: number,
   ): MindmapLayoutNode {
     const dimensions = calculateNodeDimensions(node);
     const isCollapsed = collapsedIds.has(node.id);
@@ -1151,7 +1162,7 @@ function layoutTimelineTree(
       dimensions,
       outward > 0 ? "bottom" : "top",
       colorIndex,
-      collapsedIds
+      collapsedIds,
     );
     allNodes.push(layoutNode);
     placed.set(node.id, layoutNode);
@@ -1177,7 +1188,7 @@ function layoutTimelineTree(
     rootDimensions,
     "right",
     0,
-    collapsedIds
+    collapsedIds,
   );
   allNodes.push(rootLayout);
   placed.set(rootNode.id, rootLayout);
@@ -1189,13 +1200,7 @@ function layoutTimelineTree(
       // The first branch goes above the axis and the rest alternate, so the
       // sequence the document has is the sequence read from left to right.
       const outward: -1 | 1 = index % 2 === 0 ? -1 : 1;
-      place(
-        child,
-        cursor + band / 2,
-        outward * SPINE_GAP,
-        outward,
-        index % BRANCH_COLORS.length
-      );
+      place(child, cursor + band / 2, outward * SPINE_GAP, outward, index % BRANCH_COLORS.length);
       cursor += band + TIMELINE_GAP;
     });
   }
@@ -1241,7 +1246,7 @@ function layoutTimelineTree(
             childCentreX,
             childInnerEdge,
             style,
-            "vertical"
+            "vertical",
           ),
           colorIndex: childLayout.colorIndex,
           color: child.lineColor || node.lineColor,

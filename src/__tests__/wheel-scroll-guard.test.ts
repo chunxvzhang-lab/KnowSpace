@@ -30,13 +30,21 @@ function makeScroller(options: {
 describe("canConsumeWheel", () => {
   it("owns the wheel while there is somewhere left to scroll", () => {
     expect(
-      canConsumeWheel(makeScroller({ scrollHeight: 400, clientHeight: 100, scrollTop: 50 }), 0, 120)
+      canConsumeWheel(
+        makeScroller({ scrollHeight: 400, clientHeight: 100, scrollTop: 50 }),
+        0,
+        120,
+      ),
     ).toBe(true);
   });
 
   it("hands the wheel back once it is pinned at the bottom", () => {
     expect(
-      canConsumeWheel(makeScroller({ scrollHeight: 400, clientHeight: 100, scrollTop: 300 }), 0, 120)
+      canConsumeWheel(
+        makeScroller({ scrollHeight: 400, clientHeight: 100, scrollTop: 300 }),
+        0,
+        120,
+      ),
     ).toBe(false);
   });
 
@@ -50,7 +58,7 @@ describe("canConsumeWheel", () => {
 
   it("ignores an element with nothing to scroll", () => {
     expect(canConsumeWheel(makeScroller({ scrollHeight: 100, clientHeight: 100 }), 0, 120)).toBe(
-      false
+      false,
     );
   });
 
@@ -66,7 +74,7 @@ describe("canConsumeWheel", () => {
 
   it("does not claim a wheel with no vertical delta", () => {
     expect(
-      canConsumeWheel(makeScroller({ scrollHeight: 400, clientHeight: 100, scrollTop: 50 }), 0, 0)
+      canConsumeWheel(makeScroller({ scrollHeight: 400, clientHeight: 100, scrollTop: 50 }), 0, 0),
     ).toBe(false);
   });
 });

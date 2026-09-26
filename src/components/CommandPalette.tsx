@@ -175,8 +175,8 @@ export const CommandPalette = memo(function CommandPalette({
   const currentItemsCount = isActionMode
     ? filteredActions.length
     : isHeadingMode
-    ? filteredHeadings.length
-    : filteredDocs.length;
+      ? filteredHeadings.length
+      : filteredDocs.length;
 
   // Reset or clamp selected index when items change
   useEffect(() => {
@@ -186,7 +186,9 @@ export const CommandPalette = memo(function CommandPalette({
   // Auto-scroll selected item into view
   useEffect(() => {
     if (!listRef.current) return;
-    const activeEl = listRef.current.querySelector<HTMLElement>(".command-palette-item.is-selected");
+    const activeEl = listRef.current.querySelector<HTMLElement>(
+      ".command-palette-item.is-selected",
+    );
     if (activeEl) {
       activeEl.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }
@@ -286,8 +288,8 @@ export const CommandPalette = memo(function CommandPalette({
               isActionMode
                 ? "输入关键词搜索执行命令..."
                 : isHeadingMode
-                ? "输入关键词直达章节小节大纲..."
-                : "搜索文档标题/路径，输入 > 执行动作，输入 # 搜索小节大纲..."
+                  ? "输入关键词直达章节小节大纲..."
+                  : "搜索文档标题/路径，输入 > 执行动作，输入 # 搜索小节大纲..."
             }
           />
           {query && (
@@ -400,9 +402,7 @@ export const CommandPalette = memo(function CommandPalette({
                             {h.text}
                           </span>
                         </div>
-                        {h.line && (
-                          <span className="item-subtitle">第 {h.line} 行</span>
-                        )}
+                        {h.line && <span className="item-subtitle">第 {h.line} 行</span>}
                       </div>
                       <div className="item-action-icon">
                         <CornerDownLeft size={13} />
@@ -479,9 +479,7 @@ export const CommandPalette = memo(function CommandPalette({
               输入 <kbd>#</kbd> 大纲
             </span>
           </div>
-          <div className="footer-count">
-            {currentItemsCount} 项
-          </div>
+          <div className="footer-count">{currentItemsCount} 项</div>
         </div>
       </div>
     </div>

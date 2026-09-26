@@ -26,7 +26,8 @@ const hookPath = path.join(root, "src", "hooks", "useSearch.ts");
 const write = process.argv.includes("--write");
 
 /** Block A: the results memo, which the callbacks below depend on. */
-const A_START = "  const isSearchActive = (sidebarOpen && sidebarTab === \"search\") || commandPaletteOpen;";
+const A_START =
+  '  const isSearchActive = (sidebarOpen && sidebarTab === "search") || commandPaletteOpen;';
 const A_END = "  const bookmarkedHeadingIds = useMemo(() => {";
 
 /** Block B: the navigation and highlighting callbacks. */
@@ -196,7 +197,9 @@ function main() {
   fs.writeFileSync(hookPath, HOOK_HEADER + blockB.join("\n") + HOOK_FOOTER);
   fs.writeFileSync(appPath, nextLines.join("\n"));
   console.log(`wrote ${path.relative(root, hookPath)}`);
-  console.log(`rewrote ${path.relative(root, appPath)}: ${lines.length} -> ${nextLines.length} lines`);
+  console.log(
+    `rewrote ${path.relative(root, appPath)}: ${lines.length} -> ${nextLines.length} lines`,
+  );
 }
 
 main();

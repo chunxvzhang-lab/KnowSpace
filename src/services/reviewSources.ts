@@ -41,14 +41,14 @@ export interface ReviewSourceReader {
  */
 export async function readReviewDocuments(
   bridge: ReviewSourceReader,
-  paths: string[]
+  paths: string[],
 ): Promise<ReviewSourceDocument[]> {
   if (paths.length === 0) return [];
 
   const sources: ChapterSource[] = bridge.readMarkdownBatch
     ? await bridge.readMarkdownBatch(paths)
     : (await Promise.all(paths.map((path) => bridge.readMarkdownFile(path)))).map(
-        (source, index) => ({ ...source, absolutePath: source.absolutePath ?? paths[index] })
+        (source, index) => ({ ...source, absolutePath: source.absolutePath ?? paths[index] }),
       );
 
   const byPath = new Map<string, ChapterSource>();
@@ -86,7 +86,7 @@ export async function readReviewDocumentsChunked(
     onProgress?: (done: number, total: number) => void;
     /** Checked between batches, so a source the reader has left stops being read. */
     isCancelled?: () => boolean;
-  } = {}
+  } = {},
 ): Promise<ReviewSourceDocument[]> {
   const { chunkSize = 24, onProgress, isCancelled } = options;
   if (paths.length === 0) return [];

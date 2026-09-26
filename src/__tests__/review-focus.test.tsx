@@ -48,9 +48,7 @@ describe("SpaceTimelinePanel - 复盘时让出空间", () => {
 
   it("在复盘中卸载时复位，不把折叠状态留给下一个界面", () => {
     const onReviewActiveChange = vi.fn();
-    const { unmount } = render(
-      <SpaceTimelinePanel onReviewActiveChange={onReviewActiveChange} />
-    );
+    const { unmount } = render(<SpaceTimelinePanel onReviewActiveChange={onReviewActiveChange} />);
 
     fireEvent.click(screen.getByText("复盘"));
     onReviewActiveChange.mockClear();
@@ -79,12 +77,12 @@ describe("SpaceTimelinePanel - 复盘时让出空间", () => {
     // is where a feature nobody knows about lives.
     const onReviewActiveChange = vi.fn();
     const { rerender } = render(
-      <SpaceTimelinePanel onReviewActiveChange={onReviewActiveChange} openReviewRequest={0} />
+      <SpaceTimelinePanel onReviewActiveChange={onReviewActiveChange} openReviewRequest={0} />,
     );
     expect(onReviewActiveChange).toHaveBeenLastCalledWith(false);
 
     rerender(
-      <SpaceTimelinePanel onReviewActiveChange={onReviewActiveChange} openReviewRequest={1} />
+      <SpaceTimelinePanel onReviewActiveChange={onReviewActiveChange} openReviewRequest={1} />,
     );
 
     expect(onReviewActiveChange).toHaveBeenLastCalledWith(true);
@@ -95,7 +93,7 @@ describe("SpaceTimelinePanel - 复盘时让出空间", () => {
     // with the number it already has must not pull the reader back out of the timeline.
     const onReviewActiveChange = vi.fn();
     const { rerender } = render(
-      <SpaceTimelinePanel onReviewActiveChange={onReviewActiveChange} openReviewRequest={1} />
+      <SpaceTimelinePanel onReviewActiveChange={onReviewActiveChange} openReviewRequest={1} />,
     );
     expect(onReviewActiveChange).toHaveBeenLastCalledWith(true);
 
@@ -103,12 +101,12 @@ describe("SpaceTimelinePanel - 复盘时让出空间", () => {
     expect(onReviewActiveChange).toHaveBeenLastCalledWith(false);
 
     rerender(
-      <SpaceTimelinePanel onReviewActiveChange={onReviewActiveChange} openReviewRequest={1} />
+      <SpaceTimelinePanel onReviewActiveChange={onReviewActiveChange} openReviewRequest={1} />,
     );
     expect(onReviewActiveChange).toHaveBeenLastCalledWith(false);
 
     rerender(
-      <SpaceTimelinePanel onReviewActiveChange={onReviewActiveChange} openReviewRequest={2} />
+      <SpaceTimelinePanel onReviewActiveChange={onReviewActiveChange} openReviewRequest={2} />,
     );
     expect(onReviewActiveChange).toHaveBeenLastCalledWith(true);
   });

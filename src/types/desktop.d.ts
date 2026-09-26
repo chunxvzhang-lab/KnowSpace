@@ -35,7 +35,13 @@ export type SaveMarkdownResult =
     }
   | {
       success: false;
-      errorCode: "INVALID_PATH" | "INVALID_EXTENSION" | "FILE_CONFLICT" | "ACCESS_DENIED" | "WRITE_FAILED" | string;
+      errorCode:
+        | "INVALID_PATH"
+        | "INVALID_EXTENSION"
+        | "FILE_CONFLICT"
+        | "ACCESS_DENIED"
+        | "WRITE_FAILED"
+        | string;
       message: string;
       diskVersion?: DiskVersion;
     };
@@ -180,7 +186,10 @@ export type KnowSpaceDesktopAPI = {
   }>;
   saveMarkdownFileAs: (request?: SaveMarkdownAsRequest) => Promise<SaveMarkdownAsResult>;
   setDocumentState: (state: { activePath: string | null; isDirty: boolean }) => Promise<void>;
-  resolveBeforeClose: (result: { requestId: number; action: "proceed" | "cancel" }) => Promise<void>;
+  resolveBeforeClose: (result: {
+    requestId: number;
+    action: "proceed" | "cancel";
+  }) => Promise<void>;
   openExternal?: (url: string) => Promise<boolean>;
   toggleFullScreen?: () => Promise<boolean>;
   isFullScreen?: () => Promise<boolean>;
@@ -240,14 +249,28 @@ export type KnowSpaceDesktopAPI = {
 
   // Version Snapshots & Time Travel
   listSnapshots?: (params: { filePath: string; rootPath?: string }) => Promise<SnapshotItem[]>;
-  readSnapshot?: (params: { filePath: string; rootPath?: string; snapshotId: string }) => Promise<SnapshotDetail | null>;
-  revertSnapshot?: (params: { filePath: string; rootPath?: string; snapshotId: string }) => Promise<SaveMarkdownResult>;
-  createManualSnapshot?: (params: { filePath: string; rootPath?: string; content: string }) => Promise<{ success: boolean; snapshotId?: string; error?: string }>;
+  readSnapshot?: (params: {
+    filePath: string;
+    rootPath?: string;
+    snapshotId: string;
+  }) => Promise<SnapshotDetail | null>;
+  revertSnapshot?: (params: {
+    filePath: string;
+    rootPath?: string;
+    snapshotId: string;
+  }) => Promise<SaveMarkdownResult>;
+  createManualSnapshot?: (params: {
+    filePath: string;
+    rootPath?: string;
+    content: string;
+  }) => Promise<{ success: boolean; snapshotId?: string; error?: string }>;
 
   openFlashCapsule?: () => Promise<boolean>;
   hideFlashCapsule?: () => Promise<boolean>;
   getFlashShortcut?: () => Promise<string>;
-  setFlashShortcut?: (shortcut: string) => Promise<{ success: boolean; shortcut?: string; error?: string }>;
+  setFlashShortcut?: (
+    shortcut: string,
+  ) => Promise<{ success: boolean; shortcut?: string; error?: string }>;
   getFlashTargetPath?: () => Promise<{
     workspaceDir: string | null;
     spaceDir?: string;
@@ -267,15 +290,31 @@ export type KnowSpaceDesktopAPI = {
   }>;
   getFlashPin?: () => Promise<{ pinned: boolean }>;
   setFlashPin?: (pinned: boolean) => Promise<{ success: boolean; pinned: boolean }>;
-  getFlashSpaceConfig?: () => Promise<{ currentDir: string; isCustom: boolean; defaultDir: string }>;
-  selectFlashSpaceDir?: () => Promise<{ success: boolean; canceled?: boolean; newDir?: string; error?: string }>;
+  getFlashSpaceConfig?: () => Promise<{
+    currentDir: string;
+    isCustom: boolean;
+    defaultDir: string;
+  }>;
+  selectFlashSpaceDir?: () => Promise<{
+    success: boolean;
+    canceled?: boolean;
+    newDir?: string;
+    error?: string;
+  }>;
   resetFlashSpaceDir?: () => Promise<{ success: boolean; defaultDir: string }>;
   getPersistentNote?: () => Promise<{ text: string }>;
   savePersistentNote?: (text: string) => Promise<{ success: boolean }>;
-  setFlashSize?: (size: { width: number; height: number }) => Promise<{ success: boolean; width?: number; height?: number }>;
+  setFlashSize?: (size: {
+    width: number;
+    height: number;
+  }) => Promise<{ success: boolean; width?: number; height?: number }>;
   resetFlashSize?: () => Promise<{ success: boolean; width?: number; height?: number }>;
   getFlashNotesSummary?: () => Promise<FlashNotesSummaryResult>;
-  toggleFlashTodo?: (params: { filePath: string; lineIndex: number; completed: boolean }) => Promise<{ success: boolean; completed?: boolean; error?: string }>;
+  toggleFlashTodo?: (params: {
+    filePath: string;
+    lineIndex: number;
+    completed: boolean;
+  }) => Promise<{ success: boolean; completed?: boolean; error?: string }>;
   deleteFlashNote?: (params: { filePath: string }) => Promise<{ success: boolean; error?: string }>;
   savePastedImage?: (params: {
     currentFilePath?: string;
@@ -283,16 +322,31 @@ export type KnowSpaceDesktopAPI = {
     originalName?: string;
     ext?: string;
   }) => Promise<SavePastedImageResult>;
-  getAppSettings?: () => Promise<{ autoLaunch: boolean; runInBackground: boolean; flashShortcut: string }>;
-  setAppSettings?: (settings: { autoLaunch?: boolean; runInBackground?: boolean }) => Promise<{ success: boolean; settings?: { autoLaunch: boolean; runInBackground: boolean; flashShortcut: string } }>;
+  getAppSettings?: () => Promise<{
+    autoLaunch: boolean;
+    runInBackground: boolean;
+    flashShortcut: string;
+  }>;
+  setAppSettings?: (settings: { autoLaunch?: boolean; runInBackground?: boolean }) => Promise<{
+    success: boolean;
+    settings?: { autoLaunch: boolean; runInBackground: boolean; flashShortcut: string };
+  }>;
   onOpenFilePath: (callback: (absolutePath: string) => void) => () => void;
   onMenuCommand: (callback: (command: string) => void) => () => void;
   onBeforeClose: (callback: (data: BeforeCloseData) => void) => () => void;
   onFullScreenChanged?: (callback: (isFullscreen: boolean) => void) => () => void;
   onFlashFocus?: (callback: () => void) => () => void;
   onFlashShortcutUpdated?: (callback: (shortcut: string) => void) => () => void;
-  onFlashNoteSaved?: (callback: (data: { filePath: string; dateStr: string; fileName?: string }) => void) => () => void;
-  onAppSettingsUpdated?: (callback: (data: { autoLaunch: boolean; runInBackground: boolean; flashShortcut: string }) => void) => () => void;
+  onFlashNoteSaved?: (
+    callback: (data: { filePath: string; dateStr: string; fileName?: string }) => void,
+  ) => () => void;
+  onAppSettingsUpdated?: (
+    callback: (data: {
+      autoLaunch: boolean;
+      runInBackground: boolean;
+      flashShortcut: string;
+    }) => void,
+  ) => () => void;
   onThemeUpdated?: (callback: (theme: string) => void) => () => void;
 };
 

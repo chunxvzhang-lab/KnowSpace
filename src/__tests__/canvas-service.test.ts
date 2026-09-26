@@ -1,7 +1,69 @@
 import { describe, it, expect, vi } from "vitest";
-import { parseCanvasData, serializeCanvasData, createDefaultCanvas, computeBoundingBox, getNodeAnchorPoint, computeEdgePath, extractCanvasToMarkdown, getOptimalAnchorSides, getSourceNodeEdgeColor, getEffectiveEdgeColorKey, isColorSimilar, exportCanvasToSvg, exportCanvasToPng, downloadCanvasAsImage, copyCanvasImageToClipboard, resolveExportScale, sanitizeSvgResources, valueBooleanAttributes, reverseEdgeDirection, connectOneToMany, connectChainNodes, connectLoopNodes, getLoopEdgeColors, getLoopEdgeIds, expandLoopEdgeSelection, computeSourceDisplayColorMap, alignNodesInCircle, alignNodesInGrid, computeRingLayout, syncRingEdges, projectPointOntoRing, computeGridLayout, syncGridEdges, syncLoopEdgeGeometry, resizeGridSpacing, computeMinRingRadius, computeRingSpacingLayout, resizeRingSpacing, isPointInsideNodeHull, CANVAS_COLOR_PALETTES, CANVAS_STANDARD_COLOR_IDS, disconnectNodeEdges, spawnConnectedCard, spawnMultipleBranches, cycleEdgeStrokePattern, getStepBendHandleInfo, computeBezierControlPoints, computeEdgeMidpoint, alignNodes, getMediaFileType, isMediaFile, isImageFile, resolveMediaSrc, pathIntersectsBox, buildPresentationSequence } from "../services/canvasService";
+import {
+  parseCanvasData,
+  serializeCanvasData,
+  createDefaultCanvas,
+  computeBoundingBox,
+  getNodeAnchorPoint,
+  computeEdgePath,
+  extractCanvasToMarkdown,
+  getOptimalAnchorSides,
+  getSourceNodeEdgeColor,
+  getEffectiveEdgeColorKey,
+  isColorSimilar,
+  exportCanvasToSvg,
+  exportCanvasToPng,
+  downloadCanvasAsImage,
+  copyCanvasImageToClipboard,
+  resolveExportScale,
+  sanitizeSvgResources,
+  valueBooleanAttributes,
+  reverseEdgeDirection,
+  connectOneToMany,
+  connectChainNodes,
+  connectLoopNodes,
+  getLoopEdgeColors,
+  getLoopEdgeIds,
+  expandLoopEdgeSelection,
+  computeSourceDisplayColorMap,
+  alignNodesInCircle,
+  alignNodesInGrid,
+  computeRingLayout,
+  syncRingEdges,
+  projectPointOntoRing,
+  computeGridLayout,
+  syncGridEdges,
+  syncLoopEdgeGeometry,
+  resizeGridSpacing,
+  computeMinRingRadius,
+  computeRingSpacingLayout,
+  resizeRingSpacing,
+  isPointInsideNodeHull,
+  CANVAS_COLOR_PALETTES,
+  CANVAS_STANDARD_COLOR_IDS,
+  disconnectNodeEdges,
+  spawnConnectedCard,
+  spawnMultipleBranches,
+  cycleEdgeStrokePattern,
+  getStepBendHandleInfo,
+  computeBezierControlPoints,
+  computeEdgeMidpoint,
+  alignNodes,
+  getMediaFileType,
+  isMediaFile,
+  isImageFile,
+  resolveMediaSrc,
+  pathIntersectsBox,
+  buildPresentationSequence,
+} from "../services/canvasService";
 import { getCanvasThemeColors } from "../services/canvasTheme";
-import type { CanvasData, CanvasTextNode, CanvasFileNode, CanvasGroupNode, CanvasEdge } from "../types/canvasTypes";
+import type {
+  CanvasData,
+  CanvasTextNode,
+  CanvasFileNode,
+  CanvasGroupNode,
+  CanvasEdge,
+} from "../types/canvasTypes";
 
 describe("canvasService - JSON Canvas 1.0 Specification", () => {
   it("parses empty or invalid input safely", () => {
@@ -13,13 +75,55 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
   it("parses standard text, file, link, and group nodes", () => {
     const json = JSON.stringify({
       nodes: [
-        { id: "text-1", type: "text", text: "Hello Canvas", x: 10, y: 20, width: 250, height: 150, color: "1" },
-        { id: "file-1", type: "file", file: "01-架构设计.md", x: 300, y: 50, width: 320, height: 240, color: "4" },
-        { id: "link-1", type: "link", url: "https://knowspace.dev", x: 700, y: 100, width: 200, height: 100 },
-        { id: "group-1", type: "group", label: "核心系统", x: 0, y: 0, width: 900, height: 500, color: "5" },
+        {
+          id: "text-1",
+          type: "text",
+          text: "Hello Canvas",
+          x: 10,
+          y: 20,
+          width: 250,
+          height: 150,
+          color: "1",
+        },
+        {
+          id: "file-1",
+          type: "file",
+          file: "01-架构设计.md",
+          x: 300,
+          y: 50,
+          width: 320,
+          height: 240,
+          color: "4",
+        },
+        {
+          id: "link-1",
+          type: "link",
+          url: "https://knowspace.dev",
+          x: 700,
+          y: 100,
+          width: 200,
+          height: 100,
+        },
+        {
+          id: "group-1",
+          type: "group",
+          label: "核心系统",
+          x: 0,
+          y: 0,
+          width: 900,
+          height: 500,
+          color: "5",
+        },
       ],
       edges: [
-        { id: "edge-1", fromNode: "text-1", fromSide: "right", toNode: "file-1", toSide: "left", label: "引用" },
+        {
+          id: "edge-1",
+          fromNode: "text-1",
+          fromSide: "right",
+          toNode: "file-1",
+          toSide: "left",
+          label: "引用",
+        },
       ],
     });
 
@@ -76,20 +180,46 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
   });
 
   it("computes anchor points and SVG edge paths", () => {
-    const node: CanvasTextNode = { id: "1", type: "text", text: "A", x: 100, y: 100, width: 200, height: 100 };
+    const node: CanvasTextNode = {
+      id: "1",
+      type: "text",
+      text: "A",
+      x: 100,
+      y: 100,
+      width: 200,
+      height: 100,
+    };
     const rightAnchor = getNodeAnchorPoint(node, "right");
     expect(rightAnchor).toEqual({ x: 300, y: 150 });
 
     const topAnchor = getNodeAnchorPoint(node, "top");
     expect(topAnchor).toEqual({ x: 200, y: 100 });
 
-    const bezierPath = computeEdgePath({ x: 100, y: 100 }, "right", { x: 300, y: 200 }, "left", "bezier");
+    const bezierPath = computeEdgePath(
+      { x: 100, y: 100 },
+      "right",
+      { x: 300, y: 200 },
+      "left",
+      "bezier",
+    );
     expect(bezierPath).toMatch(/^M 100 100 C/);
 
-    const stepPath = computeEdgePath({ x: 100, y: 100 }, "right", { x: 300, y: 200 }, "left", "step");
+    const stepPath = computeEdgePath(
+      { x: 100, y: 100 },
+      "right",
+      { x: 300, y: 200 },
+      "left",
+      "step",
+    );
     expect(stepPath).toMatch(/^M 100 100 L/);
 
-    const straightPath = computeEdgePath({ x: 100, y: 100 }, "right", { x: 300, y: 200 }, "left", "straight");
+    const straightPath = computeEdgePath(
+      { x: 100, y: 100 },
+      "right",
+      { x: 300, y: 200 },
+      "left",
+      "straight",
+    );
     expect(straightPath).toBe("M 100 100 L 300 200");
   });
 
@@ -125,7 +255,14 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
     const data: CanvasData = {
       nodes: [group, t1, f1],
       edges: [
-        { id: "e1", fromNode: "t1", fromSide: "right", toNode: "f1", toSide: "left", label: "转发请求" },
+        {
+          id: "e1",
+          fromNode: "t1",
+          fromSide: "right",
+          toNode: "f1",
+          toSide: "left",
+          label: "转发请求",
+        },
       ],
     };
 
@@ -138,15 +275,47 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
   });
 
   it("calculates optimal anchor sides based on relative position", () => {
-    const nodeA: CanvasTextNode = { id: "a", type: "text", text: "A", x: 0, y: 100, width: 100, height: 100 };
-    const nodeB: CanvasTextNode = { id: "b", type: "text", text: "B", x: 300, y: 100, width: 100, height: 100 };
+    const nodeA: CanvasTextNode = {
+      id: "a",
+      type: "text",
+      text: "A",
+      x: 0,
+      y: 100,
+      width: 100,
+      height: 100,
+    };
+    const nodeB: CanvasTextNode = {
+      id: "b",
+      type: "text",
+      text: "B",
+      x: 300,
+      y: 100,
+      width: 100,
+      height: 100,
+    };
     // Node B is to the right of Node A -> A: right, B: left
     expect(getOptimalAnchorSides(nodeA, nodeB)).toEqual({ fromSide: "right", toSide: "left" });
     // Reverse -> B: left, A: right
     expect(getOptimalAnchorSides(nodeB, nodeA)).toEqual({ fromSide: "left", toSide: "right" });
 
-    const nodeC: CanvasTextNode = { id: "c", type: "text", text: "C", x: 100, y: 0, width: 100, height: 100 };
-    const nodeD: CanvasTextNode = { id: "d", type: "text", text: "D", x: 100, y: 400, width: 100, height: 100 };
+    const nodeC: CanvasTextNode = {
+      id: "c",
+      type: "text",
+      text: "C",
+      x: 100,
+      y: 0,
+      width: 100,
+      height: 100,
+    };
+    const nodeD: CanvasTextNode = {
+      id: "d",
+      type: "text",
+      text: "D",
+      x: 100,
+      y: 400,
+      width: 100,
+      height: 100,
+    };
     // Node D is below Node C -> C: bottom, D: top
     expect(getOptimalAnchorSides(nodeC, nodeD)).toEqual({ fromSide: "bottom", toSide: "top" });
     // Reverse -> D: top, C: bottom
@@ -156,20 +325,68 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
   it("exports canvas to standalone SVG with nodes, edges, and centered labels", () => {
     const data: CanvasData = {
       nodes: [
-        { id: "grp-1", type: "group", label: "核心域", x: 50, y: 50, width: 400, height: 300, color: "5" },
-        { id: "card-1", type: "text", text: "### 系统模型\n- [x] 模块完成\n- [ ] 待定", x: 80, y: 90, width: 200, height: 120, color: "2" },
-        { id: "file-1", type: "file", file: "设计图.md", x: 350, y: 90, width: 180, height: 100, color: "3" },
-        { id: "link-1", type: "link", url: "https://example.com", x: 350, y: 220, width: 180, height: 80 },
+        {
+          id: "grp-1",
+          type: "group",
+          label: "核心域",
+          x: 50,
+          y: 50,
+          width: 400,
+          height: 300,
+          color: "5",
+        },
+        {
+          id: "card-1",
+          type: "text",
+          text: "### 系统模型\n- [x] 模块完成\n- [ ] 待定",
+          x: 80,
+          y: 90,
+          width: 200,
+          height: 120,
+          color: "2",
+        },
+        {
+          id: "file-1",
+          type: "file",
+          file: "设计图.md",
+          x: 350,
+          y: 90,
+          width: 180,
+          height: 100,
+          color: "3",
+        },
+        {
+          id: "link-1",
+          type: "link",
+          url: "https://example.com",
+          x: 350,
+          y: 220,
+          width: 180,
+          height: 80,
+        },
       ],
       edges: [
-        { id: "edge-1", fromNode: "card-1", toNode: "file-1", label: "推导演化", labelShape: "pill", toEnd: "arrow" },
-        { id: "edge-2", fromNode: "card-1", toNode: "link-1", label: "参考链接", labelShape: "diamond" },
+        {
+          id: "edge-1",
+          fromNode: "card-1",
+          toNode: "file-1",
+          label: "推导演化",
+          labelShape: "pill",
+          toEnd: "arrow",
+        },
+        {
+          id: "edge-2",
+          fromNode: "card-1",
+          toNode: "link-1",
+          label: "参考链接",
+          labelShape: "diamond",
+        },
       ],
     };
 
     const svg = exportCanvasToSvg(data, { theme: "light", background: "white" });
     expect(svg).toMatch(/^<\?xml version="1\.0"/);
-    expect(svg).toContain("<svg xmlns=\"http://www.w3.org/2000/svg\"");
+    expect(svg).toContain('<svg xmlns="http://www.w3.org/2000/svg"');
     // Contains group container
     expect(svg).toContain("📁 核心域");
     // Cards are rendered as foreignObject so every on-screen detail survives
@@ -194,7 +411,7 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
     // Contains centered edge labels with transform translate
     expect(svg).toContain("推导演化");
     expect(svg).toContain("参考链接");
-    expect(svg).toContain("class=\"canvas-edge-label\"");
+    expect(svg).toContain('class="canvas-edge-label"');
     // Diamond label shape uses polygon
     expect(svg).toContain("<polygon points=");
 
@@ -205,9 +422,7 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
 
   it("exports canvas to PNG data url or svg fallback safely", async () => {
     const data: CanvasData = {
-      nodes: [
-        { id: "1", type: "text", text: "PNG Test", x: 0, y: 0, width: 200, height: 100 },
-      ],
+      nodes: [{ id: "1", type: "text", text: "PNG Test", x: 0, y: 0, width: 200, height: 100 }],
       edges: [],
     };
 
@@ -491,7 +706,7 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
     for (const n of resized) {
       const r = Math.hypot(
         n.x + n.width / 2 - layout.center.x,
-        n.y + n.height / 2 - layout.center.y
+        n.y + n.height / 2 - layout.center.y,
       );
       expect(r).toBeGreaterThan(layout.radius * 1.2);
     }
@@ -499,10 +714,7 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
     // Seating order is preserved, so cards do not swap places mid-drag
     const angles = layout.orderedIds.map((id) => {
       const n = resized.find((x) => x.id === id)!;
-      return Math.atan2(
-        n.y + n.height / 2 - layout.center.y,
-        n.x + n.width / 2 - layout.center.x
-      );
+      return Math.atan2(n.y + n.height / 2 - layout.center.y, n.x + n.width / 2 - layout.center.x);
     });
     const sorted = [...angles].sort((a, b) => a - b);
     expect(angles).toEqual(sorted);
@@ -531,7 +743,7 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
     for (const n of collapsed) {
       const r = Math.hypot(
         n.x + n.width / 2 - layout.center.x,
-        n.y + n.height / 2 - layout.center.y
+        n.y + n.height / 2 - layout.center.y,
       );
       expect(r).toBeGreaterThanOrEqual(layout.minRadius - 1);
     }
@@ -579,8 +791,8 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
     expect(
       isPointInsideNodeHull(
         { x: layout.center.x, y: layout.center.y - layout.radius * 3 },
-        ringNodes
-      )
+        ringNodes,
+      ),
     ).toBe(false);
 
     // A grid's inner gap counts too
@@ -589,8 +801,8 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
     expect(
       isPointInsideNodeHull(
         { x: gridBox.minX + gridBox.width / 2, y: gridBox.minY + gridBox.height / 2 },
-        gridNodes
-      )
+        gridNodes,
+      ),
     ).toBe(true);
 
     // Fewer than three cards cannot enclose anything
@@ -752,9 +964,33 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
   });
 
   it("connects nodes in a chain with spatial sorting to prevent criss-crossing dead knots", () => {
-    const nodeA: CanvasTextNode = { id: "a", type: "text", text: "A", x: 100, y: 100, width: 100, height: 100 };
-    const nodeB: CanvasTextNode = { id: "b", type: "text", text: "B", x: 300, y: 100, width: 100, height: 100 };
-    const nodeC: CanvasTextNode = { id: "c", type: "text", text: "C", x: 500, y: 100, width: 100, height: 100 };
+    const nodeA: CanvasTextNode = {
+      id: "a",
+      type: "text",
+      text: "A",
+      x: 100,
+      y: 100,
+      width: 100,
+      height: 100,
+    };
+    const nodeB: CanvasTextNode = {
+      id: "b",
+      type: "text",
+      text: "B",
+      x: 300,
+      y: 100,
+      width: 100,
+      height: 100,
+    };
+    const nodeC: CanvasTextNode = {
+      id: "c",
+      type: "text",
+      text: "C",
+      x: 500,
+      y: 100,
+      width: 100,
+      height: 100,
+    };
 
     // Pass in unordered array: [C, A, B]
     const chainEdges = connectChainNodes([nodeC, nodeA, nodeB], [], "bezier", true);
@@ -838,10 +1074,42 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
   });
 
   it("connects nodes in a closed loop (Ring) in centroid angular order without crossing", () => {
-    const node1: CanvasTextNode = { id: "n1", type: "text", text: "1", x: 200, y: 100, width: 100, height: 100 };
-    const node2: CanvasTextNode = { id: "n2", type: "text", text: "2", x: 400, y: 100, width: 100, height: 100 };
-    const node3: CanvasTextNode = { id: "n3", type: "text", text: "3", x: 400, y: 300, width: 100, height: 100 };
-    const node4: CanvasTextNode = { id: "n4", type: "text", text: "4", x: 200, y: 300, width: 100, height: 100 };
+    const node1: CanvasTextNode = {
+      id: "n1",
+      type: "text",
+      text: "1",
+      x: 200,
+      y: 100,
+      width: 100,
+      height: 100,
+    };
+    const node2: CanvasTextNode = {
+      id: "n2",
+      type: "text",
+      text: "2",
+      x: 400,
+      y: 100,
+      width: 100,
+      height: 100,
+    };
+    const node3: CanvasTextNode = {
+      id: "n3",
+      type: "text",
+      text: "3",
+      x: 400,
+      y: 300,
+      width: 100,
+      height: 100,
+    };
+    const node4: CanvasTextNode = {
+      id: "n4",
+      type: "text",
+      text: "4",
+      x: 200,
+      y: 300,
+      width: 100,
+      height: 100,
+    };
 
     // Pass in scrambled order
     const loopEdges = connectLoopNodes([node3, node1, node4, node2], [], "bezier", true);
@@ -941,7 +1209,6 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
     expect(getNodeAnchorPoint(wideContainer, "right")).toEqual({ x: 100 + 600, y: 100 + 200 });
   });
 
-
   it("prioritizes horizontal dominance in left-right structured layouts", () => {
     // Left node and right node with slight vertical offset
     const leftNode: CanvasTextNode = {
@@ -974,13 +1241,58 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
 
   it("assigns smooth tangent-aligned sides in circular loop without overlapping entry/exit", () => {
     // 5 nodes arranged roughly in a circle (12, 2, 5, 7, 10 o'clock)
-    const topNode: CanvasTextNode = { id: "top", type: "text", text: "12", x: 300, y: 50, width: 120, height: 80 };
-    const rightTopNode: CanvasTextNode = { id: "rt", type: "text", text: "2", x: 500, y: 180, width: 120, height: 80 };
-    const rightBotNode: CanvasTextNode = { id: "rb", type: "text", text: "5", x: 450, y: 380, width: 120, height: 80 };
-    const leftBotNode: CanvasTextNode = { id: "lb", type: "text", text: "7", x: 150, y: 380, width: 120, height: 80 };
-    const leftTopNode: CanvasTextNode = { id: "lt", type: "text", text: "10", x: 100, y: 180, width: 120, height: 80 };
+    const topNode: CanvasTextNode = {
+      id: "top",
+      type: "text",
+      text: "12",
+      x: 300,
+      y: 50,
+      width: 120,
+      height: 80,
+    };
+    const rightTopNode: CanvasTextNode = {
+      id: "rt",
+      type: "text",
+      text: "2",
+      x: 500,
+      y: 180,
+      width: 120,
+      height: 80,
+    };
+    const rightBotNode: CanvasTextNode = {
+      id: "rb",
+      type: "text",
+      text: "5",
+      x: 450,
+      y: 380,
+      width: 120,
+      height: 80,
+    };
+    const leftBotNode: CanvasTextNode = {
+      id: "lb",
+      type: "text",
+      text: "7",
+      x: 150,
+      y: 380,
+      width: 120,
+      height: 80,
+    };
+    const leftTopNode: CanvasTextNode = {
+      id: "lt",
+      type: "text",
+      text: "10",
+      x: 100,
+      y: 180,
+      width: 120,
+      height: 80,
+    };
 
-    const ringEdges = connectLoopNodes([topNode, rightTopNode, rightBotNode, leftBotNode, leftTopNode], [], "bezier", true);
+    const ringEdges = connectLoopNodes(
+      [topNode, rightTopNode, rightBotNode, leftBotNode, leftTopNode],
+      [],
+      "bezier",
+      true,
+    );
     expect(ringEdges).toHaveLength(5);
 
     // Check top node's incoming and outgoing edges:
@@ -999,10 +1311,42 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
   });
 
   it("uses one identical color for every edge within the same ring", () => {
-    const n1: CanvasTextNode = { id: "r1", type: "text", text: "1", x: 200, y: 100, width: 100, height: 100 };
-    const n2: CanvasTextNode = { id: "r2", type: "text", text: "2", x: 400, y: 100, width: 100, height: 100 };
-    const n3: CanvasTextNode = { id: "r3", type: "text", text: "3", x: 400, y: 300, width: 100, height: 100 };
-    const n4: CanvasTextNode = { id: "r4", type: "text", text: "4", x: 200, y: 300, width: 100, height: 100 };
+    const n1: CanvasTextNode = {
+      id: "r1",
+      type: "text",
+      text: "1",
+      x: 200,
+      y: 100,
+      width: 100,
+      height: 100,
+    };
+    const n2: CanvasTextNode = {
+      id: "r2",
+      type: "text",
+      text: "2",
+      x: 400,
+      y: 100,
+      width: 100,
+      height: 100,
+    };
+    const n3: CanvasTextNode = {
+      id: "r3",
+      type: "text",
+      text: "3",
+      x: 400,
+      y: 300,
+      width: 100,
+      height: 100,
+    };
+    const n4: CanvasTextNode = {
+      id: "r4",
+      type: "text",
+      text: "4",
+      x: 200,
+      y: 300,
+      width: 100,
+      height: 100,
+    };
 
     const ring = connectLoopNodes([n1, n2, n3, n4], [], "bezier", true);
     expect(ring).toHaveLength(4);
@@ -1013,16 +1357,80 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
 
   it("assigns different colors to different rings on the same canvas", () => {
     // First ring
-    const a1: CanvasTextNode = { id: "a1", type: "text", text: "A1", x: 100, y: 100, width: 80, height: 80 };
-    const a2: CanvasTextNode = { id: "a2", type: "text", text: "A2", x: 260, y: 100, width: 80, height: 80 };
-    const a3: CanvasTextNode = { id: "a3", type: "text", text: "A3", x: 260, y: 260, width: 80, height: 80 };
-    const a4: CanvasTextNode = { id: "a4", type: "text", text: "A4", x: 100, y: 260, width: 80, height: 80 };
+    const a1: CanvasTextNode = {
+      id: "a1",
+      type: "text",
+      text: "A1",
+      x: 100,
+      y: 100,
+      width: 80,
+      height: 80,
+    };
+    const a2: CanvasTextNode = {
+      id: "a2",
+      type: "text",
+      text: "A2",
+      x: 260,
+      y: 100,
+      width: 80,
+      height: 80,
+    };
+    const a3: CanvasTextNode = {
+      id: "a3",
+      type: "text",
+      text: "A3",
+      x: 260,
+      y: 260,
+      width: 80,
+      height: 80,
+    };
+    const a4: CanvasTextNode = {
+      id: "a4",
+      type: "text",
+      text: "A4",
+      x: 100,
+      y: 260,
+      width: 80,
+      height: 80,
+    };
 
     // Second ring (spatially separated so angular ordering is stable)
-    const b1: CanvasTextNode = { id: "b1", type: "text", text: "B1", x: 700, y: 500, width: 80, height: 80 };
-    const b2: CanvasTextNode = { id: "b2", type: "text", text: "B2", x: 860, y: 500, width: 80, height: 80 };
-    const b3: CanvasTextNode = { id: "b3", type: "text", text: "B3", x: 860, y: 660, width: 80, height: 80 };
-    const b4: CanvasTextNode = { id: "b4", type: "text", text: "B4", x: 700, y: 660, width: 80, height: 80 };
+    const b1: CanvasTextNode = {
+      id: "b1",
+      type: "text",
+      text: "B1",
+      x: 700,
+      y: 500,
+      width: 80,
+      height: 80,
+    };
+    const b2: CanvasTextNode = {
+      id: "b2",
+      type: "text",
+      text: "B2",
+      x: 860,
+      y: 500,
+      width: 80,
+      height: 80,
+    };
+    const b3: CanvasTextNode = {
+      id: "b3",
+      type: "text",
+      text: "B3",
+      x: 860,
+      y: 660,
+      width: 80,
+      height: 80,
+    };
+    const b4: CanvasTextNode = {
+      id: "b4",
+      type: "text",
+      text: "B4",
+      x: 700,
+      y: 660,
+      width: 80,
+      height: 80,
+    };
 
     const ringA = connectLoopNodes([a1, a2, a3, a4], [], "bezier", true);
     const allNodes = [a1, a2, a3, a4, b1, b2, b3, b4];
@@ -1071,11 +1479,51 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
   });
 
   it("maps every node of a ring to ONE identical display color (regression)", () => {
-    const n1: CanvasTextNode = { id: "c1", type: "text", text: "1", x: 200, y: 100, width: 100, height: 100 };
-    const n2: CanvasTextNode = { id: "c2", type: "text", text: "2", x: 400, y: 100, width: 100, height: 100 };
-    const n3: CanvasTextNode = { id: "c3", type: "text", text: "3", x: 480, y: 300, width: 100, height: 100 };
-    const n4: CanvasTextNode = { id: "c4", type: "text", text: "4", x: 380, y: 460, width: 100, height: 100 };
-    const n5: CanvasTextNode = { id: "c5", type: "text", text: "5", x: 180, y: 420, width: 100, height: 100 };
+    const n1: CanvasTextNode = {
+      id: "c1",
+      type: "text",
+      text: "1",
+      x: 200,
+      y: 100,
+      width: 100,
+      height: 100,
+    };
+    const n2: CanvasTextNode = {
+      id: "c2",
+      type: "text",
+      text: "2",
+      x: 400,
+      y: 100,
+      width: 100,
+      height: 100,
+    };
+    const n3: CanvasTextNode = {
+      id: "c3",
+      type: "text",
+      text: "3",
+      x: 480,
+      y: 300,
+      width: 100,
+      height: 100,
+    };
+    const n4: CanvasTextNode = {
+      id: "c4",
+      type: "text",
+      text: "4",
+      x: 380,
+      y: 460,
+      width: 100,
+      height: 100,
+    };
+    const n5: CanvasTextNode = {
+      id: "c5",
+      type: "text",
+      text: "5",
+      x: 180,
+      y: 420,
+      width: 100,
+      height: 100,
+    };
 
     const nodes = [n1, n2, n3, n4, n5];
     const ring = connectLoopNodes(nodes, [], "bezier", true);
@@ -1098,14 +1546,78 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
   });
 
   it("keeps two separate rings mapped to two different display colors", () => {
-    const a1: CanvasTextNode = { id: "da1", type: "text", text: "A1", x: 100, y: 100, width: 80, height: 80 };
-    const a2: CanvasTextNode = { id: "da2", type: "text", text: "A2", x: 260, y: 100, width: 80, height: 80 };
-    const a3: CanvasTextNode = { id: "da3", type: "text", text: "A3", x: 260, y: 260, width: 80, height: 80 };
-    const a4: CanvasTextNode = { id: "da4", type: "text", text: "A4", x: 100, y: 260, width: 80, height: 80 };
-    const b1: CanvasTextNode = { id: "db1", type: "text", text: "B1", x: 900, y: 600, width: 80, height: 80 };
-    const b2: CanvasTextNode = { id: "db2", type: "text", text: "B2", x: 1060, y: 600, width: 80, height: 80 };
-    const b3: CanvasTextNode = { id: "db3", type: "text", text: "B3", x: 1060, y: 760, width: 80, height: 80 };
-    const b4: CanvasTextNode = { id: "db4", type: "text", text: "B4", x: 900, y: 760, width: 80, height: 80 };
+    const a1: CanvasTextNode = {
+      id: "da1",
+      type: "text",
+      text: "A1",
+      x: 100,
+      y: 100,
+      width: 80,
+      height: 80,
+    };
+    const a2: CanvasTextNode = {
+      id: "da2",
+      type: "text",
+      text: "A2",
+      x: 260,
+      y: 100,
+      width: 80,
+      height: 80,
+    };
+    const a3: CanvasTextNode = {
+      id: "da3",
+      type: "text",
+      text: "A3",
+      x: 260,
+      y: 260,
+      width: 80,
+      height: 80,
+    };
+    const a4: CanvasTextNode = {
+      id: "da4",
+      type: "text",
+      text: "A4",
+      x: 100,
+      y: 260,
+      width: 80,
+      height: 80,
+    };
+    const b1: CanvasTextNode = {
+      id: "db1",
+      type: "text",
+      text: "B1",
+      x: 900,
+      y: 600,
+      width: 80,
+      height: 80,
+    };
+    const b2: CanvasTextNode = {
+      id: "db2",
+      type: "text",
+      text: "B2",
+      x: 1060,
+      y: 600,
+      width: 80,
+      height: 80,
+    };
+    const b3: CanvasTextNode = {
+      id: "db3",
+      type: "text",
+      text: "B3",
+      x: 1060,
+      y: 760,
+      width: 80,
+      height: 80,
+    };
+    const b4: CanvasTextNode = {
+      id: "db4",
+      type: "text",
+      text: "B4",
+      x: 900,
+      y: 760,
+      width: 80,
+      height: 80,
+    };
 
     const ringA = connectLoopNodes([a1, a2, a3, a4], [], "bezier", true);
     const allNodes = [a1, a2, a3, a4, b1, b2, b3, b4];
@@ -1188,9 +1700,33 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
   });
 
   it("ensures spawnConnectedCard and spawnMultipleBranches on ring card isolate external edge color", () => {
-    const r1: CanvasTextNode = { id: "cr1", type: "text", text: "Ring 1", x: 100, y: 100, width: 80, height: 80 };
-    const r2: CanvasTextNode = { id: "cr2", type: "text", text: "Ring 2", x: 300, y: 100, width: 80, height: 80 };
-    const r3: CanvasTextNode = { id: "cr3", type: "text", text: "Ring 3", x: 200, y: 300, width: 80, height: 80 };
+    const r1: CanvasTextNode = {
+      id: "cr1",
+      type: "text",
+      text: "Ring 1",
+      x: 100,
+      y: 100,
+      width: 80,
+      height: 80,
+    };
+    const r2: CanvasTextNode = {
+      id: "cr2",
+      type: "text",
+      text: "Ring 2",
+      x: 300,
+      y: 100,
+      width: 80,
+      height: 80,
+    };
+    const r3: CanvasTextNode = {
+      id: "cr3",
+      type: "text",
+      text: "Ring 3",
+      x: 200,
+      y: 300,
+      width: 80,
+      height: 80,
+    };
     const ring = connectLoopNodes([r1, r2, r3], [], "bezier", true);
     const ringColor = ring[0].color;
 
@@ -1207,10 +1743,42 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
   });
 
   it("replicates exact user topology and checks edgeColor", () => {
-    const tr: CanvasTextNode = { id: "tr", type: "text", text: "Top Right", x: 600, y: 100, width: 200, height: 150 };
-    const br: CanvasTextNode = { id: "br", type: "text", text: "Bottom Right", x: 600, y: 300, width: 200, height: 150 };
-    const r: CanvasTextNode = { id: "r", type: "text", text: "Right", x: 900, y: 200, width: 200, height: 150 };
-    const l: CanvasTextNode = { id: "l", type: "text", text: "Left", x: 200, y: 200, width: 200, height: 150 };
+    const tr: CanvasTextNode = {
+      id: "tr",
+      type: "text",
+      text: "Top Right",
+      x: 600,
+      y: 100,
+      width: 200,
+      height: 150,
+    };
+    const br: CanvasTextNode = {
+      id: "br",
+      type: "text",
+      text: "Bottom Right",
+      x: 600,
+      y: 300,
+      width: 200,
+      height: 150,
+    };
+    const r: CanvasTextNode = {
+      id: "r",
+      type: "text",
+      text: "Right",
+      x: 900,
+      y: 200,
+      width: 200,
+      height: 150,
+    };
+    const l: CanvasTextNode = {
+      id: "l",
+      type: "text",
+      text: "Left",
+      x: 200,
+      y: 200,
+      width: 200,
+      height: 150,
+    };
 
     // Ring: tr -> r -> br -> tr, all colored "11" (lime green)
     const e1: CanvasEdge = { id: "e1", fromNode: "tr", toNode: "r", color: "11" };
@@ -1238,11 +1806,55 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
   });
 
   it("handles exact user snapshot: ring card colored #98ff1a, ring edges #afff4d, external edge decouples to non-lime color", () => {
-    const ringNode1: CanvasTextNode = { id: "rn1", type: "text", text: "Top-Left", x: 1301, y: 1043, width: 200, height: 100, color: "#98ff1a" };
-    const ringNode2: CanvasTextNode = { id: "rn2", type: "text", text: "Top-Right", x: 1860, y: 1043, width: 200, height: 100, color: "#98ff1a" };
-    const ringNode3: CanvasTextNode = { id: "rn3", type: "text", text: "Bottom-Right", x: 1860, y: 1279, width: 200, height: 100, color: "#9cd1e8" };
-    const ringNode4: CanvasTextNode = { id: "rn4", type: "text", text: "Bottom-Left", x: 1301, y: 1279, width: 200, height: 100, color: "#9cd1e8" };
-    const externalCard: CanvasTextNode = { id: "extCard", type: "text", text: "Outside Left", x: 308, y: 1176, width: 200, height: 100 };
+    const ringNode1: CanvasTextNode = {
+      id: "rn1",
+      type: "text",
+      text: "Top-Left",
+      x: 1301,
+      y: 1043,
+      width: 200,
+      height: 100,
+      color: "#98ff1a",
+    };
+    const ringNode2: CanvasTextNode = {
+      id: "rn2",
+      type: "text",
+      text: "Top-Right",
+      x: 1860,
+      y: 1043,
+      width: 200,
+      height: 100,
+      color: "#98ff1a",
+    };
+    const ringNode3: CanvasTextNode = {
+      id: "rn3",
+      type: "text",
+      text: "Bottom-Right",
+      x: 1860,
+      y: 1279,
+      width: 200,
+      height: 100,
+      color: "#9cd1e8",
+    };
+    const ringNode4: CanvasTextNode = {
+      id: "rn4",
+      type: "text",
+      text: "Bottom-Left",
+      x: 1301,
+      y: 1279,
+      width: 200,
+      height: 100,
+      color: "#9cd1e8",
+    };
+    const externalCard: CanvasTextNode = {
+      id: "extCard",
+      type: "text",
+      text: "Outside Left",
+      x: 308,
+      y: 1176,
+      width: 200,
+      height: 100,
+    };
 
     const ringEdges: CanvasEdge[] = [
       { id: "re1", fromNode: "rn1", toNode: "rn2", color: "#afff4d" },
@@ -1280,7 +1892,11 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
       toNode: "extCard",
       color: "#f97316",
     };
-    const effectiveCustom = getEffectiveEdgeColorKey(customEdge, [...allEdges, customEdge], allNodes);
+    const effectiveCustom = getEffectiveEdgeColorKey(
+      customEdge,
+      [...allEdges, customEdge],
+      allNodes,
+    );
     expect(effectiveCustom).toBe("#f97316");
 
     // 4. Ring edges maintain the ring's color
@@ -1336,8 +1952,24 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
   it("prefers vertical routing for tiered layouts even when connecting to outermost cards across wide horizontal distance", () => {
     // Lower card in bottom tier connecting to outermost card on the far left of upper tier
     // gapX is wide (800 - 360 = 440px), gapY is 360px
-    const bottomCard: CanvasTextNode = { id: "bot-3", type: "text", text: "Bottom Card 3", x: 800, y: 600, width: 260, height: 140 };
-    const topOutermostCard: CanvasTextNode = { id: "top-1", type: "text", text: "Top Card 1", x: 100, y: 100, width: 260, height: 140 };
+    const bottomCard: CanvasTextNode = {
+      id: "bot-3",
+      type: "text",
+      text: "Bottom Card 3",
+      x: 800,
+      y: 600,
+      width: 260,
+      height: 140,
+    };
+    const topOutermostCard: CanvasTextNode = {
+      id: "top-1",
+      type: "text",
+      text: "Top Card 1",
+      x: 100,
+      y: 100,
+      width: 260,
+      height: 140,
+    };
 
     // Lower card must start from its top, and upper card must end at its bottom
     const sides = getOptimalAnchorSides(bottomCard, topOutermostCard);
@@ -1349,11 +1981,51 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
   });
 
   it("ensures all edges from the same card/starting point share identical color, while different cards get distinct colors", () => {
-    const cardA: CanvasTextNode = { id: "card-a", type: "text", text: "Card A", x: 0, y: 0, width: 200, height: 120 };
-    const cardB: CanvasTextNode = { id: "card-b", type: "text", text: "Card B", x: 300, y: 0, width: 200, height: 120 };
-    const target1: CanvasTextNode = { id: "t1", type: "text", text: "T1", x: 0, y: 300, width: 200, height: 120 };
-    const target2: CanvasTextNode = { id: "t2", type: "text", text: "T2", x: 300, y: 300, width: 200, height: 120 };
-    const target3: CanvasTextNode = { id: "t3", type: "text", text: "T3", x: 600, y: 300, width: 200, height: 120 };
+    const cardA: CanvasTextNode = {
+      id: "card-a",
+      type: "text",
+      text: "Card A",
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 120,
+    };
+    const cardB: CanvasTextNode = {
+      id: "card-b",
+      type: "text",
+      text: "Card B",
+      x: 300,
+      y: 0,
+      width: 200,
+      height: 120,
+    };
+    const target1: CanvasTextNode = {
+      id: "t1",
+      type: "text",
+      text: "T1",
+      x: 0,
+      y: 300,
+      width: 200,
+      height: 120,
+    };
+    const target2: CanvasTextNode = {
+      id: "t2",
+      type: "text",
+      text: "T2",
+      x: 300,
+      y: 300,
+      width: 200,
+      height: 120,
+    };
+    const target3: CanvasTextNode = {
+      id: "t3",
+      type: "text",
+      text: "T3",
+      x: 600,
+      y: 300,
+      width: 200,
+      height: 120,
+    };
 
     // Card A connects to multiple targets (1-to-many): all lines from Card A must be IDENTICAL in color
     const edgesFromA = connectOneToMany(cardA, [target1, target2, target3], []);
@@ -1373,7 +2045,16 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
     expect(colorB).not.toBe(colorA);
 
     // If card has an explicit user-assigned color, all lines from it strictly use that color
-    const coloredCard: CanvasTextNode = { id: "c-col", type: "text", text: "Colored", x: 0, y: 0, width: 200, height: 120, color: "2" };
+    const coloredCard: CanvasTextNode = {
+      id: "c-col",
+      type: "text",
+      text: "Colored",
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 120,
+      color: "2",
+    };
     const edgesFromColored = connectOneToMany(coloredCard, [target1, target2], []);
     expect(edgesFromColored.every((e) => e.color === "2")).toBe(true);
   });
@@ -1389,11 +2070,51 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
       label: "服务容器",
     };
 
-    const card1: CanvasTextNode = { id: "c1", type: "text", text: "Card 1", x: 50, y: 50, width: 180, height: 100 };
-    const card2: CanvasTextNode = { id: "c2", type: "text", text: "Card 2", x: 260, y: 50, width: 180, height: 100 };
-    const card3: CanvasTextNode = { id: "c3", type: "text", text: "Card 3", x: 470, y: 50, width: 180, height: 100 };
-    const targetA: CanvasTextNode = { id: "tA", type: "text", text: "Target A", x: 200, y: 800, width: 180, height: 100 };
-    const targetB: CanvasTextNode = { id: "tB", type: "text", text: "Target B", x: 500, y: 800, width: 180, height: 100 };
+    const card1: CanvasTextNode = {
+      id: "c1",
+      type: "text",
+      text: "Card 1",
+      x: 50,
+      y: 50,
+      width: 180,
+      height: 100,
+    };
+    const card2: CanvasTextNode = {
+      id: "c2",
+      type: "text",
+      text: "Card 2",
+      x: 260,
+      y: 50,
+      width: 180,
+      height: 100,
+    };
+    const card3: CanvasTextNode = {
+      id: "c3",
+      type: "text",
+      text: "Card 3",
+      x: 470,
+      y: 50,
+      width: 180,
+      height: 100,
+    };
+    const targetA: CanvasTextNode = {
+      id: "tA",
+      type: "text",
+      text: "Target A",
+      x: 200,
+      y: 800,
+      width: 180,
+      height: 100,
+    };
+    const targetB: CanvasTextNode = {
+      id: "tB",
+      type: "text",
+      text: "Target B",
+      x: 500,
+      y: 800,
+      width: 180,
+      height: 100,
+    };
 
     const allNodes = [group, card1, card2, card3, targetA, targetB];
 
@@ -1424,16 +2145,54 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
     expect(color3).not.toBe(color2);
 
     // connectOneToMany with container nodes
-    const autoEdgesCard2 = connectOneToMany(card2, [targetA, targetB], edgesCard1, "bezier", allNodes);
+    const autoEdgesCard2 = connectOneToMany(
+      card2,
+      [targetA, targetB],
+      edgesCard1,
+      "bezier",
+      allNodes,
+    );
     expect(autoEdgesCard2.every((e) => e.color === color2)).toBe(true);
     expect(autoEdgesCard2[0].color).not.toBe(color1);
   });
 
   it("aligns nodes along horizontal, vertical, and distributed directions accurately", () => {
-    const nodeA: CanvasTextNode = { id: "a", type: "text", text: "A", x: 100, y: 100, width: 100, height: 100 };
-    const nodeB: CanvasTextNode = { id: "b", type: "text", text: "B", x: 300, y: 200, width: 100, height: 200 };
-    const nodeC: CanvasTextNode = { id: "c", type: "text", text: "C", x: 500, y: 300, width: 100, height: 100 };
-    const untouched: CanvasTextNode = { id: "u", type: "text", text: "U", x: 999, y: 999, width: 50, height: 50 };
+    const nodeA: CanvasTextNode = {
+      id: "a",
+      type: "text",
+      text: "A",
+      x: 100,
+      y: 100,
+      width: 100,
+      height: 100,
+    };
+    const nodeB: CanvasTextNode = {
+      id: "b",
+      type: "text",
+      text: "B",
+      x: 300,
+      y: 200,
+      width: 100,
+      height: 200,
+    };
+    const nodeC: CanvasTextNode = {
+      id: "c",
+      type: "text",
+      text: "C",
+      x: 500,
+      y: 300,
+      width: 100,
+      height: 100,
+    };
+    const untouched: CanvasTextNode = {
+      id: "u",
+      type: "text",
+      text: "U",
+      x: 999,
+      y: 999,
+      width: 50,
+      height: 50,
+    };
 
     const nodes = [nodeA, nodeB, nodeC, untouched];
     const selIds = new Set(["a", "b", "c"]);
@@ -1487,18 +2246,48 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
   });
 
   it("assigns distinct colors when source cards in different containers initiate connections", () => {
-    const containerA: CanvasGroupNode = { id: "contA", type: "group", label: "Group A", x: 0, y: 0, width: 300, height: 400 };
-    const containerB: CanvasGroupNode = { id: "contB", type: "group", label: "Group B", x: 400, y: 0, width: 300, height: 400 };
-    const cardA1: CanvasTextNode = { id: "ca1", type: "text", text: "A1", x: 20, y: 50, width: 200, height: 80 };
-    const cardB1: CanvasTextNode = { id: "cb1", type: "text", text: "B1", x: 420, y: 50, width: 200, height: 80 };
+    const containerA: CanvasGroupNode = {
+      id: "contA",
+      type: "group",
+      label: "Group A",
+      x: 0,
+      y: 0,
+      width: 300,
+      height: 400,
+    };
+    const containerB: CanvasGroupNode = {
+      id: "contB",
+      type: "group",
+      label: "Group B",
+      x: 400,
+      y: 0,
+      width: 300,
+      height: 400,
+    };
+    const cardA1: CanvasTextNode = {
+      id: "ca1",
+      type: "text",
+      text: "A1",
+      x: 20,
+      y: 50,
+      width: 200,
+      height: 80,
+    };
+    const cardB1: CanvasTextNode = {
+      id: "cb1",
+      type: "text",
+      text: "B1",
+      x: 420,
+      y: 50,
+      width: 200,
+      height: 80,
+    };
     const allNodes = [containerA, containerB, cardA1, cardB1];
 
     const colorA = getSourceNodeEdgeColor(cardA1, [], allNodes);
     expect(colorA).toBeDefined();
 
-    const edgesA = [
-      { id: "ea1", fromNode: cardA1.id, toNode: cardB1.id, color: colorA },
-    ];
+    const edgesA = [{ id: "ea1", fromNode: cardA1.id, toNode: cardB1.id, color: colorA }];
 
     // Card B in container B initiates connections -> must pick a color unused by Card A on canvas!
     const colorB = getSourceNodeEdgeColor(cardB1, edgesA, allNodes);
@@ -1507,8 +2296,24 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
   });
 
   it("renders origin dot circles for directed lines in exportCanvasToSvg", () => {
-    const nodeA: CanvasTextNode = { id: "na", type: "text", text: "Node A", x: 0, y: 0, width: 200, height: 100 };
-    const nodeB: CanvasTextNode = { id: "nb", type: "text", text: "Node B", x: 300, y: 0, width: 200, height: 100 };
+    const nodeA: CanvasTextNode = {
+      id: "na",
+      type: "text",
+      text: "Node A",
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+    };
+    const nodeB: CanvasTextNode = {
+      id: "nb",
+      type: "text",
+      text: "Node B",
+      x: 300,
+      y: 0,
+      width: 200,
+      height: 100,
+    };
     const directedEdge: CanvasEdge = {
       id: "e1",
       fromNode: "na",
@@ -1525,9 +2330,33 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
   });
 
   it("keeps aligned geometry identical between state and the exported SVG (preview == export)", () => {
-    const a: CanvasTextNode = { id: "a", type: "text", text: "A", x: 0, y: 0, width: 200, height: 100 };
-    const b: CanvasTextNode = { id: "b", type: "text", text: "B", x: 300, y: 260, width: 200, height: 100 };
-    const c: CanvasTextNode = { id: "c", type: "text", text: "C", x: 600, y: 90, width: 200, height: 100 };
+    const a: CanvasTextNode = {
+      id: "a",
+      type: "text",
+      text: "A",
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+    };
+    const b: CanvasTextNode = {
+      id: "b",
+      type: "text",
+      text: "B",
+      x: 300,
+      y: 260,
+      width: 200,
+      height: 100,
+    };
+    const c: CanvasTextNode = {
+      id: "c",
+      type: "text",
+      text: "C",
+      x: 600,
+      y: 90,
+      width: 200,
+      height: 100,
+    };
 
     // Center-align the three cards on the horizontal midline
     const aligned = alignNodes([a, b, c], ["a", "b", "c"], "horizontal");
@@ -1542,7 +2371,7 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
     const svg = exportCanvasToSvg({ nodes: aligned, edges: [] }, { theme: "light" });
     for (const n of picked) {
       expect(svg).toContain(
-        `<foreignObject x="${n.x}" y="${n.y}" width="${n.width}" height="${n.height}">`
+        `<foreignObject x="${n.x}" y="${n.y}" width="${n.width}" height="${n.height}">`,
       );
     }
   });
@@ -1586,7 +2415,7 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
 
     // 3. The ring must not collapse inward
     const originalMaxRadius = Math.max(
-      ...nodes.map((n) => Math.hypot(n.x + n.width / 2 - cx, n.y + n.height / 2 - cy))
+      ...nodes.map((n) => Math.hypot(n.x + n.width / 2 - cx, n.y + n.height / 2 - cy)),
     );
     expect(radii[0]).toBeGreaterThanOrEqual(originalMaxRadius - 1);
   });
@@ -1616,8 +2445,24 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
   });
 
   it("leaves selections smaller than 3 cards untouched for ring alignment", () => {
-    const a: CanvasTextNode = { id: "a", type: "text", text: "A", x: 0, y: 0, width: 100, height: 80 };
-    const b: CanvasTextNode = { id: "b", type: "text", text: "B", x: 400, y: 260, width: 100, height: 80 };
+    const a: CanvasTextNode = {
+      id: "a",
+      type: "text",
+      text: "A",
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 80,
+    };
+    const b: CanvasTextNode = {
+      id: "b",
+      type: "text",
+      text: "B",
+      x: 400,
+      y: 260,
+      width: 100,
+      height: 80,
+    };
     const result = alignNodes([a, b], ["a", "b"], "circle");
     expect(result.find((n) => n.id === "a")).toMatchObject({ x: 0, y: 0 });
     expect(result.find((n) => n.id === "b")).toMatchObject({ x: 400, y: 260 });
@@ -1690,7 +2535,10 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
       width: 160,
       height: 100,
     }));
-    const gridNodes = alignNodesInGrid(cards, cards.map((n) => n.id));
+    const gridNodes = alignNodesInGrid(
+      cards,
+      cards.map((n) => n.id),
+    );
     const layout = computeGridLayout(gridNodes);
 
     expect(layout).not.toBeNull();
@@ -1787,11 +2635,13 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
 
     // Drag the top-right card 80px to the right
     const draggedId = layout.orderedIds[1];
-    const startById = new Map(layout.orderedIds.map((id) => [id, laidOut.find((n) => n.id === id)!]));
+    const startById = new Map(
+      layout.orderedIds.map((id) => [id, laidOut.find((n) => n.id === id)!]),
+    );
     const startPos = startById.get(draggedId)!;
 
     const moved = laidOut.map((n) =>
-      n.id === draggedId ? { ...n, x: startPos.x + 80, y: startPos.y } : n
+      n.id === draggedId ? { ...n, x: startPos.x + 80, y: startPos.y } : n,
     );
     const result = resizeGridSpacing(moved, layout, draggedId, 80, 0, layout.gapX, layout.gapY);
 
@@ -2005,7 +2855,15 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
   });
 
   it("exports the hub badge for one-to-many sources with the exact edge count", () => {
-    const hub: CanvasTextNode = { id: "hub", type: "text", text: "Hub", x: 0, y: 0, width: 200, height: 100 };
+    const hub: CanvasTextNode = {
+      id: "hub",
+      type: "text",
+      text: "Hub",
+      x: 0,
+      y: 0,
+      width: 200,
+      height: 100,
+    };
     const targets: CanvasTextNode[] = [1, 2, 3].map((i) => ({
       id: `t${i}`,
       type: "text" as const,
@@ -2057,16 +2915,14 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
       // This is the fix for media cards rendering a broken-image placeholder:
       // the relative path used to be resolved against the HTML page URL.
       expect(resolveMediaSrc("assets/pic.png", canvasFile)).toBe(
-        "file:///C:/vault/boards/assets/pic.png"
+        "file:///C:/vault/boards/assets/pic.png",
       );
 
       // Absolute filesystem paths convert to file URLs too
       expect(resolveMediaSrc("C:\\vault\\assets\\a.png", canvasFile)).toBe(
-        "file:///C:/vault/assets/a.png"
+        "file:///C:/vault/assets/a.png",
       );
-      expect(resolveMediaSrc("/vault/assets/a.png", canvasFile)).toBe(
-        "file:///vault/assets/a.png"
-      );
+      expect(resolveMediaSrc("/vault/assets/a.png", canvasFile)).toBe("file:///vault/assets/a.png");
 
       // Self-contained URLs pass through untouched
       expect(resolveMediaSrc("data:image/png;base64,AAA")).toBe("data:image/png;base64,AAA");
@@ -2091,8 +2947,8 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
             { x: 50, y: 150 },
             { x: 250, y: 150 },
           ],
-          box
-        )
+          box,
+        ),
       ).toBe(true);
 
       // Horizontal segment passing clearly above the box
@@ -2102,8 +2958,8 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
             { x: 50, y: 50 },
             { x: 250, y: 50 },
           ],
-          box
-        )
+          box,
+        ),
       ).toBe(false);
 
       // Vertical segment piercing through the box
@@ -2113,8 +2969,8 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
             { x: 150, y: 50 },
             { x: 150, y: 250 },
           ],
-          box
-        )
+          box,
+        ),
       ).toBe(true);
 
       // Vertical segment passing clearly to the right of the box
@@ -2124,8 +2980,8 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
             { x: 250, y: 50 },
             { x: 250, y: 250 },
           ],
-          box
-        )
+          box,
+        ),
       ).toBe(false);
     });
 
@@ -2138,7 +2994,9 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
 
       // Place an obstacle card directly in the middle (x: 200, y: 100, width: 100, height: 100)
       const obstacle = { id: "obs-1", x: 200, y: 100, width: 100, height: 100 };
-      const bypassedPath = computeEdgePath(p1, "right", p2, "left", "step", 0, undefined, [obstacle]);
+      const bypassedPath = computeEdgePath(p1, "right", p2, "left", "step", 0, undefined, [
+        obstacle,
+      ]);
 
       // The line must detour around the obstacle: it generates 5 orthogonal L segments (6 parts when split)
       expect(bypassedPath).not.toEqual(directPath);
@@ -2146,7 +3004,9 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
 
       // computeEdgeMidpoint also avoids the obstacle and returns midpoint along detour
       const directMid = computeEdgeMidpoint(p1, "right", p2, "left", "step");
-      const bypassedMid = computeEdgeMidpoint(p1, "right", p2, "left", "step", 0, undefined, [obstacle]);
+      const bypassedMid = computeEdgeMidpoint(p1, "right", p2, "left", "step", 0, undefined, [
+        obstacle,
+      ]);
       expect(bypassedMid.y).not.toEqual(directMid.y);
     });
 
@@ -2200,19 +3060,48 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
       // The midpoint must not sit inside either obstacle
       for (const obs of obstacles) {
         const inside =
-          mid.x > obs.x &&
-          mid.x < obs.x + obs.width &&
-          mid.y > obs.y &&
-          mid.y < obs.y + obs.height;
+          mid.x > obs.x && mid.x < obs.x + obs.width && mid.y > obs.y && mid.y < obs.y + obs.height;
         expect(inside).toBe(false);
       }
     });
 
     it("builds a presentation sequence ordered by topological links and spatial coordinates", () => {
-      const nodeA: CanvasTextNode = { id: "node-a", type: "text", text: "Introduction", x: 100, y: 100, width: 200, height: 100 };
-      const nodeB: CanvasTextNode = { id: "node-b", type: "text", text: "Deep Dive", x: 400, y: 100, width: 200, height: 100 };
-      const nodeC: CanvasTextNode = { id: "node-c", type: "text", text: "Conclusion", x: 700, y: 100, width: 200, height: 100 };
-      const group: CanvasGroupNode = { id: "grp-1", type: "group", label: "Overview Container", x: 50, y: 50, width: 900, height: 300 };
+      const nodeA: CanvasTextNode = {
+        id: "node-a",
+        type: "text",
+        text: "Introduction",
+        x: 100,
+        y: 100,
+        width: 200,
+        height: 100,
+      };
+      const nodeB: CanvasTextNode = {
+        id: "node-b",
+        type: "text",
+        text: "Deep Dive",
+        x: 400,
+        y: 100,
+        width: 200,
+        height: 100,
+      };
+      const nodeC: CanvasTextNode = {
+        id: "node-c",
+        type: "text",
+        text: "Conclusion",
+        x: 700,
+        y: 100,
+        width: 200,
+        height: 100,
+      };
+      const group: CanvasGroupNode = {
+        id: "grp-1",
+        type: "group",
+        label: "Overview Container",
+        x: 50,
+        y: 50,
+        width: 900,
+        height: 300,
+      };
 
       // Directed edges: A -> B -> C
       const edge1: CanvasEdge = { id: "e1", fromNode: "node-a", toNode: "node-b" };
@@ -2232,14 +3121,62 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
 
     it("clusters presentation sequence by groups and propagates group-level connections", () => {
       // Group 1 on the left with two cards
-      const grp1: CanvasGroupNode = { id: "grp-1", type: "group", label: "Phase 1", x: 0, y: 0, width: 300, height: 400 };
-      const cardA1: CanvasTextNode = { id: "card-a1", type: "text", text: "Step 1.1", x: 20, y: 20, width: 100, height: 50 };
-      const cardA2: CanvasTextNode = { id: "card-a2", type: "text", text: "Step 1.2", x: 20, y: 150, width: 100, height: 50 };
+      const grp1: CanvasGroupNode = {
+        id: "grp-1",
+        type: "group",
+        label: "Phase 1",
+        x: 0,
+        y: 0,
+        width: 300,
+        height: 400,
+      };
+      const cardA1: CanvasTextNode = {
+        id: "card-a1",
+        type: "text",
+        text: "Step 1.1",
+        x: 20,
+        y: 20,
+        width: 100,
+        height: 50,
+      };
+      const cardA2: CanvasTextNode = {
+        id: "card-a2",
+        type: "text",
+        text: "Step 1.2",
+        x: 20,
+        y: 150,
+        width: 100,
+        height: 50,
+      };
 
       // Group 2 on the right with two cards
-      const grp2: CanvasGroupNode = { id: "grp-2", type: "group", label: "Phase 2", x: 500, y: 0, width: 300, height: 400 };
-      const cardB1: CanvasTextNode = { id: "card-b1", type: "text", text: "Step 2.1", x: 520, y: 20, width: 100, height: 50 };
-      const cardB2: CanvasTextNode = { id: "card-b2", type: "text", text: "Step 2.2", x: 520, y: 150, width: 100, height: 50 };
+      const grp2: CanvasGroupNode = {
+        id: "grp-2",
+        type: "group",
+        label: "Phase 2",
+        x: 500,
+        y: 0,
+        width: 300,
+        height: 400,
+      };
+      const cardB1: CanvasTextNode = {
+        id: "card-b1",
+        type: "text",
+        text: "Step 2.1",
+        x: 520,
+        y: 20,
+        width: 100,
+        height: 50,
+      };
+      const cardB2: CanvasTextNode = {
+        id: "card-b2",
+        type: "text",
+        text: "Step 2.2",
+        x: 520,
+        y: 150,
+        width: 100,
+        height: 50,
+      };
 
       // Edge from Group 1 container to Group 2 container
       const groupEdge: CanvasEdge = { id: "e-grp", fromNode: "grp-1", toNode: "grp-2" };
@@ -2258,8 +3195,24 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
     });
 
     it("includes empty group containers as independent framing slides", () => {
-      const emptyGrp: CanvasGroupNode = { id: "empty-slide", type: "group", label: "Chapter Intro Frame", x: 100, y: 100, width: 600, height: 400 };
-      const standaloneCard: CanvasTextNode = { id: "card-1", type: "text", text: "Detail Card", x: 800, y: 100, width: 200, height: 100 };
+      const emptyGrp: CanvasGroupNode = {
+        id: "empty-slide",
+        type: "group",
+        label: "Chapter Intro Frame",
+        x: 100,
+        y: 100,
+        width: 600,
+        height: 400,
+      };
+      const standaloneCard: CanvasTextNode = {
+        id: "card-1",
+        type: "text",
+        text: "Detail Card",
+        x: 800,
+        y: 100,
+        width: 200,
+        height: 100,
+      };
 
       const canvasData: CanvasData = {
         nodes: [emptyGrp, standaloneCard],
@@ -2273,10 +3226,42 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
     it("plays circular ring cycles in clockwise order starting from the entry node", () => {
       // 4 cards in a diamond / ring:
       // Top (100, 0), Right (200, 100), Bottom (100, 200), Left (0, 100)
-      const topNode: CanvasTextNode = { id: "node-top", type: "text", text: "Top", x: 100, y: 0, width: 60, height: 40 };
-      const rightNode: CanvasTextNode = { id: "node-right", type: "text", text: "Right", x: 200, y: 100, width: 60, height: 40 };
-      const bottomNode: CanvasTextNode = { id: "node-bottom", type: "text", text: "Bottom", x: 100, y: 200, width: 60, height: 40 };
-      const leftNode: CanvasTextNode = { id: "node-left", type: "text", text: "Left", x: 0, y: 100, width: 60, height: 40 };
+      const topNode: CanvasTextNode = {
+        id: "node-top",
+        type: "text",
+        text: "Top",
+        x: 100,
+        y: 0,
+        width: 60,
+        height: 40,
+      };
+      const rightNode: CanvasTextNode = {
+        id: "node-right",
+        type: "text",
+        text: "Right",
+        x: 200,
+        y: 100,
+        width: 60,
+        height: 40,
+      };
+      const bottomNode: CanvasTextNode = {
+        id: "node-bottom",
+        type: "text",
+        text: "Bottom",
+        x: 100,
+        y: 200,
+        width: 60,
+        height: 40,
+      };
+      const leftNode: CanvasTextNode = {
+        id: "node-left",
+        type: "text",
+        text: "Left",
+        x: 0,
+        y: 100,
+        width: 60,
+        height: 40,
+      };
 
       // Loop edges connecting in a cycle
       const edges: CanvasEdge[] = [
@@ -2299,9 +3284,33 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
     it("ensures cycle is traversed clockwise even if edges are drawn counter-clockwise", () => {
       // 3 nodes forming a triangle:
       // Top (100, 0), Bottom-Right (180, 150), Bottom-Left (20, 150)
-      const topNode: CanvasTextNode = { id: "tri-top", type: "text", text: "Top", x: 100, y: 0, width: 60, height: 40 };
-      const brNode: CanvasTextNode = { id: "tri-br", type: "text", text: "BR", x: 180, y: 150, width: 60, height: 40 };
-      const blNode: CanvasTextNode = { id: "tri-bl", type: "text", text: "BL", x: 20, y: 150, width: 60, height: 40 };
+      const topNode: CanvasTextNode = {
+        id: "tri-top",
+        type: "text",
+        text: "Top",
+        x: 100,
+        y: 0,
+        width: 60,
+        height: 40,
+      };
+      const brNode: CanvasTextNode = {
+        id: "tri-br",
+        type: "text",
+        text: "BR",
+        x: 180,
+        y: 150,
+        width: 60,
+        height: 40,
+      };
+      const blNode: CanvasTextNode = {
+        id: "tri-bl",
+        type: "text",
+        text: "BL",
+        x: 20,
+        y: 150,
+        width: 60,
+        height: 40,
+      };
 
       // Counter-clockwise edges: Top -> Bottom-Left -> Bottom-Right -> Top
       const edges: CanvasEdge[] = [
@@ -2322,10 +3331,42 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
 
     it("plays grid perimeter loop in clockwise order", () => {
       // 2x2 grid loop: Top-Left (0,0), Top-Right (200,0), Bottom-Right (200,200), Bottom-Left (0,200)
-      const tl: CanvasTextNode = { id: "tl", type: "text", text: "Top-Left", x: 0, y: 0, width: 80, height: 50 };
-      const tr: CanvasTextNode = { id: "tr", type: "text", text: "Top-Right", x: 200, y: 0, width: 80, height: 50 };
-      const br: CanvasTextNode = { id: "br", type: "text", text: "Bottom-Right", x: 200, y: 200, width: 80, height: 50 };
-      const bl: CanvasTextNode = { id: "bl", type: "text", text: "Bottom-Left", x: 0, y: 200, width: 80, height: 50 };
+      const tl: CanvasTextNode = {
+        id: "tl",
+        type: "text",
+        text: "Top-Left",
+        x: 0,
+        y: 0,
+        width: 80,
+        height: 50,
+      };
+      const tr: CanvasTextNode = {
+        id: "tr",
+        type: "text",
+        text: "Top-Right",
+        x: 200,
+        y: 0,
+        width: 80,
+        height: 50,
+      };
+      const br: CanvasTextNode = {
+        id: "br",
+        type: "text",
+        text: "Bottom-Right",
+        x: 200,
+        y: 200,
+        width: 80,
+        height: 50,
+      };
+      const bl: CanvasTextNode = {
+        id: "bl",
+        type: "text",
+        text: "Bottom-Left",
+        x: 0,
+        y: 200,
+        width: 80,
+        height: 50,
+      };
 
       const edges: CanvasEdge[] = [
         { id: "e1", fromNode: "tl", toNode: "tr", gridPath: true },
@@ -2345,20 +3386,84 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
 
     it("enters cycle from an upstream initiator and delays external connections until the entire cycle finishes", () => {
       // Initiator (root) outside cycle
-      const rootNode: CanvasTextNode = { id: "root", type: "text", text: "Root Initiator", x: 100, y: -100, width: 60, height: 40 };
+      const rootNode: CanvasTextNode = {
+        id: "root",
+        type: "text",
+        text: "Root Initiator",
+        x: 100,
+        y: -100,
+        width: 60,
+        height: 40,
+      };
 
       // Cycle: Top -> Right -> Bottom -> Left -> Top
-      const topNode: CanvasTextNode = { id: "c-top", type: "text", text: "Cycle Top", x: 100, y: 0, width: 60, height: 40 };
-      const rightNode: CanvasTextNode = { id: "c-right", type: "text", text: "Cycle Right", x: 200, y: 100, width: 60, height: 40 };
-      const bottomNode: CanvasTextNode = { id: "c-bottom", type: "text", text: "Cycle Bottom", x: 100, y: 200, width: 60, height: 40 };
-      const leftNode: CanvasTextNode = { id: "c-left", type: "text", text: "Cycle Left", x: 0, y: 100, width: 60, height: 40 };
+      const topNode: CanvasTextNode = {
+        id: "c-top",
+        type: "text",
+        text: "Cycle Top",
+        x: 100,
+        y: 0,
+        width: 60,
+        height: 40,
+      };
+      const rightNode: CanvasTextNode = {
+        id: "c-right",
+        type: "text",
+        text: "Cycle Right",
+        x: 200,
+        y: 100,
+        width: 60,
+        height: 40,
+      };
+      const bottomNode: CanvasTextNode = {
+        id: "c-bottom",
+        type: "text",
+        text: "Cycle Bottom",
+        x: 100,
+        y: 200,
+        width: 60,
+        height: 40,
+      };
+      const leftNode: CanvasTextNode = {
+        id: "c-left",
+        type: "text",
+        text: "Cycle Left",
+        x: 0,
+        y: 100,
+        width: 60,
+        height: 40,
+      };
 
       // External exit branch from c-right
-      const out1: CanvasTextNode = { id: "out-1", type: "text", text: "Branch 1", x: 350, y: 100, width: 60, height: 40 };
-      const out2: CanvasTextNode = { id: "out-2", type: "text", text: "Branch 1 Sub", x: 450, y: 100, width: 60, height: 40 };
+      const out1: CanvasTextNode = {
+        id: "out-1",
+        type: "text",
+        text: "Branch 1",
+        x: 350,
+        y: 100,
+        width: 60,
+        height: 40,
+      };
+      const out2: CanvasTextNode = {
+        id: "out-2",
+        type: "text",
+        text: "Branch 1 Sub",
+        x: 450,
+        y: 100,
+        width: 60,
+        height: 40,
+      };
 
       // External exit branch from c-bottom
-      const out3: CanvasTextNode = { id: "out-3", type: "text", text: "Branch 2", x: 100, y: 350, width: 60, height: 40 };
+      const out3: CanvasTextNode = {
+        id: "out-3",
+        type: "text",
+        text: "Branch 2",
+        x: 100,
+        y: 350,
+        width: 60,
+        height: 40,
+      };
 
       const edges: CanvasEdge[] = [
         // root connects to c-top
@@ -2397,13 +3502,61 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
     });
 
     it("prioritizes same container and plays entire container to completion before transitioning", () => {
-      const grpA: CanvasGroupNode = { id: "grp-a", type: "group", label: "Container A", x: 0, y: 0, width: 400, height: 300 };
-      const cardA1: CanvasTextNode = { id: "card-a1", type: "text", text: "A1", x: 20, y: 20, width: 80, height: 50 };
-      const cardA2: CanvasTextNode = { id: "card-a2", type: "text", text: "A2", x: 20, y: 150, width: 80, height: 50 };
+      const grpA: CanvasGroupNode = {
+        id: "grp-a",
+        type: "group",
+        label: "Container A",
+        x: 0,
+        y: 0,
+        width: 400,
+        height: 300,
+      };
+      const cardA1: CanvasTextNode = {
+        id: "card-a1",
+        type: "text",
+        text: "A1",
+        x: 20,
+        y: 20,
+        width: 80,
+        height: 50,
+      };
+      const cardA2: CanvasTextNode = {
+        id: "card-a2",
+        type: "text",
+        text: "A2",
+        x: 20,
+        y: 150,
+        width: 80,
+        height: 50,
+      };
 
-      const grpB: CanvasGroupNode = { id: "grp-b", type: "group", label: "Container B", x: 500, y: 0, width: 400, height: 300 };
-      const cardB1: CanvasTextNode = { id: "card-b1", type: "text", text: "B1", x: 520, y: 20, width: 80, height: 50 };
-      const cardB2: CanvasTextNode = { id: "card-b2", type: "text", text: "B2", x: 520, y: 150, width: 80, height: 50 };
+      const grpB: CanvasGroupNode = {
+        id: "grp-b",
+        type: "group",
+        label: "Container B",
+        x: 500,
+        y: 0,
+        width: 400,
+        height: 300,
+      };
+      const cardB1: CanvasTextNode = {
+        id: "card-b1",
+        type: "text",
+        text: "B1",
+        x: 520,
+        y: 20,
+        width: 80,
+        height: 50,
+      };
+      const cardB2: CanvasTextNode = {
+        id: "card-b2",
+        type: "text",
+        text: "B2",
+        x: 520,
+        y: 150,
+        width: 80,
+        height: 50,
+      };
 
       // Card inside Group A points to Card inside Group B
       const crossEdge: CanvasEdge = { id: "e-cross", fromNode: "card-a1", toNode: "card-b1" };
@@ -2423,20 +3576,92 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
 
     it("plays container cards in order, drills into initiator targets (single cards first then cycles), and returns to container next card", () => {
       // Container 1 with cards A1, A2, A3
-      const grp1: CanvasGroupNode = { id: "grp-1", type: "group", label: "Main Flow", x: 0, y: 0, width: 400, height: 600 };
-      const cardA1: CanvasTextNode = { id: "card-a1", type: "text", text: "A1 Intro", x: 20, y: 20, width: 80, height: 50 };
-      const cardA2: CanvasTextNode = { id: "card-a2", type: "text", text: "A2 Initiator", x: 20, y: 150, width: 80, height: 50 };
-      const cardA3: CanvasTextNode = { id: "card-a3", type: "text", text: "A3 Next in Container", x: 20, y: 400, width: 80, height: 50 };
+      const grp1: CanvasGroupNode = {
+        id: "grp-1",
+        type: "group",
+        label: "Main Flow",
+        x: 0,
+        y: 0,
+        width: 400,
+        height: 600,
+      };
+      const cardA1: CanvasTextNode = {
+        id: "card-a1",
+        type: "text",
+        text: "A1 Intro",
+        x: 20,
+        y: 20,
+        width: 80,
+        height: 50,
+      };
+      const cardA2: CanvasTextNode = {
+        id: "card-a2",
+        type: "text",
+        text: "A2 Initiator",
+        x: 20,
+        y: 150,
+        width: 80,
+        height: 50,
+      };
+      const cardA3: CanvasTextNode = {
+        id: "card-a3",
+        type: "text",
+        text: "A3 Next in Container",
+        x: 20,
+        y: 400,
+        width: 80,
+        height: 50,
+      };
 
       // Single cards S1 -> S2
-      const cardS1: CanvasTextNode = { id: "card-s1", type: "text", text: "S1 Single Detail", x: 500, y: 50, width: 80, height: 50 };
-      const cardS2: CanvasTextNode = { id: "card-s2", type: "text", text: "S2 Single Sub", x: 650, y: 50, width: 80, height: 50 };
+      const cardS1: CanvasTextNode = {
+        id: "card-s1",
+        type: "text",
+        text: "S1 Single Detail",
+        x: 500,
+        y: 50,
+        width: 80,
+        height: 50,
+      };
+      const cardS2: CanvasTextNode = {
+        id: "card-s2",
+        type: "text",
+        text: "S2 Single Sub",
+        x: 650,
+        y: 50,
+        width: 80,
+        height: 50,
+      };
 
       // Cycle group R1 -> R2 -> R3 -> R1
       // Top (600, 200), Right (700, 300), Left (500, 300)
-      const cardR1: CanvasTextNode = { id: "card-r1", type: "text", text: "R1 Ring Top", x: 600, y: 200, width: 80, height: 50 };
-      const cardR2: CanvasTextNode = { id: "card-r2", type: "text", text: "R2 Ring Right", x: 700, y: 300, width: 80, height: 50 };
-      const cardR3: CanvasTextNode = { id: "card-r3", type: "text", text: "R3 Ring Left", x: 500, y: 300, width: 80, height: 50 };
+      const cardR1: CanvasTextNode = {
+        id: "card-r1",
+        type: "text",
+        text: "R1 Ring Top",
+        x: 600,
+        y: 200,
+        width: 80,
+        height: 50,
+      };
+      const cardR2: CanvasTextNode = {
+        id: "card-r2",
+        type: "text",
+        text: "R2 Ring Right",
+        x: 700,
+        y: 300,
+        width: 80,
+        height: 50,
+      };
+      const cardR3: CanvasTextNode = {
+        id: "card-r3",
+        type: "text",
+        text: "R3 Ring Left",
+        x: 500,
+        y: 300,
+        width: 80,
+        height: 50,
+      };
 
       const edges: CanvasEdge[] = [
         // A2 points to single card S1
@@ -2477,14 +3702,62 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
     });
 
     it("plays single cards first and complete clockwise cycle when an initiator points to both, even if single card connects to cycle", () => {
-      const initiator: CanvasTextNode = { id: "init", type: "text", text: "Initiator", x: 100, y: 100, width: 80, height: 50 };
-      const singleCard: CanvasTextNode = { id: "single", type: "text", text: "Single Card", x: 300, y: 50, width: 80, height: 50 };
+      const initiator: CanvasTextNode = {
+        id: "init",
+        type: "text",
+        text: "Initiator",
+        x: 100,
+        y: 100,
+        width: 80,
+        height: 50,
+      };
+      const singleCard: CanvasTextNode = {
+        id: "single",
+        type: "text",
+        text: "Single Card",
+        x: 300,
+        y: 50,
+        width: 80,
+        height: 50,
+      };
 
       // Cycle nodes in diamond: Top, Right, Bottom, Left
-      const rTop: CanvasTextNode = { id: "r-top", type: "text", text: "Ring Top", x: 400, y: 150, width: 80, height: 50 };
-      const rRight: CanvasTextNode = { id: "r-right", type: "text", text: "Ring Right", x: 550, y: 250, width: 80, height: 50 };
-      const rBottom: CanvasTextNode = { id: "r-bottom", type: "text", text: "Ring Bottom", x: 400, y: 350, width: 80, height: 50 };
-      const rLeft: CanvasTextNode = { id: "r-left", type: "text", text: "Ring Left", x: 250, y: 250, width: 80, height: 50 };
+      const rTop: CanvasTextNode = {
+        id: "r-top",
+        type: "text",
+        text: "Ring Top",
+        x: 400,
+        y: 150,
+        width: 80,
+        height: 50,
+      };
+      const rRight: CanvasTextNode = {
+        id: "r-right",
+        type: "text",
+        text: "Ring Right",
+        x: 550,
+        y: 250,
+        width: 80,
+        height: 50,
+      };
+      const rBottom: CanvasTextNode = {
+        id: "r-bottom",
+        type: "text",
+        text: "Ring Bottom",
+        x: 400,
+        y: 350,
+        width: 80,
+        height: 50,
+      };
+      const rLeft: CanvasTextNode = {
+        id: "r-left",
+        type: "text",
+        text: "Ring Left",
+        x: 250,
+        y: 250,
+        width: 80,
+        height: 50,
+      };
 
       const edges: CanvasEdge[] = [
         { id: "e-init-single", fromNode: "init", toNode: "single" },
@@ -2509,27 +3782,76 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
       // 1. initiator
       // 2. single card plays first ("先播放单独的卡片")
       // 3. ring plays in full clockwise starting from r-top: r-top -> r-right -> r-bottom -> r-left ("播放成环卡片组", 完整成环)
-      expect(sequence).toEqual([
-        "init",
-        "single",
-        "r-top",
-        "r-right",
-        "r-bottom",
-        "r-left",
-      ]);
+      expect(sequence).toEqual(["init", "single", "r-top", "r-right", "r-bottom", "r-left"]);
     });
 
     it("allows cards in different containers to play again when their container is presented (even if previously played as pointed node)", () => {
       // Container 1: [A1, A2, A3]
-      const grp1: CanvasGroupNode = { id: "grp-1", type: "group", label: "Container 1", x: 0, y: 0, width: 400, height: 500 };
-      const a1: CanvasTextNode = { id: "a1", type: "text", text: "A1", x: 20, y: 20, width: 80, height: 50 };
-      const a2: CanvasTextNode = { id: "a2", type: "text", text: "A2 Initiator", x: 20, y: 150, width: 80, height: 50 };
-      const a3: CanvasTextNode = { id: "a3", type: "text", text: "A3", x: 20, y: 300, width: 80, height: 50 };
+      const grp1: CanvasGroupNode = {
+        id: "grp-1",
+        type: "group",
+        label: "Container 1",
+        x: 0,
+        y: 0,
+        width: 400,
+        height: 500,
+      };
+      const a1: CanvasTextNode = {
+        id: "a1",
+        type: "text",
+        text: "A1",
+        x: 20,
+        y: 20,
+        width: 80,
+        height: 50,
+      };
+      const a2: CanvasTextNode = {
+        id: "a2",
+        type: "text",
+        text: "A2 Initiator",
+        x: 20,
+        y: 150,
+        width: 80,
+        height: 50,
+      };
+      const a3: CanvasTextNode = {
+        id: "a3",
+        type: "text",
+        text: "A3",
+        x: 20,
+        y: 300,
+        width: 80,
+        height: 50,
+      };
 
       // Container 2: [B1, B2]
-      const grp2: CanvasGroupNode = { id: "grp-2", type: "group", label: "Container 2", x: 600, y: 0, width: 400, height: 500 };
-      const b1: CanvasTextNode = { id: "b1", type: "text", text: "B1", x: 620, y: 20, width: 80, height: 50 };
-      const b2: CanvasTextNode = { id: "b2", type: "text", text: "B2", x: 620, y: 150, width: 80, height: 50 };
+      const grp2: CanvasGroupNode = {
+        id: "grp-2",
+        type: "group",
+        label: "Container 2",
+        x: 600,
+        y: 0,
+        width: 400,
+        height: 500,
+      };
+      const b1: CanvasTextNode = {
+        id: "b1",
+        type: "text",
+        text: "B1",
+        x: 620,
+        y: 20,
+        width: 80,
+        height: 50,
+      };
+      const b2: CanvasTextNode = {
+        id: "b2",
+        type: "text",
+        text: "B2",
+        x: 620,
+        y: 150,
+        width: 80,
+        height: 50,
+      };
 
       // A2 points to B1
       const edges: CanvasEdge[] = [
@@ -2552,26 +3874,67 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
       // 3. Drill-down finishes, returns to Container 1: a3
       // 4. Container 1 completes!
       // 5. Container 2 starts: b1 (plays AGAIN in its container context!) -> b2
-      expect(sequence).toEqual([
-        "a1",
-        "a2",
-        "b1",
-        "a3",
-        "b1",
-        "b2",
-      ]);
+      expect(sequence).toEqual(["a1", "a2", "b1", "a3", "b1", "b2"]);
     });
 
     it("allows cards played as normal cards in the first container to play again when pointed to from a subsequent container", () => {
       // First Container: [C1, C2]
-      const grp1: CanvasGroupNode = { id: "grp-1", type: "group", label: "First Container", x: 0, y: 0, width: 400, height: 300 };
-      const c1: CanvasTextNode = { id: "c1", type: "text", text: "C1 Overview", x: 20, y: 20, width: 80, height: 50 };
-      const c2: CanvasTextNode = { id: "c2", type: "text", text: "C2 Summary", x: 20, y: 150, width: 80, height: 50 };
+      const grp1: CanvasGroupNode = {
+        id: "grp-1",
+        type: "group",
+        label: "First Container",
+        x: 0,
+        y: 0,
+        width: 400,
+        height: 300,
+      };
+      const c1: CanvasTextNode = {
+        id: "c1",
+        type: "text",
+        text: "C1 Overview",
+        x: 20,
+        y: 20,
+        width: 80,
+        height: 50,
+      };
+      const c2: CanvasTextNode = {
+        id: "c2",
+        type: "text",
+        text: "C2 Summary",
+        x: 20,
+        y: 150,
+        width: 80,
+        height: 50,
+      };
 
       // Second Container: [D1, D2]
-      const grp2: CanvasGroupNode = { id: "grp-2", type: "group", label: "Second Container", x: 500, y: 0, width: 400, height: 300 };
-      const d1: CanvasTextNode = { id: "d1", type: "text", text: "D1 Review", x: 520, y: 20, width: 80, height: 50 };
-      const d2: CanvasTextNode = { id: "d2", type: "text", text: "D2 Next Steps", x: 520, y: 150, width: 80, height: 50 };
+      const grp2: CanvasGroupNode = {
+        id: "grp-2",
+        type: "group",
+        label: "Second Container",
+        x: 500,
+        y: 0,
+        width: 400,
+        height: 300,
+      };
+      const d1: CanvasTextNode = {
+        id: "d1",
+        type: "text",
+        text: "D1 Review",
+        x: 520,
+        y: 20,
+        width: 80,
+        height: 50,
+      };
+      const d2: CanvasTextNode = {
+        id: "d2",
+        type: "text",
+        text: "D2 Next Steps",
+        x: 520,
+        y: 150,
+        width: 80,
+        height: 50,
+      };
 
       // D1 points back to C1 (cross-referencing first container's card)
       const edges: CanvasEdge[] = [
@@ -2593,26 +3956,76 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
       // 2. Container 2 plays: d1
       // 3. d1 drills back to c1 (played AGAIN as a pointed-to node): c1
       // 4. Returns to Container 2: d2
-      expect(sequence).toEqual([
-        "c1",
-        "c2",
-        "d1",
-        "c1",
-        "d2",
-      ]);
+      expect(sequence).toEqual(["c1", "c2", "d1", "c1", "d2"]);
     });
 
     it("plays complete cycle again in full clockwise order when referenced from another container", () => {
       // Container 1 has a ring cycle: [R1, R2, R3]
-      const grp1: CanvasGroupNode = { id: "grp-1", type: "group", label: "Ring Container", x: 0, y: 0, width: 400, height: 400 };
-      const r1: CanvasTextNode = { id: "r1", type: "text", text: "Ring Top", x: 150, y: 50, width: 80, height: 50 };
-      const r2: CanvasTextNode = { id: "r2", type: "text", text: "Ring Right", x: 250, y: 200, width: 80, height: 50 };
-      const r3: CanvasTextNode = { id: "r3", type: "text", text: "Ring Left", x: 50, y: 200, width: 80, height: 50 };
+      const grp1: CanvasGroupNode = {
+        id: "grp-1",
+        type: "group",
+        label: "Ring Container",
+        x: 0,
+        y: 0,
+        width: 400,
+        height: 400,
+      };
+      const r1: CanvasTextNode = {
+        id: "r1",
+        type: "text",
+        text: "Ring Top",
+        x: 150,
+        y: 50,
+        width: 80,
+        height: 50,
+      };
+      const r2: CanvasTextNode = {
+        id: "r2",
+        type: "text",
+        text: "Ring Right",
+        x: 250,
+        y: 200,
+        width: 80,
+        height: 50,
+      };
+      const r3: CanvasTextNode = {
+        id: "r3",
+        type: "text",
+        text: "Ring Left",
+        x: 50,
+        y: 200,
+        width: 80,
+        height: 50,
+      };
 
       // Container 2 has [X1, X2], where X1 points to R1
-      const grp2: CanvasGroupNode = { id: "grp-2", type: "group", label: "Follow-up Container", x: 600, y: 0, width: 400, height: 400 };
-      const x1: CanvasTextNode = { id: "x1", type: "text", text: "X1", x: 620, y: 50, width: 80, height: 50 };
-      const x2: CanvasTextNode = { id: "x2", type: "text", text: "X2", x: 620, y: 200, width: 80, height: 50 };
+      const grp2: CanvasGroupNode = {
+        id: "grp-2",
+        type: "group",
+        label: "Follow-up Container",
+        x: 600,
+        y: 0,
+        width: 400,
+        height: 400,
+      };
+      const x1: CanvasTextNode = {
+        id: "x1",
+        type: "text",
+        text: "X1",
+        x: 620,
+        y: 50,
+        width: 80,
+        height: 50,
+      };
+      const x2: CanvasTextNode = {
+        id: "x2",
+        type: "text",
+        text: "X2",
+        x: 620,
+        y: 200,
+        width: 80,
+        height: 50,
+      };
 
       const edges: CanvasEdge[] = [
         { id: "e-r1", fromNode: "r1", toNode: "r2" },
@@ -2635,16 +4048,7 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
       // 2. Container 2 starts: x1
       // 3. x1 points to ring: plays complete ring clockwise: r1 -> r2 -> r3
       // 4. Returns to Container 2: x2
-      expect(sequence).toEqual([
-        "r1",
-        "r2",
-        "r3",
-        "x1",
-        "r1",
-        "r2",
-        "r3",
-        "x2",
-      ]);
+      expect(sequence).toEqual(["r1", "r2", "r3", "x1", "r1", "r2", "r3", "x2"]);
     });
 
     it("exports image cards with img tags and media badges in SVG export", () => {
@@ -2665,7 +4069,3 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
     });
   });
 });
-
-
-
-

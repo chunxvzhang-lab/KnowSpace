@@ -108,15 +108,28 @@ function splitTop(value: string, sep: string): string[] {
 /** `animation` / `animation-name` 的简写里，这些词不是动画名。 */
 const NOT_A_NAME = new Set([
   // 方向
-  "normal", "reverse", "alternate", "alternate-reverse",
+  "normal",
+  "reverse",
+  "alternate",
+  "alternate-reverse",
   // 填充模式
-  "none", "forwards", "backwards", "both",
+  "none",
+  "forwards",
+  "backwards",
+  "both",
   // 播放状态
-  "running", "paused",
+  "running",
+  "paused",
   // 次数
   "infinite",
   // 缓动（函数形式由下面的括号判断兜住）
-  "linear", "ease", "ease-in", "ease-out", "ease-in-out", "step-start", "step-end",
+  "linear",
+  "ease",
+  "ease-in",
+  "ease-out",
+  "ease-in-out",
+  "step-start",
+  "step-end",
 ]);
 
 /** 从一条 animation 值里挑出动画名。 */
@@ -167,7 +180,11 @@ for (const file of FILES) {
       }
     }
     for (const name of namesIn(m[3])) {
-      REFS.push({ file: file.replace(/\\/g, "/").replace(SRC.replace(/\\/g, "/") + "/", ""), line, name });
+      REFS.push({
+        file: file.replace(/\\/g, "/").replace(SRC.replace(/\\/g, "/") + "/", ""),
+        line,
+        name,
+      });
     }
   }
 }
@@ -175,8 +192,14 @@ for (const file of FILES) {
 describe("CSS 动画名守卫", () => {
   it("扫描器本身有效（否则会静默全绿）", () => {
     expect(FILES.length, "没扫到任何 css 文件").toBeGreaterThan(0);
-    expect(DEFINED.size, `扫到的 @keyframes 太少（${DEFINED.size}），解析器可能坏了`).toBeGreaterThan(20);
-    expect(REFS.length, `扫到的 animation 引用太少（${REFS.length}），解析器可能坏了`).toBeGreaterThan(30);
+    expect(
+      DEFINED.size,
+      `扫到的 @keyframes 太少（${DEFINED.size}），解析器可能坏了`,
+    ).toBeGreaterThan(20);
+    expect(
+      REFS.length,
+      `扫到的 animation 引用太少（${REFS.length}），解析器可能坏了`,
+    ).toBeGreaterThan(30);
   });
 
   it("每个被引用的动画名都有 @keyframes 定义", () => {
@@ -190,7 +213,7 @@ describe("CSS 动画名守卫", () => {
     });
     expect(
       uniq.map((d) => `${d.file}:${d.line} 引用了未定义的动画 "${d.name}"`),
-      "引用了不存在的 @keyframes：浏览器会把整条 animation 声明当无效值丢掉，动画静默失效"
+      "引用了不存在的 @keyframes：浏览器会把整条 animation 声明当无效值丢掉，动画静默失效",
     ).toEqual([]);
   });
 

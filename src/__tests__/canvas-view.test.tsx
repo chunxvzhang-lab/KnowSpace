@@ -51,7 +51,7 @@ describe("CanvasView Component", () => {
         editable={true}
         theme="twitter"
         onClose={onClose}
-      />
+      />,
     );
 
     // Toolbar title
@@ -78,7 +78,7 @@ describe("CanvasView Component", () => {
         onSourceChange={vi.fn()}
         editable={true}
         theme="twitter"
-      />
+      />,
     );
 
     const zoomInBtn = screen.getByTitle("放大");
@@ -104,7 +104,7 @@ describe("CanvasView Component", () => {
         onSourceChange={onSourceChange}
         editable={true}
         theme="twitter"
-      />
+      />,
     );
 
     const addCardBtn = screen.getByText("文本卡片");
@@ -129,7 +129,7 @@ describe("CanvasView Component", () => {
         onSourceChange={onSourceChange}
         editable={true}
         theme="twitter"
-      />
+      />,
     );
 
     const addGroupBtn = screen.getByText("分组容器");
@@ -153,7 +153,7 @@ describe("CanvasView Component", () => {
         editable={true}
         theme="twitter"
         onExtractToNote={onExtractToNote}
-      />
+      />,
     );
 
     // Click "萃取长文"
@@ -185,7 +185,7 @@ describe("CanvasView Component", () => {
         isDirty={true}
         editable={true}
         theme="twitter"
-      />
+      />,
     );
 
     // Save button rendered with dirty status
@@ -207,7 +207,7 @@ describe("CanvasView Component", () => {
         source={JSON.stringify(initialCanvasData)}
         editable={true}
         theme="twitter"
-      />
+      />,
     );
 
     const boxSelectBtn = screen.getByTitle(/开启框选模式/);
@@ -227,7 +227,7 @@ describe("CanvasView Component", () => {
         source={JSON.stringify(initialCanvasData)}
         editable={true}
         theme="twitter"
-      />
+      />,
     );
 
     // 1. Context menu on background
@@ -261,10 +261,12 @@ describe("CanvasView Component", () => {
         source={JSON.stringify(initialCanvasData)}
         editable={true}
         theme="twitter"
-      />
+      />,
     );
 
-    const canvasContainer = screen.getByTitle("遮挡测试白板").closest(".knowspace-canvas-view") as HTMLElement;
+    const canvasContainer = screen
+      .getByTitle("遮挡测试白板")
+      .closest(".knowspace-canvas-view") as HTMLElement;
     expect(canvasContainer).toBeDefined();
 
     vi.spyOn(canvasContainer, "getBoundingClientRect").mockReturnValue({
@@ -305,7 +307,7 @@ describe("CanvasView Component", () => {
         onSave={onSave}
         editable={true}
         theme="twitter"
-      />
+      />,
     );
 
     // 1. Right click on background to open menu and click "在此处新建文本卡片"
@@ -371,7 +373,7 @@ describe("CanvasView Component", () => {
         onSourceChange={onSourceChange}
         editable={true}
         theme="twitter"
-      />
+      />,
     );
 
     // 1. Right click card and duplicate
@@ -417,7 +419,7 @@ describe("CanvasView Component", () => {
         onSourceChange={onSourceChange}
         editable={true}
         theme="twitter"
-      />
+      />,
     );
 
     // 1. Drag a text card
@@ -452,7 +454,7 @@ describe("CanvasView Component", () => {
         onSourceChange={onSourceChange}
         editable={true}
         theme="twitter"
-      />
+      />,
     );
 
     // Right click card and click "🌱 派生右侧子想法"
@@ -464,11 +466,15 @@ describe("CanvasView Component", () => {
     fireEvent.click(spawnBtn);
 
     expect(onSourceChange).toHaveBeenCalled();
-    const lastSaved = JSON.parse(onSourceChange.mock.calls[onSourceChange.mock.calls.length - 1][0]);
+    const lastSaved = JSON.parse(
+      onSourceChange.mock.calls[onSourceChange.mock.calls.length - 1][0],
+    );
     // A new text node and a connecting edge should be created
     expect(lastSaved.nodes.length).toBe(3);
     expect(lastSaved.edges.length).toBe(2);
-    const newEdge = lastSaved.edges.find((e: any) => e.fromNode === "node-1" && e.toNode !== "node-2");
+    const newEdge = lastSaved.edges.find(
+      (e: any) => e.fromNode === "node-1" && e.toNode !== "node-2",
+    );
     expect(newEdge).toBeDefined();
   });
 
@@ -488,7 +494,7 @@ describe("CanvasView Component", () => {
         onSourceChange={onSourceChange}
         editable={true}
         theme="twitter"
-      />
+      />,
     );
 
     // Select node A
@@ -505,7 +511,9 @@ describe("CanvasView Component", () => {
     fireEvent.click(linkToolbarBtn);
 
     expect(onSourceChange).toHaveBeenCalled();
-    const lastSaved = JSON.parse(onSourceChange.mock.calls[onSourceChange.mock.calls.length - 1][0]);
+    const lastSaved = JSON.parse(
+      onSourceChange.mock.calls[onSourceChange.mock.calls.length - 1][0],
+    );
     expect(lastSaved.edges.length).toBe(1);
     expect(lastSaved.edges[0].fromNode).toBe("a");
     expect(lastSaved.edges[0].toNode).toBe("b");
@@ -521,7 +529,7 @@ describe("CanvasView Component", () => {
         onSourceChange={onSourceChange}
         editable={true}
         theme="twitter"
-      />
+      />,
     );
 
     // Click on edge path to select edge
@@ -539,7 +547,9 @@ describe("CanvasView Component", () => {
 
     // Click destination handle to cycle toSide (左 -> 自适应 undefined)
     fireEvent.click(anchorHandles[1]);
-    const lastSaved = JSON.parse(onSourceChange.mock.calls[onSourceChange.mock.calls.length - 1][0]);
+    const lastSaved = JSON.parse(
+      onSourceChange.mock.calls[onSourceChange.mock.calls.length - 1][0],
+    );
     expect(lastSaved.edges[0].toSide).toBeUndefined();
   });
 
@@ -567,7 +577,7 @@ describe("CanvasView Component", () => {
         onSourceChange={onSourceChange}
         editable={true}
         theme="twitter"
-      />
+      />,
     );
 
     const c1 = screen.getByText("Card 1").closest(".canvas-node")!;
@@ -584,7 +594,9 @@ describe("CanvasView Component", () => {
     expect(disconnectBtn).toBeDefined();
     fireEvent.click(disconnectBtn);
 
-    const lastSaved = JSON.parse(onSourceChange.mock.calls[onSourceChange.mock.calls.length - 1][0]);
+    const lastSaved = JSON.parse(
+      onSourceChange.mock.calls[onSourceChange.mock.calls.length - 1][0],
+    );
     expect(lastSaved.edges).toHaveLength(1);
     expect(lastSaved.edges[0].id).toBe("e-ext");
   });
@@ -610,7 +622,7 @@ describe("CanvasView Component", () => {
         onSourceChange={onSourceChange}
         editable={true}
         theme="twitter"
-      />
+      />,
     );
 
     const hitAreas = document.querySelectorAll("svg path[stroke='transparent']");
@@ -645,7 +657,14 @@ describe("CanvasView Component", () => {
         { id: "n2", type: "text", text: "N2", x: 400, y: 250, width: 150, height: 80 },
       ],
       edges: [
-        { id: "e1", fromNode: "n1", toNode: "n2", style: "step", fromSide: "right", toSide: "left" },
+        {
+          id: "e1",
+          fromNode: "n1",
+          toNode: "n2",
+          style: "step",
+          fromSide: "right",
+          toSide: "left",
+        },
       ],
     };
 
@@ -656,7 +675,7 @@ describe("CanvasView Component", () => {
         onSourceChange={onSourceChange}
         editable={true}
         theme="twitter"
-      />
+      />,
     );
 
     const hitArea = document.querySelector("svg path[stroke='transparent']")!;
@@ -669,7 +688,9 @@ describe("CanvasView Component", () => {
     fireEvent.mouseMove(window, { clientX: 240, clientY: 100 });
     fireEvent.mouseUp(window);
 
-    const lastSaved = JSON.parse(onSourceChange.mock.calls[onSourceChange.mock.calls.length - 1][0]);
+    const lastSaved = JSON.parse(
+      onSourceChange.mock.calls[onSourceChange.mock.calls.length - 1][0],
+    );
     expect(lastSaved.edges[0].stepOffset).toBe(40);
   });
 
@@ -683,7 +704,7 @@ describe("CanvasView Component", () => {
         onSourceChange={onSourceChange}
         editable={true}
         theme="twitter"
-      />
+      />,
     );
 
     // Right-click on edge <g>
@@ -721,7 +742,15 @@ describe("CanvasView Component", () => {
         { id: "n2", type: "text", text: "B", x: 200, y: 0, width: 100, height: 100 },
       ],
       edges: [
-        { id: "e1", fromNode: "n1", fromSide: "right", fromEnd: "none", toNode: "n2", toSide: "left", toEnd: "arrow" },
+        {
+          id: "e1",
+          fromNode: "n1",
+          fromSide: "right",
+          fromEnd: "none",
+          toNode: "n2",
+          toSide: "left",
+          toEnd: "arrow",
+        },
       ],
     };
 
@@ -731,7 +760,7 @@ describe("CanvasView Component", () => {
         source={JSON.stringify(edgeData)}
         onSourceChange={onSourceChange}
         editable={true}
-      />
+      />,
     );
 
     const edgeGroup = document.querySelector("svg g[style*='pointer-events: all']")!;
@@ -747,7 +776,9 @@ describe("CanvasView Component", () => {
     vi.advanceTimersByTime(600);
 
     expect(onSourceChange).toHaveBeenCalled();
-    const lastSaved = JSON.parse(onSourceChange.mock.calls[onSourceChange.mock.calls.length - 1][0]);
+    const lastSaved = JSON.parse(
+      onSourceChange.mock.calls[onSourceChange.mock.calls.length - 1][0],
+    );
     expect(lastSaved.edges[0].color).toBe("#10b981");
 
     vi.useRealTimers();
@@ -794,7 +825,7 @@ describe("CanvasView Component", () => {
         source={JSON.stringify(multiGroupData)}
         onSourceChange={onSourceChange}
         editable={true}
-      />
+      />,
     );
 
     const groupA = screen.getByText(/分组 A/).closest(".canvas-group")!;
@@ -809,7 +840,9 @@ describe("CanvasView Component", () => {
     // Release mouse at current position
     fireEvent.mouseUp(window, { clientX: 160, clientY: 160 });
 
-    const lastSaved = JSON.parse(onSourceChange.mock.calls[onSourceChange.mock.calls.length - 1][0]);
+    const lastSaved = JSON.parse(
+      onSourceChange.mock.calls[onSourceChange.mock.calls.length - 1][0],
+    );
     const savedGroupA = lastSaved.nodes.find((n: any) => n.id === "group-A");
     const savedGroupB = lastSaved.nodes.find((n: any) => n.id === "group-B");
     const savedCardA = lastSaved.nodes.find((n: any) => n.id === "card-in-A");
@@ -844,7 +877,7 @@ describe("CanvasView Component", () => {
         source={JSON.stringify(edgeData)}
         onSourceChange={vi.fn()}
         editable={true}
-      />
+      />,
     );
 
     // Labeled edge badge is rendered
@@ -862,7 +895,15 @@ describe("CanvasView Component", () => {
       nodes: [
         { id: "group-1", type: "group", label: "容器内", x: 50, y: 50, width: 300, height: 200 },
         { id: "card-inside", type: "text", text: "组内卡片", x: 80, y: 80, width: 100, height: 60 },
-        { id: "card-outside", type: "file", file: "独立卡片.md", x: 500, y: 400, width: 150, height: 80 },
+        {
+          id: "card-outside",
+          type: "file",
+          file: "独立卡片.md",
+          x: 500,
+          y: 400,
+          width: 150,
+          height: 80,
+        },
       ],
       edges: [],
     };
@@ -872,7 +913,7 @@ describe("CanvasView Component", () => {
         title="缩略图全卡片测试"
         source={JSON.stringify(dataWithStandalone)}
         onSourceChange={vi.fn()}
-      />
+      />,
     );
 
     const minimap = document.querySelector(".canvas-minimap");
@@ -890,7 +931,7 @@ describe("CanvasView Component", () => {
         source={JSON.stringify(initialCanvasData)}
         onSourceChange={vi.fn()}
         allChapters={[{ id: "1", title: "笔记1", src: "notes/1.md" }]}
-      />
+      />,
     );
 
     // Initially at 100% zoom
@@ -928,7 +969,7 @@ describe("CanvasView Component", () => {
         title="卡片滚轮归属测试"
         source={JSON.stringify(initialCanvasData)}
         onSourceChange={vi.fn()}
-      />
+      />,
     );
 
     const world = document.querySelector(".canvas-world") as HTMLElement;
@@ -980,7 +1021,7 @@ describe("CanvasView Component", () => {
         source={JSON.stringify(initialCanvasData)}
         onSourceChange={vi.fn()}
         editable={true}
-      />
+      />,
     );
 
     const world = document.querySelector(".canvas-world") as HTMLElement;
@@ -1019,7 +1060,16 @@ describe("CanvasView Component", () => {
   it("a wheel over the media lightbox zooms the image and leaves the whiteboard alone", async () => {
     const mediaData: CanvasData = {
       nodes: [
-        { id: "media-1", type: "file", file: "photo.png", x: 100, y: 100, width: 240, height: 160, color: "4" },
+        {
+          id: "media-1",
+          type: "file",
+          file: "photo.png",
+          x: 100,
+          y: 100,
+          width: 240,
+          height: 160,
+          color: "4",
+        },
       ],
       edges: [],
     };
@@ -1029,7 +1079,7 @@ describe("CanvasView Component", () => {
         source={JSON.stringify(mediaData)}
         onSourceChange={vi.fn()}
         editable={true}
-      />
+      />,
     );
 
     const world = document.querySelector(".canvas-world") as HTMLElement;
@@ -1054,7 +1104,16 @@ describe("CanvasView Component", () => {
   it("opens group-specific context menu with label rename, color palette, and duplicate actions", () => {
     const groupData: CanvasData = {
       nodes: [
-        { id: "group-target", type: "group", label: "研发架构组", x: 100, y: 100, width: 300, height: 200, color: "3" },
+        {
+          id: "group-target",
+          type: "group",
+          label: "研发架构组",
+          x: 100,
+          y: 100,
+          width: 300,
+          height: 200,
+          color: "3",
+        },
       ],
       edges: [],
     };
@@ -1065,7 +1124,7 @@ describe("CanvasView Component", () => {
         source={JSON.stringify(groupData)}
         onSourceChange={vi.fn()}
         editable={true}
-      />
+      />,
     );
 
     const groupEl = screen.getByText(/研发架构组/).closest(".canvas-group")!;
@@ -1084,8 +1143,24 @@ describe("CanvasView Component", () => {
     const onSourceChange = vi.fn();
     const existingData: CanvasData = {
       nodes: [
-        { id: "old-group", type: "group", label: "原有分组", x: 200, y: 100, width: 500, height: 400 },
-        { id: "card-in-old", type: "text", text: "原容器卡片", x: 250, y: 150, width: 120, height: 80 },
+        {
+          id: "old-group",
+          type: "group",
+          label: "原有分组",
+          x: 200,
+          y: 100,
+          width: 500,
+          height: 400,
+        },
+        {
+          id: "card-in-old",
+          type: "text",
+          text: "原容器卡片",
+          x: 250,
+          y: 150,
+          width: 120,
+          height: 80,
+        },
       ],
       edges: [],
     };
@@ -1096,7 +1171,7 @@ describe("CanvasView Component", () => {
         source={JSON.stringify(existingData)}
         onSourceChange={onSourceChange}
         editable={true}
-      />
+      />,
     );
 
     // Click "分组容器" to add a new group
@@ -1129,7 +1204,13 @@ describe("CanvasView Component", () => {
         { id: "to-node", type: "text", text: "终点卡片", x: 400, y: 100, width: 120, height: 80 },
       ],
       edges: [
-        { id: "edge-shape-test", fromNode: "from-node", toNode: "to-node", label: "因果影响", labelShape: "pill" },
+        {
+          id: "edge-shape-test",
+          fromNode: "from-node",
+          toNode: "to-node",
+          label: "因果影响",
+          labelShape: "pill",
+        },
       ],
     };
 
@@ -1139,7 +1220,7 @@ describe("CanvasView Component", () => {
         source={JSON.stringify(edgeData)}
         onSourceChange={onSourceChange}
         editable={true}
-      />
+      />,
     );
 
     const badge = screen.getByText("因果影响");
@@ -1169,7 +1250,7 @@ describe("CanvasView Component", () => {
         source={JSON.stringify(initialCanvasData)}
         onSourceChange={vi.fn()}
         editable={true}
-      />
+      />,
     );
 
     // Click "导出图片" in toolbar
@@ -1213,7 +1294,7 @@ describe("CanvasView Component", () => {
         source={JSON.stringify(initialCanvasData)}
         onSourceChange={vi.fn()}
         editable={true}
-      />
+      />,
     );
 
     // Right click canvas background
@@ -1238,7 +1319,7 @@ describe("CanvasView Component", () => {
         source={JSON.stringify(initialCanvasData)}
         onSourceChange={onSourceChange}
         editable={true}
-      />
+      />,
     );
 
     // 1. Select a card first
@@ -1286,7 +1367,7 @@ describe("CanvasView Component", () => {
         source={JSON.stringify(initialCanvasData)}
         onSourceChange={onSourceChange}
         editable={true}
-      />
+      />,
     );
 
     const card = screen.getByText(/核心假说/).closest(".canvas-node") as HTMLElement;
@@ -1320,7 +1401,7 @@ describe("CanvasView Component", () => {
         source={JSON.stringify(initialCanvasData)}
         onSourceChange={onSourceChange}
         editable={true}
-      />
+      />,
     );
 
     // Click "文本卡片" to create new card
@@ -1361,7 +1442,7 @@ describe("CanvasView Component", () => {
         source={JSON.stringify(initialCanvasData)}
         onSourceChange={onSourceChange}
         editable={true}
-      />
+      />,
     );
 
     // Select edge
@@ -1373,7 +1454,9 @@ describe("CanvasView Component", () => {
     fireEvent.keyDown(window, { key: "r" });
 
     expect(onSourceChange).toHaveBeenCalled();
-    const updatedData: CanvasData = JSON.parse(onSourceChange.mock.calls[onSourceChange.mock.calls.length - 1][0]);
+    const updatedData: CanvasData = JSON.parse(
+      onSourceChange.mock.calls[onSourceChange.mock.calls.length - 1][0],
+    );
     expect(updatedData.edges[0].fromNode).toBe("node-2");
     expect(updatedData.edges[0].toNode).toBe("node-1");
   });
@@ -1401,7 +1484,7 @@ describe("CanvasView Component", () => {
         source={JSON.stringify(testData)}
         onSourceChange={onSourceChange}
         editable={true}
-      />
+      />,
     );
 
     const cardEl = screen.getByText(/测试卡片/).closest(".canvas-node")!;
@@ -1416,7 +1499,9 @@ describe("CanvasView Component", () => {
     fireEvent.click(screen.getByText("重置标准尺寸"));
 
     expect(onSourceChange).toHaveBeenCalled();
-    const updatedData: CanvasData = JSON.parse(onSourceChange.mock.calls[onSourceChange.mock.calls.length - 1][0]);
+    const updatedData: CanvasData = JSON.parse(
+      onSourceChange.mock.calls[onSourceChange.mock.calls.length - 1][0],
+    );
     const resetNode = updatedData.nodes.find((n) => n.id === "custom-size-node")!;
     expect(resetNode.width).toBe(280);
     expect(resetNode.height).toBe(160);
@@ -1438,7 +1523,7 @@ describe("CanvasView Component", () => {
         source={JSON.stringify(multiCardsData)}
         onSourceChange={onSourceChange}
         editable={true}
-      />
+      />,
     );
 
     // Select both cards with Shift
@@ -1463,7 +1548,9 @@ describe("CanvasView Component", () => {
     fireEvent.click(screen.getByText("左对齐"));
 
     expect(onSourceChange).toHaveBeenCalled();
-    let updatedData: CanvasData = JSON.parse(onSourceChange.mock.calls[onSourceChange.mock.calls.length - 1][0]);
+    let updatedData: CanvasData = JSON.parse(
+      onSourceChange.mock.calls[onSourceChange.mock.calls.length - 1][0],
+    );
     const nodeA = updatedData.nodes.find((n) => n.id === "c1")!;
     const nodeB = updatedData.nodes.find((n) => n.id === "c2")!;
     expect(nodeA.x).toBe(100);
@@ -1489,8 +1576,24 @@ describe("CanvasView Component", () => {
     const groupWithCardsData: CanvasData = {
       nodes: [
         { id: "grp-box", type: "group", label: "核心容器", x: 50, y: 50, width: 800, height: 600 },
-        { id: "inner-card-1", type: "text", text: "内部卡片 1", x: 100, y: 100, width: 200, height: 100 },
-        { id: "inner-card-2", type: "text", text: "内部卡片 2", x: 350, y: 100, width: 200, height: 100 },
+        {
+          id: "inner-card-1",
+          type: "text",
+          text: "内部卡片 1",
+          x: 100,
+          y: 100,
+          width: 200,
+          height: 100,
+        },
+        {
+          id: "inner-card-2",
+          type: "text",
+          text: "内部卡片 2",
+          x: 350,
+          y: 100,
+          width: 200,
+          height: 100,
+        },
       ],
       edges: [],
     };
@@ -1501,7 +1604,7 @@ describe("CanvasView Component", () => {
         source={JSON.stringify(groupWithCardsData)}
         onSourceChange={onSourceChange}
         editable={true}
-      />
+      />,
     );
 
     const grpEl = screen.getByText(/核心容器/).closest(".canvas-group")!;
@@ -1517,7 +1620,9 @@ describe("CanvasView Component", () => {
     fireEvent.click(screen.getByText("自适应贴合组内卡片尺寸"));
 
     expect(onSourceChange).toHaveBeenCalled();
-    let updatedData: CanvasData = JSON.parse(onSourceChange.mock.calls[onSourceChange.mock.calls.length - 1][0]);
+    let updatedData: CanvasData = JSON.parse(
+      onSourceChange.mock.calls[onSourceChange.mock.calls.length - 1][0],
+    );
     const fittedGrp = updatedData.nodes.find((n) => n.id === "grp-box")!;
     expect(fittedGrp.width).toBeLessThan(800);
 
@@ -1536,7 +1641,15 @@ describe("CanvasView Component", () => {
     const onSourceChange = vi.fn();
     const unalignedData: CanvasData = {
       nodes: [
-        { id: "unaligned-1", type: "text", text: "非对齐卡片", x: 107, y: 133, width: 200, height: 100 },
+        {
+          id: "unaligned-1",
+          type: "text",
+          text: "非对齐卡片",
+          x: 107,
+          y: 133,
+          width: 200,
+          height: 100,
+        },
       ],
       edges: [],
     };
@@ -1547,10 +1660,12 @@ describe("CanvasView Component", () => {
         source={JSON.stringify(unalignedData)}
         onSourceChange={onSourceChange}
         editable={true}
-      />
+      />,
     );
 
-    const canvasContainer = screen.getByTitle("背景右键细化测试").closest(".knowspace-canvas-view")!;
+    const canvasContainer = screen
+      .getByTitle("背景右键细化测试")
+      .closest(".knowspace-canvas-view")!;
     fireEvent.contextMenu(canvasContainer);
 
     // Verify background items
@@ -1561,7 +1676,9 @@ describe("CanvasView Component", () => {
     fireEvent.click(screen.getByText("对齐所有卡片到网格 (20px)"));
 
     expect(onSourceChange).toHaveBeenCalled();
-    const updatedData: CanvasData = JSON.parse(onSourceChange.mock.calls[onSourceChange.mock.calls.length - 1][0]);
+    const updatedData: CanvasData = JSON.parse(
+      onSourceChange.mock.calls[onSourceChange.mock.calls.length - 1][0],
+    );
     const alignedNode = updatedData.nodes.find((n) => n.id === "unaligned-1")!;
     expect(alignedNode.x % 20).toBe(0);
     expect(alignedNode.y % 20).toBe(0);
@@ -1585,7 +1702,7 @@ describe("CanvasView Component", () => {
         onSourceChange={onSourceChange}
         editable={true}
         theme="twitter"
-      />
+      />,
     );
 
     // Multi-select all 3 cards: root, sub-1, sub-2
@@ -1598,7 +1715,9 @@ describe("CanvasView Component", () => {
     fireEvent.mouseDown(sub2El, { button: 0, shiftKey: true });
 
     // One-to-many button should be visible in toolbar
-    const oneToManyBtn = screen.getByTitle("以当前选中卡片为源，向其余所有选中卡片放射建立一对多关联");
+    const oneToManyBtn = screen.getByTitle(
+      "以当前选中卡片为源，向其余所有选中卡片放射建立一对多关联",
+    );
     expect(oneToManyBtn).toBeDefined();
     fireEvent.click(oneToManyBtn);
 
@@ -1607,7 +1726,9 @@ describe("CanvasView Component", () => {
     expect(saved.edges.length).toBe(2);
     // Both edges originate from root
     expect(saved.edges.every((e: any) => e.fromNode === "root")).toBe(true);
-    expect(saved.edges.map((e: any) => e.toNode)).toEqual(expect.arrayContaining(["sub-1", "sub-2"]));
+    expect(saved.edges.map((e: any) => e.toNode)).toEqual(
+      expect.arrayContaining(["sub-1", "sub-2"]),
+    );
   });
 
   it("renders origin dot circles on directed edges and displays initiator badge on source card", () => {
@@ -1618,8 +1739,26 @@ describe("CanvasView Component", () => {
         { id: "leaf-2", type: "text", text: "叶子 2", x: 400, y: 200, width: 200, height: 100 },
       ],
       edges: [
-        { id: "e1", fromNode: "hub", fromSide: "right", fromEnd: "none", toNode: "leaf-1", toSide: "left", toEnd: "arrow", color: "3" },
-        { id: "e2", fromNode: "hub", fromSide: "right", fromEnd: "none", toNode: "leaf-2", toSide: "left", toEnd: "arrow", color: "3" },
+        {
+          id: "e1",
+          fromNode: "hub",
+          fromSide: "right",
+          fromEnd: "none",
+          toNode: "leaf-1",
+          toSide: "left",
+          toEnd: "arrow",
+          color: "3",
+        },
+        {
+          id: "e2",
+          fromNode: "hub",
+          fromSide: "right",
+          fromEnd: "none",
+          toNode: "leaf-2",
+          toSide: "left",
+          toEnd: "arrow",
+          color: "3",
+        },
       ],
     };
 
@@ -1629,7 +1768,7 @@ describe("CanvasView Component", () => {
         source={JSON.stringify(dataWithOneToMany)}
         editable={true}
         theme="twitter"
-      />
+      />,
     );
 
     // Initiator card displays badge 🌱 发起源 · 2
@@ -1639,7 +1778,6 @@ describe("CanvasView Component", () => {
     const originCircles = document.querySelectorAll("circle");
     expect(originCircles.length).toBeGreaterThanOrEqual(2);
   });
-
 
   it("supports connecting cards by dragging and dropping directly onto target card body", () => {
     const onSourceChange = vi.fn();
@@ -1658,7 +1796,7 @@ describe("CanvasView Component", () => {
         onSourceChange={onSourceChange}
         editable={true}
         theme="twitter"
-      />
+      />,
     );
 
     // Select the from card to display anchors
@@ -1697,7 +1835,7 @@ describe("CanvasView Component", () => {
         onSourceChange={onSourceChange}
         editable={true}
         theme="twitter"
-      />
+      />,
     );
 
     const hubCard = screen.getByText("主干主题").closest(".canvas-node")!;
@@ -1743,7 +1881,7 @@ describe("CanvasView Component", () => {
         onSourceChange={onSourceChange}
         editable={true}
         theme="twitter"
-      />
+      />,
     );
 
     const cardX = screen.getByText("连线卡片").closest(".canvas-node")!;
@@ -1775,7 +1913,7 @@ describe("CanvasView Component", () => {
         onSourceChange={vi.fn()}
         editable={true}
         theme="twitter"
-      />
+      />,
     );
 
     const card1 = screen.getByText("卡片一").closest(".canvas-node")!;
@@ -1821,7 +1959,7 @@ describe("CanvasView Component", () => {
         onSourceChange={vi.fn()}
         editable={true}
         theme="twitter"
-      />
+      />,
     );
 
     const cardA = screen.getByText("拖拽卡片A").closest(".canvas-node")!;
@@ -1864,7 +2002,7 @@ describe("CanvasView Component", () => {
         onSourceChange={vi.fn()}
         editable={true}
         theme="twitter"
-      />
+      />,
     );
 
     const groupNode = screen.getByText(/容器分组/).closest(".canvas-node")!;
@@ -1886,7 +2024,15 @@ describe("CanvasView Component", () => {
   it("panning canvas does not clear active card selection while stationary background click does", () => {
     const data: CanvasData = {
       nodes: [
-        { id: "pan-card", type: "text", text: "保持选中卡片", x: 100, y: 100, width: 200, height: 100 },
+        {
+          id: "pan-card",
+          type: "text",
+          text: "保持选中卡片",
+          x: 100,
+          y: 100,
+          width: 200,
+          height: 100,
+        },
       ],
       edges: [],
     };
@@ -1898,7 +2044,7 @@ describe("CanvasView Component", () => {
         onSourceChange={vi.fn()}
         editable={true}
         theme="twitter"
-      />
+      />,
     );
 
     const card = screen.getByText("保持选中卡片").closest(".canvas-node")!;
@@ -1959,8 +2105,24 @@ describe("CanvasView Component", () => {
   it("enters presentation mode, focuses on slides, and navigates with controls", () => {
     const data: CanvasData = {
       nodes: [
-        { id: "node-1", type: "text", text: "第一幕：引言", x: 100, y: 100, width: 220, height: 120 },
-        { id: "node-2", type: "text", text: "第二幕：核心展开", x: 400, y: 100, width: 220, height: 120 },
+        {
+          id: "node-1",
+          type: "text",
+          text: "第一幕：引言",
+          x: 100,
+          y: 100,
+          width: 220,
+          height: 120,
+        },
+        {
+          id: "node-2",
+          type: "text",
+          text: "第二幕：核心展开",
+          x: 400,
+          y: 100,
+          width: 220,
+          height: 120,
+        },
       ],
       edges: [{ id: "e-1", fromNode: "node-1", toNode: "node-2" }],
     };
@@ -1972,7 +2134,7 @@ describe("CanvasView Component", () => {
         onSourceChange={vi.fn()}
         editable={true}
         theme="twitter"
-      />
+      />,
     );
 
     // Initial state: presentation bar not visible
@@ -2008,9 +2170,33 @@ describe("CanvasView Component", () => {
   it("starts presentation directly from the currently selected card (就近开播)", () => {
     const data: CanvasData = {
       nodes: [
-        { id: "node-1", type: "text", text: "第一幕：背景", x: 100, y: 100, width: 200, height: 100 },
-        { id: "node-2", type: "text", text: "第二幕：方案", x: 400, y: 100, width: 200, height: 100 },
-        { id: "node-3", type: "text", text: "第三幕：总结", x: 700, y: 100, width: 200, height: 100 },
+        {
+          id: "node-1",
+          type: "text",
+          text: "第一幕：背景",
+          x: 100,
+          y: 100,
+          width: 200,
+          height: 100,
+        },
+        {
+          id: "node-2",
+          type: "text",
+          text: "第二幕：方案",
+          x: 400,
+          y: 100,
+          width: 200,
+          height: 100,
+        },
+        {
+          id: "node-3",
+          type: "text",
+          text: "第三幕：总结",
+          x: 700,
+          y: 100,
+          width: 200,
+          height: 100,
+        },
       ],
       edges: [
         { id: "e-1", fromNode: "node-1", toNode: "node-2" },
@@ -2025,7 +2211,7 @@ describe("CanvasView Component", () => {
         onSourceChange={vi.fn()}
         editable={true}
         theme="twitter"
-      />
+      />,
     );
 
     // Select node-2 before entering presentation
@@ -2045,7 +2231,15 @@ describe("CanvasView Component", () => {
     const data: CanvasData = {
       nodes: [
         { id: "node-1", type: "text", text: "开场介绍", x: 100, y: 100, width: 200, height: 100 },
-        { id: "node-2", type: "text", text: "架构设计核心", x: 400, y: 100, width: 200, height: 100 },
+        {
+          id: "node-2",
+          type: "text",
+          text: "架构设计核心",
+          x: 400,
+          y: 100,
+          width: 200,
+          height: 100,
+        },
         { id: "node-3", type: "text", text: "实施路线图", x: 700, y: 100, width: 200, height: 100 },
       ],
       edges: [
@@ -2061,7 +2255,7 @@ describe("CanvasView Component", () => {
         onSourceChange={vi.fn()}
         editable={true}
         theme="twitter"
-      />
+      />,
     );
 
     // Enter presentation
@@ -2086,7 +2280,10 @@ describe("CanvasView Component", () => {
 
     // Presentation jumped to slide 3!
     expect(screen.getByText("3 / 3")).toBeDefined();
-    const slide3 = screen.getAllByText("实施路线图").find((el) => el.closest(".canvas-node"))!.closest(".canvas-node")!;
+    const slide3 = screen
+      .getAllByText("实施路线图")
+      .find((el) => el.closest(".canvas-node"))!
+      .closest(".canvas-node")!;
     expect(slide3.classList.contains("current-slide")).toBe(true);
   });
 
@@ -2106,7 +2303,7 @@ describe("CanvasView Component", () => {
         onSourceChange={vi.fn()}
         editable={true}
         theme="twitter"
-      />
+      />,
     );
 
     // Before presentation: anchor dots exist when hovered/selected
@@ -2136,12 +2333,27 @@ describe("CanvasView Component", () => {
     const data: CanvasData = {
       nodes: [
         { id: "grp-1", type: "group", label: "研发组", x: 50, y: 50, width: 400, height: 300 },
-        { id: "node-1", type: "text", text: "第一幕：容器内卡片", x: 80, y: 80, width: 200, height: 100, color: "#10b981" },
-        { id: "node-2", type: "text", text: "第二幕：容器外卡片", x: 550, y: 80, width: 200, height: 100 },
+        {
+          id: "node-1",
+          type: "text",
+          text: "第一幕：容器内卡片",
+          x: 80,
+          y: 80,
+          width: 200,
+          height: 100,
+          color: "#10b981",
+        },
+        {
+          id: "node-2",
+          type: "text",
+          text: "第二幕：容器外卡片",
+          x: 550,
+          y: 80,
+          width: 200,
+          height: 100,
+        },
       ],
-      edges: [
-        { id: "edge-1", fromNode: "node-1", toNode: "node-2", label: "递进" },
-      ],
+      edges: [{ id: "edge-1", fromNode: "node-1", toNode: "node-2", label: "递进" }],
     };
 
     render(
@@ -2151,7 +2363,7 @@ describe("CanvasView Component", () => {
         onSourceChange={vi.fn()}
         editable={true}
         theme="twitter"
-      />
+      />,
     );
 
     // Enter presentation mode
@@ -2201,7 +2413,7 @@ describe("CanvasView Component", () => {
         onSourceChange={vi.fn()}
         editable={true}
         theme="twitter"
-      />
+      />,
     );
 
     // Renders embedded image card title and img tag
@@ -2222,7 +2434,7 @@ describe("CanvasView Component", () => {
         theme="twitter"
         isFullscreen={false}
         onToggleFullscreen={onToggleFullscreen}
-      />
+      />,
     );
 
     // Initial windowed state: button title is "全屏沉浸白板 (F11)"
@@ -2249,7 +2461,7 @@ describe("CanvasView Component", () => {
         theme="twitter"
         isFullscreen={true}
         onToggleFullscreen={onToggleFullscreen}
-      />
+      />,
     );
 
     // Button updates to exit title
@@ -2262,6 +2474,3 @@ describe("CanvasView Component", () => {
     expect(onToggleFullscreen).toHaveBeenCalledTimes(2);
   });
 });
-
-
-

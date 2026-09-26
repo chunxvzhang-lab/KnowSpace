@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { samePath } from "../core/paths";
 import type { ManifestScanTruncation, ManifestScanUnreadable } from "../core/types";
-import {
-  readReviewDocumentsChunked,
-  type ReviewSourceDocument,
-} from "../services/reviewSources";
+import { readReviewDocumentsChunked, type ReviewSourceDocument } from "../services/reviewSources";
 
 /**
  * A folder the reader chose to revise from, as it is remembered between sessions.
@@ -72,8 +69,14 @@ function normaliseChoice(value: unknown): ReviewFolderChoice | null {
 /** The truncation marker, or undefined when there is nothing trustworthy to carry. */
 function normaliseTruncation(value: unknown): ReviewFolderChoice["scanTruncated"] {
   if (!value || typeof value !== "object") return undefined;
-  const marker = value as { reason?: unknown; seen?: unknown; remainingDirs?: unknown; at?: unknown };
-  if (marker.reason !== "files" && marker.reason !== "depth" && marker.reason !== "time") return undefined;
+  const marker = value as {
+    reason?: unknown;
+    seen?: unknown;
+    remainingDirs?: unknown;
+    at?: unknown;
+  };
+  if (marker.reason !== "files" && marker.reason !== "depth" && marker.reason !== "time")
+    return undefined;
   return {
     reason: marker.reason,
     seen: typeof marker.seen === "number" ? marker.seen : 0,
@@ -208,16 +211,18 @@ export function useReviewFolders(enabled = true) {
           } catch {
             return null;
           }
-        })
+        }),
       );
 
       const fresh = listed.filter(
-        (entry): entry is {
+        (
+          entry,
+        ): entry is {
           rootPath: string;
           paths: string[];
           scanTruncated: ReviewFolderChoice["scanTruncated"];
           scanUnreadable: ReviewFolderChoice["scanUnreadable"];
-        } => !!entry
+        } => !!entry,
       );
       if (fresh.length === 0) return;
 
@@ -311,7 +316,7 @@ export function useReviewFolders(enabled = true) {
         }
       }
     },
-    [bridge]
+    [bridge],
   );
 
   /** Reads the folders that are currently chosen — for when this source is switched to. */
@@ -346,7 +351,7 @@ export function useReviewFolders(enabled = true) {
 
     setChoices((prev) => {
       const existing = prev.findIndex(
-        (entry) => entry.rootPath.toLowerCase() === chosen.rootPath.toLowerCase()
+        (entry) => entry.rootPath.toLowerCase() === chosen.rootPath.toLowerCase(),
       );
       if (existing >= 0) {
         const next = [...prev];
@@ -369,9 +374,7 @@ export function useReviewFolders(enabled = true) {
   /** Forgets one folder. The others stay, and so does the source. */
   const remove = useCallback((rootPath: string) => {
     setChoices((prev) => {
-      const next = prev.filter(
-        (entry) => entry.rootPath.toLowerCase() !== rootPath.toLowerCase()
-      );
+      const next = prev.filter((entry) => entry.rootPath.toLowerCase() !== rootPath.toLowerCase());
       writeStoredChoices(next);
       return next;
     });
@@ -391,7 +394,7 @@ export function useReviewFolders(enabled = true) {
    */
   const applySaved = useCallback((filePath: string, content: string) => {
     setDocuments((prev) =>
-      prev.map((doc) => (samePath(doc.filePath, filePath) ? { ...doc, content } : doc))
+      prev.map((doc) => (samePath(doc.filePath, filePath) ? { ...doc, content } : doc)),
     );
   }, []);
 

@@ -39,19 +39,28 @@ if (process.platform === "win32") {
 
 async function main() {
   console.log("1. Ensuring dist is built...");
-  await assertExists(path.join(root, "dist", "index.html"), "dist is missing. Run npm run build first.");
+  await assertExists(
+    path.join(root, "dist", "index.html"),
+    "dist is missing. Run npm run build first.",
+  );
 
   // 安装包已经构建好时，没必要再跑一遍 electron-builder：它慢，而且每次都会先清空
   // release/win-unpacked 和自己的临时暂存目录。只想同步便携目录或重打 zip 的时候，
   // 那两件事都是白做的——尤其在被沙箱限制批量删除的环境里，清空暂存目录还会直接失败。
   if (process.argv.includes("--skip-builder")) {
     console.log("2. Skipping electron-builder (--skip-builder); reusing release/win-unpacked...");
-    await assertExists(path.join(winUnpacked, "KnowSpace.exe"), "release/win-unpacked is missing. Run a full pack first.");
+    await assertExists(
+      path.join(winUnpacked, "KnowSpace.exe"),
+      "release/win-unpacked is missing. Run a full pack first.",
+    );
   } else {
-    console.log("2. Building MSI installer, NSIS installer, and unpacked application via electron-builder...");
-    const builderCmd = process.platform === "win32"
-      ? `"${path.join(root, "node_modules", ".bin", "electron-builder.cmd")}"`
-      : "npx electron-builder";
+    console.log(
+      "2. Building MSI installer, NSIS installer, and unpacked application via electron-builder...",
+    );
+    const builderCmd =
+      process.platform === "win32"
+        ? `"${path.join(root, "node_modules", ".bin", "electron-builder.cmd")}"`
+        : "npx electron-builder";
     await execPromise(`${builderCmd} --win msi nsis dir`, { cwd: root });
   }
 
@@ -65,7 +74,10 @@ async function main() {
   // 安装包。而删除失败在这里是被 `.catch(() => {})` 吞掉的，症状就变成"旧安装包跟着进了便携
   // zip"——正是脚本上面那段注释里 v2.6.0 事故的重演。所以定向清理必须排在前面：
   // 它是本次调用里唯一真正需要成功的删除。
-  await pruneDirectory(appReleaseDir, [`KnowSpace-${appVersion}.msi`, `KnowSpace-Setup-${appVersion}.exe`]);
+  await pruneDirectory(appReleaseDir, [
+    `KnowSpace-${appVersion}.msi`,
+    `KnowSpace-Setup-${appVersion}.exe`,
+  ]);
   await pruneDirectory(appAssetsDir, ["icon.png", "screenshot.png"]);
   await pruneDirectory(appDocsDir, PORTABLE_DOC_ENTRIES);
 
@@ -106,11 +118,14 @@ async function main() {
   }
   if (problems.length) {
     const detail = problems
-      .map((item) => `  ${item.kind === "extra" ? "leftover from an older build" : "not written by this build"}: ${item.path}`)
+      .map(
+        (item) =>
+          `  ${item.kind === "extra" ? "leftover from an older build" : "not written by this build"}: ${item.path}`,
+      )
       .join("\n");
     throw new Error(
       `The packaged folder is not this build, and what does not fit could not be removed:\n${detail}\n` +
-        `Close whatever is using ${appDir} (a running KnowSpace.exe, an editor, an open zip) and run again.`
+        `Close whatever is using ${appDir} (a running KnowSpace.exe, an editor, an open zip) and run again.`,
     );
   }
 
@@ -121,13 +136,24 @@ async function main() {
   try {
     await execFileAsync(rcedit, [
       targetExe,
-      "--set-icon", iconIco,
-      "--set-version-string", "ProductName", "KnowSpace",
-      "--set-version-string", "FileDescription", "KnowSpace - Personal Knowledge Workspace",
-      "--set-version-string", "CompanyName", "KnowSpace Team",
-      "--set-version-string", "LegalCopyright", `Copyright © ${new Date().getFullYear()} KnowSpace`,
-      "--set-file-version", appVersion,
-      "--set-product-version", appVersion
+      "--set-icon",
+      iconIco,
+      "--set-version-string",
+      "ProductName",
+      "KnowSpace",
+      "--set-version-string",
+      "FileDescription",
+      "KnowSpace - Personal Knowledge Workspace",
+      "--set-version-string",
+      "CompanyName",
+      "KnowSpace Team",
+      "--set-version-string",
+      "LegalCopyright",
+      `Copyright © ${new Date().getFullYear()} KnowSpace`,
+      "--set-file-version",
+      appVersion,
+      "--set-product-version",
+      appVersion,
     ]);
     console.log(`Successfully embedded icon and PE metadata (v${appVersion}) into KnowSpace.exe.`);
   } catch (err) {
@@ -179,20 +205,32 @@ async function main() {
     await fs.copyFile(path.join(root, "LICENSE"), path.join(appDocsDir, "LICENSE"));
   } catch (e) {}
   try {
-    await fs.copyFile(path.join(root, "docs", "USER_MANUAL.md"), path.join(appDocsDir, "USER_MANUAL.md"));
+    await fs.copyFile(
+      path.join(root, "docs", "USER_MANUAL.md"),
+      path.join(appDocsDir, "USER_MANUAL.md"),
+    );
   } catch (e) {}
   // 规划与路线图类文档不再随包分发，也不再留在仓库里：`docs/` 只保留跟着版本走的
   // 用户手册与工程规范。2026-09-26 一次性清掉了二十余份实施计划、路线图、推广方案与
   // 一次性校验报告 —— 它们的基线都停在某个旧版本，留着只会让读者读到过时的口径。
   // 需要历史版本时从 git 历史里取，不要再把它们放回这个白名单。
   try {
-    await fs.copyFile(path.join(root, "docs", "PICTURE_MANUAL.md"), path.join(appDocsDir, "PICTURE_MANUAL.md"));
+    await fs.copyFile(
+      path.join(root, "docs", "PICTURE_MANUAL.md"),
+      path.join(appDocsDir, "PICTURE_MANUAL.md"),
+    );
   } catch (e) {}
   try {
-    await fs.copyFile(path.join(root, "docs", "全功能高清图片手册.md"), path.join(appDocsDir, "全功能高清图片手册.md"));
+    await fs.copyFile(
+      path.join(root, "docs", "全功能高清图片手册.md"),
+      path.join(appDocsDir, "全功能高清图片手册.md"),
+    );
   } catch (e) {}
   try {
-    await copyDirectory(path.join(root, "docs", "manual-images"), path.join(appDocsDir, "manual-images"));
+    await copyDirectory(
+      path.join(root, "docs", "manual-images"),
+      path.join(appDocsDir, "manual-images"),
+    );
   } catch (e) {}
   try {
     const readmeTxt = `KnowSpace v${appVersion}\nPersonal Knowledge Workspace (个人知识工作台)\n\nDirect Run: Double-click 'KnowSpace.exe'\nInstaller: Locate MSI in 'release/KnowSpace-${appVersion}.msi'\nManual: Check 'docs/USER_MANUAL.md'\nGitHub: https://github.com/chunxvzhang-lab/KnowSpace\n`;

@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { BookManifest } from "../core/types";
-import {
-  createBacklinkIndex,
-  updateDocumentInIndex,
-} from "../services/backlinkIndex";
+import { createBacklinkIndex, updateDocumentInIndex } from "../services/backlinkIndex";
 import {
   buildGraphDataFromIndex,
   computeOrganicGraphPositions,
@@ -33,7 +30,7 @@ describe("graphService", () => {
       "doc-1",
       "Introduction",
       "We follow [[Architecture]] before doing [[Deployment]].",
-      "intro.md"
+      "intro.md",
     );
 
     // doc-2 links to Deployment
@@ -42,7 +39,7 @@ describe("graphService", () => {
       "doc-2",
       "Architecture",
       "See [[Deployment]] guide for containers.",
-      "arch.md"
+      "arch.md",
     );
 
     // doc-3 has no outgoing links
@@ -209,9 +206,7 @@ describe("graphService", () => {
     const manifest: BookManifest = {
       id: "book-dup",
       title: "Dup Book",
-      chapters: [
-        { id: "chapter-0", title: "USER_MANUAL", src: "USER_MANUAL.md" },
-      ],
+      chapters: [{ id: "chapter-0", title: "USER_MANUAL", src: "USER_MANUAL.md" }],
     };
     const index = createBacklinkIndex();
     // Simulate user editing where document is indexed under a different docId like 'uploaded'
@@ -220,13 +215,13 @@ describe("graphService", () => {
       "uploaded",
       "USER_MANUAL",
       "Content of user manual",
-      "USER_MANUAL.md"
+      "USER_MANUAL.md",
     );
 
     const graph = buildGraphDataFromIndex(manifest, index, "USER_MANUAL");
     // MUST have exactly 1 node for USER_MANUAL, NEVER duplicate nodes
     const manualNodes = graph.nodes.filter(
-      (n) => n.label === "USER_MANUAL" || n.normTitle === "user_manual"
+      (n) => n.label === "USER_MANUAL" || n.normTitle === "user_manual",
     );
     expect(manualNodes.length).toBe(1);
     expect(graph.nodes.length).toBe(1);
@@ -248,7 +243,7 @@ describe("graphService", () => {
       "chap-notes",
       "Notes.markdown",
       "Check our [[ArchitectureBoard]] for details.",
-      "Notes.markdown"
+      "Notes.markdown",
     );
 
     const graph = buildGraphDataFromIndex(manifest, index, "ArchitectureBoard");
@@ -275,7 +270,13 @@ describe("graphService", () => {
     };
     const index = createBacklinkIndex([]);
     // doc-a links to doc-b (same folder: guides) and doc-c (cross-folder: guides -> reference)
-    updateDocumentInIndex(index, "doc-a", "Doc A", "Link to [[Doc B]] and [[Doc C]].", "guides/docA.md");
+    updateDocumentInIndex(
+      index,
+      "doc-a",
+      "Doc A",
+      "Link to [[Doc B]] and [[Doc C]].",
+      "guides/docA.md",
+    );
     updateDocumentInIndex(index, "doc-b", "Doc B", "Internal doc.", "guides/docB.md");
     updateDocumentInIndex(index, "doc-c", "Doc C", "Reference doc.", "reference/docC.md");
 

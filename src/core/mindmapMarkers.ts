@@ -65,7 +65,7 @@ export const MINDMAP_PRIORITIES: PriorityMark[] = PRIORITY_COLORS.map((color, in
 
 export const MINDMAP_PROGRESS_STEPS: ProgressMark[] = Array.from(
   { length: PROGRESS_MAX - PROGRESS_MIN + 1 },
-  (_, index) => ({ value: PROGRESS_MIN + index, label: `${PROGRESS_MIN + index}/${PROGRESS_MAX}` })
+  (_, index) => ({ value: PROGRESS_MIN + index, label: `${PROGRESS_MIN + index}/${PROGRESS_MAX}` }),
 );
 
 /** Whether a value is a priority this map can draw. */

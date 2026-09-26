@@ -186,7 +186,7 @@ export function MindmapAnnotationSections({
                 onMarkChange(
                   nodeId,
                   "priority",
-                  markers.priority === mark.value ? null : mark.value
+                  markers.priority === mark.value ? null : mark.value,
                 )
               }
               title={`优先级 ${mark.label}`}
@@ -213,7 +213,7 @@ export function MindmapAnnotationSections({
                 onMarkChange(
                   nodeId,
                   "progress",
-                  markers.progress === mark.value ? null : mark.value
+                  markers.progress === mark.value ? null : mark.value,
                 )
               }
               title={mark.label}
@@ -261,7 +261,7 @@ export function MindmapAnnotationSections({
                       nodeId,
                       active
                         ? tags.filter((own) => own.toLowerCase() !== tag.toLowerCase())
-                        : [...tags, tag]
+                        : [...tags, tag],
                     )
                   }
                   title={active ? `从本节点去掉 ${tag}` : `加到本节点：${tag}`}

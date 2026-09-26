@@ -157,10 +157,15 @@ function main() {
     return;
   }
 
-  fs.writeFileSync(hookPath, HOOK_HEADER + blockA.join("\n") + "\n\n" + blockB.join("\n") + HOOK_FOOTER);
+  fs.writeFileSync(
+    hookPath,
+    HOOK_HEADER + blockA.join("\n") + "\n\n" + blockB.join("\n") + HOOK_FOOTER,
+  );
   fs.writeFileSync(appPath, nextLines.join("\n"));
   console.log(`wrote ${path.relative(root, hookPath)}`);
-  console.log(`rewrote ${path.relative(root, appPath)}: ${lines.length} -> ${nextLines.length} lines`);
+  console.log(
+    `rewrote ${path.relative(root, appPath)}: ${lines.length} -> ${nextLines.length} lines`,
+  );
 }
 
 main();

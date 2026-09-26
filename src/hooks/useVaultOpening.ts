@@ -3,12 +3,7 @@ import { loadBookmarks, loadReadingPosition } from "../services/storage";
 import { useTabStore } from "../store/useTabStore";
 import { useUiStore } from "../store/useUiStore";
 import { useVaultStore } from "../store/useVaultStore";
-import type {
-  BookManifest,
-  Bookmark,
-  ChapterManifest,
-  ChapterSource,
-} from "../core/types";
+import type { BookManifest, Bookmark, ChapterManifest, ChapterSource } from "../core/types";
 import type { useDocumentSession } from "./useDocumentSession";
 
 /**
@@ -91,7 +86,9 @@ export function useVaultOpening({
       setManifest(localManifest);
       setBookmarks(loadBookmarks(localId, localManifest.chapters));
       setChapterId("uploaded");
-      setTabs([{ id: "uploaded", title: baseName, relativePath: file.name, absolutePath: undefined }]);
+      setTabs([
+        { id: "uploaded", title: baseName, relativePath: file.name, absolutePath: undefined },
+      ]);
       if (file.name.toLowerCase().endsWith(".canvas")) {
         setViewMode("canvas");
         setDirectoryOpen(false);
@@ -112,7 +109,11 @@ export function useVaultOpening({
         writable: false,
       });
 
-      setNotice(file.name.toLowerCase().endsWith(".canvas") ? "空间白板已打开（浏览器环境为只读模式）。" : "Markdown 文件已打开（浏览器环境为只读模式）。");
+      setNotice(
+        file.name.toLowerCase().endsWith(".canvas")
+          ? "空间白板已打开（浏览器环境为只读模式）。"
+          : "Markdown 文件已打开（浏览器环境为只读模式）。",
+      );
     } catch (cause: unknown) {
       setNotice(cause instanceof Error ? cause.message : "无法读取文件。");
     }
@@ -120,7 +121,7 @@ export function useVaultOpening({
 
   const doOpenDesktopMarkdownPath = async (
     absolutePath: string,
-    preloadedSource?: ChapterSource | null
+    preloadedSource?: ChapterSource | null,
   ) => {
     if (!window.bookMDDesktop) return;
     if (!/\.(md|markdown|canvas)$/i.test(absolutePath)) {
@@ -139,7 +140,8 @@ export function useVaultOpening({
       const fileName = absolutePath.split(/[\\/]/).pop() ?? "Markdown.md";
       const baseName = fileName.replace(/\.(md|markdown|canvas)$/i, "") || "本地文档";
       const normPath = absolutePath.replace(/\\/g, "/").toLowerCase();
-      const isSpaceFile = normPath.includes("/space/") || /^\d{4}-\d{2}-\d{2}_\d{4}\.md$/i.test(fileName);
+      const isSpaceFile =
+        normPath.includes("/space/") || /^\d{4}-\d{2}-\d{2}_\d{4}\.md$/i.test(fileName);
 
       // Read the manifest as it is right now rather than from the render this
       // closure was created in: there are awaits above this point, so a captured
@@ -150,17 +152,19 @@ export function useVaultOpening({
 
       // Check if file belongs to currently active manifest
       const existingChap = activeManifest?.chapters.find(
-        (c) => c.absolutePath && c.absolutePath.toLowerCase() === absolutePath.toLowerCase()
+        (c) => c.absolutePath && c.absolutePath.toLowerCase() === absolutePath.toLowerCase(),
       );
 
-      const targetChapterId = existingChap ? existingChap.id : `file:${encodeURIComponent(absolutePath.toLowerCase())}`;
+      const targetChapterId = existingChap
+        ? existingChap.id
+        : `file:${encodeURIComponent(absolutePath.toLowerCase())}`;
 
       // Check if user already has an active workspace
       const hasActiveWorkspace = Boolean(
         activeManifest &&
         activeManifest.chapters.length > 0 &&
         (activeManifest.rootPath || activeManifest.chapters.length > 1) &&
-        !activeManifest.rootPath?.toLowerCase().includes("space")
+        !activeManifest.rootPath?.toLowerCase().includes("space"),
       );
 
       // Only set single file manifest if user had NO workspace and it is NOT a Space note
@@ -177,7 +181,10 @@ export function useVaultOpening({
           id: `file:${absolutePath.toLowerCase()}`,
           title: baseName,
           description: "本地文档",
-          rootPath: absolutePath.substring(0, Math.max(absolutePath.lastIndexOf("\\"), absolutePath.lastIndexOf("/"))),
+          rootPath: absolutePath.substring(
+            0,
+            Math.max(absolutePath.lastIndexOf("\\"), absolutePath.lastIndexOf("/")),
+          ),
           chapters: [singleChapter],
         };
 
@@ -215,13 +222,13 @@ export function useVaultOpening({
         const matchIdx = prev.findIndex(
           (t) =>
             t.id === targetChapterId ||
-            (t.absolutePath && t.absolutePath.toLowerCase() === absolutePath.toLowerCase())
+            (t.absolutePath && t.absolutePath.toLowerCase() === absolutePath.toLowerCase()),
         );
         if (matchIdx !== -1) {
           return prev.map((t, idx) =>
             idx === matchIdx
               ? { ...t, id: targetChapterId, title: baseName, relativePath: fileName, absolutePath }
-              : t
+              : t,
           );
         }
         return [
@@ -266,7 +273,7 @@ export function useVaultOpening({
           .then((dirResult) => {
             if (openRequestRef.current !== requestId) return;
             const activeChap = dirResult.directory.chapters.find(
-              (c) => c.absolutePath && c.absolutePath.toLowerCase() === absolutePath.toLowerCase()
+              (c) => c.absolutePath && c.absolutePath.toLowerCase() === absolutePath.toLowerCase(),
             );
             if (activeChap) {
               setManifest(dirResult.directory);
@@ -284,8 +291,8 @@ export function useVaultOpening({
                         relativePath: activeChap.src,
                         absolutePath: activeChap.absolutePath,
                       }
-                    : t
-                )
+                    : t,
+                ),
               );
             }
           })
@@ -314,7 +321,9 @@ export function useVaultOpening({
       }
       const saved = loadReadingPosition(result.directory.id, result.directory.chapters);
       const targetChapterId = saved?.chapterId ?? result.directory.chapters[0].id;
-      const targetChapter = result.directory.chapters.find((c) => c.id === targetChapterId) ?? result.directory.chapters[0];
+      const targetChapter =
+        result.directory.chapters.find((c) => c.id === targetChapterId) ??
+        result.directory.chapters[0];
 
       setManifest(result.directory);
       setBookmarks(loadBookmarks(result.directory.id, result.directory.chapters));
@@ -325,7 +334,7 @@ export function useVaultOpening({
             t.id === targetChapter.id ||
             (t.absolutePath &&
               targetChapter.absolutePath &&
-              t.absolutePath.toLowerCase() === targetChapter.absolutePath.toLowerCase())
+              t.absolutePath.toLowerCase() === targetChapter.absolutePath.toLowerCase()),
         );
         if (exists) return prev;
         return [

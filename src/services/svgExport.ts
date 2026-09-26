@@ -21,14 +21,20 @@ export function serializeSvgForExport(svgInput: string | SVGElement | HTMLElemen
     content = content.replace(/<svg\b([^>]*)>/i, '<svg xmlns="http://www.w3.org/2000/svg" $1>');
   }
   if (!content.includes("xmlns:xlink=") && content.includes("xlink:")) {
-    content = content.replace(/<svg\b([^>]*)>/i, '<svg xmlns:xlink="http://www.w3.org/1999/xlink" $1>');
+    content = content.replace(
+      /<svg\b([^>]*)>/i,
+      '<svg xmlns:xlink="http://www.w3.org/1999/xlink" $1>',
+    );
   }
 
   // 2. Fix all HTML-style self-closing void elements inside foreignObject (<br>, <hr>, <img ...>, etc.)
-  content = content.replace(/<(br|hr|img|input|meta|link)(\s+[^>]*)?\/?>/gi, (_match, tag, attrs = "") => {
-    const cleanAttrs = attrs.trim();
-    return cleanAttrs ? `<${tag} ${cleanAttrs} />` : `<${tag} />`;
-  });
+  content = content.replace(
+    /<(br|hr|img|input|meta|link)(\s+[^>]*)?\/?>/gi,
+    (_match, tag, attrs = "") => {
+      const cleanAttrs = attrs.trim();
+      return cleanAttrs ? `<${tag} ${cleanAttrs} />` : `<${tag} />`;
+    },
+  );
 
   // 3. Try to validate with DOMParser if available in browser
   if (typeof DOMParser !== "undefined") {
@@ -72,7 +78,7 @@ export function triggerDownload(urlOrDataUri: string, filename: string, ext: str
 export async function rasterizeRenderedSvgToPng(
   svgElement: SVGSVGElement,
   theme = "twitter",
-  scale = 3
+  scale = 3,
 ): Promise<string> {
   // 1. Measure real bounding box in the active DOM
   let bbox: { x: number; y: number; width: number; height: number };
@@ -107,7 +113,9 @@ export async function rasterizeRenderedSvgToPng(
   // 3. Add background rect inside the SVG
   const isDark =
     theme === "twitter" ||
-    (theme === "system" && typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    (theme === "system" &&
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches);
   const bgRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
   bgRect.setAttribute("x", `${minX}`);
   bgRect.setAttribute("y", `${minY}`);
@@ -195,7 +203,7 @@ export async function downloadSvgAsPng(
   svgInput: string | SVGElement,
   filename: string,
   targetElement?: HTMLElement | SVGElement | null,
-  scaleMultiplier = 2
+  scaleMultiplier = 2,
 ): Promise<void> {
   const cleanXml = serializeSvgForExport(svgInput);
 
@@ -212,7 +220,9 @@ export async function downloadSvgAsPng(
   }
 
   // If width/height still need extraction, parse from viewBox or attributes
-  const viewBoxMatch = cleanXml.match(/viewBox=["']\s*([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s*["']/i);
+  const viewBoxMatch = cleanXml.match(
+    /viewBox=["']\s*([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s*["']/i,
+  );
   if (viewBoxMatch) {
     const vbWidth = parseFloat(viewBoxMatch[3]);
     const vbHeight = parseFloat(viewBoxMatch[4]);
@@ -260,7 +270,7 @@ async function rasterizeSvgToPngDownload(
   width: number,
   height: number,
   filename: string,
-  scaleMultiplier: number
+  scaleMultiplier: number,
 ): Promise<void> {
   const dataUrl = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgXml);
 
@@ -342,4 +352,3 @@ export function downloadSvgFile(svgContent: string | SVGElement, filename: strin
     URL.revokeObjectURL(url);
   }, 100);
 }
-

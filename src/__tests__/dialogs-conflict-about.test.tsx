@@ -15,7 +15,7 @@ describe("Dialogs Sub-function Tests", () => {
           onOverwrite={vi.fn()}
           onSaveAs={vi.fn()}
           onCancel={vi.fn()}
-        />
+        />,
       );
       expect(container.firstChild).toBeNull();
     });
@@ -34,7 +34,7 @@ describe("Dialogs Sub-function Tests", () => {
           onOverwrite={onOverwrite}
           onSaveAs={onSaveAs}
           onCancel={onCancel}
-        />
+        />,
       );
 
       expect(screen.getByText("检测到文件冲突")).toBeDefined();
@@ -63,7 +63,7 @@ describe("Dialogs Sub-function Tests", () => {
           onSave={vi.fn()}
           onDiscard={vi.fn()}
           onCancel={vi.fn()}
-        />
+        />,
       );
       expect(container.firstChild).toBeNull();
     });
@@ -80,7 +80,7 @@ describe("Dialogs Sub-function Tests", () => {
           onSave={onSave}
           onDiscard={onDiscard}
           onCancel={onCancel}
-        />
+        />,
       );
 
       expect(screen.getByText("是否保存未保存的修改？")).toBeDefined();
@@ -99,9 +99,7 @@ describe("Dialogs Sub-function Tests", () => {
 
   describe("AboutDialog", () => {
     it("returns null when not open", () => {
-      const { container } = render(
-        <AboutDialog isOpen={false} onClose={vi.fn()} />
-      );
+      const { container } = render(<AboutDialog isOpen={false} onClose={vi.fn()} />);
       expect(container.firstChild).toBeNull();
     });
 

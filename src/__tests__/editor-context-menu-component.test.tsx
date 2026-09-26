@@ -30,14 +30,7 @@ describe("EditorContextMenu Component", () => {
     const mockView = createMockView();
     const onClose = vi.fn();
 
-    render(
-      <EditorContextMenu
-        x={150}
-        y={200}
-        onClose={onClose}
-        view={mockView}
-      />
-    );
+    render(<EditorContextMenu x={150} y={200} onClose={onClose} view={mockView} />);
 
     const menu = document.querySelector(".editor-context-menu");
     expect(menu).toBeDefined();
@@ -57,14 +50,7 @@ describe("EditorContextMenu Component", () => {
     const mockView = createMockView();
     const onClose = vi.fn();
 
-    render(
-      <EditorContextMenu
-        x={150}
-        y={200}
-        onClose={onClose}
-        view={mockView}
-      />
-    );
+    render(<EditorContextMenu x={150} y={200} onClose={onClose} view={mockView} />);
 
     const insertTrigger = screen.getByText("插入内容与图表");
     expect(insertTrigger).toBeDefined();
@@ -94,14 +80,7 @@ describe("EditorContextMenu Component", () => {
     const mockView = createMockView();
     const onClose = vi.fn();
 
-    render(
-      <EditorContextMenu
-        x={150}
-        y={200}
-        onClose={onClose}
-        view={mockView}
-      />
-    );
+    render(<EditorContextMenu x={150} y={200} onClose={onClose} view={mockView} />);
 
     // Direct first-class trigger in main menu
     const directTableTrigger = screen.getByText("插入表格 (自定义行列)");
@@ -129,14 +108,7 @@ describe("EditorContextMenu Component", () => {
     const mockView = createMockView();
     const onClose = vi.fn();
 
-    render(
-      <EditorContextMenu
-        x={150}
-        y={200}
-        onClose={onClose}
-        view={mockView}
-      />
-    );
+    render(<EditorContextMenu x={150} y={200} onClose={onClose} view={mockView} />);
 
     // 1. Hover table picker -> table picker opens
     const directTableTrigger = screen.getByText("插入表格 (自定义行列)");

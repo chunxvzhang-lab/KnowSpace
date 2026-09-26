@@ -53,9 +53,7 @@ describe("useDocumentCreation", () => {
   });
 
   const mount = () =>
-    renderHook(() =>
-      useDocumentCreation({ openSession, setViewMode, activeLoadedChapterIdRef })
-    );
+    renderHook(() => useDocumentCreation({ openSession, setViewMode, activeLoadedChapterIdRef }));
 
   describe("when the desktop bridge is missing", () => {
     it("says so instead of failing silently", async () => {
@@ -124,7 +122,7 @@ describe("useDocumentCreation", () => {
           fileName: "新笔记.md",
           source: "# 新文档\n",
           writable: true,
-        })
+        }),
       );
     });
 
@@ -174,7 +172,7 @@ describe("useDocumentCreation", () => {
 
       expect(setViewMode).toHaveBeenCalledWith("mindmap");
       expect(desktop.createMarkdownFile).toHaveBeenCalledWith(
-        expect.objectContaining({ defaultName: "新建思维导图.mindmap.md" })
+        expect.objectContaining({ defaultName: "新建思维导图.mindmap.md" }),
       );
     });
 

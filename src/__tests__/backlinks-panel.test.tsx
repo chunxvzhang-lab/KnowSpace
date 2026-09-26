@@ -13,7 +13,7 @@ describe("BacklinksPanel Component Sub-function Tests", () => {
         unlinkedMentions={[]}
         onJumpToSource={vi.fn()}
         onConvertMention={vi.fn()}
-      />
+      />,
     );
 
     expect(screen.getByText("当前文档上下文")).toBeDefined();
@@ -52,7 +52,7 @@ describe("BacklinksPanel Component Sub-function Tests", () => {
         unlinkedMentions={[]}
         onJumpToSource={onJumpToSource}
         onConvertMention={vi.fn()}
-      />
+      />,
     );
 
     expect(screen.getByText("来源笔记 A")).toBeDefined();
@@ -85,7 +85,7 @@ describe("BacklinksPanel Component Sub-function Tests", () => {
         unlinkedMentions={unlinkedMentions}
         onJumpToSource={vi.fn()}
         onConvertMention={onConvertMention}
-      />
+      />,
     );
 
     expect(screen.getByText("草稿 B")).toBeDefined();

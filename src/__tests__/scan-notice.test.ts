@@ -37,14 +37,20 @@ describe("describeScanUnreadable", () => {
   });
 
   it("distinguishes a folder that is gone from one that cannot be read", () => {
-    const notice = describeScanUnreadable({ count: 2, samples: ["C:/vault/旧的"], reason: "ENOENT" });
+    const notice = describeScanUnreadable({
+      count: 2,
+      samples: ["C:/vault/旧的"],
+      reason: "ENOENT",
+    });
     expect(notice).toContain("已不存在");
     expect(notice).not.toContain("权限");
   });
 
   it("explains a link loop and a non-directory path separately", () => {
     expect(describeScanUnreadable({ count: 1, samples: [], reason: "ELOOP" })).toContain("循环");
-    expect(describeScanUnreadable({ count: 1, samples: [], reason: "ENOTDIR" })).toContain("不是目录");
+    expect(describeScanUnreadable({ count: 1, samples: [], reason: "ENOTDIR" })).toContain(
+      "不是目录",
+    );
   });
 
   it("still produces a sentence when no example path travelled with the marker", () => {

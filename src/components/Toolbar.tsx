@@ -193,7 +193,9 @@ export function Toolbar(props: ToolbarProps) {
             className={`icon-button ${props.typewriterMode ? "active" : ""}`}
             onClick={props.onToggleTypewriterMode}
             aria-label={props.typewriterMode ? "关闭打字机居中滚动" : "开启打字机居中滚动"}
-            title={props.typewriterMode ? "打字机模式：已开启（Alt+T）" : "打字机模式：已关闭（Alt+T）"}
+            title={
+              props.typewriterMode ? "打字机模式：已开启（Alt+T）" : "打字机模式：已关闭（Alt+T）"
+            }
           >
             <Eye size={17} />
           </button>
@@ -204,7 +206,11 @@ export function Toolbar(props: ToolbarProps) {
             className={`icon-button ${props.showLineNumbers ? "active" : ""}`}
             onClick={props.onToggleLineNumbers}
             aria-label={props.showLineNumbers ? "隐藏正文预览行号" : "显示正文预览行号"}
-            title={props.showLineNumbers ? "正文行号：已开启（点击隐藏）" : "正文行号：已隐藏（点击开启）"}
+            title={
+              props.showLineNumbers
+                ? "正文行号：已开启（点击隐藏）"
+                : "正文行号：已隐藏（点击开启）"
+            }
           >
             <Hash size={17} />
           </button>

@@ -42,7 +42,7 @@ function installBridge(content?: string) {
     readMindmapSidecar: vi
       .fn()
       .mockResolvedValue(
-        content ? { success: true, exists: true, content } : { success: true, exists: false }
+        content ? { success: true, exists: true, content } : { success: true, exists: false },
       ),
     saveMindmapSidecar: vi.fn().mockResolvedValue({ success: true }),
   };
@@ -115,7 +115,10 @@ describe("关系线的标签、箭头、形态与颜色", () => {
     const fs = await import("node:fs/promises");
     const path = await import("node:path");
     const css = await fs.readFile(path.resolve(__dirname, "../styles.css"), "utf8");
-    const hitRule = css.slice(css.indexOf(".mindmap-relation-hit"), css.indexOf("}", css.indexOf(".mindmap-relation-hit")));
+    const hitRule = css.slice(
+      css.indexOf(".mindmap-relation-hit"),
+      css.indexOf("}", css.indexOf(".mindmap-relation-hit")),
+    );
     expect(hitRule).toContain("stroke-width: 14");
     expect(hitRule).toContain("stroke: transparent");
 
@@ -231,14 +234,16 @@ describe("关系线的标签、箭头、形态与颜色", () => {
 
     const built = buildStandaloneMindmapSvg(
       document.querySelector(".mindmap-svg-canvas") as SVGSVGElement,
-      { bounds: layoutMindmap(parseMarkdownToMindmapTree(SOURCE, "测试")).bounds, dark: true }
+      { bounds: layoutMindmap(parseMarkdownToMindmapTree(SOURCE, "测试")).bounds, dark: true },
     )!;
     const doc = new DOMParser().parseFromString(built.svg, "image/svg+xml");
 
     // The reader's colour beats the rule table's default, on screen and in the
     // file: the rule paints what the element does not already say.
     expect(doc.querySelector(".mindmap-relation-line")?.getAttribute("stroke")).toBe("#fb7185");
-    expect(doc.querySelector(".mindmap-relation-line")?.getAttribute("stroke-dasharray")).toBe("5 4");
+    expect(doc.querySelector(".mindmap-relation-line")?.getAttribute("stroke-dasharray")).toBe(
+      "5 4",
+    );
     // A picked line is drawn heavier; that is a state of the editor, not of the
     // picture.
     expect(doc.querySelector(".mindmap-relation.is-selected")).toBeNull();

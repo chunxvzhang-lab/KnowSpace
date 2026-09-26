@@ -82,7 +82,12 @@ describe("分支编号", () => {
     saveMindmapNumbering(DOC, true);
     const onSourceChange = vi.fn();
     render(
-      <MindmapView title="测试" source={SOURCE} documentKey={DOC} onSourceChange={onSourceChange} />
+      <MindmapView
+        title="测试"
+        source={SOURCE}
+        documentKey={DOC}
+        onSourceChange={onSourceChange}
+      />,
     );
 
     expect(numbers().length).toBe(4);

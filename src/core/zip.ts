@@ -24,7 +24,13 @@ function readUint16(bytes: Uint8Array, offset: number): number {
 function readUint32(bytes: Uint8Array, offset: number): number {
   // `>>> 0` because the top bit would otherwise make this negative, and every
   // offset in a ZIP is unsigned.
-  return (bytes[offset] | (bytes[offset + 1] << 8) | (bytes[offset + 2] << 16) | (bytes[offset + 3] << 24)) >>> 0;
+  return (
+    (bytes[offset] |
+      (bytes[offset + 1] << 8) |
+      (bytes[offset + 2] << 16) |
+      (bytes[offset + 3] << 24)) >>>
+    0
+  );
 }
 
 /**
@@ -229,7 +235,7 @@ export function readZipEntry(
   bytes: Uint8Array,
   wanted: (name: string) => boolean,
   /** What is being looked for, by name — this ends up in the message. */
-  label: string
+  label: string,
 ): ZipResult {
   const directory = readDirectory(bytes);
   if (!directory || directory.length === 0) {
@@ -245,7 +251,10 @@ export function readZipEntry(
   if (entry.compressedSize === 0xffffffff || entry.headerOffset === 0xffffffff) {
     return { ok: false, message: "这个 ZIP 包用了 ZIP64，暂不支持。" };
   }
-  if (entry.headerOffset + 30 > bytes.length || readUint32(bytes, entry.headerOffset) !== LOCAL_ENTRY) {
+  if (
+    entry.headerOffset + 30 > bytes.length ||
+    readUint32(bytes, entry.headerOffset) !== LOCAL_ENTRY
+  ) {
     return { ok: false, message: "这个 ZIP 包的目录指向了不存在的数据。" };
   }
 

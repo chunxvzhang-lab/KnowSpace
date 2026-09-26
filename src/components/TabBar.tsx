@@ -78,18 +78,25 @@ export const TabBar = memo(function TabBar({
     });
   }, []);
 
-  const handleMouseDown = useCallback((e: React.MouseEvent, tabId: string) => {
-    if (e.button === 1) {
-      // Middle click closes tab
-      e.preventDefault();
-      onCloseTab(tabId);
-    }
-  }, [onCloseTab]);
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent, tabId: string) => {
+      if (e.button === 1) {
+        // Middle click closes tab
+        e.preventDefault();
+        onCloseTab(tabId);
+      }
+    },
+    [onCloseTab],
+  );
 
   if (tabs.length === 0) return null;
 
   return (
-    <div className={`tab-bar-container ${dualSplitTabId ? "has-dual-split" : ""}`} role="tablist" aria-label="文档标签页">
+    <div
+      className={`tab-bar-container ${dualSplitTabId ? "has-dual-split" : ""}`}
+      role="tablist"
+      aria-label="文档标签页"
+    >
       <div className="tab-bar-list" ref={tabListRef}>
         {tabs.map((tab) => {
           const isActive = tab.id === activeTabId;
@@ -107,7 +114,11 @@ export const TabBar = memo(function TabBar({
             >
               <span className="tab-icon">📄</span>
               <span className="tab-title">{tab.title}</span>
-              {isSplitSecondary ? <span className="tab-split-badge" title="右侧分屏对比中">分屏</span> : null}
+              {isSplitSecondary ? (
+                <span className="tab-split-badge" title="右侧分屏对比中">
+                  分屏
+                </span>
+              ) : null}
               {tab.isDirty ? <span className="tab-dirty-indicator" title="未保存的修改" /> : null}
               <button
                 type="button"
@@ -132,7 +143,9 @@ export const TabBar = memo(function TabBar({
             type="button"
             className={`tab-graph-toggle-btn ${isGraphPaneOpen ? "is-active" : ""}`}
             onClick={onToggleGraphPane}
-            title={isGraphPaneOpen ? "收起知识网络图谱分栏 (Ctrl+G)" : "在右侧打开知识网络图谱 (Ctrl+G)"}
+            title={
+              isGraphPaneOpen ? "收起知识网络图谱分栏 (Ctrl+G)" : "在右侧打开知识网络图谱 (Ctrl+G)"
+            }
           >
             <Network size={13} style={{ color: "#38bdf8" }} />
             <span>知识图谱</span>
@@ -168,21 +181,24 @@ export const TabBar = memo(function TabBar({
               📖 在右侧分屏对比查看
             </button>
           )}
-          {onOpenDualSplit && contextMenu.tabId === activeTabId && tabs.length >= 2 && !dualSplitTabId && (
-            <button
-              type="button"
-              className="menu-item menu-item-highlight"
-              onClick={() => {
-                const otherTab = tabs.find((t) => t.id !== activeTabId);
-                if (otherTab) {
-                  onOpenDualSplit(otherTab.id);
-                }
-                setContextMenu(null);
-              }}
-            >
-              📖 开启分屏对比查看
-            </button>
-          )}
+          {onOpenDualSplit &&
+            contextMenu.tabId === activeTabId &&
+            tabs.length >= 2 &&
+            !dualSplitTabId && (
+              <button
+                type="button"
+                className="menu-item menu-item-highlight"
+                onClick={() => {
+                  const otherTab = tabs.find((t) => t.id !== activeTabId);
+                  if (otherTab) {
+                    onOpenDualSplit(otherTab.id);
+                  }
+                  setContextMenu(null);
+                }}
+              >
+                📖 开启分屏对比查看
+              </button>
+            )}
           {dualSplitTabId && onCloseDualSplit && (
             <button
               type="button"

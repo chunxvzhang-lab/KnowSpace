@@ -42,7 +42,7 @@ const RAW_CSS = readFileSync(resolve(__dirname, "../styles.css"), "utf8");
 // 先剥注释：注释里会以散文形式写出 `@media (prefers-color-scheme: light) { … }` 和
 // `var(--flash-accent)`，不剥的话前者会被当成真的 at-rule、后者会被当成真的引用。
 const { stripped: STRIPPED_CSS, atRules: AT_RULES } = stripAtRules(
-  RAW_CSS.replace(/\/\*[\s\S]*?\*\//g, "")
+  RAW_CSS.replace(/\/\*[\s\S]*?\*\//g, ""),
 );
 
 /** 剥离 `@media` / `@keyframes` / `@supports` 块，返回剥离后的文本与被剥离的内容。 */
@@ -84,7 +84,10 @@ function declarations(body: string): Declaration[] {
   for (const raw of body.split(";")) {
     const colon = raw.indexOf(":");
     if (colon === -1) continue;
-    out.push({ prop: raw.slice(0, colon).trim().toLowerCase(), value: raw.slice(colon + 1).trim() });
+    out.push({
+      prop: raw.slice(0, colon).trim().toLowerCase(),
+      value: raw.slice(colon + 1).trim(),
+    });
   }
   return out;
 }
@@ -127,7 +130,7 @@ function normalize(selector: string): string {
 
 function themeQualifiers(selector: string): string[] {
   return [...selector.matchAll(/\.theme-([\w-]+)|\[data-theme="([\w-]+)"\]/g)].map(
-    (m) => m[1] ?? m[2]
+    (m) => m[1] ?? m[2],
   );
 }
 
@@ -184,7 +187,13 @@ type Rgb = [number, number, number];
 
 function parseHex(value: string): Rgb {
   const h = value.replace("#", "");
-  const full = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  const full =
+    h.length === 3
+      ? h
+          .split("")
+          .map((c) => c + c)
+          .join("")
+      : h;
   return [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16)) as Rgb;
 }
 
@@ -247,7 +256,7 @@ type Resolved = { value: string; from: string };
 function resolveProperty(
   elementSelector: string,
   prop: "color" | "background",
-  theme: ThemeKey
+  theme: ThemeKey,
 ): Resolved | null {
   let best: (Resolved & { weight: number; order: number }) | null = null;
   for (const rule of RULES) {
@@ -264,7 +273,8 @@ function resolveProperty(
 }
 
 function tokensOf(theme: ThemeKey): Record<string, string> {
-  const selector = theme === "dark" ? ".flash-capsule-overlay" : `.flash-capsule-overlay.theme-${theme}`;
+  const selector =
+    theme === "dark" ? ".flash-capsule-overlay" : `.flash-capsule-overlay.theme-${theme}`;
   const out: Record<string, string> = {};
   for (const rule of RULES) {
     if (rule.selector !== selector) continue;
@@ -355,7 +365,10 @@ function foregroundOf(elementSelector: string, theme: ThemeKey): Resolved | null
   const token = raw.match(/^var\((--flash-[\w-]+)\)$/);
   if (!token) return { value: raw, from: resolved.from };
   const tokens = tokensOf(theme);
-  expect(tokens[token[1]], `${theme} 主题缺少令牌 ${token[1]}（${elementSelector} 用到）`).toBeTruthy();
+  expect(
+    tokens[token[1]],
+    `${theme} 主题缺少令牌 ${token[1]}（${elementSelector} 用到）`,
+  ).toBeTruthy();
   return { value: tokens[token[1]], from: `${resolved.from} → ${token[1]}` };
 }
 
@@ -462,9 +475,11 @@ describe("闪念胶囊配色令牌", () => {
     // 是手工复制出来的第二份浅色来源，只覆盖了容器和两个 textarea。
     // 现在系统主题由 resolveThemeMode() 解析成具体主题（见 theme-mode.test.ts）。
     const offenders = AT_RULES.filter(
-      (block) => block.includes("prefers-color-scheme") && block.includes("flash-")
+      (block) => block.includes("prefers-color-scheme") && block.includes("flash-"),
     );
-    expect(offenders, `胶囊规则不应再出现 prefers-color-scheme：${offenders.join(" | ")}`).toEqual([]);
+    expect(offenders, `胶囊规则不应再出现 prefers-color-scheme：${offenders.join(" | ")}`).toEqual(
+      [],
+    );
   });
 
   it("扫描集足够大，且每条显式列出的选择器都真的存在", () => {
@@ -473,10 +488,12 @@ describe("闪念胶囊配色令牌", () => {
     // 判定标准是「能解析出前景色」，不是「自己的规则里有 color」——只改 background 的
     // hover 态正是靠继承拿颜色的，用后者会把它们误判成拼错的选择器。
     const missing = EXTRA_SELECTORS.filter((sel) =>
-      THEME_KEYS.every((theme) => foregroundOf(sel, theme) === null)
+      THEME_KEYS.every((theme) => foregroundOf(sel, theme) === null),
     );
-    expect(missing, `EXTRA_SELECTORS 里这些选择器解析不出前景色（拼错？）: ${missing.join(", ")}`)
-      .toEqual([]);
+    expect(
+      missing,
+      `EXTRA_SELECTORS 里这些选择器解析不出前景色（拼错？）: ${missing.join(", ")}`,
+    ).toEqual([]);
   });
 
   describe("令牌叠在淡色底上（不只是纯底）", () => {
@@ -509,8 +526,10 @@ describe("闪念胶囊配色令牌", () => {
         for (const selector of HINT_BACKDROPS) {
           const bg = backdropOf(selector, theme);
           const ratio = contrast(parseHex(token), bg);
-          expect(ratio, `${selector}: ${token} on rgb(${bg.join(",")}) = ${ratio.toFixed(2)}:1`)
-            .toBeGreaterThanOrEqual(4.5);
+          expect(
+            ratio,
+            `${selector}: ${token} on rgb(${bg.join(",")}) = ${ratio.toFixed(2)}:1`,
+          ).toBeGreaterThanOrEqual(4.5);
         }
       });
 
@@ -520,8 +539,10 @@ describe("闪念胶囊配色令牌", () => {
         for (const selector of ON_TINT_BACKDROPS) {
           const bg = backdropOf(selector, theme);
           const ratio = contrast(parseHex(token), bg);
-          expect(ratio, `${selector}: ${token} on rgb(${bg.join(",")}) = ${ratio.toFixed(2)}:1`)
-            .toBeGreaterThanOrEqual(4.5);
+          expect(
+            ratio,
+            `${selector}: ${token} on rgb(${bg.join(",")}) = ${ratio.toFixed(2)}:1`,
+          ).toBeGreaterThanOrEqual(4.5);
         }
       });
     }
@@ -559,7 +580,7 @@ describe("闪念胶囊配色令牌", () => {
         expect(base, `${theme} 有 ${name} 却没有对应的 ${baseName}`).toBeTruthy();
         expect(
           value.split(",").map((s) => Number(s.trim())),
-          `${theme} 的 ${name} 与 ${baseName} 不是同一颜色`
+          `${theme} 的 ${name} 与 ${baseName} 不是同一颜色`,
         ).toEqual(parseHex(base));
       }
     }
@@ -567,7 +588,9 @@ describe("闪念胶囊配色令牌", () => {
 
   it("三个主题解析出的胶囊面互不相同（解析器没有把主题搞混）", () => {
     const surfaces = THEME_KEYS.map((t) => surfaceOf(t).join(","));
-    expect(new Set(surfaces).size, `解析出的胶囊面: ${surfaces.join(" | ")}`).toBe(THEME_KEYS.length);
+    expect(new Set(surfaces).size, `解析出的胶囊面: ${surfaces.join(" | ")}`).toBe(
+      THEME_KEYS.length,
+    );
   });
 
   it("标题用的是令牌，不是硬编码琥珀", () => {
@@ -575,7 +598,9 @@ describe("闪念胶囊配色令牌", () => {
     // 只有 2.15:1。`!important` 尤其危险——它会让主题覆盖彻底失效。
     for (const theme of THEME_KEYS) {
       const fg = foregroundOf(".flash-title", theme)!;
-      expect(fg.value, `${theme} 的 .flash-title 应解析到令牌`).toBe(tokensOf(theme)["--flash-accent"]);
+      expect(fg.value, `${theme} 的 .flash-title 应解析到令牌`).toBe(
+        tokensOf(theme)["--flash-accent"],
+      );
     }
   });
 
@@ -592,7 +617,7 @@ describe("闪念胶囊配色令牌", () => {
             if (ratio < 4.5) {
               failures.push(
                 `${selector}: ${fg.value} on rgb(${bg.join(",")}) = ${ratio.toFixed(2)}:1` +
-                  `  [color 来自 ${fg.from}]`
+                  `  [color 来自 ${fg.from}]`,
               );
             }
           }
@@ -655,8 +680,9 @@ describe("对比度度量与阈值确实在起作用", () => {
   });
 
   it("改动后的取值确实达标", () => {
-    expect(contrast(parseHex("#475569"), composite([0, 0, 0], 0.05, lightSurface)))
-      .toBeGreaterThanOrEqual(4.5);
+    expect(
+      contrast(parseHex("#475569"), composite([0, 0, 0], 0.05, lightSurface)),
+    ).toBeGreaterThanOrEqual(4.5);
     expect(contrast(parseHex("#b45309"), lightSurface)).toBeGreaterThanOrEqual(4.5);
   });
 });
