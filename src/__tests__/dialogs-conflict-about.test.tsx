@@ -124,5 +124,33 @@ describe("Dialogs Sub-function Tests", () => {
       fireEvent.click(closeBtn);
       expect(onClose).toHaveBeenCalledTimes(1);
     });
+
+    /**
+     * The changelog is hand-written, so nothing ties it to the version except a
+     * check like this one — and the badge above it is injected from
+     * package.json. The two drifted: the dialog showed "v2.6.5" next to a
+     * changelog whose newest entry was v2.6.4, and every test still passed,
+     * because the only assertion about the version was that the badge renders
+     * it. Shipping a release whose own "What's New" stops one version short is
+     * invisible from the outside, which is what makes it worth a guard.
+     */
+    it("has a changelog entry for the version being shipped", () => {
+      const { container } = render(<AboutDialog isOpen={true} onClose={vi.fn()} />);
+
+      const labels = Array.from(
+        container.querySelectorAll(".about-changelog-group-label span"),
+      ).map((node) => node.textContent?.trim() ?? "");
+
+      expect(labels.length).toBeGreaterThan(0);
+
+      // Newest first, so the entry for this version has to lead the list.
+      expect(labels[0].startsWith(`v${__APP_VERSION__} `)).toBe(true);
+
+      // And every entry has to be version-prefixed, so a label that lost its
+      // number is caught rather than silently skipped by the check above.
+      for (const label of labels) {
+        expect(label).toMatch(/^v\d+\.\d+\.\d+ /);
+      }
+    });
   });
 });

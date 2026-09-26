@@ -150,6 +150,23 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
               <span className="about-changelog-version-badge">v{__APP_VERSION__}</span>
             </div>
             <div className="about-changelog-list">
+              {/* v2.6.5 */}
+              <div className="about-changelog-group">
+                <div className="about-changelog-group-label">
+                  <Sparkles size={12} className="text-cyan" />
+                  <span>v2.6.5 点开头的文件可以显示了 · 目录不再漏文件 · 复盘与切换提速</span>
+                </div>
+                <ul className="about-changelog-items">
+                  <li>👁️ <strong>新增「显示点开头的文件」开关</strong>（工具栏，仅在打开了文件夹时出现；<strong>默认关闭</strong>，所以升级后第一眼看到的目录树与 v2.6.4 完全一样）。过滤规则分两类：<code>.git</code>、<code>node_modules</code>、<code>dist</code> 这类工具与系统目录<strong>始终跳过</strong>，开关不会把仓库内部结构铺进文档树；你自己的隐藏文件（<code>.草稿.md</code>、<code>.archive/</code>）打开后显示，并以弱化样式呈现。</li>
+                  <li>🔤 <strong>隐藏项作为一整块排在可见项之后</strong>，不按名字与可见项混排 —— 打开开关应当是「末尾多出一段」，而不是把你正在看的列表重新排一遍：文档挪位置只因为<em>另一个</em>文档被显示出来，是让列表显得不可靠的那类变化。判定规则为「文件名以点开头，<strong>或它上面任意一层文件夹以点开头</strong>」。</li>
+                  <li>🗂️ <strong>修复目录扫描静默漏文件</strong>：文件上限 3000 与深度上限 6 层此前是<strong>硬截断且不产生任何提示</strong> —— 第 7 层往下的整棵子树直接丢弃，读者的结论只能是「我的文档不见了」。现改为护栏（50000 个文件 / 64 层 + 20 秒墙钟兜底），<strong>截断原因必须上报</strong>并在目录树底部说明；同时补上 junction 环路保护与符号链接分支，并区分「打不开的目录」与「空目录」（此前权限不足与空目录都返回空列表，长得一模一样）。</li>
+                  <li>🖱️ <strong>修复复盘的文件夹列表滚不动</strong>：列表本身没有滚动容器，而外层容器是 <code>overflow: hidden</code>、头部又不肯收缩，于是列表一变长就被直接裁掉 —— 既没有滚动条也没有触屏手势。顺带修了一个更糟的：列表为空时整个容器不渲染，<strong>「添加文件夹」这个唯一能填充列表的入口被一起藏掉</strong>。</li>
+                  <li>⚡ <strong>打开新文件不再跳动</strong>：切换文档时存在两个中间态 —— Tab 已切到新文件而正文还是旧的；以及新正文渲染前的「新身份 + 旧内容」那一帧。现在在切换时<strong>同步查渲染缓存</strong>，让两者落在同一次提交里，中间那一帧就不存在了。</li>
+                  <li>🚀 <strong>几处按次发生的平方级扫描</strong>：围栏代码块扫描由「每行从头重扫」改为一次预扫描（5000 行笔记 <strong>973.6 ms → 1.01 ms</strong>）；文件夹路径去重改用 Set（5000 个路径 <strong>7080 ms → 4.4 ms</strong> —— 此前选满 5 个文件夹再切到该来源，界面会僵住约 7 秒）；目录树构建改为查表（9000 篇 <strong>265 ms → 23 ms</strong>）。</li>
+                  <li>🧪 <strong>测试规模</strong>：<strong>110 个测试套件、1382 项</strong>单元与集成测试 100% 通过。</li>
+                </ul>
+              </div>
+
               {/* v2.6.4 */}
               <div className="about-changelog-group">
                 <div className="about-changelog-group-label">
