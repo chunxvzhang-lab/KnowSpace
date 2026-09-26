@@ -24,6 +24,7 @@
 /.codex
 /.playwright-cli
 /__pycache__
+__pycache__/
 *.pyc
 product_roadmap.md
 ROADMAP.md
@@ -59,5 +60,5 @@ test-baseline.json
 baseline-run.txt
 baseline-capture.log
 
-# Pre-split backup written by scripts/split-canvas-service.cjs
+# Pre-split backup written by scripts/_archive/split-canvas-service.cjs
 *.pre-split.ts.bak
