@@ -1,4 +1,11 @@
-import type { BookManifest, ChapterManifest, ChapterSource, DiskVersion } from "../core/types";
+import type {
+  BookManifest,
+  ChapterManifest,
+  ChapterSource,
+  DiskVersion,
+  ManifestScanTruncation,
+  ManifestScanUnreadable,
+} from "../core/types";
 
 export type DirectoryOpenResult =
   | { canceled: true }
@@ -85,6 +92,15 @@ export type KnowSpaceDesktopAPI = {
   getInitialSyncData?: () => { filePath: string; source: ChapterSource | null } | null;
   getLaunchFilePath: () => Promise<string | null>;
   setNativeTheme: (theme: string) => Promise<void>;
+  /**
+   * Applies the reader's directory-scan preferences.
+   *
+   * A setting rather than an argument on each listing call: a directory is
+   * listed from many places in the app, and a preference threaded through all of
+   * them would eventually be missed on one — showing up as hidden files coming
+   * back on whichever path was forgotten.
+   */
+  setScanOptions?: (options: { includeHidden?: boolean }) => Promise<{ ok: boolean }>;
   openDirectory: () => Promise<DirectoryOpenResult>;
   refreshDirectory: (rootPath: string) => Promise<BookManifest & { rootPath: string }>;
   readMarkdownFile: (absolutePath: string) => Promise<ChapterSource>;
@@ -102,9 +118,16 @@ export type KnowSpaceDesktopAPI = {
     name?: string;
     paths?: string[];
     message?: string;
+    scanTruncated?: ManifestScanTruncation;
+    scanUnreadable?: ManifestScanUnreadable;
   }>;
   /** The Markdown files in a folder chosen earlier, listed again with no side effects. */
-  listReviewFolder?: (rootPath: string) => Promise<{ paths?: string[]; message?: string }>;
+  listReviewFolder?: (rootPath: string) => Promise<{
+    paths?: string[];
+    message?: string;
+    scanTruncated?: ManifestScanTruncation;
+    scanUnreadable?: ManifestScanUnreadable;
+  }>;
   /**
    * The mind map's companion file, which holds what the document cannot.
    *

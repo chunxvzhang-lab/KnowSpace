@@ -39,5 +39,17 @@ export default defineConfig({
      * 调这个值之前请先量一遍最慢的用例（`npx vitest run <file>` 看单条耗时）。
      */
     testTimeout: 15000,
+    /**
+     * `hookTimeout` 是同一个问题的另一半，只是之前漏了 —— 它一直是默认的 10s。
+     *
+     * 这个套件里有若干用例在 `beforeEach` / `afterEach` 里真的读写磁盘（`markdown-files`
+     * 建临时目录、写几十个文件、再递归删掉），而 `singleFork: true` 让所有文件共用一个进程：
+     * 前一个文件留下的 GC 压力会落到后一个文件的 hook 上。实测 `markdown-files` 单跑约 7s、
+     * 每个 hook 平均不到 100ms，但在全量跑的负载下同一个 hook 会跨过 10s —— 于是单文件绿、
+     * 全量红，且失败点报在 `afterEach` 上，看起来像"清理代码坏了"。
+     *
+     * 与 `testTimeout` 取同一个值：两者都该抓卡死，而不是抓机器慢。
+     */
+    hookTimeout: 15000,
   },
 });

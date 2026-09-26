@@ -9,6 +9,10 @@ const desktopApi = {
   getInitialSyncData: () => initialSyncData,
   getLaunchFilePath: () => ipcRenderer.invoke("bookmd:get-launch-file-path"),
   setNativeTheme: (theme) => ipcRenderer.invoke("bookmd:set-native-theme", theme),
+  // The reader's scan preferences (currently: whether hidden files appear). A
+  // setting rather than an argument on each listing call, so a re-listing from
+  // any of the app's eleven paths honours it without being told again.
+  setScanOptions: (options) => ipcRenderer.invoke("bookmd:set-scan-options", options),
   openDirectory: () => ipcRenderer.invoke("bookmd:open-directory"),
   refreshDirectory: (rootPath) => ipcRenderer.invoke("bookmd:refresh-directory", rootPath),
   readMarkdownFile: (absolutePath) => ipcRenderer.invoke("bookmd:read-markdown-file", absolutePath),

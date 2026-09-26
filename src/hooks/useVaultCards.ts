@@ -1,8 +1,8 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { samePath } from "../core/paths";
 import { useVaultStore } from "../store/useVaultStore";
 import {
-  readReviewDocuments,
+  readReviewDocumentsChunked,
   type ReviewSourceDocument,
 } from "../services/reviewSources";
 
@@ -27,6 +27,22 @@ export function useVaultCards() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  /**
+   * How much of the vault has been read, while it is being read.
+   *
+   * A whole-vault read is the longest wait the review has, and it used to be a
+   * bare spinner over it. Reported in documents rather than bytes because that
+   * is the unit the reader is about to see counted in the queue.
+   */
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  /**
+   * Guards the batch loop against a load that has been superseded.
+   *
+   * Switching away from this source and back starts a second read while the
+   * first is still in flight; without this the older one would keep reading
+   * every file and then overwrite the newer answer.
+   */
+  const loadTokenRef = useRef(0);
 
   const chapterCount = manifest?.chapters.length ?? 0;
 
@@ -43,20 +59,36 @@ export function useVaultCards() {
     if (paths.length === 0 || !bridge) {
       setDocuments([]);
       setLoaded(true);
+      setProgress(null);
       return;
     }
 
+    const token = loadTokenRef.current + 1;
+    loadTokenRef.current = token;
+
     setLoading(true);
     setError(null);
+    setProgress({ done: 0, total: paths.length });
     try {
-      setDocuments(await readReviewDocuments(bridge, paths));
+      const documents = await readReviewDocumentsChunked(bridge, paths, {
+        onProgress: (done, total) => {
+          if (loadTokenRef.current === token) setProgress({ done, total });
+        },
+        isCancelled: () => loadTokenRef.current !== token,
+      });
+      if (loadTokenRef.current !== token) return;
+      setDocuments(documents);
       setLoaded(true);
     } catch (cause: unknown) {
+      if (loadTokenRef.current !== token) return;
       setError(cause instanceof Error ? cause.message : "读取知识库失败");
       setDocuments([]);
       setLoaded(true);
     } finally {
-      setLoading(false);
+      if (loadTokenRef.current === token) {
+        setLoading(false);
+        setProgress(null);
+      }
     }
   }, [manifest]);
 
@@ -80,5 +112,15 @@ export function useVaultCards() {
     );
   }, []);
 
-  return { documents, loading, error, loaded, chapterCount, load, reloadIfLoaded, applySaved };
+  return {
+    documents,
+    loading,
+    error,
+    loaded,
+    progress,
+    chapterCount,
+    load,
+    reloadIfLoaded,
+    applySaved,
+  };
 }

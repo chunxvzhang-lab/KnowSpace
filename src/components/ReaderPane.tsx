@@ -7,6 +7,18 @@ import type { WikiLinkTarget } from "./EditorPane";
 
 type ReaderPaneProps = {
   chapter: RenderedChapter | null;
+  /**
+   * Which document is on screen.
+   *
+   * Used as the article's React key, so moving to another document remounts the
+   * body and its entry animation replays — the content fades in instead of
+   * being replaced under the reader's eyes in a single hard frame.
+   *
+   * Deliberately the document's identity and not its checksum: a checksum
+   * changes on every preview re-render, so keying on it would replay the
+   * animation on each keystroke.
+   */
+  documentKey?: string;
   containerRef: React.RefObject<HTMLElement | null>;
   fontScale: number;
   mermaidTheme: MermaidTheme;
@@ -22,6 +34,7 @@ type ReaderPaneProps = {
 
 export const ReaderPane = memo(function ReaderPane({
   chapter,
+  documentKey,
   containerRef,
   fontScale,
   mermaidTheme,
@@ -287,6 +300,7 @@ export const ReaderPane = memo(function ReaderPane({
     <main className="reader-pane" ref={attachReader} style={{ "--reader-scale": fontScale } as React.CSSProperties}>
       {chapter?.frontMatter ? <FrontMatterCard data={chapter.frontMatter} /> : null}
       <article
+        key={documentKey}
         className={`markdown-body ${showLineNumbers ? "show-line-numbers" : ""}`}
         ref={attachArticle}
         onClick={handleClick}

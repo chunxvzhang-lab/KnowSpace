@@ -13,6 +13,7 @@ const {
   readOutlineFile,
   registerPath,
   isValidMarkdownPath,
+  setScanOptions,
 } = require("./markdown-files.cjs");
 const {
   recordSnapshot,
@@ -1001,6 +1002,24 @@ ipcMain.handle("bookmd:resolve-before-close", (_event, { requestId, action }) =>
   }
 });
 
+/**
+ * Applies the reader's directory-scan preferences.
+ *
+ * A setting rather than a per-call argument: a directory is listed from eleven
+ * places, and a preference threaded through all of them would be forgotten on
+ * one of them eventually — showing up as "my hidden files came back", but only
+ * on whichever path was missed. Kept here beside `lastActiveWorkspaceDir`, which
+ * is state for the same reason.
+ *
+ * The renderer pushes this on startup and on every change. A renderer that never
+ * pushes gets the default (hidden files stay hidden), which is what the app did
+ * before the preference existed.
+ */
+ipcMain.handle("bookmd:set-scan-options", (_event, options) => {
+  setScanOptions(options);
+  return { ok: true };
+});
+
 ipcMain.handle("bookmd:open-directory", async (event) => {
   const targetWin = getWindowFromEvent(event);
   const result = await dialog.showOpenDialog(targetWin || undefined, {
@@ -1057,6 +1076,8 @@ ipcMain.handle("bookmd:pick-review-folder", async (event) => {
       rootPath,
       name: path.basename(rootPath),
       paths: manifest.chapters.map((chapter) => chapter.absolutePath).filter(Boolean),
+      ...(manifest.scanTruncated ? { scanTruncated: manifest.scanTruncated } : {}),
+      ...(manifest.scanUnreadable ? { scanUnreadable: manifest.scanUnreadable } : {}),
     };
   } catch (err) {
     return { canceled: false, rootPath, name: path.basename(rootPath), paths: [], message: err?.message || "无法读取这个文件夹。" };
@@ -1075,7 +1096,13 @@ ipcMain.handle("bookmd:list-review-folder", async (_event, rootPath) => {
 
   try {
     const manifest = await buildDirectoryManifest(rootPath);
-    return { paths: manifest.chapters.map((chapter) => chapter.absolutePath).filter(Boolean) };
+    return {
+      paths: manifest.chapters.map((chapter) => chapter.absolutePath).filter(Boolean),
+      // Passed through so the folder row can say a listing is partial rather
+      // than showing a short count as if it were the folder's real size.
+      ...(manifest.scanTruncated ? { scanTruncated: manifest.scanTruncated } : {}),
+      ...(manifest.scanUnreadable ? { scanUnreadable: manifest.scanUnreadable } : {}),
+    };
   } catch (err) {
     return { paths: [], message: err?.message || "无法读取这个文件夹。" };
   }

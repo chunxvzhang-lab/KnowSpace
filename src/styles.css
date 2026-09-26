@@ -1045,6 +1045,41 @@ body.is-resizing-col * {
   text-transform: uppercase;
 }
 
+/* Shown only when the directory walk stopped early: the tree on screen is
+   missing documents, and saying so is the difference between "the app cannot
+   see my notes" and "the app told me why". Pinned to the bottom of the sidebar
+   so it stays visible however far down the tree the reader has scrolled. */
+.tree-scan-notice {
+  position: sticky;
+  bottom: 0;
+  margin: 8px 0 0;
+  padding: 6px 8px;
+  border-top: 1px solid rgba(245, 158, 11, 0.28);
+  background: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+  font-size: 10.5px;
+  line-height: 1.45;
+  border-radius: 0 0 4px 4px;
+}
+
+/* One line per thing that went wrong — a scan can both stop at the file ceiling
+   and have passed over a folder it could not open. */
+.tree-scan-notice p {
+  margin: 0;
+}
+
+.tree-scan-notice p + p {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(245, 158, 11, 0.18);
+}
+
+[data-theme="light"] .tree-scan-notice {
+  border-top-color: rgba(180, 83, 9, 0.28);
+  background: rgba(245, 158, 11, 0.12);
+  color: #b45309;
+}
+
 .tree-action-btn {
   display: inline-flex;
   align-items: center;
@@ -1095,6 +1130,20 @@ body.is-resizing-col * {
 
 .tree-row svg {
   flex-shrink: 0;
+}
+
+/* Documents hidden by a leading dot, shown because the reader asked for them.
+   Dimmed rather than hidden again: the point of turning the preference on is to
+   be able to open them, and they still read as the secondary set — which is
+   also why they sort after the visible ones. */
+.tree-row-name.is-hidden {
+  opacity: 0.72;
+  font-style: italic;
+}
+
+.tree-row:hover .tree-row-name.is-hidden,
+.tree-row-wrapper.is-active .tree-row-name.is-hidden {
+  opacity: 1;
 }
 
 .tree-row .folder-caret {
@@ -1919,6 +1968,34 @@ body.is-resizing-col * {
 }
 
 /* Editorial Floating Markdown Body Card (Adaptive Full-Width Layout, No Horizontal Scroll) */
+/* The document body arrives with a short fade instead of being swapped under
+   the reader in one hard frame.
+   Keyed on the document rather than its checksum (see ReaderPane), so this plays
+   when the reader moves to another document and not on every preview re-render —
+   a fade on each keystroke would be worse than the jump it is here to soften.
+   Scoped to the reader pane's own article: `.markdown-body` is used elsewhere
+   and an entry animation on those surfaces would be noise. */
+.reader-pane > article.markdown-body {
+  animation: reader-document-in 0.16s var(--ease-smooth, ease) both;
+}
+
+@keyframes reader-document-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reader-pane > article.markdown-body {
+    animation: none;
+  }
+}
+
 .markdown-body {
   width: 100%;
   max-width: 100%;
@@ -6141,6 +6218,23 @@ body:has(.flash-capsule-overlay) {
   background: inherit;
 }
 
+/* The review stays mounted while the reader is on 时间轴, and is hidden rather
+   than taken down. The attribute is honoured explicitly because an author rule
+   beats the browser's `[hidden] { display: none }` — so a `display` set on this
+   element later would silently un-hide it. */
+.space-review-slot[hidden] {
+  display: none;
+}
+
+/* Holds the review panel while it waits its turn. Sized like the container it
+   replaces so the panel's own `height: 100%` still resolves. */
+.space-review-slot {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
 .space-panel-header {
   padding: 12px 14px 10px 14px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
@@ -6148,6 +6242,40 @@ body:has(.flash-capsule-overlay) {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+/* The review header holds more than the timeline's: the title, the tab
+   switcher, the source row, the folder list and the progress bar. Each is
+   capped on its own, but on a short window they can still add up past the
+   panel — and the panel clips rather than scrolls, so the overflow used to be
+   silently lost. Capped and scrollable here as a backstop, so the body below
+   always keeps its space and nothing becomes unreachable.
+
+   Scoped to the review panel rather than to `.space-panel-header`, because the
+   timeline header never grows past its two rows and does not need a scroll
+   container imposed on it. */
+.space-panel-header.dr-header {
+  max-height: 62%;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
+}
+
+.space-panel-header.dr-header::-webkit-scrollbar {
+  width: 8px;
+}
+
+.space-panel-header.dr-header::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.space-panel-header.dr-header::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  border-radius: 8px;
 }
 
 [data-theme="light"] .space-panel-header {
@@ -6786,12 +6914,56 @@ body:has(.flash-capsule-overlay) {
 
 /* Which folders the review is reading, and what one may do about them. Shown only
    while that source is in use: they belong to the source, not to the header. One
-   row per folder, and the last row is the way to add another. */
+   row per folder, and the last row is the way to add another.
+
+   Up to five folders, so this is short in practice — but the rows are a list and
+   a list has to scroll rather than clip. `max-height` is set in rows' worth
+   rather than in pixels so it tracks the font size, and the container shrinks
+   first when the sidebar is short so the header above it never gets pushed off. */
 .dr-folder-list {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  padding: 0 0 8px;
+  padding: 0 2px 8px 0;
+  max-height: min(38vh, 190px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* Touch: keep the gesture inside the list instead of scrolling the page
+     behind it, and let the flick follow the finger (momentum + rubber-band on
+     the platforms that have them). Mouse: the wheel scrolls this box only. */
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.45) transparent;
+}
+
+/* The webkit scrollbar, so the box is visibly scrollable without hover. */
+.dr-folder-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.dr-folder-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dr-folder-list::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.38);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  border-radius: 8px;
+}
+
+.dr-folder-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.62);
+  background-clip: padding-box;
+}
+
+/* E-ink has no scrollbar chrome worth drawing and a mask reads as a smudge. */
+[data-theme="eink"] .dr-folder-list {
+  mask-image: none;
+  -webkit-mask-image: none;
+  scrollbar-color: #b9b2a3 transparent;
 }
 
 .dr-folder-row {
@@ -6800,6 +6972,16 @@ body:has(.flash-capsule-overlay) {
   gap: 6px;
   font-size: 10.5px;
   color: #94a3b8;
+  /* Rows must not compress when the list scrolls: a squeezed row clips its own
+     text instead of the list scrolling past it. */
+  flex: 0 0 auto;
+  min-height: 20px;
+}
+
+.dr-folder-empty {
+  font-size: 10.5px;
+  color: #64748b;
+  padding: 2px 0 4px;
 }
 
 .dr-folder-name {
@@ -6814,6 +6996,21 @@ body:has(.flash-capsule-overlay) {
 
 .dr-folder-count {
   color: #64748b;
+  /* The count must not shrink or wrap when the name beside it is long: "12 篇"
+     is the number being qualified, and a clipped "1…" is worse than no count. */
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* A listing that stopped early: the number is real but it is not the folder's
+   size, and amber is the app's existing signal for "worth a look". */
+.dr-folder-count.is-truncated {
+  color: #f59e0b;
+  cursor: help;
+}
+
+[data-theme="light"] .dr-folder-count.is-truncated {
+  color: #b45309;
 }
 
 .dr-folder-action {

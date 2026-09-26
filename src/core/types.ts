@@ -37,6 +37,55 @@ export type ChapterManifest = {
   src: string;
   absolutePath?: string;
   baseUrl?: string;
+  /**
+   * Set when the document is hidden by naming convention.
+   *
+   * A leading dot on the document's own name, or on any folder above it — a note
+   * inside `.archive/` is hidden because the reader hid the folder. Present only
+   * when true, so a manifest from a vault with no hidden documents is identical
+   * to what earlier versions produced.
+   *
+   * The tree sorts these after the visible documents rather than by name among
+   * them, so turning the preference on appends a section instead of reshuffling
+   * the list the reader was already reading.
+   */
+  hidden?: boolean;
+};
+
+/**
+ * Set when a directory walk stopped before it had seen everything.
+ *
+ * A scan that stopped early is otherwise indistinguishable from a folder that
+ * genuinely holds nothing, and the reader's only available explanation for the
+ * second is the wrong one. So the reason travels with the manifest, and the UI
+ * that shows a count is the UI that qualifies it.
+ */
+export type ManifestScanTruncation = {
+  reason: "files" | "depth" | "time";
+  seen: number;
+  /** Directories still queued when the file ceiling was reached. */
+  remainingDirs?: number;
+  /** The folder the depth limit stopped at. */
+  at?: string;
+};
+
+/**
+ * Directories the scan could not open.
+ *
+ * Kept apart from a truncation because it is a different fact and calls for a
+ * different response: a truncated scan means "there is more than I showed you",
+ * while this means "there is a part of your folder I could not look at". A
+ * directory that fails to open returns no entries, so without this it is
+ * indistinguishable from an empty one — and "empty" is the reading the reader
+ * will land on, which is the wrong one.
+ */
+export type ManifestScanUnreadable = {
+  /** How many directories could not be opened. Exact, unlike `samples`. */
+  count: number;
+  /** A few of them, so the reader can see which. Capped on the main side. */
+  samples: string[];
+  /** The errno of the first failure, e.g. `EACCES`. */
+  reason: string;
 };
 
 export type BookManifest = {
@@ -45,6 +94,10 @@ export type BookManifest = {
   description?: string;
   rootPath?: string;
   chapters: ChapterManifest[];
+  /** Present only for a walk that stopped early; absent for a complete one. */
+  scanTruncated?: ManifestScanTruncation;
+  /** Present only when part of the folder could not be opened. */
+  scanUnreadable?: ManifestScanUnreadable;
 };
 
 export type Heading = {

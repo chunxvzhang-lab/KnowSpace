@@ -33,6 +33,16 @@ type ToolbarProps = {
   fontScale: number;
   showLineNumbers?: boolean;
   onToggleLineNumbers?: () => void;
+  /**
+   * Whether the directory tree is showing documents hidden by a leading dot.
+   *
+   * The control is only offered when a folder is open (`hasDirectory`): the
+   * setting is stored regardless, but with a single document there is no tree
+   * for it to change.
+   */
+  showHiddenFiles?: boolean;
+  onToggleHiddenFiles?: () => void;
+  hasDirectory?: boolean;
   typewriterMode?: boolean;
   onToggleTypewriterMode?: () => void;
   isFullscreen?: boolean;
@@ -197,6 +207,24 @@ export function Toolbar(props: ToolbarProps) {
             title={props.showLineNumbers ? "正文行号：已开启（点击隐藏）" : "正文行号：已隐藏（点击开启）"}
           >
             <Hash size={17} />
+          </button>
+        )}
+
+        {/* Only worth offering when there is a folder to apply it to. The
+            preference is stored either way, so a single document opened by
+            itself does not need the control. */}
+        {props.onToggleHiddenFiles && props.hasDirectory && (
+          <button
+            className={`icon-button ${props.showHiddenFiles ? "active" : ""}`}
+            onClick={props.onToggleHiddenFiles}
+            aria-label={props.showHiddenFiles ? "隐藏点开头的文件" : "显示点开头的文件"}
+            title={
+              props.showHiddenFiles
+                ? "隐藏文件：已显示（点击隐藏）"
+                : "隐藏文件：已隐藏（点击显示点开头的文件与文件夹）"
+            }
+          >
+            <Eye size={17} />
           </button>
         )}
 

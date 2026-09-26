@@ -29,6 +29,7 @@ import {
 } from "../services/fsrsService";
 import { useVaultCards } from "../hooks/useVaultCards";
 import { MAX_REVIEW_FOLDERS, useReviewFolders } from "../hooks/useReviewFolders";
+import { describeScanTruncation, describeScanUnreadable } from "../core/scanNotice";
 import type { ReviewSourceDocument } from "../services/reviewSources";
 
 /**
@@ -89,10 +90,31 @@ type DailyReviewPanelProps = {
    * instead of trapping the user in a panel they cannot leave.
    */
   tabsSlot?: React.ReactNode;
+  /**
+   * Whether the review is the view on screen.
+   *
+   * The panel stays mounted while the reader is on the timeline — that is what
+   * keeps the parse cache and the session's rated-card set alive — so it has to
+   * be told when it is not the one being looked at. False means: do not parse,
+   * and do not take the keyboard.
+   *
+   * Undefined is treated as active, so a caller that does not know about this
+   * gets the old behaviour rather than a panel that never runs.
+   */
+  active?: boolean;
 };
 
 /** The four places cards can come from. */
 type ReviewSourceKind = "space" | "vault" | "folder" | "document";
+
+/**
+ * The empty source list, as one shared value.
+ *
+ * A fresh `[]` per render would be a new identity each time, and `activeNotes`
+ * feeds the parsing effect — so the "nothing to review" state would re-run the
+ * parse sweep on every render, which is the busiest state to be wasteful in.
+ */
+const EMPTY_NOTES: ReviewSourceDocument[] = [];
 
 const REVIEW_SOURCE_KEY = "knowspace.review-source";
 
@@ -152,6 +174,7 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
   onOpenNoteFile,
   onProgressSaved,
   tabsSlot,
+  active = true,
 }) => {
   const desktop =
     typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
@@ -169,7 +192,10 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
    */
   const [reviewSource, setReviewSource] = useState<ReviewSourceKind>(() => readStoredSource());
   const vault = useVaultCards();
-  const folder = useReviewFolders();
+  // Gated on being the visible view: the panel stays mounted now, so this would
+  // otherwise list the reader's remembered folders at app start for a review they
+  // may not open.
+  const folder = useReviewFolders(active);
   const isVaultSource = reviewSource === "vault";
   const isFolderSource = reviewSource === "folder";
   const isDocumentSource = reviewSource === "document";
@@ -250,16 +276,40 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
    * Switching source mid-session is allowed, and it starts a fresh round — the
    * queue is derived from this, so changing it rebuilds the queue exactly as a
    * changed note list would.
+   *
+   * Memoised, and that is load-bearing rather than a micro-optimisation: this is
+   * a dependency of the parsing effect below, and the `document` branch builds a
+   * fresh one-element array on every render. Without the memo the effect re-ran
+   * on every render, and the `publishedKey` guard inside it could only stop the
+   * *publish* — the key join and the per-note staleness sweep had already run.
+   *
+   * The dependencies are chosen to be value-stable as well as correct: the two
+   * source arrays come from `useState`, and the open document is read through
+   * its path and its text rather than through the object, because `App` rebuilds
+   * that object on every edit. So identity now changes exactly when the review's
+   * input changes, and a content edit still reaches the parser — which a
+   * path-only signature would have missed.
    */
-  const activeNotes: ReviewSourceDocument[] = isVaultSource
-    ? vault.documents
-    : isFolderSource
-      ? folder.documents
-      : isDocumentSource
-        ? canReviewDocument && currentDocument
-          ? [{ filePath: currentDocument.filePath, content: currentDocument.content }]
-          : []
-        : notes;
+  const activeNotes: ReviewSourceDocument[] = useMemo(() => {
+    if (isVaultSource) return vault.documents;
+    if (isFolderSource) return folder.documents;
+    if (isDocumentSource) {
+      return canReviewDocument && currentDocument
+        ? [{ filePath: currentDocument.filePath, content: currentDocument.content }]
+        : EMPTY_NOTES;
+    }
+    return notes;
+  }, [
+    isVaultSource,
+    isFolderSource,
+    isDocumentSource,
+    vault.documents,
+    folder.documents,
+    canReviewDocument,
+    currentDocument?.filePath,
+    currentDocument?.content,
+    notes,
+  ]);
   /**
    * How far the card-finding has got, when it is running.
    *
@@ -269,12 +319,26 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
    */
   const [parseProgress, setParseProgress] = useState<{ done: number; total: number } | null>(null);
 
+  /**
+   * Reading the source and finding cards in it, as one wait.
+   *
+   * To the reader these are the same thing — a source was picked and cards are
+   * coming — but they used to look different: reading was a bare spinner, and
+   * only the parse that followed it counted anything. The read reports its own
+   * numbers now, so the count starts at the first file instead of appearing
+   * partway through, and it never runs backwards because the read is finished
+   * before the parse begins.
+   */
+  const readProgress = isVaultSource ? vault.progress : isFolderSource ? folder.progress : null;
+  const activeProgress = parseProgress ?? readProgress;
+
   // The open document needs no fetching — its text is already here — so it is never
   // in a loading state, whatever the Space list above is doing.
   //
   // Parsing is folded in here rather than reported separately, for the reason above.
   const isLoading =
     parseProgress !== null ||
+    readProgress !== null ||
     (isVaultSource
       ? vault.loading
       : isFolderSource
@@ -344,6 +408,11 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
   const [parseRevision, setParseRevision] = useState(0);
 
   useEffect(() => {
+    // Nothing to parse for a view nobody is looking at. The cache is a ref, so
+    // it survives the visit and there is nothing to catch up on when the review
+    // comes back — this only stops the panel from working while it is hidden.
+    if (!active) return undefined;
+
     let cancelled = false;
     const cache = parsedNotes.current;
     const key = activeNotes.map((note) => note.filePath).join("\u0000");
@@ -398,7 +467,7 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [activeNotes, parseRevision]);
+  }, [active, activeNotes, parseRevision]);
 
   /**
    * Files what was just written to a note back into the panel's own view of it.
@@ -441,21 +510,33 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
   }, [parsed]);
 
   /**
-   * The card being asked about: the first one in the queue that has not been
-   * rated yet this session. Derived rather than stored, so a queue rebuild
-   * cannot move it backwards.
-   */
-  const current = initialQueue.find((item) => !reviewedIds.has(item.card.id));
-
-  /**
-   * Session progress, measured against what the session started with.
+   * The card being asked about, and how many are left — in one pass.
    *
-   * Counting the remaining cards rather than the whole queue keeps the numbers
-   * still as rated cards drop out of it: each rating adds one to `done` and
-   * takes one off `remaining`, so the total does not shrink under the reader.
+   * The card is the first in the queue not rated yet this session; derived
+   * rather than stored, so a queue rebuild cannot move it backwards. The count
+   * is measured against what the session started with, which keeps the numbers
+   * still as rated cards drop out of the queue: each rating adds one to `done`
+   * and takes one off `remaining`, so the total does not shrink under the reader.
+   *
+   * Both walk the queue against the session's rated set, and both used to do it
+   * on every render. The first stopped at the first unrated card, but the count
+   * had to look at all of them — so a queue of a few thousand cards cost a few
+   * thousand set lookups per render, and this panel re-renders on every reveal
+   * and every rating. Memoised, and sharing the walk, they cost that once per
+   * rating instead.
    */
+  const { current, remaining } = useMemo(() => {
+    let unrated = 0;
+    let firstUnrated: (typeof initialQueue)[number] | undefined;
+    for (const item of initialQueue) {
+      if (reviewedIds.has(item.card.id)) continue;
+      unrated += 1;
+      if (firstUnrated === undefined) firstUnrated = item;
+    }
+    return { current: firstUnrated, remaining: unrated };
+  }, [initialQueue, reviewedIds]);
+
   const done = reviewedIds.size;
-  const remaining = initialQueue.filter((item) => !reviewedIds.has(item.card.id)).length;
   const total = done + remaining;
   const progressPct = total > 0 ? Math.round((done / total) * 100) : 0;
 
@@ -669,49 +750,66 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
     vault.applySaved,
   ]);
 
-  // Keyboard review flow: Space reveals, 1-4 grade. Guarded against firing while
-  // the user is typing in the search box above.
+  /**
+   * Keyboard review flow: Space reveals, 1-4 grade.
+   *
+   * Registered once, and dispatched through a ref that always holds the latest
+   * handler. Two things changed when the panel started staying mounted:
+   *
+   * - It must do nothing while the review is not the view on screen. A global
+   *   Space handler left live under 时间轴 would swallow the key for the whole
+   *   app, which is a far worse bug than the re-binding it replaced.
+   * - It must not be re-bound on every rating. The listener used to depend on
+   *   `handleRate`, which is rebuilt whenever the queue moves — so every single
+   *   rating tore the listener down and put it back up. The ref makes the
+   *   registration depend on nothing, and the handler still sees current state
+   *   because the ref is refreshed on each render.
+   */
+  const keyHandlerRef = useRef<(event: KeyboardEvent) => void>(() => {});
+  keyHandlerRef.current = (event: KeyboardEvent) => {
+    if (!active) return;
+
+    // Narrow to an Element before probing: `event.target` is not always one
+    // (it is the window for synthetic events, and can be the document when
+    // nothing holds focus), and calling `.closest()` on those throws.
+    const target = event.target instanceof HTMLElement ? event.target : null;
+    const isEditing =
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLTextAreaElement ||
+      target instanceof HTMLSelectElement ||
+      target?.isContentEditable === true ||
+      target?.closest(".cm-editor") != null;
+    if (isEditing) return;
+
+    // Ctrl/Cmd+Z only reaches here from outside a text field — the guard above has
+    // already let the editor keep its own undo.
+    if ((event.ctrlKey || event.metaKey) && (event.key === "z" || event.key === "Z")) {
+      event.preventDefault();
+      void handleUndo();
+      return;
+    }
+
+    if (event.code === "Space" || event.key === " ") {
+      // Stop the page from scrolling, and don't re-fire the button's own
+      // click handler.
+      event.preventDefault();
+      setRevealed((r) => !r);
+      return;
+    }
+
+    if (!revealed || saving) return;
+    const rating = Number(event.key);
+    if (rating >= 1 && rating <= 4) {
+      event.preventDefault();
+      void handleRate(rating as FsrsRating);
+    }
+  };
+
   useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      // Narrow to an Element before probing: `event.target` is not always one
-      // (it is the window for synthetic events, and can be the document when
-      // nothing holds focus), and calling `.closest()` on those throws.
-      const target = event.target instanceof HTMLElement ? event.target : null;
-      const isEditing =
-        target instanceof HTMLInputElement ||
-        target instanceof HTMLTextAreaElement ||
-        target instanceof HTMLSelectElement ||
-        target?.isContentEditable === true ||
-        target?.closest(".cm-editor") != null;
-      if (isEditing) return;
-
-      // Ctrl/Cmd+Z only reaches here from outside a text field — the guard above has
-      // already let the editor keep its own undo.
-      if ((event.ctrlKey || event.metaKey) && (event.key === "z" || event.key === "Z")) {
-        event.preventDefault();
-        void handleUndo();
-        return;
-      }
-
-      if (event.code === "Space" || event.key === " ") {
-        // Stop the page from scrolling, and don't re-fire the button's own
-        // click handler.
-        event.preventDefault();
-        setRevealed((r) => !r);
-        return;
-      }
-
-      if (!revealed || saving) return;
-      const rating = Number(event.key);
-      if (rating >= 1 && rating <= 4) {
-        event.preventDefault();
-        void handleRate(rating as FsrsRating);
-      }
-    };
-
+    const onKey = (event: KeyboardEvent) => keyHandlerRef.current(event);
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [revealed, saving, handleRate]);
+  }, []);
 
   const currentSourceName = current
     ? sourceMap.get(current.card.id)?.path.split(/[\\/]/).pop() ?? ""
@@ -722,7 +820,7 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
   return (
     <div className="space-timeline-container">
       {/* Panel Top Header */}
-      <div className="space-panel-header">
+      <div className="space-panel-header dr-header">
         <div className="space-panel-title-row">
           <div className="space-panel-title">
             <GraduationCap size={16} />
@@ -836,16 +934,43 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
 
         {/* Which folders, and what one might want to do about them. Only while that
             source is in use: these are rows about the source, not a permanent part of
-            the header. */}
-        {isFolderSource && folder.choices.length > 0 ? (
-          <div className="dr-folder-list">
+            the header.
+
+            Rendered even with nothing chosen. The way to add the first folder is the
+            row this list holds, so hiding the list when it is empty hides the only
+            route to filling it — the reader is left on a source with no folders and no
+            visible way to add one. */}
+        {isFolderSource ? (
+          <div className="dr-folder-list" role="list" aria-label="复习的文件夹">
+            {folder.choices.length === 0 ? (
+              <div className="dr-folder-empty">
+                还没有选择文件夹。卡片会从所选文件夹里的所有 Markdown 文档中提取。
+              </div>
+            ) : null}
             {folder.choices.map((choice) => (
-              <div className="dr-folder-row" key={choice.rootPath}>
+              <div className="dr-folder-row" key={choice.rootPath} role="listitem">
                 <FolderOpen size={12} />
                 <span className="dr-folder-name" title={choice.rootPath}>
                   {choice.name}
                 </span>
-                <span className="dr-folder-count">{choice.paths.length} 篇</span>
+                <span
+                  className={
+                    choice.scanTruncated || choice.scanUnreadable
+                      ? "dr-folder-count is-truncated"
+                      : "dr-folder-count"
+                  }
+                  title={
+                    [
+                      describeScanTruncation(choice.scanTruncated),
+                      describeScanUnreadable(choice.scanUnreadable),
+                    ]
+                      .filter(Boolean)
+                      .join("\n") || undefined
+                  }
+                >
+                  {choice.paths.length} 篇
+                  {choice.scanTruncated || choice.scanUnreadable ? " ⚠" : ""}
+                </span>
                 <button
                   type="button"
                   className="dr-folder-action"
@@ -902,9 +1027,11 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
                   ? "正在读取知识库文档..."
                   : "正在载入 Space 闪念库..."}
             </p>
-            {parseProgress && (
+            {activeProgress && (
               <p className="dr-empty-hint">
-                正在查找卡片 {parseProgress.done} / {parseProgress.total} 篇…
+                {parseProgress
+                  ? `正在查找卡片 ${activeProgress.done} / ${activeProgress.total} 篇…`
+                  : `正在读取文档 ${activeProgress.done} / ${activeProgress.total} 篇…`}
               </p>
             )}
           </div>

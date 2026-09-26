@@ -431,61 +431,134 @@ export function parseDocumentBlocks(
   return blocks;
 }
 
+/** The mutable maps an index is built from, before they are wrapped up. */
+type VaultSearchIndexMaps = {
+  docMap: Map<string, SearchIndexDocument>;
+  tagIndex: Map<string, Set<string>>;
+  linkIndex: Map<string, Set<string>>;
+  termIndex: Map<string, Set<string>>;
+  blockMap: Map<string, SearchIndexBlock>;
+};
+
+function emptyIndexMaps(): VaultSearchIndexMaps {
+  return {
+    docMap: new Map<string, SearchIndexDocument>(),
+    tagIndex: new Map<string, Set<string>>(),
+    linkIndex: new Map<string, Set<string>>(),
+    termIndex: new Map<string, Set<string>>(),
+    blockMap: new Map<string, SearchIndexBlock>(),
+  };
+}
+
+/**
+ * Indexes one document into the maps, in place.
+ *
+ * Shared by the batch builder and its chunked twin so the two cannot disagree
+ * about what an index contains: a chunked build that produced a subtly different
+ * index from the synchronous one would be a search that works on small vaults
+ * and quietly misses things on large ones.
+ */
+function indexDocumentInto(maps: VaultSearchIndexMaps, doc: IndexedDocument): void {
+  const docTags = new Set<string>();
+  const docLinks = new Set<string>();
+
+  const blocks = parseDocumentBlocks(doc.id, doc.title, doc.content, doc.path);
+
+  for (const block of blocks) {
+    maps.blockMap.set(block.blockId, block);
+
+    for (const tag of block.tags) {
+      docTags.add(tag);
+      if (!maps.tagIndex.has(tag)) maps.tagIndex.set(tag, new Set());
+      maps.tagIndex.get(tag)!.add(block.blockId);
+    }
+
+    for (const link of block.links) {
+      docLinks.add(link);
+      if (!maps.linkIndex.has(link)) maps.linkIndex.set(link, new Set());
+      maps.linkIndex.get(link)!.add(block.blockId);
+    }
+
+    const tokens = block.tokens ?? (block.tokens = tokenizeText(block.text));
+    for (const token of tokens) {
+      if (!maps.termIndex.has(token)) maps.termIndex.set(token, new Set());
+      maps.termIndex.get(token)!.add(block.blockId);
+    }
+  }
+
+  maps.docMap.set(doc.id, {
+    id: doc.id,
+    title: doc.title,
+    path: doc.path,
+    blocks,
+    tags: docTags,
+    links: docLinks,
+  });
+}
+
+function wrapIndexMaps(maps: VaultSearchIndexMaps): VaultSearchIndex {
+  return {
+    documents: maps.docMap,
+    tagIndex: maps.tagIndex,
+    linkIndex: maps.linkIndex,
+    termIndex: maps.termIndex,
+    blockMap: maps.blockMap,
+  };
+}
+
 /**
  * Builds a fresh VaultSearchIndex from an array of IndexedDocuments.
  */
 export function buildVaultSearchIndex(documents: IndexedDocument[]): VaultSearchIndex {
-  const docMap = new Map<string, SearchIndexDocument>();
-  const tagIndex = new Map<string, Set<string>>();
-  const linkIndex = new Map<string, Set<string>>();
-  const termIndex = new Map<string, Set<string>>();
-  const blockMap = new Map<string, SearchIndexBlock>();
-
+  const maps = emptyIndexMaps();
   for (const doc of documents) {
-    const docTags = new Set<string>();
-    const docLinks = new Set<string>();
+    indexDocumentInto(maps, doc);
+  }
+  return wrapIndexMaps(maps);
+}
 
-    const blocks = parseDocumentBlocks(doc.id, doc.title, doc.content, doc.path);
+/**
+ * The same build, in batches, handing the thread back between them.
+ *
+ * Indexing a vault is the second-longest thing the app does after parsing it,
+ * and it used to happen in one synchronous call — so a large vault produced a
+ * window that did not answer at all while the index was built. The work is the
+ * same and the result is the same; it is only spread over frames now, with a
+ * count the caller can put on screen.
+ *
+ * `isCancelled` is checked between batches, so a vault the reader has closed
+ * stops being indexed rather than running to completion into a discarded index.
+ */
+export async function buildVaultSearchIndexChunked(
+  documents: IndexedDocument[],
+  options: {
+    /** Documents per batch. */
+    chunkSize?: number;
+    onProgress?: (done: number, total: number) => void;
+    isCancelled?: () => boolean;
+  } = {}
+): Promise<VaultSearchIndex> {
+  const { chunkSize = 12, onProgress, isCancelled } = options;
+  const maps = emptyIndexMaps();
 
-    for (const block of blocks) {
-      blockMap.set(block.blockId, block);
-
-      for (const tag of block.tags) {
-        docTags.add(tag);
-        if (!tagIndex.has(tag)) tagIndex.set(tag, new Set());
-        tagIndex.get(tag)!.add(block.blockId);
-      }
-
-      for (const link of block.links) {
-        docLinks.add(link);
-        if (!linkIndex.has(link)) linkIndex.set(link, new Set());
-        linkIndex.get(link)!.add(block.blockId);
-      }
-
-      const tokens = block.tokens ?? (block.tokens = tokenizeText(block.text));
-      for (const token of tokens) {
-        if (!termIndex.has(token)) termIndex.set(token, new Set());
-        termIndex.get(token)!.add(block.blockId);
-      }
+  for (let start = 0; start < documents.length; start += chunkSize) {
+    if (isCancelled?.()) break;
+    for (const doc of documents.slice(start, start + chunkSize)) {
+      indexDocumentInto(maps, doc);
     }
-
-    docMap.set(doc.id, {
-      id: doc.id,
-      title: doc.title,
-      path: doc.path,
-      blocks,
-      tags: docTags,
-      links: docLinks,
+    onProgress?.(Math.min(start + chunkSize, documents.length), documents.length);
+    // Yield, so the progress the caller just rendered is painted before the next
+    // batch competes with it for the thread.
+    await new Promise<void>((resolve) => {
+      if (typeof window !== "undefined" && typeof window.requestIdleCallback === "function") {
+        window.requestIdleCallback(() => setTimeout(resolve, 0), { timeout: 120 });
+      } else {
+        setTimeout(resolve, 0);
+      }
     });
   }
 
-  return {
-    documents: docMap,
-    tagIndex,
-    linkIndex,
-    termIndex,
-    blockMap,
-  };
+  return wrapIndexMaps(maps);
 }
 
 /**

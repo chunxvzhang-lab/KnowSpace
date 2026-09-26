@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { samePath } from "../core/paths";
+import type { ManifestScanTruncation, ManifestScanUnreadable } from "../core/types";
 import {
-  readReviewDocuments,
+  readReviewDocumentsChunked,
   type ReviewSourceDocument,
 } from "../services/reviewSources";
 
@@ -18,6 +19,18 @@ export type ReviewFolderChoice = {
   name: string;
   /** The Markdown files in it, as of the last listing. */
   paths: string[];
+  /**
+   * Set when the last listing of this folder stopped before it had seen
+   * everything.
+   *
+   * Carried on the choice rather than reported once, because the row that shows
+   * the count is also the row that has to qualify it: "12 篇" next to a folder
+   * that actually holds 4000 documents is a number the reader will trust, and
+   * the whole point of surfacing a truncation is that they should not.
+   */
+  scanTruncated?: ManifestScanTruncation;
+  /** Set when part of the folder could not be opened at all. */
+  scanUnreadable?: ManifestScanUnreadable;
 };
 
 /**
@@ -49,6 +62,48 @@ function normaliseChoice(value: unknown): ReviewFolderChoice | null {
     paths: Array.isArray(entry.paths)
       ? entry.paths.filter((path): path is string => typeof path === "string")
       : [],
+    // Re-checked rather than passed through: this comes out of localStorage and
+    // the renderer reads `.seen` off it to build a sentence.
+    scanTruncated: normaliseTruncation(entry.scanTruncated),
+    scanUnreadable: normaliseUnreadable(entry.scanUnreadable),
+  };
+}
+
+/** The truncation marker, or undefined when there is nothing trustworthy to carry. */
+function normaliseTruncation(value: unknown): ReviewFolderChoice["scanTruncated"] {
+  if (!value || typeof value !== "object") return undefined;
+  const marker = value as { reason?: unknown; seen?: unknown; remainingDirs?: unknown; at?: unknown };
+  if (marker.reason !== "files" && marker.reason !== "depth" && marker.reason !== "time") return undefined;
+  return {
+    reason: marker.reason,
+    seen: typeof marker.seen === "number" ? marker.seen : 0,
+    ...(typeof marker.remainingDirs === "number" ? { remainingDirs: marker.remainingDirs } : {}),
+    ...(typeof marker.at === "string" ? { at: marker.at } : {}),
+  };
+}
+
+/** The unreadable marker, checked the same way for the same reason. */
+function normaliseUnreadable(value: unknown): ReviewFolderChoice["scanUnreadable"] {
+  if (!value || typeof value !== "object") return undefined;
+  const marker = value as { count?: unknown; samples?: unknown; reason?: unknown };
+  if (typeof marker.count !== "number" || marker.count <= 0) return undefined;
+  return {
+    count: marker.count,
+    samples: Array.isArray(marker.samples)
+      ? marker.samples.filter((path): path is string => typeof path === "string")
+      : [],
+    reason: typeof marker.reason === "string" ? marker.reason : "EACCES",
+  };
+}
+
+/** Both markers at once, for the places that carry a fresh listing around. */
+function normaliseScanMarkers(value: {
+  scanTruncated?: unknown;
+  scanUnreadable?: unknown;
+}): Pick<ReviewFolderChoice, "scanTruncated" | "scanUnreadable"> {
+  return {
+    scanTruncated: normaliseTruncation(value.scanTruncated),
+    scanUnreadable: normaliseUnreadable(value.scanUnreadable),
   };
 }
 
@@ -97,8 +152,14 @@ function writeStoredChoices(choices: ReviewFolderChoice[]): void {
  *
  * More than one, because revision is rarely one subject: a reader with 英语 and 专业课
  * was re-picking a folder every time they switched.
+ *
+ * `enabled` gates the work that would otherwise happen on mount. The review panel
+ * is kept mounted now — that is what preserves its parse cache — so without this
+ * the remembered folders would be listed again at app start, for a panel the
+ * reader may never open. Defaults to true so a caller that does not know about it
+ * gets the old behaviour.
  */
-export function useReviewFolders() {
+export function useReviewFolders(enabled = true) {
   const bridge =
     typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
 
@@ -107,6 +168,10 @@ export function useReviewFolders() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  /** How many of the chosen folders' files have been read, while they are being read. */
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  /** Guards the batch loop against a read that has been superseded by a newer one. */
+  const loadTokenRef = useRef(0);
 
   /**
    * Whether the folders in state came from storage.
@@ -121,6 +186,7 @@ export function useReviewFolders() {
   // chosen are in tonight's review.
   const rememberedPaths = choices.map((choice) => choice.rootPath).join("\u0000");
   useEffect(() => {
+    if (!enabled) return;
     if (!rememberedPaths || !bridge?.listReviewFolder || !restoredRef.current) return;
 
     void (async () => {
@@ -135,26 +201,43 @@ export function useReviewFolders() {
             // a reader concludes their cards are gone. One folder failing is also not a
             // reason to stop looking at the others.
             if (!Array.isArray(paths) || answer?.message) return null;
-            return { rootPath, paths };
+            // A listing that stopped early is still a listing, and the markers have
+            // to travel with it — dropping them here would turn a truncated count
+            // back into a number presented as the folder's real size.
+            return { rootPath, paths, ...normaliseScanMarkers(answer ?? {}) };
           } catch {
             return null;
           }
         })
       );
 
-      const fresh = listed.filter((entry): entry is { rootPath: string; paths: string[] } => !!entry);
+      const fresh = listed.filter(
+        (entry): entry is {
+          rootPath: string;
+          paths: string[];
+          scanTruncated: ReviewFolderChoice["scanTruncated"];
+          scanUnreadable: ReviewFolderChoice["scanUnreadable"];
+        } => !!entry
+      );
       if (fresh.length === 0) return;
 
       setChoices((prev) => {
         const next = prev.map((choice) => {
           const updated = fresh.find((entry) => entry.rootPath === choice.rootPath);
-          return updated ? { ...choice, paths: updated.paths } : choice;
+          return updated
+            ? {
+                ...choice,
+                paths: updated.paths,
+                scanTruncated: updated.scanTruncated,
+                scanUnreadable: updated.scanUnreadable,
+              }
+            : choice;
         });
         writeStoredChoices(next);
         return next;
       });
     })();
-  }, [rememberedPaths, bridge?.listReviewFolder]);
+  }, [enabled, rememberedPaths, bridge?.listReviewFolder]);
 
   /**
    * Reads the documents of a set of folders.
@@ -166,39 +249,66 @@ export function useReviewFolders() {
    */
   const readFolders = useCallback(
     async (targets: ReviewFolderChoice[]) => {
+      const token = loadTokenRef.current + 1;
+      loadTokenRef.current = token;
+
       if (targets.length === 0) {
         setDocuments([]);
         setError(null);
         setLoaded(true);
+        setProgress(null);
         return;
       }
 
       if (!bridge?.readMarkdownFile && !bridge?.readMarkdownBatch) {
         setError("当前环境不支持读取文件夹。");
         setLoaded(true);
+        setProgress(null);
         return;
       }
 
       // Two folders can hold the same file — one inside the other, or the same folder
       // added twice in an earlier session. A path is read once.
+      //
+      // Through a Set of the folded paths rather than `paths.some(...)`: that scan
+      // is O(n²) over the whole set, and it lower-cases both sides on every one of
+      // those comparisons — so five folders of a thousand notes each cost a
+      // million comparisons and two million throwaway strings, on the click that
+      // switches to this source.
+      const seen = new Set<string>();
       const paths: string[] = [];
       for (const target of targets) {
         for (const path of target.paths) {
-          if (!paths.some((seen) => seen.toLowerCase() === path.toLowerCase())) paths.push(path);
+          const key = path.toLowerCase();
+          if (seen.has(key)) continue;
+          seen.add(key);
+          paths.push(path);
         }
       }
 
       setLoading(true);
       setError(null);
+      setProgress({ done: 0, total: paths.length });
       try {
-        setDocuments(await readReviewDocuments(bridge, paths));
+        const documents = await readReviewDocumentsChunked(bridge, paths, {
+          onProgress: (done, total) => {
+            if (loadTokenRef.current === token) setProgress({ done, total });
+          },
+          isCancelled: () => loadTokenRef.current !== token,
+        });
+        if (loadTokenRef.current !== token) return;
+        setDocuments(documents);
         setLoaded(true);
       } catch (cause: unknown) {
+        if (loadTokenRef.current !== token) return;
         setError(cause instanceof Error ? cause.message : "读取文件夹失败");
         setDocuments([]);
         setLoaded(true);
       } finally {
-        setLoading(false);
+        if (loadTokenRef.current === token) {
+          setLoading(false);
+          setProgress(null);
+        }
       }
     },
     [bridge]
@@ -231,6 +341,7 @@ export function useReviewFolders() {
       rootPath: picked.rootPath,
       name: picked.name || folderName(picked.rootPath),
       paths: picked.paths,
+      ...normaliseScanMarkers(picked),
     };
 
     setChoices((prev) => {
@@ -294,6 +405,7 @@ export function useReviewFolders() {
     loading,
     error,
     loaded,
+    progress,
     fileCount,
     canAddMore: choices.length < MAX_REVIEW_FOLDERS,
     load,

@@ -1,5 +1,6 @@
 import { ChevronRight, FileText, Folder, FolderOpen, FolderMinus, Edit3, Import, ListTree, Boxes } from "lucide-react";
 import { memo, useEffect, useMemo, useState } from "react";
+import { describeScanTruncation, describeScanUnreadable } from "../core/scanNotice";
 import type { BookManifest, ChapterManifest } from "../core/types";
 
 type ChapterListProps = {
@@ -25,6 +26,15 @@ type TreeNode = {
   path: string;
   children: TreeNode[];
   chapter?: ChapterManifest;
+  /**
+   * Whether this entry is hidden by naming convention.
+   *
+   * A node is hidden if its own name starts with a dot, or if its document is —
+   * which covers a file inside a hidden folder, since the manifest marks those
+   * too. Kept on the node rather than recomputed from `name` so a folder and the
+   * documents under it cannot disagree about it.
+   */
+  hidden: boolean;
 };
 
 export const ChapterList = memo(function ChapterList({
@@ -66,6 +76,26 @@ export const ChapterList = memo(function ChapterList({
       return next;
     });
   }
+
+  /**
+   * What to say when the tree is not the whole folder.
+   *
+   * A partial tree that says nothing is worse than no tree: the missing files
+   * are ones the reader wrote and expects to see, and "they are not there" has
+   * one obvious explanation, which is the wrong one. So anything that kept the
+   * walk from the truth is announced in the place the documents would have been.
+   *
+   * Both can apply at once — a scan can stop at the file ceiling *and* have
+   * passed over a folder it could not open — so this is a list, not one line.
+   */
+  const scanNotices = useMemo(() => {
+    const notices: string[] = [];
+    const truncated = describeScanTruncation(manifest.scanTruncated);
+    if (truncated) notices.push(truncated);
+    const unreadable = describeScanUnreadable(manifest.scanUnreadable);
+    if (unreadable) notices.push(unreadable);
+    return notices;
+  }, [manifest.scanTruncated, manifest.scanUnreadable]);
 
   return (
     <aside className="chapter-list file-tree" aria-label="文档目录">
@@ -137,6 +167,15 @@ export const ChapterList = memo(function ChapterList({
           <p className="muted-panel">没有 Markdown 文件。</p>
         )}
       </nav>
+      {scanNotices.length > 0 ? (
+        <div className="tree-scan-notice">
+          {scanNotices.map((notice) => (
+            <p key={notice} title={notice}>
+              {notice}
+            </p>
+          ))}
+        </div>
+      ) : null}
     </aside>
   );
 });
@@ -173,7 +212,7 @@ function TreeRow({
         >
           <ChevronRight className={isOpen ? "folder-caret open" : "folder-caret"} size={12} />
           {isOpen ? <FolderOpen size={13} /> : <Folder size={13} />}
-          <span>{node.name}</span>
+          <span className={`tree-row-name${node.hidden ? " is-hidden" : ""}`}>{node.name}</span>
         </button>
         {isOpen
           ? node.children.map((child) => (
@@ -215,7 +254,9 @@ function TreeRow({
         ) : (
           <FileText size={13} />
         )}
-        <span className="tree-file-title">{fileLabel(node.name)}</span>
+        <span className={`tree-file-title tree-row-name${node.hidden ? " is-hidden" : ""}`}>
+          {fileLabel(node.name)}
+        </span>
         {isActive && isDirty && <span className="tree-dirty-dot" title="未保存" />}
       </button>
       {onRenameChapter && (
@@ -236,28 +277,73 @@ function TreeRow({
   );
 }
 
+/**
+ * Builds the folder tree the sidebar renders.
+ *
+ * Siblings are looked up through a map rather than scanned. The obvious shape —
+ * `current.children.find(child => child.path === path)` — is O(siblings) per
+ * document, so a folder holding a few thousand notes at one level costs a
+ * quadratic number of string comparisons every time the tree is rebuilt, which
+ * is on every manifest change.
+ *
+ * The path is accumulated as the walk descends instead of being re-sliced and
+ * re-joined at each level, which also drops a per-level array allocation.
+ */
 function buildTree(chapters: ChapterManifest[]): TreeNode[] {
-  const root: TreeNode = { name: "root", path: "", children: [] };
+  const root: TreeNode = { name: "root", path: "", children: [], hidden: false };
+  /** Each node's children, keyed by their own path. */
+  const childrenByPath = new Map<TreeNode, Map<string, TreeNode>>();
+  childrenByPath.set(root, new Map());
+
   for (const chapter of chapters) {
     const parts = chapter.src.replace(/\\/g, "/").split("/").filter(Boolean);
+    // A document is hidden if its own name is, or any folder above it is — the
+    // manifest carries the whole-path answer, so read it rather than re-deriving
+    // it from the last segment.
+    const documentHidden = chapter.hidden === true || parts.some((part) => part.startsWith("."));
     let current = root;
-    parts.forEach((part, index) => {
-      const path = parts.slice(0, index + 1).join("/");
-      let child = current.children.find((item) => item.path === path);
+    let path = "";
+
+    for (let index = 0; index < parts.length; index += 1) {
+      const part = parts[index];
+      path = path ? `${path}/${part}` : part;
+      const isLeaf = index === parts.length - 1;
+
+      const siblings = childrenByPath.get(current)!;
+      let child = siblings.get(path);
       if (!child) {
-        child = { name: part, path, children: [] };
+        child = {
+          name: part,
+          path,
+          children: [],
+          hidden: part.startsWith(".") || (isLeaf && documentHidden),
+        };
+        siblings.set(path, child);
         current.children.push(child);
+        childrenByPath.set(child, new Map());
       }
-      if (index === parts.length - 1) child.chapter = chapter;
+      if (isLeaf) child.chapter = chapter;
       current = child;
-    });
+    }
   }
   sortNodes(root.children);
   return root.children;
 }
 
+/**
+ * Orders each folder's contents.
+ *
+ * Hidden entries sort as a block after the visible ones, and that is the point
+ * of it rather than an incidental detail: turning the hidden-file preference on
+ * appends a section instead of interleaving. A reader who had a tree they knew
+ * should not find a document moved because a *different* one was revealed.
+ *
+ * The folder-before-file rule then applies inside each block, so the shape of
+ * the visible tree is exactly what it was with the preference off.
+ */
 function sortNodes(nodes: TreeNode[]): void {
   nodes.sort((a, b) => {
+    if (a.hidden !== b.hidden) return a.hidden ? 1 : -1;
     const aFolder = a.children.length > 0 && !a.chapter;
     const bFolder = b.children.length > 0 && !b.chapter;
     if (aFolder !== bFolder) return aFolder ? -1 : 1;

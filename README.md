@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-v2.6.4-1D9BF0?style=flat-square&logo=github" alt="Version 2.6.4" />
+  <img src="https://img.shields.io/badge/Version-v2.6.5-1D9BF0?style=flat-square&logo=github" alt="Version 2.6.5" />
   <img src="https://img.shields.io/badge/Presentation-Mode_2.3_Clockwise_Cycles-8B5CF6?style=flat-square" alt="Presentation Mode 2.3" />
   <img src="https://img.shields.io/badge/FSRS-5_Spaced_Repetition-F59E0B?style=flat-square" alt="FSRS-5 Spaced Repetition" />
   <img src="https://img.shields.io/badge/Mind_Map-Non--Destructive_Sync-00BA7C?style=flat-square" alt="Non-Destructive Mindmap Sync" />
@@ -60,6 +60,7 @@
 
 ## 🏛️ 核心能力体系
 
+- **📂 目录与复盘 2.6.5（隐藏文件开关 · 不再漏文件 · 提速 · v2.6.5 更新）**：**新增「显示点开头的文件」开关**（工具栏，仅打开文件夹时出现；默认**关**，升级后第一眼与 v2.6.4 一致 ✓）—— 工具与系统目录（`.git`、`node_modules`、`dist`、`$RECYCLE.BIN` 等）**始终跳过**，开关不会把仓库内部铺进文档树；你自己的隐藏文件（`.草稿.md`、`.archive/`）打开后显示并弱化呈现，**排序上作为一整块排在可见项之后**，所以打开开关是「末尾多出一段」而不是把列表重排一遍 ✓；判定规则为「文件名有点，**或它上面任意一层文件夹有点**」✓。**修复目录扫描静默漏文件**：文件上限 3000 / 深度 6 层两处硬截断此前**不产生任何提示**，现改为护栏（50000 / 64 层 + 20 秒墙钟兜底），**截断原因必须上报**并在树底部提示，补 junction 环路保护与符号链接分支，并区分「打不开的目录」与「空目录」（此前 `EACCES/EPERM/ENOENT` 一律返回空列表 ✓）。**修复复盘文件夹列表滚不动**（列表无滚动容器，外层 `overflow:hidden` 直接裁掉；空列表时「添加文件夹」入口还被一并藏掉 ✓）。**修复打开新文件的视觉跳动**：同步查渲染缓存使「切换身份」与「换上新正文」落在同一次 React 提交，缓存 12 → 40 篇 + 48 MB 字节上限，空闲预取相邻文档 ✓。**性能**：围栏扫描 O(n²) → O(n)（5000 行 **973.6ms → 1.01ms**）、路径去重改用 `Set`（5000 路径 **7080ms → 4.4ms**，此前选满 5 个文件夹切来源会僵住约 7 秒）、目录树构建改 Map 查找（9000 篇 **265ms → 23ms**）✓。
 - **🎨 Canvas Card 2.6.4（卡片斜杠命令与滚轮归属 · v2.6.4 更新）**：白板卡片编辑器键入 `/` 弹出**与文档编辑器同一套**斜杠命令 —— 不是"照抄一份界面"，而是两边调用**同一条触发规则、同一张命令表**（`src/services/slashCommands.ts`），所以 `↑` `↓` 选择、`Enter` / `Tab` 插入、`Esc` 关闭、英文与拼音首字母搜索的行为在哪儿都一致 ✓；**引用笔记改用 `[[`**（与文档编辑器语义对齐），从命令列表里选「双向链接 `[[]]`」会**自动接上**笔记列表 ✓；`/` 只在一行开头或空格之后触发 —— 路径（`notes/a.md`）、网址（`https://…`）与 `//` 注释里的斜杠**不会**弹面板 ✓。**滚动卡片内的清单不再带动画布**：滚轮按**滚动链语义**判定归属 —— 内层还有得滚就归内层，滚到顶或底才交还给画布，所以滚轮停在卡片上永远不会变成死区 ✓。
 - **🗺️ Mind Map 2.6.3（顶栏重排 · v2.6.3 更新）**：**双栏展开时两行对齐成一列** —— 顶栏从"会自己换行的横排"改成网格：设置控件（搜索 / 主题 / 布局 / 编号）整排换行，并与第一行第一个控件**同列**；两行时缩放与导出整组搬到**第二行右端**，第二行不再空半行 ✓。一行还是两行由顶栏**按实测宽度自行决定**：把六种排法（单行/两行 × 全文字/收次级标签/收主级标签）各量一遍，第一种放得下的胜出 —— 搜索框开闭、多选节点、标题长短都自动算进去，不再有写死的宽度阈值 ✓。控件统一 30px 高、组间 6px / 组内 4px，各窄档位补回上下留白，主题与布局两个下拉做成真正的控件（此前无边框、偏矮、文字偏暗，看着像被禁用 ✓）；节点上的**链接徽章改为透明底**（只剩箭头与细边，SVG 导出同步 ✓）。
 - **🗺️ Mind Map 2.6.2（细节打磨 · v2.6.2 更新）**：**顶栏两行对齐** —— 两行布局下第二行与第一行左对齐，右侧那排不再看起来错位 ✓；**链接徽章真正可点** —— 根因是父层的 `pointer-events: none` 被继承下来、徽章收不到点击，改为显式 `auto`，并支持**裸域名**（`example.com` ✓）；节点类型图标改画在**主题盒子之上**，不再被连线压住 ✓；**PNG 导出改为 3× 超采样**，放大后文字与图标不再发虚 ✓。
@@ -534,20 +535,20 @@
 
 ## 📦 安装程序与便携版下载 (Downloads & Release Assets)
 
-本项目为 Windows 64 位系统深度优化，提供图形化安装程序、标准 MSI 安装包与免安装便携版，最新 `v2.6.4` 资产已发布：
+本项目为 Windows 64 位系统深度优化，提供图形化安装程序、标准 MSI 安装包与免安装便携版，最新 `v2.6.5` 资产已发布：
 
-> 🌐 **GitHub 官方发布主页**：[GitHub Releases · v2.6.4](https://github.com/chunxvzhang-lab/KnowSpace/releases/tag/v2.6.4)
+> 🌐 **GitHub 官方发布主页**：[GitHub Releases · v2.6.5](https://github.com/chunxvzhang-lab/KnowSpace/releases/tag/v2.6.5)
 
 ### 1. Windows 图形化安装程序（推荐）
-- **安装文件**：[`KnowSpace-Setup-2.6.4.exe`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.6.4/KnowSpace-Setup-2.6.4.exe)
+- **安装文件**：[`KnowSpace-Setup-2.6.5.exe`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.6.5/KnowSpace-Setup-2.6.5.exe)
 - **特点**：双击即可向导式安装，支持自定义安装目录，自动创建桌面快捷方式与开始菜单官方品牌图标，深度集成系统级 `.md` 与 `.canvas` 文件关联，内置标准卸载程序。
 
 ### 2. Windows MSI 标准安装包
-- **安装文件**：[`KnowSpace-2.6.4.msi`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.6.4/KnowSpace-2.6.4.msi)
+- **安装文件**：[`KnowSpace-2.6.5.msi`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.6.5/KnowSpace-2.6.5.msi)
 - **特点**：Windows Installer 官方格式，适合企业批量部署、组策略分发与企业级静默安装，支持标准控制面板卸载。
 
 ### 3. Windows 绿色免安装便携版
-- **便携文件**：[`KnowSpace-win-x64-portable.zip`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.6.4/KnowSpace-win-x64-portable.zip)
+- **便携文件**：[`KnowSpace-win-x64-portable.zip`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.6.5/KnowSpace-win-x64-portable.zip)
 - **直接运行**：解压后双击 `KnowSpace.exe` 即可直接使用完整功能。
 - **特点**：解压即用、随身携带（支持装入 U 盘或移动硬盘）；完全自包含 Electron 运行时与全套本地依赖，无需配置任何外部开发环境；支持右键「打开方式」关联 Markdown 与白板文档。
 

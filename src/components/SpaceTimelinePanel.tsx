@@ -279,287 +279,307 @@ export const SpaceTimelinePanel: React.FC<SpaceTimelinePanelProps> = ({
     </div>
   );
 
-  // The review view brings its own header (progress bar instead of search), so
-  // it takes over the panel rather than nesting inside the timeline body.
-  if (activeTab === "review") {
-    return (
-      <DailyReviewPanel
-        notes={notes}
-        currentDocument={currentDocument}
-        loading={loading}
-        onOpenNoteFile={onOpenNoteFile}
-        onProgressSaved={loadSummary}
-        tabsSlot={tabSwitcher}
-        />
-    );
-  }
-
+  // Only the review is kept mounted; the timeline is not.
+  //
+  // The review used to be an early return, which unmounted it on the way out —
+  // and the parse cache, the rating log and the set of cards already rated this
+  // session all live in its hooks. So every trip to 时间轴 and back re-read the
+  // sources and re-parsed them from nothing, which is what made the tab feel
+  // heavy. It stays mounted now, and is hidden rather than taken down.
+  //
+  // The timeline does not need that: it holds no state of its own — the search
+  // box, the filter and the note list all belong to this component — so leaving
+  // it rendered under the review would buy nothing and put a second copy of the
+  // tab labels into the DOM.
   return (
-    <div className="space-timeline-container">
-      {/* Panel Top Header */}
-      <div className="space-panel-header">
-        <div className="space-panel-title-row">
-          <div className="space-panel-title">
-            <Zap size={16} className="text-orange" />
-            <span>闪念时间线</span>
-            <span className="space-count-badge">{notes.length} 篇</span>
+    <>
+      {/* Timeline and todo views. */}
+      {!isReviewActive ? (
+        <div className="space-timeline-container">
+          {/* Panel Top Header */}
+          <div className="space-panel-header">
+            <div className="space-panel-title-row">
+              <div className="space-panel-title">
+                <Zap size={16} className="text-orange" />
+                <span>闪念时间线</span>
+                <span className="space-count-badge">{notes.length} 篇</span>
+              </div>
+              <div className="space-header-actions">
+                <button
+                  type="button"
+                  className="space-icon-btn"
+                  onClick={loadSummary}
+                  title="刷新列表"
+                >
+                  <RotateCw size={13} className={loading ? "spin" : ""} />
+                </button>
+                <button
+                  type="button"
+                  className="space-icon-btn"
+                  onClick={() => {
+                    desktop?.openFlashCapsule?.();
+                  }}
+                  title="呼出闪念胶囊 (Alt+Space)"
+                >
+                  <Zap size={13} className="text-orange" />
+                </button>
+              </div>
+            </div>
+
+            {/* Segmented View Switcher */}
+            {tabSwitcher}
+
+            {/* Search & Filter Bar */}
+            <div className="space-search-wrapper">
+              <Search size={13} className="space-search-icon" />
+              <input
+                type="text"
+                className="space-search-input"
+                placeholder={activeTab === "timeline" ? "搜索闪念内容、标签、时间..." : "筛选待办清单..."}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  className="space-clear-search-btn"
+                  onClick={() => setSearchQuery("")}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {feedback && <div className="space-feedback-toast">{feedback}</div>}
           </div>
-          <div className="space-header-actions">
-            <button
-              type="button"
-              className="space-icon-btn"
-              onClick={loadSummary}
-              title="刷新列表"
-            >
-              <RotateCw size={13} className={loading ? "spin" : ""} />
-            </button>
-            <button
-              type="button"
-              className="space-icon-btn"
-              onClick={() => {
-                desktop?.openFlashCapsule?.();
-              }}
-              title="呼出闪念胶囊 (Alt+Space)"
-            >
-              <Zap size={13} className="text-orange" />
-            </button>
-          </div>
-        </div>
 
-        {/* Segmented View Switcher */}
-        {tabSwitcher}
+          {/* Panel Body Content */}
+          <div className="space-panel-body">
+            {loading && notes.length === 0 ? (
+              <div className="space-empty-state">
+                <RotateCw size={24} className="spin text-muted" />
+                <p>正在载入 Space 闪念库...</p>
+              </div>
+            ) : notes.length === 0 ? (
+              <div className="space-empty-state">
+                <Zap size={32} className="text-orange opacity-60" />
+                <h3>暂无闪念记录</h3>
+                <p>按下全局热键或点击下方按钮，随时捕捉灵感与待办，自动归档至 Space。</p>
+                <button
+                  type="button"
+                  className="space-btn-primary"
+                  onClick={() => desktop?.openFlashCapsule?.()}
+                >
+                  <Zap size={14} /> 呼出闪念胶囊
+                </button>
+              </div>
+            ) : activeTab === "timeline" ? (
+              /* Timeline View */
+              <div className="space-timeline-list">
+                {(["今天", "昨天", "更早之前"] as const).map((groupKey) => {
+                  const groupNotes = groupedTimeline[groupKey];
+                  if (!groupNotes || groupNotes.length === 0) return null;
+                  return (
+                    <div key={groupKey} className="space-timeline-group">
+                      <div className="space-group-header">
+                        <Calendar size={12} />
+                        <span>{groupKey}</span>
+                        <span className="space-group-badge">{groupNotes.length}</span>
+                      </div>
 
-        {/* Search & Filter Bar */}
-        <div className="space-search-wrapper">
-          <Search size={13} className="space-search-icon" />
-          <input
-            type="text"
-            className="space-search-input"
-            placeholder={activeTab === "timeline" ? "搜索闪念内容、标签、时间..." : "筛选待办清单..."}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-          {searchQuery && (
-            <button
-              type="button"
-              className="space-clear-search-btn"
-              onClick={() => setSearchQuery("")}
-            >
-              ✕
-            </button>
-          )}
-        </div>
-
-        {feedback && <div className="space-feedback-toast">{feedback}</div>}
-      </div>
-
-      {/* Panel Body Content */}
-      <div className="space-panel-body">
-        {loading && notes.length === 0 ? (
-          <div className="space-empty-state">
-            <RotateCw size={24} className="spin text-muted" />
-            <p>正在载入 Space 闪念库...</p>
-          </div>
-        ) : notes.length === 0 ? (
-          <div className="space-empty-state">
-            <Zap size={32} className="text-orange opacity-60" />
-            <h3>暂无闪念记录</h3>
-            <p>按下全局热键或点击下方按钮，随时捕捉灵感与待办，自动归档至 Space。</p>
-            <button
-              type="button"
-              className="space-btn-primary"
-              onClick={() => desktop?.openFlashCapsule?.()}
-            >
-              <Zap size={14} /> 呼出闪念胶囊
-            </button>
-          </div>
-        ) : activeTab === "timeline" ? (
-          /* Timeline View */
-          <div className="space-timeline-list">
-            {(["今天", "昨天", "更早之前"] as const).map((groupKey) => {
-              const groupNotes = groupedTimeline[groupKey];
-              if (!groupNotes || groupNotes.length === 0) return null;
-              return (
-                <div key={groupKey} className="space-timeline-group">
-                  <div className="space-group-header">
-                    <Calendar size={12} />
-                    <span>{groupKey}</span>
-                    <span className="space-group-badge">{groupNotes.length}</span>
-                  </div>
-
-                  <div className="space-group-cards">
-                    {groupNotes.map((note) => (
-                      <div key={note.filePath} className="space-note-card">
-                        <div className="space-card-top">
-                          <span className="space-card-time" title={note.fileName}>
-                            <Clock size={11} />
-                            <strong>{note.timeDisplay}</strong>
-                            <span className="space-file-tag">{note.fileName.replace(/\.md$/, "")}</span>
-                          </span>
-
-                          <div className="space-card-actions">
-                            <button
-                              type="button"
-                              className="space-card-btn"
-                              onClick={() => onOpenNoteFile?.(note.filePath)}
-                              title="在编辑器标签页中打开"
-                            >
-                              <FileText size={12} />
-                            </button>
-                            {onMergeIntoDocument && (
-                              <button
-                                type="button"
-                                className="space-card-btn"
-                                onClick={() => handleMerge(note)}
-                                title="一键并入当前正在编辑的文档"
-                              >
-                                <ArrowDownToLine size={12} />
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              className="space-card-btn"
-                              onClick={() => handleCopyNote(note.content)}
-                              title="复制全文"
-                            >
-                              <Copy size={12} />
-                            </button>
-                            <button
-                              type="button"
-                              className="space-card-btn danger"
-                              onClick={() => handleDeleteNote(note.filePath, note.fileName)}
-                              title="删除此条闪念"
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Interactive Todos within note */}
-                        {note.todos.length > 0 && (
-                          <div className="space-card-todos">
-                            {note.todos.map((todo) => (
-                              <label
-                                key={todo.id}
-                                className={`space-card-todo-item ${todo.completed ? "completed" : ""}`}
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={todo.completed}
-                                  onChange={() =>
-                                    handleToggleTodo(note.filePath, todo.lineIndex, todo.completed)
-                                  }
-                                />
-                                <span>{todo.text}</span>
-                              </label>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Clean Content Snippet */}
-                        <div className="space-card-content">
-                          {note.content
-                            .replace(/^#+.*$/gm, "")
-                            .replace(/^[-*]\s*\[[ xX]\].*$/gm, "")
-                            .replace(/---/g, "")
-                            .trim()}
-                        </div>
-
-                        {/* Tag Pills */}
-                        {note.tags.length > 0 && (
-                          <div className="space-card-tags">
-                            {note.tags.map((tag) => (
-                              <span key={tag} className="space-tag-pill">
-                                <Tag size={10} />
-                                <span>{tag}</span>
+                      <div className="space-group-cards">
+                        {groupNotes.map((note) => (
+                          <div key={note.filePath} className="space-note-card">
+                            <div className="space-card-top">
+                              <span className="space-card-time" title={note.fileName}>
+                                <Clock size={11} />
+                                <strong>{note.timeDisplay}</strong>
+                                <span className="space-file-tag">{note.fileName.replace(/\.md$/, "")}</span>
                               </span>
-                            ))}
+
+                              <div className="space-card-actions">
+                                <button
+                                  type="button"
+                                  className="space-card-btn"
+                                  onClick={() => onOpenNoteFile?.(note.filePath)}
+                                  title="在编辑器标签页中打开"
+                                >
+                                  <FileText size={12} />
+                                </button>
+                                {onMergeIntoDocument && (
+                                  <button
+                                    type="button"
+                                    className="space-card-btn"
+                                    onClick={() => handleMerge(note)}
+                                    title="一键并入当前正在编辑的文档"
+                                  >
+                                    <ArrowDownToLine size={12} />
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  className="space-card-btn"
+                                  onClick={() => handleCopyNote(note.content)}
+                                  title="复制全文"
+                                >
+                                  <Copy size={12} />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="space-card-btn danger"
+                                  onClick={() => handleDeleteNote(note.filePath, note.fileName)}
+                                  title="删除此条闪念"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Interactive Todos within note */}
+                            {note.todos.length > 0 && (
+                              <div className="space-card-todos">
+                                {note.todos.map((todo) => (
+                                  <label
+                                    key={todo.id}
+                                    className={`space-card-todo-item ${todo.completed ? "completed" : ""}`}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={todo.completed}
+                                      onChange={() =>
+                                        handleToggleTodo(note.filePath, todo.lineIndex, todo.completed)
+                                      }
+                                    />
+                                    <span>{todo.text}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Clean Content Snippet */}
+                            <div className="space-card-content">
+                              {note.content
+                                .replace(/^#+.*$/gm, "")
+                                .replace(/^[-*]\s*\[[ xX]\].*$/gm, "")
+                                .replace(/---/g, "")
+                                .trim()}
+                            </div>
+
+                            {/* Tag Pills */}
+                            {note.tags.length > 0 && (
+                              <div className="space-card-tags">
+                                {note.tags.map((tag) => (
+                                  <span key={tag} className="space-tag-pill">
+                                    <Tag size={10} />
+                                    <span>{tag}</span>
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </div>
-                        )}
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              /* Todos Hub View */
+              <div className="space-todos-container">
+                {/* Filter Radio Tabs */}
+                <div className="space-todo-filters">
+                  <button
+                    type="button"
+                    className={`space-filter-btn ${todoFilter === "pending" ? "active" : ""}`}
+                    onClick={() => setTodoFilter("pending")}
+                  >
+                    待处理 ({totalTodoCount - completedTodoCount})
+                  </button>
+                  <button
+                    type="button"
+                    className={`space-filter-btn ${todoFilter === "done" ? "active" : ""}`}
+                    onClick={() => setTodoFilter("done")}
+                  >
+                    已完成 ({completedTodoCount})
+                  </button>
+                  <button
+                    type="button"
+                    className={`space-filter-btn ${todoFilter === "all" ? "active" : ""}`}
+                    onClick={() => setTodoFilter("all")}
+                  >
+                    全部 ({totalTodoCount})
+                  </button>
+                </div>
+
+                {/* Todo List */}
+                {allTodos.length === 0 ? (
+                  <div className="space-empty-todos">
+                    <CheckSquare size={24} className="text-muted" />
+                    <p>{todoFilter === "pending" ? "全部待办已完成！太棒了！" : "暂无匹配的待办事项"}</p>
+                  </div>
+                ) : (
+                  <div className="space-todos-list">
+                    {allTodos.map((item) => (
+                      <div
+                        key={item.todoId}
+                        className={`space-todo-item-card ${item.completed ? "completed" : ""}`}
+                      >
+                        <label className="space-todo-item-label">
+                          <input
+                            type="checkbox"
+                            checked={item.completed}
+                            onChange={() =>
+                              handleToggleTodo(item.filePath, item.lineIndex, item.completed)
+                            }
+                          />
+                          <span className="space-todo-item-text">{item.text}</span>
+                        </label>
+                        <div className="space-todo-item-meta">
+                          <button
+                            type="button"
+                            className="space-todo-file-link"
+                            onClick={() => onOpenNoteFile?.(item.filePath)}
+                            title="打开所属闪念文件"
+                          >
+                            <Clock size={10} />
+                            <span>{item.dateStr} {item.timeDisplay}</span>
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          /* Todos Hub View */
-          <div className="space-todos-container">
-            {/* Filter Radio Tabs */}
-            <div className="space-todo-filters">
-              <button
-                type="button"
-                className={`space-filter-btn ${todoFilter === "pending" ? "active" : ""}`}
-                onClick={() => setTodoFilter("pending")}
-              >
-                待处理 ({totalTodoCount - completedTodoCount})
-              </button>
-              <button
-                type="button"
-                className={`space-filter-btn ${todoFilter === "done" ? "active" : ""}`}
-                onClick={() => setTodoFilter("done")}
-              >
-                已完成 ({completedTodoCount})
-              </button>
-              <button
-                type="button"
-                className={`space-filter-btn ${todoFilter === "all" ? "active" : ""}`}
-                onClick={() => setTodoFilter("all")}
-              >
-                全部 ({totalTodoCount})
-              </button>
-            </div>
-
-            {/* Todo List */}
-            {allTodos.length === 0 ? (
-              <div className="space-empty-todos">
-                <CheckSquare size={24} className="text-muted" />
-                <p>{todoFilter === "pending" ? "全部待办已完成！太棒了！" : "暂无匹配的待办事项"}</p>
-              </div>
-            ) : (
-              <div className="space-todos-list">
-                {allTodos.map((item) => (
-                  <div
-                    key={item.todoId}
-                    className={`space-todo-item-card ${item.completed ? "completed" : ""}`}
-                  >
-                    <label className="space-todo-item-label">
-                      <input
-                        type="checkbox"
-                        checked={item.completed}
-                        onChange={() =>
-                          handleToggleTodo(item.filePath, item.lineIndex, item.completed)
-                        }
-                      />
-                      <span className="space-todo-item-text">{item.text}</span>
-                    </label>
-                    <div className="space-todo-item-meta">
-                      <button
-                        type="button"
-                        className="space-todo-file-link"
-                        onClick={() => onOpenNoteFile?.(item.filePath)}
-                        title="打开所属闪念文件"
-                      >
-                        <Clock size={10} />
-                        <span>{item.dateStr} {item.timeDisplay}</span>
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                )}
               </div>
             )}
           </div>
-        )}
-      </div>
 
-      {/* Panel Bottom Bar */}
-      <div className="space-panel-footer">
-        <span className="space-path-display" title={`存储目录: ${spaceDir}`}>
-          <FolderOpen size={12} />
-          <span>{spaceDir ? spaceDir.slice(-32) : "Space 知识库"}</span>
-        </span>
+          {/* Panel Bottom Bar */}
+          <div className="space-panel-footer">
+            <span className="space-path-display" title={`存储目录: ${spaceDir}`}>
+              <FolderOpen size={12} />
+              <span>{spaceDir ? spaceDir.slice(-32) : "Space 知识库"}</span>
+            </span>
+          </div>
+        </div>
+      ) : null}
+
+      {/* The review, mounted from the moment the panel is and never taken down.
+          `active` tells it whether it is the visible one, so it can stay out of
+          the way — no parsing, no keyboard capture — while 时间轴 is up.
+          The tab switcher is passed only while it is visible: hidden, it would
+          be a second copy of the same three labels sitting in the DOM beside the
+          timeline's own. */}
+      <div className="space-review-slot" hidden={!isReviewActive}>
+        <DailyReviewPanel
+          notes={notes}
+          currentDocument={currentDocument}
+          loading={loading}
+          onOpenNoteFile={onOpenNoteFile}
+          onProgressSaved={loadSummary}
+          tabsSlot={isReviewActive ? tabSwitcher : null}
+          active={isReviewActive}
+        />
       </div>
-    </div>
+    </>
   );
 };

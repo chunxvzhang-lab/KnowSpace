@@ -64,3 +64,42 @@ export async function readReviewDocuments(
 
   return documents;
 }
+
+/**
+ * The same read, in batches, reporting how far it has got.
+ *
+ * Reading a whole vault in one call means one long IPC round trip whose size the
+ * renderer cannot see, and a review that looks frozen until it lands. Batching
+ * gives the wait a shape — "312 / 1840" instead of a spinner — and the yield
+ * between batches lets the window keep painting.
+ *
+ * The pairing rule above is not re-implemented here: each batch goes through
+ * `readReviewDocuments`, so a batch cannot mismatch a document with another's
+ * text no matter how it comes back.
+ */
+export async function readReviewDocumentsChunked(
+  bridge: ReviewSourceReader,
+  paths: string[],
+  options: {
+    /** Documents per batch. Small enough to paint between, large enough to be worth a round trip. */
+    chunkSize?: number;
+    onProgress?: (done: number, total: number) => void;
+    /** Checked between batches, so a source the reader has left stops being read. */
+    isCancelled?: () => boolean;
+  } = {}
+): Promise<ReviewSourceDocument[]> {
+  const { chunkSize = 24, onProgress, isCancelled } = options;
+  if (paths.length === 0) return [];
+
+  const documents: ReviewSourceDocument[] = [];
+  for (let start = 0; start < paths.length; start += chunkSize) {
+    if (isCancelled?.()) return documents;
+    const batch = paths.slice(start, start + chunkSize);
+    documents.push(...(await readReviewDocuments(bridge, batch)));
+    onProgress?.(Math.min(start + chunkSize, paths.length), paths.length);
+    // Hand the thread back so the progress the caller just rendered is painted
+    // before the next batch starts competing for it.
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+  }
+  return documents;
+}

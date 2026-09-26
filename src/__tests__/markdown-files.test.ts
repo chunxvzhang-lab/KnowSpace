@@ -168,6 +168,270 @@ describe("electron/markdown-files.cjs", () => {
     expect(manifest.chapters[1].id).toBe("chapter:path:sub%2F02-detail.markdown");
   });
 
+  /**
+   * The scan has to reach everything, and it did not.
+   *
+   * The depth ceiling was 6 and the file ceiling 3000, both silent — a folder
+   * nested deeper than six levels lost whole subtrees, and a folder with more
+   * than 3000 documents lost the rest. Neither produced a warning, so the only
+   * thing the reader could conclude was that their documents were not there.
+   * These are the two shapes that used to be wrong.
+   */
+  describe("深层与大量文件的目录扫描", () => {
+    it("reaches a document nested far below the old depth ceiling", async () => {
+      // Seven levels is already past the old limit of 6, and `专业课/第一学期/…/
+      // 资料/期末` is a real folder someone would have.
+      const deepDir = path.join(tempDir, "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8");
+      await fs.mkdir(deepDir, { recursive: true });
+      await fs.writeFile(path.join(deepDir, "深处.md"), "# 深处", "utf8");
+      await fs.writeFile(path.join(tempDir, "顶层.md"), "# 顶层", "utf8");
+
+      const manifest = await markdownFiles.buildDirectoryManifest(tempDir);
+
+      expect(manifest.chapters.map((chapter: { src: string }) => chapter.src).sort()).toEqual([
+        "L1/L2/L3/L4/L5/L6/L7/L8/深处.md",
+        "顶层.md",
+      ]);
+      // A complete scan says nothing about being incomplete.
+      expect(manifest.scanTruncated).toBeUndefined();
+    });
+
+    it("collects well past the old file ceiling without truncating", async () => {
+      // 40 documents — three read batches, so the scan is exercised across the
+      // batching boundary and proves it is not stopping early. The ceiling
+      // itself is asserted against the exported constant below rather than by
+      // creating thousands of files: this suite runs one fork and does real disk
+      // I/O, and a fixture large enough to matter to the assertion is also large
+      // enough to make the test fail on a busy machine and pass on an idle one.
+      const wideDir = path.join(tempDir, "wide");
+      await fs.mkdir(wideDir, { recursive: true });
+      const total = 40;
+      await Promise.all(
+        Array.from({ length: total }, (_, index) =>
+          fs.writeFile(path.join(wideDir, `n${String(index).padStart(4, "0")}.md`), "x", "utf8")
+        )
+      );
+
+      const manifest = await markdownFiles.buildDirectoryManifest(tempDir);
+
+      expect(manifest.chapters.length).toBe(total);
+      expect(manifest.scanTruncated).toBeUndefined();
+    }, 30000);
+
+    it("keeps the ceilings clear of a real vault", () => {
+      // The old values were 3000 files and 6 levels, and both failed silently.
+      // Asserted against the exported constants so the number and the test cannot
+      // drift apart.
+      expect(markdownFiles.MAX_DIRECTORY_SCAN_FILES).toBeGreaterThanOrEqual(50000);
+      expect(markdownFiles.MAX_DIRECTORY_SCAN_DEPTH).toBeGreaterThanOrEqual(32);
+    });
+
+    it("still skips ignored directories", async () => {
+      const ignored = path.join(tempDir, "node_modules", "pkg");
+      await fs.mkdir(ignored, { recursive: true });
+      await fs.writeFile(path.join(ignored, "skip.md"), "# skip", "utf8");
+      await fs.writeFile(path.join(tempDir, "keep.md"), "# keep", "utf8");
+
+      const manifest = await markdownFiles.buildDirectoryManifest(tempDir);
+
+      expect(manifest.chapters.map((chapter: { src: string }) => chapter.src)).toEqual(["keep.md"]);
+    });
+
+    it("reports a scan it had to cut short rather than dropping files silently", async () => {
+      const files = await markdownFiles.collectMarkdownFilesDetailed(tempDir, tempDir);
+      // The detailed form always answers with the truncation marker, present or
+      // not — that is what the manifest and the review folder rows read.
+      expect(files).toHaveProperty("truncated");
+      expect(files.truncated).toBeNull();
+      expect(Array.isArray(files.files)).toBe(true);
+    });
+  });
+
+  /**
+   * A directory that cannot be opened returns no entries — so it looks exactly
+   * like an empty directory, and "empty" is the reading the reader will land on.
+   * The failure has to travel back with the result instead of being folded into
+   * "nothing in here".
+   */
+  describe("无法读取的目录", () => {
+    it("reports the errno instead of answering an empty list", async () => {
+      const missing = path.join(tempDir, "并不存在");
+
+      const result = await markdownFiles.readDirectoryEntries(missing);
+
+      expect(result.entries).toEqual([]);
+      expect(result.error).toBeTruthy();
+      expect(result.error.code).toBe("ENOENT");
+    });
+
+    it("reports a path that is a file rather than a directory", async () => {
+      const filePath = path.join(tempDir, "是文件.md");
+      await fs.writeFile(filePath, "# 内容", "utf8");
+
+      const result = await markdownFiles.readDirectoryEntries(filePath);
+
+      expect(result.entries).toEqual([]);
+      expect(result.error).toBeTruthy();
+      expect(result.error.code).toBe("ENOTDIR");
+    });
+
+    it("answers a readable directory with its entries and no error", async () => {
+      const result = await markdownFiles.readDirectoryEntries(tempDir);
+
+      expect(result.error).toBeNull();
+      expect(Array.isArray(result.entries)).toBe(true);
+    });
+
+    it("leaves the manifest unmarked when every directory was readable", async () => {
+      await fs.writeFile(path.join(tempDir, "正常.md"), "# 正常", "utf8");
+
+      const manifest = await markdownFiles.buildDirectoryManifest(tempDir);
+
+      // A clean scan says nothing about being clean, which is what makes the
+      // marker worth reading when it is there.
+      expect(manifest.scanUnreadable).toBeUndefined();
+    });
+
+    it("keeps unreadable directories out of the file list without failing the scan", async () => {
+      await fs.writeFile(path.join(tempDir, "可见.md"), "# 可见", "utf8");
+
+      const scan = await markdownFiles.collectMarkdownFilesDetailed(tempDir, tempDir);
+
+      // `unreadable` is always an array, so the manifest can summarise it
+      // without a presence check.
+      expect(Array.isArray(scan.unreadable)).toBe(true);
+      expect(scan.unreadable).toHaveLength(0);
+      expect(scan.files).toHaveLength(1);
+    });
+  });
+
+  /**
+   * Names starting with `.` fall into two groups that used to be one rule:
+   * tooling that is never a document, and the reader's own files hidden by a
+   * naming convention they chose. Only the second is a preference.
+   */
+  describe("点开头的文件（隐藏文件）", () => {
+    afterEach(() => {
+      // Module-level setting, so it has to be put back or the next file's tests
+      // inherit it.
+      markdownFiles.setScanOptions({ includeHidden: false });
+    });
+
+    /** A vault with one visible note, one hidden note, and one hidden folder. */
+    async function makeVault() {
+      await fs.writeFile(path.join(tempDir, "可见.md"), "# 可见", "utf8");
+      await fs.writeFile(path.join(tempDir, ".草稿.md"), "# 草稿", "utf8");
+      const hiddenDir = path.join(tempDir, ".archive");
+      await fs.mkdir(hiddenDir, { recursive: true });
+      await fs.writeFile(path.join(hiddenDir, "旧稿.md"), "# 旧稿", "utf8");
+    }
+
+    it("hides them by default", async () => {
+      await makeVault();
+
+      const manifest = await markdownFiles.buildDirectoryManifest(tempDir);
+
+      expect(manifest.chapters.map((c: { src: string }) => c.src)).toEqual(["可见.md"]);
+      // Nothing is marked hidden when nothing hidden is listed — the flag only
+      // appears on documents that are actually in the tree.
+      expect(manifest.chapters.every((c: { hidden?: boolean }) => c.hidden === undefined)).toBe(true);
+    });
+
+    it("lists them when asked, and marks them", async () => {
+      await makeVault();
+      markdownFiles.setScanOptions({ includeHidden: true });
+
+      const manifest = await markdownFiles.buildDirectoryManifest(tempDir);
+      const sources = manifest.chapters.map((c: { src: string }) => c.src);
+
+      // Membership, not an exact order: how two hidden names sort against each
+      // other is the collator's business, and pinning it here would make this
+      // test fail on a Node upgrade for no reason. The order rule that matters
+      // is asserted on its own below.
+      expect(sources).toHaveLength(3);
+      expect([...sources].sort()).toEqual(["可见.md", ".archive/旧稿.md", ".草稿.md"].sort());
+
+      const hidden = manifest.chapters
+        .filter((c: { hidden?: boolean }) => c.hidden === true)
+        .map((c: { src: string }) => c.src);
+      expect([...hidden].sort()).toEqual([".archive/旧稿.md", ".草稿.md"].sort());
+      // The visible one is not marked.
+      expect(manifest.chapters.find((c: { src: string }) => c.src === "可见.md").hidden).toBeUndefined();
+    });
+
+    it("sorts hidden documents after the visible ones", async () => {
+      await makeVault();
+      markdownFiles.setScanOptions({ includeHidden: true });
+
+      const manifest = await markdownFiles.buildDirectoryManifest(tempDir);
+      const firstHidden = manifest.chapters.findIndex((c: { hidden?: boolean }) => c.hidden === true);
+      const lastVisible = manifest.chapters
+        .map((c: { hidden?: boolean }) => c.hidden === true)
+        .lastIndexOf(false);
+
+      // The visible block is contiguous and comes first: turning the preference
+      // on appends, rather than interleaving.
+      expect(lastVisible).toBeLessThan(firstHidden);
+    });
+
+    it("marks a document hidden when a folder above it is", async () => {
+      await makeVault();
+      markdownFiles.setScanOptions({ includeHidden: true });
+
+      const manifest = await markdownFiles.buildDirectoryManifest(tempDir);
+      const inside = manifest.chapters.find((c: { src: string }) => c.src === ".archive/旧稿.md");
+
+      // Its own name has no dot; the folder's does, and the folder is what the
+      // reader hid.
+      expect(inside.hidden).toBe(true);
+    });
+
+    it("still skips tooling directories even when hidden files are shown", async () => {
+      await makeVault();
+      const gitDir = path.join(tempDir, ".git");
+      const modulesDir = path.join(tempDir, "node_modules", "pkg");
+      await fs.mkdir(gitDir, { recursive: true });
+      await fs.mkdir(modulesDir, { recursive: true });
+      await fs.writeFile(path.join(gitDir, "notes.md"), "# 不是文档", "utf8");
+      await fs.writeFile(path.join(modulesDir, "readme.md"), "# 不是文档", "utf8");
+      markdownFiles.setScanOptions({ includeHidden: true });
+
+      const manifest = await markdownFiles.buildDirectoryManifest(tempDir);
+      const sources = manifest.chapters.map((c: { src: string }) => c.src);
+
+      // The preference is about the reader's own files. It must not be able to
+      // drag a repository's internals into the tree.
+      expect(sources).not.toContain(".git/notes.md");
+      expect(sources.some((src: string) => src.includes("node_modules"))).toBe(false);
+    });
+
+    it("ignores a non-boolean includeHidden rather than flipping it on", async () => {
+      await makeVault();
+
+      // A renderer sending `"yes"` or `1` is a bug on the other side; the safe
+      // reading of it is "not asked for", not "show everything".
+      markdownFiles.setScanOptions({ includeHidden: "yes" });
+      let manifest = await markdownFiles.buildDirectoryManifest(tempDir);
+      expect(manifest.chapters).toHaveLength(1);
+
+      markdownFiles.setScanOptions({ includeHidden: 1 });
+      manifest = await markdownFiles.buildDirectoryManifest(tempDir);
+      expect(manifest.chapters).toHaveLength(1);
+    });
+
+    it("survives being handed nothing at all", async () => {
+      await makeVault();
+      markdownFiles.setScanOptions({ includeHidden: true });
+      markdownFiles.setScanOptions(null);
+      markdownFiles.setScanOptions(undefined);
+
+      // A malformed call must not throw and must not change the setting: the
+      // last valid value stands.
+      const manifest = await markdownFiles.buildDirectoryManifest(tempDir);
+      expect(manifest.chapters).toHaveLength(3);
+    });
+  });
+
   it("reads markdown files and captures diskVersion, BOM and line endings", async () => {
     const filePath = path.join(tempDir, "test-bom.md");
     const bomBuffer = Buffer.concat([

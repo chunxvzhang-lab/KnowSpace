@@ -33,7 +33,7 @@ import { useSearch } from "./hooks/useSearch";
 import { useBacklinkIndex } from "./hooks/useBacklinkIndex";
 import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
 import { useBookmarks } from "./hooks/useBookmarks";
-import { useDocumentSession } from "./hooks/useDocumentSession";
+import { useDocumentSession, renderedCacheKey } from "./hooks/useDocumentSession";
 import { useReadingTracker } from "./hooks/useReadingTracker";
 import { resolveBookmark } from "./services/bookmarks";
 import { loadPackagedChapterMarkdown } from "./services/bookSource";
@@ -245,6 +245,7 @@ export function App() {
     openSession,
     updateSource,
     renderPreviewNow,
+    primeRenderedCache,
     setViewMode,
     saveSession,
     saveSessionAs,
@@ -1035,6 +1036,81 @@ export function App() {
     };
   }, [chapterId, manifest, tabs, openSession, session?.chapterId, session?.absolutePath]);
 
+  /**
+   * Renders the documents either side of the open one, while nothing else needs
+   * the thread.
+   *
+   * The other half of making a document switch instant. The render cache only
+   * helps a document that has been opened before, and the common case is moving
+   * forward through a folder in order — so the next document is rendered before
+   * it is asked for, and opening it hits the cache and swaps in one commit.
+   *
+   * Deliberately narrow: two neighbours, not a window, and only on an idle
+   * callback. Pre-loading more than the reader is likely to reach for would be
+   * reading files off disk and rendering them to save a wait that most of them
+   * never have.
+   */
+  const preloadedPathsRef = useRef(new Set<string>());
+  useEffect(() => {
+    if (!manifest?.chapters?.length || !chapterId) return;
+    const index = manifest.chapters.findIndex((chapter) => chapter.id === chapterId);
+    if (index < 0) return;
+
+    const neighbours = [manifest.chapters[index + 1], manifest.chapters[index - 1]].filter(
+      (chapter): chapter is (typeof manifest.chapters)[number] =>
+        Boolean(chapter?.absolutePath) && !chapter.src.toLowerCase().endsWith(".canvas")
+    );
+    if (neighbours.length === 0) return;
+
+    let cancelled = false;
+
+    const run = async () => {
+      for (const chapter of neighbours) {
+        if (cancelled) return;
+        const absolutePath = chapter.absolutePath;
+        if (!absolutePath) continue;
+        // Asked once per session per file: re-rendering a neighbour every time
+        // the reader steps between two documents would undo the saving.
+        const seenKey = absolutePath.toLowerCase();
+        if (preloadedPathsRef.current.has(seenKey)) continue;
+        preloadedPathsRef.current.add(seenKey);
+
+        try {
+          const source = await window.bookMDDesktop?.readMarkdownFile(absolutePath);
+          if (cancelled || !source?.markdown) continue;
+          const rendered = await renderMarkdown(source.markdown, source.baseUrl);
+          if (cancelled) continue;
+          primeRenderedCache(
+            renderedCacheKey({
+              absolutePath,
+              chapterId: chapter.id,
+              sourceLength: source.markdown.length,
+              diskVersion: source.diskVersion ?? null,
+            }),
+            rendered
+          );
+        } catch {
+          // A neighbour that cannot be read is not a problem: it is a
+          // pre-load, and the reader will get the normal error if they open it.
+        }
+      }
+    };
+
+    const handle =
+      typeof window.requestIdleCallback === "function"
+        ? window.requestIdleCallback(() => void run(), { timeout: 3000 })
+        : window.setTimeout(() => void run(), 1200);
+
+    return () => {
+      cancelled = true;
+      if (typeof window.cancelIdleCallback === "function" && typeof handle === "number") {
+        window.cancelIdleCallback(handle);
+      } else {
+        window.clearTimeout(handle as number);
+      }
+    };
+  }, [manifest, chapterId, primeRenderedCache]);
+
   // Close directory and outline whenever a canvas file/mode is active
   useEffect(() => {
     if (viewMode === "canvas" || session?.fileName?.toLowerCase().endsWith(".canvas")) {
@@ -1175,6 +1251,42 @@ export function App() {
     document.documentElement.dataset.theme = preferences.theme;
     window.bookMDDesktop?.setNativeTheme?.(preferences.theme);
   }, [preferences]);
+
+  /**
+   * Tells the main process whether hidden documents should be listed, and
+   * re-lists the open folder so the change is visible immediately.
+   *
+   * The preference is read in the main process, because that is where the
+   * directory is walked — so it has to be pushed rather than simply stored. And
+   * pushing it is only half the job: the tree already on screen was built under
+   * the old setting, and without the re-listing below, turning the option on
+   * would appear to do nothing until the reader happened to reopen the folder.
+   *
+   * Keyed on the preference alone. Depending on `manifest` would re-run this on
+   * every refresh, and the refresh itself changes the manifest — a loop.
+   */
+  useEffect(() => {
+    const desktop = window.bookMDDesktop;
+    desktop?.setScanOptions?.({ includeHidden: preferences.showHiddenFiles === true });
+
+    const rootPath = manifestRef.current?.rootPath;
+    if (!rootPath || !desktop?.refreshDirectory) return;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const next = await desktop.refreshDirectory(rootPath);
+        if (!cancelled && next) setManifest(next);
+      } catch {
+        // A failed re-listing leaves the tree as it is. The setting is already
+        // stored, so the next open picks it up — no need to say anything.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [preferences.showHiddenFiles, setManifest]);
 
   const handlePrintDocument = useCallback(async () => {
     if (renderPreviewNow) {
@@ -1838,6 +1950,11 @@ export function App() {
             showLineNumbers={preferences.showLineNumbers}
             onToggleLineNumbers={() =>
               patchPreferences({ showLineNumbers: !preferences.showLineNumbers })
+            }
+            showHiddenFiles={preferences.showHiddenFiles}
+            hasDirectory={Boolean(manifest?.rootPath)}
+            onToggleHiddenFiles={() =>
+              patchPreferences({ showHiddenFiles: !preferences.showHiddenFiles })
             }
             typewriterMode={typewriterMode}
             onToggleTypewriterMode={toggleTypewriterMode}

@@ -261,6 +261,7 @@ export const DocumentWorkspace = memo(function DocumentWorkspace({
         )}
         <ReaderPane
           chapter={renderedChapter}
+          documentKey={currentFilePath}
           containerRef={containerRef}
           fontScale={fontScale}
           mermaidTheme={mermaidTheme}

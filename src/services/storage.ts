@@ -28,6 +28,15 @@ export type Preferences = {
   fontScale: number;
   showLineNumbers?: boolean;
   flashCapsuleShortcut?: string;
+  /**
+   * Whether documents hidden by a leading dot appear in the directory tree.
+   *
+   * Off by default, which is what the app did before the preference existed — a
+   * vault that never asked for hidden files sees exactly the tree it saw before.
+   * Names that are tooling rather than documents (`.git`, `node_modules`, build
+   * output) are skipped whatever this says; see `ignoredDirectoryNames`.
+   */
+  showHiddenFiles?: boolean;
 };
 
 export function loadBookmarks(bookId: string, chapters?: ChapterManifest[]): Bookmark[] {
@@ -88,15 +97,17 @@ export function loadPreferences(): Preferences {
     fontScale: 1,
     showLineNumbers: true,
     flashCapsuleShortcut: "Alt+Space",
+    showHiddenFiles: false,
   };
   try {
     const raw = JSON.parse(localStorage.getItem(PREFS_KEY) ?? "{}");
     const theme: ThemeMode = raw.theme === "dark" ? "twitter" : (raw.theme ?? "system");
     const showLineNumbers = raw.showLineNumbers !== undefined ? Boolean(raw.showLineNumbers) : true;
+    const showHiddenFiles = raw.showHiddenFiles !== undefined ? Boolean(raw.showHiddenFiles) : false;
     const flashCapsuleShortcut = typeof raw.flashCapsuleShortcut === "string" && raw.flashCapsuleShortcut.trim()
       ? raw.flashCapsuleShortcut.trim()
       : "Alt+Space";
-    return { ...fallback, ...raw, theme, showLineNumbers, flashCapsuleShortcut };
+    return { ...fallback, ...raw, theme, showLineNumbers, showHiddenFiles, flashCapsuleShortcut };
   } catch {
     return fallback;
   }

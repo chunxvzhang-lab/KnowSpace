@@ -70,6 +70,22 @@ export function useBacklinkIndex({
   const isGraphPaneOpen = useUiStore((s) => s.isGraphPaneOpen);
   const chapterId = useTabStore((s) => s.activeTabId);
 
+  /**
+   * Which documents the vault holds, as a string that only changes when that
+   * set changes.
+   *
+   * The effect below used to depend on `manifest.chapters`, and the flash-note
+   * save path calls `setManifest` — so saving one note produced a new array, a
+   * new identity, and a full background re-index of the whole vault queued
+   * behind it. The chapter ids are what the index actually keys off, and a save
+   * does not change them; a document added or removed does, and that is what
+   * this notices.
+   */
+  const chaptersSignature = useMemo(
+    () => manifest?.chapters.map((chapter) => chapter.id).join("|") ?? "",
+    [manifest]
+  );
+
   useEffect(() => {
     if (!manifest?.chapters?.length) return;
     let active = true;
@@ -130,6 +146,7 @@ export function useBacklinkIndex({
           }
 
           // Fallback or fill for individual items
+          const indexUpdates: { id: string; title: string; content: string; src: string }[] = [];
           for (const ch of chunk) {
             if (!active) return;
             let content = "";
@@ -143,13 +160,34 @@ export function useBacklinkIndex({
             }
 
             if (!active) return;
+            // Mutated in place; the store is told once, below.
             updateDocumentInIndex(backlinkIndex, ch.id, ch.title, content, ch.src);
-            setVaultSearchIndex((prev) =>
-              updateVaultSearchIndexForDocument(prev, ch.id, ch.title, content, ch.src)
-            );
+            indexUpdates.push({ id: ch.id, title: ch.title, content, src: ch.src });
           }
 
           if (!active) return;
+          // One store write for the chunk rather than one per document.
+          //
+          // Every `setVaultSearchIndex` notifies each subscriber of the search
+          // index, and the chunk is eight documents — so this was eight rounds of
+          // subscriber work per chunk, for a result only the last of them needed.
+          // Folding them into a single updater keeps the intermediate indexes
+          // off the store entirely.
+          if (indexUpdates.length > 0) {
+            setVaultSearchIndex((prev) => {
+              let next = prev;
+              for (const update of indexUpdates) {
+                next = updateVaultSearchIndexForDocument(
+                  next,
+                  update.id,
+                  update.title,
+                  update.content,
+                  update.src
+                );
+              }
+              return next;
+            });
+          }
           setBacklinkIndex({ ...backlinkIndex });
 
           // Cooperative yield: let browser event loop handle render frames, user input, mouse, etc.
@@ -183,7 +221,7 @@ export function useBacklinkIndex({
         window.clearTimeout(debounceTimer);
       }
     };
-  }, [manifest?.chapters]);
+  }, [chaptersSignature]);
 
   // Real-time incremental update when current session content changes (debounced by 400ms to keep typing silky smooth)
   useEffect(() => {

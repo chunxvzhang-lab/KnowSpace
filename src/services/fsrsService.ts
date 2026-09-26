@@ -408,16 +408,29 @@ export function review(
  * Fenced code blocks are skipped wholesale: a note teaching FSRS syntax would
  * otherwise turn every example into a real card, and code samples containing
  * `::` or `{{c1::…}}` are common.
+ *
+ * Computed once for the whole note rather than asked per line. The obvious
+ * shape — "is line *i* inside a fence?" answered by walking the lines above it —
+ * is O(n) per call and O(n²) per note, and it was called for every line by all
+ * three extractors: a 2000-line note cost roughly six million fence checks
+ * before a single card was looked for. That is the whole reason a vault-sized
+ * review froze the window. One pass over the lines answers every query at once.
+ *
+ * `mask[i]` is the fence state *before* line `i` is read, which is exactly what
+ * the per-line walk used to return: a fence marker line is not itself "inside" a
+ * fence, and everything between the opening and closing markers is.
  */
-function isInsideFence(lines: string[], index: number): boolean {
+function computeFenceMask(lines: string[]): Uint8Array {
+  const mask = new Uint8Array(lines.length);
   let fence: string | null = null;
-  for (let i = 0; i < index; i += 1) {
+  for (let i = 0; i < lines.length; i += 1) {
+    mask[i] = fence !== null ? 1 : 0;
     const match = /^\s*(```+|~~~+)/.exec(lines[i]);
     if (!match) continue;
     if (fence === null) fence = match[1][0];
     else if (match[1][0] === fence) fence = null;
   }
-  return fence !== null;
+  return mask;
 }
 
 /** Blocks that must never contribute cards. */
@@ -457,11 +470,11 @@ export function computeCardId(kind: FsrsCardKind, front: string): string {
 }
 
 /** `Q: … / A: …` question-answer pairs, with continuation lines on the answer. */
-function extractQaPairs(lines: string[]): FsrsCard[] {
+function extractQaPairs(lines: string[], fence: Uint8Array): FsrsCard[] {
   const cards: FsrsCard[] = [];
 
   for (let i = 0; i < lines.length; i += 1) {
-    if (isInsideFence(lines, i) || isInsideMetadata(lines[i])) continue;
+    if (fence[i] || isInsideMetadata(lines[i])) continue;
 
     const question = /^\s*Q[:：]\s*(.+)$/.exec(lines[i]);
     if (!question) continue;
@@ -485,7 +498,7 @@ function extractQaPairs(lines: string[]): FsrsCard[] {
         continue;
       }
       if (/^\s*Q[:：]/.test(line)) break;
-      if (isInsideFence(lines, j)) break;
+      if (fence[j]) break;
       if (!started && !line.trim()) continue;
       if (started && !line.trim()) break;
       // Indented or plain continuation lines belong to the answer
@@ -504,12 +517,12 @@ function extractQaPairs(lines: string[]): FsrsCard[] {
 }
 
 /** Inline `front :: back` cards, one per line. */
-function extractInlineCards(lines: string[]): FsrsCard[] {
+function extractInlineCards(lines: string[], fence: Uint8Array): FsrsCard[] {
   const cards: FsrsCard[] = [];
 
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i];
-    if (isInsideFence(lines, i) || isInsideMetadata(line)) continue;
+    if (fence[i] || isInsideMetadata(line)) continue;
     // A QA block body must not be re-read as an inline card
     if (/^\s*[QA][:：]/.test(line)) continue;
     // A cloze carries its own `::` inside `{{c1::…}}` (and a hint after a second
@@ -534,14 +547,14 @@ function extractInlineCards(lines: string[]): FsrsCard[] {
 }
 
 /** `{{c1::answer}}` and `==highlight==` clozes. */
-function extractClozeCards(lines: string[]): FsrsCard[] {
+function extractClozeCards(lines: string[], fence: Uint8Array): FsrsCard[] {
   const cards: FsrsCard[] = [];
   const clozeRe = /\{\{c\d+::(.*?)(?:::(.*?))?\}\}/g;
   const highlightRe = /==([^=]+)==/g;
 
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i];
-    if (isInsideFence(lines, i) || isInsideMetadata(line)) continue;
+    if (fence[i] || isInsideMetadata(line)) continue;
 
     const blanks: string[] = [];
     let matched = false;
@@ -593,10 +606,12 @@ export function parseFlashcards(markdown: string): FsrsCard[] {
   if (!markdown || typeof markdown !== "string") return [];
 
   const lines = markdown.split(/\r?\n/);
+  // One pass for all three extractors, rather than each of them asking per line.
+  const fence = computeFenceMask(lines);
   const found = [
-    ...extractQaPairs(lines),
-    ...extractInlineCards(lines),
-    ...extractClozeCards(lines),
+    ...extractQaPairs(lines, fence),
+    ...extractInlineCards(lines, fence),
+    ...extractClozeCards(lines, fence),
   ];
 
   // QA pairs claim whole blocks, so an inline card can only appear on a line the
@@ -684,7 +699,18 @@ function parseLine(line: string): { id: string; progress: FsrsProgress } | null 
  * comments (`<!-- fsrs: S=… D=… due=… -->`) are accepted too and matched
  * positionally, which keeps notes written by early builds working.
  */
-export function parseFsrsMetadata(markdown: string): Map<string, FsrsProgress> {
+export function parseFsrsMetadata(
+  markdown: string,
+  /**
+   * The note's cards, when the caller has already parsed them.
+   *
+   * Only the legacy single-line metadata form needs them — it carries no card id
+   * and is matched to cards by order. Passing them in keeps `parseNote` from
+   * parsing every note twice, which for a vault-sized source was half the work
+   * of the scan.
+   */
+  parsedCards?: FsrsCard[]
+): Map<string, FsrsProgress> {
   const result = new Map<string, FsrsProgress>();
   if (!markdown) return result;
 
@@ -736,7 +762,7 @@ export function parseFsrsMetadata(markdown: string): Map<string, FsrsProgress> {
 
   // Attach legacy values to the parsed cards in order.
   if (orphanProgress.length > 0) {
-    const cards = parseFlashcards(markdown);
+    const cards = parsedCards ?? parseFlashcards(markdown);
     cards.forEach((card, index) => {
       if (index < orphanProgress.length && !result.has(card.id)) {
         result.set(card.id, orphanProgress[index]);
@@ -750,7 +776,9 @@ export function parseFsrsMetadata(markdown: string): Map<string, FsrsProgress> {
 /** Builds the metadata block body for the given progress map. */
 export function serializeFsrsMetadata(
   markdown: string,
-  progress: Map<string, FsrsProgress>
+  progress: Map<string, FsrsProgress>,
+  /** The note's cards, when the caller has already parsed them. */
+  parsedCards?: FsrsCard[]
 ): string {
   // An empty map is not "nothing to say" — it is "nothing to keep", and what the
   // document still holds belongs to cards that are no longer in the map, so it goes.
@@ -768,7 +796,7 @@ export function serializeFsrsMetadata(
   // every row back, leaving a file that claims scheduling history for cards that are
   // not in it. With no cards the block is empty, and an empty block is removed below,
   // which is what that guard was reaching for in the first place.
-  const liveIds = new Set(parseFlashcards(markdown).map((c) => c.id));
+  const liveIds = new Set((parsedCards ?? parseFlashcards(markdown)).map((c) => c.id));
   const lines: string[] = [];
   for (const [id, value] of progress) {
     if (!liveIds.has(id)) continue;
@@ -813,9 +841,12 @@ export function upsertFsrsMetadata(
   markdown: string,
   updates: Map<string, FsrsProgress>
 ): string {
-  const merged = parseFsrsMetadata(markdown);
+  // Parsed once for both halves. Each used to parse the note itself, so rating a
+  // single card walked the whole note twice to write one line.
+  const cards = parseFlashcards(markdown);
+  const merged = parseFsrsMetadata(markdown, cards);
   for (const [id, value] of updates) merged.set(id, value);
-  return serializeFsrsMetadata(markdown, merged);
+  return serializeFsrsMetadata(markdown, merged, cards);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -866,11 +897,16 @@ export function emptyParsedSource(): ParsedReviewSource {
 }
 
 export function parseNote(note: { path: string; content: string }): ParsedNote {
+  // Parsed once and shared with the metadata reader. Both used to call
+  // parseFlashcards themselves — and the metadata reader could call it a second
+  // time on top of that for legacy notes — so a single note was walked three
+  // times over before a card was shown.
+  const cards = parseFlashcards(note.content);
   return {
     path: note.path,
     content: note.content,
-    cards: parseFlashcards(note.content),
-    progress: parseFsrsMetadata(note.content),
+    cards,
+    progress: parseFsrsMetadata(note.content, cards),
   };
 }
 
