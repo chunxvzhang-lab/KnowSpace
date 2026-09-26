@@ -59,32 +59,19 @@ import type {
 } from "../types/canvasTypes";
 import {
   computeBoundingBox,
-  getNodeAnchorPoint,
   extractCanvasToMarkdown,
   CANVAS_COLOR_PALETTES,
   CANVAS_STANDARD_COLOR_IDS,
   isNodeInsideGroup,
-  toggleChecklistInMarkdown,
-  spawnConnectedCard,
-  connectOneToMany,
-  connectChainNodes,
-  connectLoopNodes,
   disconnectNodeEdges,
-  spawnMultipleBranches,
-  computeEdgeMidpoint,
   cycleEdgeArrow,
   cycleEdgeStyle,
   cycleEdgeStrokePattern,
   reverseEdgeDirection,
-  getOptimalAnchorSides,
-  getSourceNodeEdgeColor,
   computeSourceDisplayColorMap,
   expandLoopEdgeSelection,
   syncLoopEdgeGeometry,
-  computeGridLayout,
-  resizeGridSpacing,
   computeRingSpacingLayout,
-  resizeRingSpacing,
   isPointInsideNodeHull,
   alignNodesInCircle,
   downloadCanvasAsImage,
@@ -118,7 +105,6 @@ import { CanvasEdgeLabelLayer } from "./canvas/CanvasEdgeLabelLayer";
 import { CanvasEdgeLayer } from "./canvas/CanvasEdgeLayer";
 import { EdgeContextMenu } from "./canvas/EdgeContextMenu";
 import { NodeContextMenu } from "./canvas/NodeContextMenu";
-import { getEdgeRing } from "./canvas/canvasEdgeUtils";
 import { ExtractModal } from "./canvas/ExtractModal";
 import { FilePickerModal } from "./canvas/FilePickerModal";
 import { ExportModal } from "./canvas/ExportModal";
@@ -127,6 +113,12 @@ import { SpawnBranchModal } from "./canvas/SpawnBranchModal";
 // extracted during the wave-1 CanvasView decomposition.
 import { useCanvasDocument } from "./canvas/useCanvasDocument";
 import { useCanvasViewport } from "./canvas/useCanvasViewport";
+// Selection, node-gesture, connect and pointer domains, extracted during the
+// wave-2 CanvasView decomposition.
+import { useCanvasSelection } from "./canvas/useCanvasSelection";
+import { useCanvasNodeDrag } from "./canvas/useCanvasNodeDrag";
+import { useCanvasConnect } from "./canvas/useCanvasConnect";
+import { useCanvasPointer } from "./canvas/useCanvasPointer";
 
 export type CanvasViewProps = {
   title: string;
@@ -147,12 +139,6 @@ export type CanvasViewProps = {
 };
 
 const SIDES: CanvasNodeSide[] = ["top", "right", "bottom", "left"];
-
-/**
- * Shared empty Map so the drag hot path never allocates a throwaway one when
- * nothing else moves alongside the dragged card.
- */
-const EMPTY_DRAG_MAP = new Map<string, { id: string; startX: number; startY: number }>();
 
 // getNodePalette now lives in ./canvas/canvasPalette so the minimap and this
 // file share one definition (imported at the top).
@@ -178,106 +164,6 @@ function hexToRgbString(hex: string): string | null {
 
 // renderEdgeShapeIcon now lives in ./canvas/canvasEdgeIcons (imported at the
 // top) so the extracted edge context menu can use it.
-
-/**
- * Calculates hit nodes intersecting with a marquee box.
- * If normal cards are hit inside a group container, returns only the cards,
- * preventing accidental selection of the background group container.
- */
-function computeBoxSelectionHits(
-  minX: number,
-  maxX: number,
-  minY: number,
-  maxY: number,
-  nodes: CanvasNode[],
-): Set<string> {
-  const hitCardIds = new Set<string>();
-  const hitGroupIds = new Set<string>();
-
-  for (const node of nodes) {
-    const nodeRight = node.x + node.width;
-    const nodeBottom = node.y + node.height;
-    const intersects = node.x < maxX && nodeRight > minX && node.y < maxY && nodeBottom > minY;
-    if (!intersects) continue;
-
-    if (node.type === "group") {
-      // For groups: only select if the box completely encloses the group or covers its title header
-      const fullyEnclosed =
-        minX <= node.x && maxX >= nodeRight && minY <= node.y && maxY >= nodeBottom;
-      const headerIntersects =
-        node.x < maxX && nodeRight > minX && node.y < maxY && node.y + 40 > minY;
-      if (fullyEnclosed || headerIntersects) {
-        hitGroupIds.add(node.id);
-      }
-    } else {
-      hitCardIds.add(node.id);
-    }
-  }
-
-  if (hitGroupIds.size > 0 && hitCardIds.size > 0) {
-    const hitGroups = nodes.filter(
-      (n): n is CanvasGroupNode => n.type === "group" && hitGroupIds.has(n.id),
-    );
-    const externalCardIds = new Set<string>();
-    for (const cardId of hitCardIds) {
-      const card = nodes.find((n) => n.id === cardId);
-      if (card) {
-        const isInsideHitGroup = hitGroups.some((g) => isNodeInsideGroup(card, g));
-        if (!isInsideHitGroup) {
-          externalCardIds.add(cardId);
-        }
-      }
-    }
-    // If there are cards outside the hit groups, select both the groups and external cards
-    if (externalCardIds.size > 0) {
-      return new Set<string>([...hitGroupIds, ...externalCardIds]);
-    }
-    // Otherwise all hit cards are inside the group: prefer selecting only the inner cards
-    return hitCardIds;
-  }
-
-  if (hitCardIds.size > 0) {
-    return hitCardIds;
-  }
-  return hitGroupIds;
-}
-
-/**
- * Calculates which edges are enclosed or intersected by the selection marquee box
- */
-function computeBoxSelectionEdgeHits(
-  minX: number,
-  maxX: number,
-  minY: number,
-  maxY: number,
-  edges: CanvasEdge[],
-  nodeMap: Map<string, CanvasNode>,
-): Set<string> {
-  const hitEdgeIds = new Set<string>();
-  for (const edge of edges) {
-    const fromNode = nodeMap.get(edge.fromNode);
-    const toNode = nodeMap.get(edge.toNode);
-    if (!fromNode || !toNode) continue;
-    const optSides = getOptimalAnchorSides(fromNode, toNode);
-    const fromSide = edge.fromSide || optSides.fromSide;
-    const toSide = edge.toSide || optSides.toSide;
-    const p1 = getNodeAnchorPoint(fromNode, fromSide);
-    const p2 = getNodeAnchorPoint(toNode, toSide);
-    const mid = computeEdgeMidpoint(
-      p1,
-      fromSide,
-      p2,
-      toSide,
-      edge.style,
-      edge.stepOffset,
-      getEdgeRing(edge),
-    );
-    if (mid.x >= minX && mid.x <= maxX && mid.y >= minY && mid.y <= maxY) {
-      hitEdgeIds.add(edge.id);
-    }
-  }
-  return hitEdgeIds;
-}
 
 /**
  * A text card's body: the rendered Markdown, with its checkboxes and links live.
@@ -353,22 +239,7 @@ export const CanvasView = memo(function CanvasView({
     return () => observer.disconnect();
   }, []);
 
-  // Dragging card or canvas refs
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const isDraggingCanvasRef = useRef(false);
-  const canvasDragStartRef = useRef<{
-    x: number;
-    y: number;
-    panX: number;
-    panY: number;
-    hasMoved?: boolean;
-  }>({
-    x: 0,
-    y: 0,
-    panX: 0,
-    panY: 0,
-    hasMoved: false,
-  });
 
   // Card text editing — the draft lives here, mirrored into refs so the
   // document hook's save paths can commit it without re-subscribing on
@@ -438,31 +309,29 @@ export const CanvasView = memo(function CanvasView({
     handleWheel,
   } = useCanvasViewport({ containerRef, nodes: data.nodes });
 
-  // Multi-node selection & interaction state
-  const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set());
-  const selectedNodeId = useMemo(() => {
-    const arr = Array.from(selectedNodeIds);
-    return arr.length > 0 ? arr[arr.length - 1] : null;
-  }, [selectedNodeIds]);
-  const setSelectedNodeId = useCallback((id: string | null) => {
-    setSelectedNodeIds(id ? new Set([id]) : new Set());
-  }, []);
+  // Selection domain: multi-select state, the marquee box-selection gesture
+  // and the marquee hit tests (extracted hook).
+  const {
+    selectedNodeIds,
+    setSelectedNodeIds,
+    selectedNodeId,
+    setSelectedNodeId,
+    selectedEdgeIds,
+    setSelectedEdgeIds,
+    selectedEdgeId,
+    setSelectedEdgeId,
+    connectedInternalEdges,
+    isBoxSelectMode,
+    setIsBoxSelectMode,
+    selectionBox,
+    setSelectionBox,
+    selectionBoxRef,
+    hasDraggedRef,
+    baseSelectionBeforeBoxRef,
+    baseEdgeSelectionBeforeBoxRef,
+    handleStartBoxSelection,
+  } = useCanvasSelection({ containerRef, viewportRef, edges: data.edges });
 
-  const [selectedEdgeIds, setSelectedEdgeIds] = useState<Set<string>>(new Set());
-  const selectedEdgeId = useMemo(() => {
-    const arr = Array.from(selectedEdgeIds);
-    return arr.length === 1 ? arr[0] : null;
-  }, [selectedEdgeIds]);
-  const setSelectedEdgeId = useCallback((id: string | null) => {
-    setSelectedEdgeIds(id ? new Set([id]) : new Set());
-  }, []);
-
-  const connectedInternalEdges = useMemo(() => {
-    if (selectedNodeIds.size < 2) return [];
-    return data.edges.filter(
-      (e) => selectedNodeIds.has(e.fromNode) && selectedNodeIds.has(e.toNode),
-    );
-  }, [data.edges, selectedNodeIds]);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
 
   /**
@@ -515,33 +384,6 @@ export const CanvasView = memo(function CanvasView({
   const isFullscreenActive = isFullscreen ?? isPresentationFullscreen;
   const slideDrawerRef = useRef<HTMLDivElement>(null);
   const savedViewportBeforePresentationRef = useRef<CanvasViewport | null>(null);
-
-  // Mouse marquee box selection
-  const [isBoxSelectMode, setIsBoxSelectMode] = useState(false);
-  const [selectionBox, setSelectionBox] = useState<{
-    startX: number;
-    startY: number;
-    currentX: number;
-    currentY: number;
-  } | null>(null);
-  const selectionBoxRef = useRef<{
-    startX: number;
-    startY: number;
-    currentX: number;
-    currentY: number;
-  } | null>(null);
-  const hasDraggedRef = useRef(false);
-  const baseSelectionBeforeBoxRef = useRef<Set<string>>(new Set());
-  const baseEdgeSelectionBeforeBoxRef = useRef<Set<string>>(new Set());
-
-  // Step bend drag state
-  const stepBendDragRef = useRef<{
-    edgeId: string;
-    startX: number;
-    startY: number;
-    initialOffset: number;
-    orientation: "horizontal" | "vertical";
-  } | null>(null);
 
   // Dynamically clamp context menu position against the actual viewport so
   // the menu never spills off-screen, even when the canvas is nested in a
@@ -651,117 +493,98 @@ export const CanvasView = memo(function CanvasView({
     setTimeout(() => setToastMessage(null), 2200);
   }, []);
 
-  // Connecting line dragging state
-  const [connectingState, setConnectingState] = useState<{
-    fromNodeId: string;
-    fromSide: CanvasNodeSide;
-    currentX: number;
-    currentY: number;
-  } | null>(null);
-  // Mirrors connectingState for the global mouse listeners, so those listeners
-  // can stay mounted across renders instead of being re-attached every time
-  // the connection cursor moves.
-  const connectingStateRef = useRef(connectingState);
-  connectingStateRef.current = connectingState;
+  // Node gesture starts: what a mousedown on a card means — plain drag,
+  // collaborative multi-drag, grid/ring re-flow, group scoop, resize — written
+  // into the drag-state refs the pointer listeners consume (extracted hook).
+  const {
+    nodeDragRef,
+    resizeDragRef,
+    freshGroupIdsRef,
+    handleNodeDragStart,
+    handleNodeResizeStart,
+  } = useCanvasNodeDrag({
+    isPresentationMode,
+    latestDataRef,
+    editingNodeIdRef,
+    handleSaveNodeEdit,
+    setContextMenu,
+    isBoxSelectMode,
+    handleStartBoxSelection,
+    hasDraggedRef,
+    selectedNodeIds,
+    setSelectedNodeIds,
+    setSelectedEdgeId,
+  });
 
-  const nodeDragRef = useRef<{
-    nodeId: string;
-    startNodeX: number;
-    startNodeY: number;
-    mouseStartX: number;
-    mouseStartY: number;
-    containedNodes?: Array<{ id: string; startX: number; startY: number }>;
-    /**
-     * Same data as `containedNodes`, pre-indexed once at drag start. Rebuilding
-     * this Map on every mousemove (which can fire several hundred times per
-     * second) allocated constantly for no benefit.
-     */
-    containedMap?: Map<string, { id: string; startX: number; startY: number }>;
-    /**
-     * When the selection forms a rectangular grid, dragging one of its cards
-     * becomes an interactive spacing adjustment instead of a plain move.
-     */
-    gridSpacing?: {
-      layout: ReturnType<typeof computeGridLayout> & object;
-      baseGapX: number;
-      baseGapY: number;
-      startPositions: Array<{ id: string; startX: number; startY: number }>;
-      /** Pre-indexed `startPositions`, built once per drag. */
-      startById: Map<string, { id: string; startX: number; startY: number }>;
-    };
-    /**
-     * When the selection already sits on a circle, dragging one of its cards
-     * resizes the ring — and therefore the spacing between cards — instead of
-     * translating it.
-     */
-    ringSpacing?: {
-      layout: NonNullable<ReturnType<typeof computeRingSpacingLayout>>;
-    };
-  } | null>(null);
+  // Connect / step-bend subsystem: anchor-press connection drags, the batch
+  // connection builders, branch spawning and the step-bend handle
+  // (extracted hook).
+  const {
+    connectingState,
+    connectingStateRef,
+    rafConnectIdRef,
+    latestConnectPosRef,
+    stepBendDragRef,
+    setConnectingState,
+    handleAnchorMouseDown,
+    handleAnchorMouseUp,
+    handleCardMouseUpForConnect,
+    handleStepBendMouseDown,
+    handleResetEdgeStepOffset,
+    handleConnectSelectedNodes,
+    handleConnectOneToMany,
+    handleConnectLoopNodes,
+    handleConfirmBatchSpawn,
+    handleSpawnConnectedChild,
+  } = useCanvasConnect({
+    editable,
+    isPresentationMode,
+    nodes: data.nodes,
+    latestDataRef,
+    pushHistory,
+    selectedNodeIds,
+    setSelectedNodeIds,
+    setSelectedEdgeId,
+    setEditingNodeId,
+    setEditingText,
+    setContextMenu,
+    spawnModalState,
+    setSpawnModalState,
+    showToast,
+  });
 
-  const resizeDragRef = useRef<{
-    nodeId: string;
-    startW: number;
-    startH: number;
-    mouseStartX: number;
-    mouseStartY: number;
-  } | null>(null);
-
-  /**
-   * Dragging the hollow middle of a multi-selection (the empty centre of a
-   * ring or a grid) moves every selected card together, keeping their relative
-   * spacing intact — the cards neither scatter nor drag the canvas behind them.
-   */
-  const groupDragRef = useRef<{
-    startClientX: number;
-    startClientY: number;
-    startById: Map<string, { id: string; startX: number; startY: number }>;
-  } | null>(null);
-  const rafGroupDragIdRef = useRef<number | null>(null);
-  const latestGroupDragPosRef = useRef<{ dx: number; dy: number } | null>(null);
-
-  const rafDragIdRef = useRef<number | null>(null);
-  const rafResizeIdRef = useRef<number | null>(null);
-  const latestDragPosRef = useRef<{
-    dx: number;
-    dy: number;
-    updatedId: string;
-    startX: number;
-    startY: number;
-    containedMap: Map<string, { id: string; startX: number; startY: number }>;
-    gridSpacing?: {
-      layout: ReturnType<typeof computeGridLayout> & object;
-      baseGapX: number;
-      baseGapY: number;
-      startById: Map<string, { id: string; startX: number; startY: number }>;
-    };
-    ringSpacing?: {
-      layout: NonNullable<ReturnType<typeof computeRingSpacingLayout>>;
-    };
-  } | null>(null);
-  const latestResizePosRef = useRef<{
-    dw: number;
-    dh: number;
-    updatedId: string;
-    startW: number;
-    startH: number;
-  } | null>(null);
-  // High-frequency event rAF throttling & batching refs to achieve native high refresh rates (120Hz/144Hz+) with minimal CPU load
-  const rafPanIdRef = useRef<number | null>(null);
-  const latestPanPosRef = useRef<{ dx: number; dy: number } | null>(null);
-  const rafBoxSelectIdRef = useRef<number | null>(null);
-  const latestBoxSelectPosRef = useRef<{
-    clientX: number;
-    clientY: number;
-    isModifier: boolean;
-  } | null>(null);
-  const rafConnectIdRef = useRef<number | null>(null);
-  const latestConnectPosRef = useRef<{ clientX: number; clientY: number } | null>(null);
-  const rafStepBendIdRef = useRef<number | null>(null);
-  const latestStepBendPosRef = useRef<{ edgeId: string; newOffset: number } | null>(null);
-  // Track freshly created group IDs: these groups should NOT auto-scoop
-  // existing cards on their first drag (user must deliberately move cards in)
-  const freshGroupIdsRef = useRef<Set<string>>(new Set());
+  // Pointer system: the single global mousemove/mouseup pair that multiplexes
+  // step-bend, group drag, marquee, pan, node drag, resize and connect, with
+  // the shared rAF-throttling refs (extracted hook).
+  const { isDraggingCanvasRef, canvasDragStartRef, groupDragRef, handleCardBodyActivate } =
+    useCanvasPointer({
+      containerRef,
+      latestDataRef,
+      setData,
+      pushHistory,
+      emitChange,
+      setViewport,
+      viewportRef,
+      rafWheelIdRef,
+      setSelectedNodeIds,
+      setSelectedEdgeIds,
+      hasDraggedRef,
+      selectionBoxRef,
+      setSelectionBox,
+      baseSelectionBeforeBoxRef,
+      baseEdgeSelectionBeforeBoxRef,
+      nodeDragRef,
+      resizeDragRef,
+      connectingStateRef,
+      setConnectingState,
+      rafConnectIdRef,
+      latestConnectPosRef,
+      stepBendDragRef,
+      allChapters,
+      onOpenFile,
+      isPresentationMode,
+      showToast,
+    });
 
   // ResizeObserver for canvas container to ensure smooth updates
   useEffect(() => {
@@ -848,34 +671,6 @@ export const CanvasView = memo(function CanvasView({
       });
     },
     [editable, captureColorSnapshot],
-  );
-
-  // Marquee box selection starter
-  const handleStartBoxSelection = useCallback(
-    (e: React.MouseEvent | MouseEvent, isModifier: boolean) => {
-      if (!containerRef.current) return;
-      const rect = containerRef.current.getBoundingClientRect();
-      const currentZoom = viewportRef.current.zoom;
-      const currentPanX = viewportRef.current.panX;
-      const currentPanY = viewportRef.current.panY;
-      const mouseCanvasX = (e.clientX - rect.left - currentPanX) / currentZoom;
-      const mouseCanvasY = (e.clientY - rect.top - currentPanY) / currentZoom;
-      const newBox = {
-        startX: mouseCanvasX,
-        startY: mouseCanvasY,
-        currentX: mouseCanvasX,
-        currentY: mouseCanvasY,
-      };
-      selectionBoxRef.current = newBox;
-      setSelectionBox(newBox);
-      baseSelectionBeforeBoxRef.current = isModifier ? new Set(selectedNodeIds) : new Set();
-      baseEdgeSelectionBeforeBoxRef.current = isModifier ? new Set(selectedEdgeIds) : new Set();
-      if (!isModifier) {
-        setSelectedNodeIds(new Set());
-        setSelectedEdgeIds(new Set());
-      }
-    },
-    [selectedNodeIds, selectedEdgeIds],
   );
 
   // Background drag to pan or start box selection
@@ -1341,42 +1136,6 @@ export const CanvasView = memo(function CanvasView({
     showToast(`已断开所选卡片间的 ${removedCount} 条内部连线`);
   }, [editable, selectedNodeIds, pushHistory, showToast]);
 
-  const handleStepBendMouseDown = useCallback(
-    (
-      e: React.MouseEvent,
-      edgeId: string,
-      orientation: "horizontal" | "vertical",
-      currentOffset: number,
-    ) => {
-      if (e.button !== 0 || !editable) return;
-      e.preventDefault();
-      e.stopPropagation();
-      stepBendDragRef.current = {
-        edgeId,
-        startX: e.clientX,
-        startY: e.clientY,
-        initialOffset: currentOffset || 0,
-        orientation,
-      };
-    },
-    [editable],
-  );
-
-  const handleResetEdgeStepOffset = useCallback(
-    (edgeId: string) => {
-      if (!editable) return;
-      const currentData = latestDataRef.current;
-      pushHistory({
-        ...currentData,
-        edges: currentData.edges.map((e) =>
-          e.id === edgeId ? { ...e, stepOffset: undefined } : e,
-        ),
-      });
-      showToast("已重置折线转折位置");
-    },
-    [editable, pushHistory, showToast],
-  );
-
   const handleNodeColorChange = useCallback(
     (nodeId: string, color: string) => {
       if (!editable) return;
@@ -1524,124 +1283,6 @@ export const CanvasView = memo(function CanvasView({
     [editable, pushHistory],
   );
 
-  const handleConnectSelectedNodes = useCallback(() => {
-    if (!editable) return;
-    const currentData = latestDataRef.current;
-    const selectedNodes = currentData.nodes.filter((n) => selectedNodeIds.has(n.id));
-    if (selectedNodes.length < 2) return;
-
-    // Use spatially sorted chain connection to prevent criss-crossing dead knots
-    const newEdges = connectChainNodes(
-      selectedNodes,
-      currentData.edges,
-      "bezier",
-      true,
-      currentData.nodes,
-    );
-
-    if (newEdges.length > 0) {
-      pushHistory({
-        ...currentData,
-        edges: [...currentData.edges, ...newEdges],
-      });
-      showToast(`已按空间顺序建立 ${newEdges.length} 条链式连线`);
-    } else {
-      showToast("选中的卡片之间已存在关联连线");
-    }
-    setContextMenu(null);
-  }, [editable, selectedNodeIds, pushHistory, showToast]);
-
-  const handleConnectOneToMany = useCallback(
-    (specifiedRootId?: string) => {
-      if (!editable || selectedNodeIds.size < 2) return;
-      const currentData = latestDataRef.current;
-      const selectedNodes = currentData.nodes.filter((n) => selectedNodeIds.has(n.id));
-      if (selectedNodes.length < 2) return;
-
-      // Determine the root node (The "One"):
-      // 1. Specified root ID (e.g. from context menu target card)
-      // 2. The first selected node in sequence (the user clicks the origin node first, then Shift-selects targets)
-      // 3. Fallback to the geometrically leftmost/topmost node
-      let rootNode: CanvasNode | undefined;
-      if (specifiedRootId) {
-        rootNode = selectedNodes.find((n) => n.id === specifiedRootId);
-      }
-      if (!rootNode) {
-        const firstSelectedId = Array.from(selectedNodeIds)[0];
-        rootNode = selectedNodes.find((n) => n.id === firstSelectedId);
-      }
-      if (!rootNode) {
-        rootNode = [...selectedNodes].sort((a, b) => {
-          const dx = a.x - b.x;
-          if (Math.abs(dx) > 30) return dx;
-          return a.y - b.y;
-        })[0];
-      }
-      if (!rootNode) return;
-
-      const targetNodes = selectedNodes.filter((n) => n.id !== rootNode!.id);
-      const newEdges = connectOneToMany(
-        rootNode,
-        targetNodes,
-        currentData.edges,
-        "bezier",
-        currentData.nodes,
-      );
-
-      if (newEdges.length > 0) {
-        pushHistory({
-          ...currentData,
-          edges: [...currentData.edges, ...newEdges],
-        });
-        const rootTitle =
-          rootNode.type === "text"
-            ? rootNode.text
-                .split("\n")[0]
-                .replace(/^[#\s*->]+/, "")
-                .slice(0, 12) || "主卡片"
-            : rootNode.type === "group"
-              ? rootNode.label || "分组"
-              : "主卡片";
-        showToast(
-          `已建立以「${rootTitle}」为发起节点的一对多关联（辐射其余 ${newEdges.length} 张卡片）`,
-        );
-      } else {
-        showToast("选中的卡片之间已存在一对多关联");
-      }
-      setContextMenu(null);
-    },
-    [editable, selectedNodeIds, selectedNodeId, pushHistory, showToast],
-  );
-
-  const handleConnectLoopNodes = useCallback(() => {
-    if (!editable) return;
-    const currentData = latestDataRef.current;
-    const selectedNodes = currentData.nodes.filter((n) => selectedNodeIds.has(n.id));
-    if (selectedNodes.length < 3) {
-      showToast("环形闭环连线至少需要选择 3 个节点");
-      return;
-    }
-
-    const newEdges = connectLoopNodes(
-      selectedNodes,
-      currentData.edges,
-      "bezier",
-      true,
-      currentData.nodes,
-    );
-
-    if (newEdges.length > 0) {
-      pushHistory({
-        ...currentData,
-        edges: [...currentData.edges, ...newEdges],
-      });
-      showToast(`已按顺时针空间顺序建立 ${newEdges.length} 条闭合环形连线`);
-    } else {
-      showToast("选中的节点之间已存在闭环关联");
-    }
-    setContextMenu(null);
-  }, [editable, selectedNodeIds, pushHistory, showToast]);
-
   const handleDisconnectNodeEdges = useCallback(
     (nodeId: string) => {
       if (!editable) return;
@@ -1663,68 +1304,6 @@ export const CanvasView = memo(function CanvasView({
       setContextMenu(null);
     },
     [editable, pushHistory, showToast],
-  );
-
-  const handleSpawnMultipleBranches = useCallback(
-    (sourceNodeId: string, count: number = 3, direction: "right" | "bottom" = "right") => {
-      if (!editable) return;
-      const currentData = latestDataRef.current;
-      const sourceNode = currentData.nodes.find((n) => n.id === sourceNodeId);
-      if (!sourceNode) return;
-
-      const { newNodes, newEdges } = spawnMultipleBranches(
-        sourceNode,
-        count,
-        direction,
-        currentData.edges,
-        currentData.nodes,
-      );
-      pushHistory({
-        ...currentData,
-        nodes: [...currentData.nodes, ...newNodes],
-        edges: [...currentData.edges, ...newEdges],
-      });
-      setSelectedNodeIds(new Set(newNodes.map((n) => n.id)));
-      setSelectedEdgeId(null);
-      showToast(`已成功派生 ${newNodes.length} 个分支想法卡片`);
-      setContextMenu(null);
-    },
-    [editable, pushHistory, showToast],
-  );
-
-  const handleConfirmBatchSpawn = useCallback(() => {
-    if (!spawnModalState || !editable) return;
-    const { nodeId, count, direction } = spawnModalState;
-    handleSpawnMultipleBranches(nodeId, Math.max(1, Math.min(20, count)), direction);
-    setSpawnModalState(null);
-  }, [spawnModalState, editable, handleSpawnMultipleBranches]);
-
-  const handleSpawnConnectedChild = useCallback(
-    (sourceNodeId: string, direction: "right" | "bottom" = "right") => {
-      if (!editable) return;
-      const currentData = latestDataRef.current;
-      const sourceNode = currentData.nodes.find((n) => n.id === sourceNodeId);
-      if (!sourceNode) return;
-      const { newNode, newEdge } = spawnConnectedCard(
-        sourceNode,
-        direction,
-        undefined,
-        undefined,
-        currentData.edges,
-        currentData.nodes,
-      );
-      pushHistory({
-        ...currentData,
-        nodes: [...currentData.nodes, newNode],
-        edges: [...currentData.edges, newEdge],
-      });
-      setSelectedNodeIds(new Set([newNode.id]));
-      setSelectedEdgeId(null);
-      setEditingNodeId(newNode.id);
-      setEditingText(newNode.text);
-      setContextMenu(null);
-    },
-    [editable, pushHistory],
   );
 
   const handleAlignSelected = useCallback(
@@ -2731,421 +2310,6 @@ export const CanvasView = memo(function CanvasView({
     setEditingEdgeId(null);
   };
 
-  // Node Dragging: when dragging nodes, move all selected nodes together
-  const handleNodeDragStart = (e: React.MouseEvent, node: CanvasNode) => {
-    if (isPresentationMode || e.button !== 0) return;
-
-    // Do not initiate drag if user is clicking on interactive controls inside the card
-    const target = e.target as HTMLElement | null;
-    if (
-      target &&
-      (target.tagName === "INPUT" ||
-        target.tagName === "TEXTAREA" ||
-        target.tagName === "BUTTON" ||
-        target.tagName === "SELECT" ||
-        target.tagName === "A" ||
-        Boolean(target.closest("button")) ||
-        Boolean(target.closest("input")) ||
-        Boolean(target.closest("textarea")) ||
-        Boolean(target.closest("select")) ||
-        Boolean(target.closest("a")) ||
-        Boolean(target.closest(".canvas-resize-handle")))
-    ) {
-      // The press belongs to the control, not to the canvas — and saying so is
-      // what makes the control work. Without this stop the canvas root's own
-      // mousedown handler would arm a pan, and the mouseup that follows would
-      // clear the selection: a state update, which re-renders the card, which
-      // rewrites the card's markdown, and a rewritten markdown is a brand-new
-      // checkbox. The click that should have toggled it never lands, because
-      // the element it was pressed on is no longer in the document.
-      // The press belongs to the control, not to the canvas — and saying so is
-      // what makes the control work. Without this stop the canvas root's own
-      // mousedown handler would arm a pan, and the mouseup that follows would
-      // clear the selection: a state update, which re-renders the card, which
-      // rewrites the card's markdown, and a rewritten markdown is a brand-new
-      // checkbox. The click that should have toggled it never lands, because
-      // the element it was pressed on is no longer in the document.
-      e.stopPropagation();
-      return;
-    }
-
-    // Prevent default to disable native browser text selection and HTML5 drag ghost
-    // which otherwise interrupts or completely suppresses window mousemove events
-    e.preventDefault();
-    e.stopPropagation();
-
-    // Commit any active edits before moving so the card moves smoothly and text is persisted
-    if (editingNodeIdRef.current) {
-      handleSaveNodeEdit();
-    }
-    setContextMenu(null);
-
-    // Always fetch latest live node data from latestDataRef to prevent stale closures
-    const liveNode = latestDataRef.current.nodes.find((n) => n.id === node.id) || node;
-
-    const isModifier = e.shiftKey || e.ctrlKey || e.metaKey;
-    const isGroupBodyClick = liveNode.type === "group" && !target?.closest(".canvas-group-header");
-
-    // If in box select mode, or holding modifier over group background body, start box selection
-    if (isBoxSelectMode || (isModifier && isGroupBodyClick)) {
-      handleStartBoxSelection(e, isModifier);
-      return;
-    }
-
-    hasDraggedRef.current = false;
-
-    // If modifier key is held on a card or group header, toggle node into/out of selection
-    if (isModifier) {
-      setSelectedNodeIds((prev) => {
-        const next = new Set(prev);
-        if (next.has(liveNode.id)) next.delete(liveNode.id);
-        else next.add(liveNode.id);
-        return next;
-      });
-      return;
-    }
-
-    // If clicking a node that is not in current selection, select it
-    let currentSelected = selectedNodeIds;
-    if (!selectedNodeIds.has(liveNode.id)) {
-      currentSelected = new Set([liveNode.id]);
-      setSelectedNodeIds(currentSelected);
-    }
-    setSelectedEdgeId(null);
-
-    // If multiple nodes are selected, drag all of them collaboratively
-    if (currentSelected.size > 1) {
-      // Grid spacing mode: when the selection forms a complete rectangular
-      // grid, dragging a card re-flows the whole grid and adjusts the gutters
-      // live, instead of translating every card by the same offset.
-      if (liveNode.type !== "group") {
-        const selectedCards = latestDataRef.current.nodes.filter(
-          (n) => currentSelected.has(n.id) && n.type !== "group",
-        );
-        const gridLayout = computeGridLayout(selectedCards);
-        if (gridLayout) {
-          const gridStartById = new Map(
-            gridLayout.orderedIds.map((id) => {
-              const n = latestDataRef.current.nodes.find((x) => x.id === id)!;
-              return [id, { id, startX: n.x, startY: n.y }];
-            }),
-          );
-          nodeDragRef.current = {
-            nodeId: liveNode.id,
-            startNodeX: liveNode.x,
-            startNodeY: liveNode.y,
-            mouseStartX: e.clientX,
-            mouseStartY: e.clientY,
-            containedNodes: [],
-            containedMap: new Map(),
-            gridSpacing: {
-              layout: gridLayout,
-              baseGapX: Math.max(4, gridLayout.gapX),
-              baseGapY: Math.max(4, gridLayout.gapY),
-              startPositions: [...gridStartById.values()],
-              startById: gridStartById,
-            },
-          };
-          return;
-        }
-
-        // Ring spacing mode: the cards already sit on a circle, so dragging one
-        // of them resizes the ring — and with it the spacing between cards.
-        // Checked after the grid on purpose: a rectangular arrangement also
-        // satisfies the circle test (its corners are equidistant from the
-        // centre), and the rectangular reading is the more specific one.
-        const ringLayout = computeRingSpacingLayout(selectedCards);
-        if (ringLayout) {
-          nodeDragRef.current = {
-            nodeId: liveNode.id,
-            startNodeX: liveNode.x,
-            startNodeY: liveNode.y,
-            mouseStartX: e.clientX,
-            mouseStartY: e.clientY,
-            containedNodes: [],
-            containedMap: new Map(),
-            ringSpacing: { layout: ringLayout },
-          };
-          return;
-        }
-      }
-
-      const selectedOthers = latestDataRef.current.nodes.filter(
-        (n) => currentSelected.has(n.id) && n.id !== liveNode.id,
-      );
-
-      let containedCards: CanvasNode[] = [];
-      if (liveNode.type === "group") {
-        containedCards = latestDataRef.current.nodes.filter(
-          (n) =>
-            n.id !== liveNode.id &&
-            !currentSelected.has(n.id) &&
-            isNodeInsideGroup(n, liveNode as CanvasGroupNode),
-        );
-      }
-
-      const allContained = [...selectedOthers, ...containedCards].map((c) => ({
-        id: c.id,
-        startX: c.x,
-        startY: c.y,
-      }));
-
-      nodeDragRef.current = {
-        nodeId: liveNode.id,
-        startNodeX: liveNode.x,
-        startNodeY: liveNode.y,
-        mouseStartX: e.clientX,
-        mouseStartY: e.clientY,
-        containedNodes: allContained,
-        containedMap: new Map(allContained.map((c) => [c.id, c])),
-      };
-      return;
-    }
-
-    if (liveNode.type === "group") {
-      const isFresh = freshGroupIdsRef.current.has(liveNode.id);
-      const isAltOnly = e.altKey;
-      const allGroups = latestDataRef.current.nodes.filter(
-        (n): n is CanvasGroupNode => n.type === "group",
-      );
-      const thisIdx = latestDataRef.current.nodes.findIndex((x) => x.id === liveNode.id);
-
-      // Cards inside this group that do NOT belong to an older existing container
-      const contained =
-        isFresh || isAltOnly
-          ? []
-          : latestDataRef.current.nodes.filter((n) => {
-              if (n.id === liveNode.id || n.type === "group") return false;
-              if (!isNodeInsideGroup(n, liveNode as CanvasGroupNode)) return false;
-
-              // If card also lies inside another group, check if that group was established earlier
-              const otherContainingGroups = allGroups.filter(
-                (og) => og.id !== liveNode.id && isNodeInsideGroup(n, og),
-              );
-              if (otherContainingGroups.length > 0) {
-                for (const og of otherContainingGroups) {
-                  const otherIdx = latestDataRef.current.nodes.findIndex((x) => x.id === og.id);
-                  if (otherIdx !== -1 && otherIdx < thisIdx) {
-                    return false; // older container owns this card, don't drag it
-                  }
-                }
-              }
-              return true;
-            });
-
-      if (isFresh) freshGroupIdsRef.current.delete(liveNode.id);
-      const groupContained = contained.map((c) => ({
-        id: c.id,
-        startX: c.x,
-        startY: c.y,
-      }));
-      nodeDragRef.current = {
-        nodeId: liveNode.id,
-        startNodeX: liveNode.x,
-        startNodeY: liveNode.y,
-        mouseStartX: e.clientX,
-        mouseStartY: e.clientY,
-        containedNodes: groupContained,
-        containedMap: new Map(groupContained.map((c) => [c.id, c])),
-      };
-    } else {
-      nodeDragRef.current = {
-        nodeId: liveNode.id,
-        startNodeX: liveNode.x,
-        startNodeY: liveNode.y,
-        mouseStartX: e.clientX,
-        mouseStartY: e.clientY,
-        containedNodes: [],
-        containedMap: new Map(),
-      };
-    }
-  };
-
-  // Node Resizing
-  const handleNodeResizeStart = (e: React.MouseEvent, node: CanvasNode) => {
-    if (isPresentationMode || e.button !== 0) return;
-    e.stopPropagation();
-    resizeDragRef.current = {
-      nodeId: node.id,
-      startW: node.width,
-      startH: node.height,
-      mouseStartX: e.clientX,
-      mouseStartY: e.clientY,
-    };
-  };
-
-  // Edge Anchor Dragging
-  const handleAnchorMouseDown = (e: React.MouseEvent, nodeId: string, side: CanvasNodeSide) => {
-    if (isPresentationMode || e.button !== 0 || !editable) return;
-    e.stopPropagation();
-    const node = data.nodes.find((n) => n.id === nodeId);
-    if (!node) return;
-    const pt = getNodeAnchorPoint(node, side);
-    setConnectingState({
-      fromNodeId: nodeId,
-      fromSide: side,
-      currentX: pt.x,
-      currentY: pt.y,
-    });
-  };
-
-  const handleAnchorMouseUp = (
-    e: React.MouseEvent,
-    targetNodeId: string,
-    targetSide: CanvasNodeSide,
-  ) => {
-    if (!connectingState || connectingState.fromNodeId === targetNodeId) return;
-    e.stopPropagation();
-
-    const currentData = latestDataRef.current;
-    const fromNode = currentData.nodes.find((n) => n.id === connectingState.fromNodeId);
-    const targetNode = currentData.nodes.find((n) => n.id === targetNodeId);
-    if (!fromNode || !targetNode) {
-      setConnectingState(null);
-      return;
-    }
-
-    const exists = currentData.edges.some(
-      (ed) =>
-        (ed.fromNode === fromNode.id && ed.toNode === targetNode.id) ||
-        (ed.fromNode === targetNode.id && ed.toNode === fromNode.id),
-    );
-
-    if (!exists) {
-      const edgeColor = getSourceNodeEdgeColor(
-        fromNode,
-        currentData.edges,
-        currentData.nodes,
-        targetNode,
-      );
-      const newEdge: CanvasEdge = {
-        id: `edge-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        fromNode: fromNode.id,
-        fromSide: connectingState.fromSide,
-        fromEnd: "none",
-        toNode: targetNode.id,
-        toSide: targetSide,
-        toEnd: "arrow",
-        color: edgeColor,
-        style: "bezier",
-      };
-      pushHistory({
-        ...currentData,
-        edges: [...currentData.edges, newEdge],
-      });
-      showToast("已建立卡片关联");
-    } else {
-      showToast("两张卡片之间已存在关联连线");
-    }
-    setConnectingState(null);
-  };
-
-  const handleCardMouseUpForConnect = useCallback(
-    (e: React.MouseEvent, targetNode: CanvasNode) => {
-      if (!connectingState || connectingState.fromNodeId === targetNode.id) return;
-      e.stopPropagation();
-
-      const currentData = latestDataRef.current;
-      const fromNode = currentData.nodes.find((n) => n.id === connectingState.fromNodeId);
-      if (!fromNode) {
-        setConnectingState(null);
-        return;
-      }
-
-      const optimal = getOptimalAnchorSides(fromNode, targetNode);
-      const fromSide = connectingState.fromSide || optimal.fromSide;
-      const toSide = optimal.toSide;
-
-      const exists = currentData.edges.some(
-        (ed) =>
-          (ed.fromNode === fromNode.id && ed.toNode === targetNode.id) ||
-          (ed.fromNode === targetNode.id && ed.toNode === fromNode.id),
-      );
-
-      if (!exists) {
-        const edgeColor = getSourceNodeEdgeColor(
-          fromNode,
-          currentData.edges,
-          currentData.nodes,
-          targetNode,
-        );
-        const newEdge: CanvasEdge = {
-          id: `edge-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-          fromNode: fromNode.id,
-          fromSide,
-          fromEnd: "none",
-          toNode: targetNode.id,
-          toSide,
-          toEnd: "arrow",
-          color: edgeColor,
-          style: "bezier",
-        };
-        pushHistory({
-          ...currentData,
-          edges: [...currentData.edges, newEdge],
-        });
-        showToast("已建立卡片关联");
-      } else {
-        showToast("两张卡片之间已存在关联连线");
-      }
-      setConnectingState(null);
-    },
-    [connectingState, pushHistory, showToast],
-  );
-
-  // What a press on a rendered card body means: a link opens the note it names,
-  // a checkbox toggles its line. One handler for both, kept stable so the card
-  // body can be memoised (see CanvasCardMarkdown below).
-  const handleCardBodyActivate = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      const target = e.target as HTMLElement | null;
-      const cardEl = target?.closest(".canvas-card-markdown") as HTMLElement | null;
-      if (!target || !cardEl) return;
-
-      // A rendered [[link]] goes to the note it names.
-      const link = target.closest("a[data-wikilink-target]") as HTMLAnchorElement | null;
-      if (link) {
-        e.stopPropagation();
-        const wanted = (link.getAttribute("data-wikilink-target") || "")
-          .replace(/\.md$/i, "")
-          .trim()
-          .toLowerCase();
-        const hit = allChapters.find((c) => {
-          const title = c.title.trim().toLowerCase();
-          const fileName = (c.src.split("/").pop() ?? "").replace(/\.md$/i, "").toLowerCase();
-          return title === wanted || fileName === wanted;
-        });
-        if (hit?.absolutePath && onOpenFile) {
-          onOpenFile(hit.absolutePath);
-          showToast(`已打开：${hit.title}`);
-        } else {
-          showToast(`找不到笔记：${link.getAttribute("data-wikilink-target")}`);
-        }
-        return;
-      }
-
-      // A checkbox flips its own line in the Markdown.
-      if (target.tagName === "INPUT" && (target as HTMLInputElement).type === "checkbox") {
-        e.stopPropagation();
-        const nodeId = cardEl.dataset.nodeId;
-        if (!nodeId) return;
-        const idx = Array.from(cardEl.querySelectorAll('input[type="checkbox"]')).indexOf(
-          target as HTMLInputElement,
-        );
-        if (idx === -1) return;
-        const live = latestDataRef.current;
-        const node = live.nodes.find((n) => n.id === nodeId);
-        if (!node || node.type !== "text") return;
-        const updatedText = toggleChecklistInMarkdown(node.text, idx);
-        pushHistory({
-          ...live,
-          nodes: live.nodes.map((n) => (n.id === nodeId ? { ...n, text: updatedText } : n)),
-        });
-      }
-    },
-    [allChapters, onOpenFile, pushHistory, showToast],
-  );
-
   /**
    * Where the caret is, in screen pixels.
    *
@@ -3341,644 +2505,6 @@ export const CanvasView = memo(function CanvasView({
         : prev,
     );
   };
-
-  // Global mouse move and up listeners
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      // Dragging step bend handle (rAF throttled)
-      if (stepBendDragRef.current) {
-        const { edgeId, startX, startY, initialOffset, orientation } = stepBendDragRef.current;
-        const zoom = viewportRef.current.zoom;
-        const delta =
-          orientation === "horizontal" ? (e.clientX - startX) / zoom : (e.clientY - startY) / zoom;
-        const newOffset = Math.round(initialOffset + delta);
-        latestStepBendPosRef.current = { edgeId, newOffset };
-        if (!rafStepBendIdRef.current) {
-          rafStepBendIdRef.current = requestAnimationFrame(() => {
-            rafStepBendIdRef.current = null;
-            const bend = latestStepBendPosRef.current;
-            if (!bend || !stepBendDragRef.current) return;
-            setData((prev) => ({
-              ...prev,
-              edges: prev.edges.map((edge) =>
-                edge.id === bend.edgeId ? { ...edge, stepOffset: bend.newOffset } : edge,
-              ),
-            }));
-          });
-        }
-        return;
-      }
-
-      // 0. Group drag from the hollow middle of a multi-selection.
-      // Every selected card moves by the same offset, so the arrangement keeps
-      // its exact shape and spacing.
-      if (groupDragRef.current) {
-        const group = groupDragRef.current;
-        const zoom = viewportRef.current.zoom;
-        const dx = (e.clientX - group.startClientX) / zoom;
-        const dy = (e.clientY - group.startClientY) / zoom;
-
-        if (Math.hypot(e.clientX - group.startClientX, e.clientY - group.startClientY) > 3) {
-          hasDraggedRef.current = true;
-        }
-        latestGroupDragPosRef.current = { dx, dy };
-
-        if (!rafGroupDragIdRef.current) {
-          rafGroupDragIdRef.current = requestAnimationFrame(() => {
-            rafGroupDragIdRef.current = null;
-            const pos = latestGroupDragPosRef.current;
-            const active = groupDragRef.current;
-            if (!pos || !active) return;
-
-            setData((prev) => {
-              const nextNodes = prev.nodes.map((n) => {
-                const s = active.startById.get(n.id);
-                return s
-                  ? {
-                      ...n,
-                      x: Math.round(s.startX + pos.dx),
-                      y: Math.round(s.startY + pos.dy),
-                    }
-                  : n;
-              });
-              const nextData = {
-                ...prev,
-                nodes: nextNodes,
-                edges: syncLoopEdgeGeometry(nextNodes, prev.edges),
-              };
-              latestDataRef.current = nextData;
-              return nextData;
-            });
-          });
-        }
-        return;
-      }
-
-      // 0. Marquee Box Selection (rAF throttled to monitor refresh rate)
-      if (selectionBoxRef.current && containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        const currentZoom = viewportRef.current.zoom;
-        const currentPanX = viewportRef.current.panX;
-        const currentPanY = viewportRef.current.panY;
-        const mouseCanvasX = (e.clientX - rect.left - currentPanX) / currentZoom;
-        const mouseCanvasY = (e.clientY - rect.top - currentPanY) / currentZoom;
-        const isModifier = e.shiftKey || e.ctrlKey || e.metaKey;
-        const updated = {
-          ...selectionBoxRef.current,
-          currentX: mouseCanvasX,
-          currentY: mouseCanvasY,
-        };
-        selectionBoxRef.current = updated;
-        latestBoxSelectPosRef.current = {
-          clientX: e.clientX,
-          clientY: e.clientY,
-          isModifier,
-        };
-        if (!rafBoxSelectIdRef.current) {
-          rafBoxSelectIdRef.current = requestAnimationFrame(() => {
-            rafBoxSelectIdRef.current = null;
-            if (!selectionBoxRef.current || !containerRef.current) return;
-            const currentBox = selectionBoxRef.current;
-            setSelectionBox(currentBox);
-
-            // Real-time selection calculation for live visual feedback
-            const minX = Math.min(currentBox.startX, currentBox.currentX);
-            const maxX = Math.max(currentBox.startX, currentBox.currentX);
-            const minY = Math.min(currentBox.startY, currentBox.currentY);
-            const maxY = Math.max(currentBox.startY, currentBox.currentY);
-
-            if (maxX - minX > 4 || maxY - minY > 4) {
-              const hitIds = computeBoxSelectionHits(
-                minX,
-                maxX,
-                minY,
-                maxY,
-                latestDataRef.current.nodes,
-              );
-              setSelectedNodeIds(
-                isModifier ? new Set([...baseSelectionBeforeBoxRef.current, ...hitIds]) : hitIds,
-              );
-              const currentNodesMap = new Map(latestDataRef.current.nodes.map((n) => [n.id, n]));
-              const hitEdgeIds = computeBoxSelectionEdgeHits(
-                minX,
-                maxX,
-                minY,
-                maxY,
-                latestDataRef.current.edges,
-                currentNodesMap,
-              );
-              setSelectedEdgeIds(
-                isModifier
-                  ? new Set([...baseEdgeSelectionBeforeBoxRef.current, ...hitEdgeIds])
-                  : hitEdgeIds,
-              );
-            } else {
-              setSelectedNodeIds(baseSelectionBeforeBoxRef.current);
-              setSelectedEdgeIds(baseEdgeSelectionBeforeBoxRef.current);
-            }
-          });
-        }
-        return;
-      }
-
-      // 1. Panning canvas (rAF throttled to prevent 1000Hz mouse drag re-render storms)
-      if (isDraggingCanvasRef.current) {
-        const dx = e.clientX - canvasDragStartRef.current.x;
-        const dy = e.clientY - canvasDragStartRef.current.y;
-        if (Math.hypot(dx, dy) > 4) {
-          canvasDragStartRef.current.hasMoved = true;
-        }
-        latestPanPosRef.current = { dx, dy };
-        if (!rafPanIdRef.current) {
-          rafPanIdRef.current = requestAnimationFrame(() => {
-            rafPanIdRef.current = null;
-            const pos = latestPanPosRef.current;
-            if (!pos || !isDraggingCanvasRef.current) return;
-            setViewport((prev) => ({
-              ...prev,
-              panX: canvasDragStartRef.current.panX + pos.dx,
-              panY: canvasDragStartRef.current.panY + pos.dy,
-            }));
-          });
-        }
-        return;
-      }
-
-      // 2. Dragging node (with multi-select collaborative dragging & group coordination)
-      if (nodeDragRef.current) {
-        const dragInfo = nodeDragRef.current;
-        if (Math.hypot(e.clientX - dragInfo.mouseStartX, e.clientY - dragInfo.mouseStartY) > 3) {
-          hasDraggedRef.current = true;
-        }
-        const currentZoom = viewportRef.current.zoom;
-        const dx = (e.clientX - dragInfo.mouseStartX) / currentZoom;
-        const dy = (e.clientY - dragInfo.mouseStartY) / currentZoom;
-        const updatedId = dragInfo.nodeId;
-        const startX = dragInfo.startNodeX;
-        const startY = dragInfo.startNodeY;
-        // Reuse the Maps built once at drag start. These used to be rebuilt on
-        // every mousemove, which fires far more often than the frame rate.
-        latestDragPosRef.current = {
-          dx,
-          dy,
-          updatedId,
-          startX,
-          startY,
-          containedMap: dragInfo.containedMap ?? EMPTY_DRAG_MAP,
-          // The drag-start gridSpacing already carries a ready `startById` Map.
-          gridSpacing: dragInfo.gridSpacing,
-          ringSpacing: dragInfo.ringSpacing,
-        };
-
-        // Standard 60fps RAF throttling: update when frame is ready without dropping intermediate movement
-        if (!rafDragIdRef.current) {
-          rafDragIdRef.current = requestAnimationFrame(() => {
-            rafDragIdRef.current = null;
-            const pos = latestDragPosRef.current;
-            if (!pos) return;
-            setData((prev) => {
-              // ── Grid spacing mode ──────────────────────────────────────
-              // The dragged card follows the pointer while the remaining
-              // cards re-flow around it with the new gutters.
-              let workingNodes = prev.nodes;
-              if (pos.gridSpacing) {
-                const gs = pos.gridSpacing;
-                const startPos = gs.startById.get(pos.updatedId);
-                workingNodes = prev.nodes.map((n) =>
-                  n.id === pos.updatedId && startPos
-                    ? {
-                        ...n,
-                        x: Math.round(startPos.startX + pos.dx),
-                        y: Math.round(startPos.startY + pos.dy),
-                      }
-                    : n,
-                );
-                workingNodes = resizeGridSpacing(
-                  workingNodes,
-                  gs.layout,
-                  pos.updatedId,
-                  pos.dx,
-                  pos.dy,
-                  gs.baseGapX,
-                  gs.baseGapY,
-                );
-                const gridData = {
-                  ...prev,
-                  nodes: workingNodes,
-                  // Keep loop metadata glued to the re-flowed cards
-                  edges: syncLoopEdgeGeometry(workingNodes, prev.edges),
-                };
-                latestDataRef.current = gridData;
-                return gridData;
-              }
-
-              // ── Ring spacing mode ──────────────────────────────────────
-              // The dragged card follows the pointer; its distance from the
-              // ring centre becomes the new radius, and every other card keeps
-              // its seat while re-distributing around that circle.
-              if (pos.ringSpacing) {
-                const rs = pos.ringSpacing;
-                const movedNodes = prev.nodes.map((n) =>
-                  n.id === pos.updatedId
-                    ? {
-                        ...n,
-                        x: Math.round(pos.startX + pos.dx),
-                        y: Math.round(pos.startY + pos.dy),
-                      }
-                    : n,
-                );
-                const moved = movedNodes.find((n) => n.id === pos.updatedId);
-                if (moved) {
-                  const ringNodes = resizeRingSpacing(movedNodes, rs.layout, pos.updatedId, {
-                    x: moved.x + moved.width / 2,
-                    y: moved.y + moved.height / 2,
-                  });
-                  const ringData = {
-                    ...prev,
-                    nodes: ringNodes,
-                    edges: syncLoopEdgeGeometry(ringNodes, prev.edges),
-                  };
-                  latestDataRef.current = ringData;
-                  return ringData;
-                }
-              }
-
-              const movedNodes = workingNodes.map((n) => {
-                if (n.id === pos.updatedId) {
-                  return {
-                    ...n,
-                    x: Math.round(pos.startX + pos.dx),
-                    y: Math.round(pos.startY + pos.dy),
-                  };
-                }
-                const contained = pos.containedMap.get(n.id);
-                if (contained) {
-                  return {
-                    ...n,
-                    x: Math.round(contained.startX + pos.dx),
-                    y: Math.round(contained.startY + pos.dy),
-                  };
-                }
-                return n;
-              });
-
-              const nextData = {
-                ...prev,
-                nodes: movedNodes,
-                // Recompute ring/grid metadata against the new card positions
-                // so a closed loop stays attached to its cards while dragged.
-                edges: syncLoopEdgeGeometry(movedNodes, prev.edges),
-              };
-              latestDataRef.current = nextData;
-              return nextData;
-            });
-          });
-        }
-        return;
-      }
-
-      // 3. Resizing node
-      if (resizeDragRef.current) {
-        const resizeInfo = resizeDragRef.current;
-        const currentZoom = viewportRef.current.zoom;
-        const dw = (e.clientX - resizeInfo.mouseStartX) / currentZoom;
-        const dh = (e.clientY - resizeInfo.mouseStartY) / currentZoom;
-        const updatedId = resizeInfo.nodeId;
-        const startW = resizeInfo.startW;
-        const startH = resizeInfo.startH;
-
-        latestResizePosRef.current = { dw, dh, updatedId, startW, startH };
-
-        if (!rafResizeIdRef.current) {
-          rafResizeIdRef.current = requestAnimationFrame(() => {
-            rafResizeIdRef.current = null;
-            const pos = latestResizePosRef.current;
-            if (!pos) return;
-            setData((prev) => {
-              const nextData = {
-                ...prev,
-                nodes: prev.nodes.map((n) =>
-                  n.id === pos.updatedId
-                    ? {
-                        ...n,
-                        width: Math.max(180, Math.round(pos.startW + pos.dw)),
-                        height: Math.max(100, Math.round(pos.startH + pos.dh)),
-                      }
-                    : n,
-                ),
-              };
-              latestDataRef.current = nextData;
-              return nextData;
-            });
-          });
-        }
-        return;
-      }
-
-      // 4. Connecting edge (rAF throttled)
-      if (connectingStateRef.current && containerRef.current) {
-        latestConnectPosRef.current = { clientX: e.clientX, clientY: e.clientY };
-        if (!rafConnectIdRef.current) {
-          rafConnectIdRef.current = requestAnimationFrame(() => {
-            rafConnectIdRef.current = null;
-            const pos = latestConnectPosRef.current;
-            if (!pos || !connectingStateRef.current || !containerRef.current) return;
-            const rect = containerRef.current.getBoundingClientRect();
-            const currentZoom = viewportRef.current.zoom;
-            const currentPanX = viewportRef.current.panX;
-            const currentPanY = viewportRef.current.panY;
-            const mouseCanvasX = (pos.clientX - rect.left - currentPanX) / currentZoom;
-            const mouseCanvasY = (pos.clientY - rect.top - currentPanY) / currentZoom;
-            setConnectingState((prev) =>
-              prev ? { ...prev, currentX: mouseCanvasX, currentY: mouseCanvasY } : null,
-            );
-          });
-        }
-      }
-    };
-
-    const handleMouseUp = (e: MouseEvent) => {
-      if (rafDragIdRef.current) {
-        cancelAnimationFrame(rafDragIdRef.current);
-        rafDragIdRef.current = null;
-      }
-      if (rafResizeIdRef.current) {
-        cancelAnimationFrame(rafResizeIdRef.current);
-        rafResizeIdRef.current = null;
-      }
-      if (rafGroupDragIdRef.current) {
-        cancelAnimationFrame(rafGroupDragIdRef.current);
-        rafGroupDragIdRef.current = null;
-      }
-      if (rafPanIdRef.current) {
-        cancelAnimationFrame(rafPanIdRef.current);
-        rafPanIdRef.current = null;
-      }
-      if (rafBoxSelectIdRef.current) {
-        cancelAnimationFrame(rafBoxSelectIdRef.current);
-        rafBoxSelectIdRef.current = null;
-      }
-      if (rafConnectIdRef.current) {
-        cancelAnimationFrame(rafConnectIdRef.current);
-        rafConnectIdRef.current = null;
-      }
-      if (rafStepBendIdRef.current) {
-        cancelAnimationFrame(rafStepBendIdRef.current);
-        rafStepBendIdRef.current = null;
-      }
-      latestDragPosRef.current = null;
-      latestResizePosRef.current = null;
-      latestGroupDragPosRef.current = null;
-      latestBoxSelectPosRef.current = null;
-      latestConnectPosRef.current = null;
-
-      // Complete a group drag from the hollow middle of a multi-selection.
-      if (groupDragRef.current) {
-        groupDragRef.current = null;
-        if (hasDraggedRef.current) {
-          pushHistory(latestDataRef.current);
-        }
-        // Either way the selection stays as it was: a background press used to
-        // clear it, but inside the group that would drop the very selection
-        // the user is working with.
-        return;
-      }
-
-      // Complete step bend dragging
-      if (stepBendDragRef.current) {
-        const { edgeId, startX, startY, initialOffset, orientation } = stepBendDragRef.current;
-        stepBendDragRef.current = null;
-        const zoom = viewportRef.current.zoom;
-        const delta =
-          orientation === "horizontal" ? (e.clientX - startX) / zoom : (e.clientY - startY) / zoom;
-        const newOffset =
-          latestStepBendPosRef.current?.newOffset ?? Math.round(initialOffset + delta);
-        const nextEdges = latestDataRef.current.edges.map((edge) =>
-          edge.id === edgeId ? { ...edge, stepOffset: newOffset } : edge,
-        );
-        const nextData = { ...latestDataRef.current, edges: nextEdges };
-        latestDataRef.current = nextData;
-        setData(nextData);
-        emitChange(nextData);
-        if (newOffset !== initialOffset) {
-          pushHistory(nextData);
-        }
-      }
-      latestStepBendPosRef.current = null;
-
-      // Complete box selection
-      if (selectionBoxRef.current) {
-        const box = selectionBoxRef.current;
-        if (containerRef.current) {
-          const rect = containerRef.current.getBoundingClientRect();
-          const currentZoom = viewportRef.current.zoom;
-          const currentPanX = viewportRef.current.panX;
-          const currentPanY = viewportRef.current.panY;
-          box.currentX = (e.clientX - rect.left - currentPanX) / currentZoom;
-          box.currentY = (e.clientY - rect.top - currentPanY) / currentZoom;
-        }
-        selectionBoxRef.current = null;
-        setSelectionBox(null);
-        const minX = Math.min(box.startX, box.currentX);
-        const maxX = Math.max(box.startX, box.currentX);
-        const minY = Math.min(box.startY, box.currentY);
-        const maxY = Math.max(box.startY, box.currentY);
-        const isModifier = e.shiftKey || e.ctrlKey || e.metaKey;
-        if (maxX - minX > 4 || maxY - minY > 4) {
-          const hitIds = computeBoxSelectionHits(
-            minX,
-            maxX,
-            minY,
-            maxY,
-            latestDataRef.current.nodes,
-          );
-          setSelectedNodeIds(
-            isModifier ? new Set([...baseSelectionBeforeBoxRef.current, ...hitIds]) : hitIds,
-          );
-          const currentNodesMap = new Map(latestDataRef.current.nodes.map((n) => [n.id, n]));
-          const hitEdgeIds = computeBoxSelectionEdgeHits(
-            minX,
-            maxX,
-            minY,
-            maxY,
-            latestDataRef.current.edges,
-            currentNodesMap,
-          );
-          setSelectedEdgeIds(
-            isModifier
-              ? new Set([...baseEdgeSelectionBeforeBoxRef.current, ...hitEdgeIds])
-              : hitEdgeIds,
-          );
-        } else {
-          setSelectedNodeIds(baseSelectionBeforeBoxRef.current);
-          setSelectedEdgeIds(baseEdgeSelectionBeforeBoxRef.current);
-        }
-      }
-
-      if (isDraggingCanvasRef.current) {
-        if (latestPanPosRef.current) {
-          const pos = latestPanPosRef.current;
-          setViewport((prev) => ({
-            ...prev,
-            panX: canvasDragStartRef.current.panX + pos.dx,
-            panY: canvasDragStartRef.current.panY + pos.dy,
-          }));
-        }
-        isDraggingCanvasRef.current = false;
-        if (!canvasDragStartRef.current.hasMoved) {
-          if (!isPresentationMode) {
-            setSelectedNodeIds(new Set());
-            setSelectedEdgeIds(new Set());
-          }
-        }
-      }
-      latestPanPosRef.current = null;
-      if (nodeDragRef.current) {
-        const dragInfo = nodeDragRef.current;
-        const currentZoom = viewportRef.current.zoom;
-        const dx = (e.clientX - dragInfo.mouseStartX) / currentZoom;
-        const dy = (e.clientY - dragInfo.mouseStartY) / currentZoom;
-
-        if (Math.abs(dx) > 0 || Math.abs(dy) > 0) {
-          const updatedId = dragInfo.nodeId;
-          const startX = dragInfo.startNodeX;
-          const startY = dragInfo.startNodeY;
-          const containedMap = dragInfo.containedMap ?? EMPTY_DRAG_MAP;
-
-          let finalNodes: CanvasNode[];
-          if (dragInfo.ringSpacing) {
-            // Ring spacing drag: settle the ring on the final radius
-            const rs = dragInfo.ringSpacing;
-            const movedNodes = latestDataRef.current.nodes.map((n) =>
-              n.id === updatedId
-                ? { ...n, x: Math.round(startX + dx), y: Math.round(startY + dy) }
-                : n,
-            );
-            const moved = movedNodes.find((n) => n.id === updatedId);
-            finalNodes = moved
-              ? resizeRingSpacing(movedNodes, rs.layout, updatedId, {
-                  x: moved.x + moved.width / 2,
-                  y: moved.y + moved.height / 2,
-                })
-              : movedNodes;
-          } else if (dragInfo.gridSpacing) {
-            // Grid spacing drag: settle the grid on the final gutters
-            const gs = dragInfo.gridSpacing;
-            const startPos = gs.startPositions.find((p) => p.id === updatedId);
-            const movedNodes = latestDataRef.current.nodes.map((n) =>
-              n.id === updatedId && startPos
-                ? {
-                    ...n,
-                    x: Math.round(startPos.startX + dx),
-                    y: Math.round(startPos.startY + dy),
-                  }
-                : n,
-            );
-            finalNodes = resizeGridSpacing(
-              movedNodes,
-              gs.layout,
-              updatedId,
-              dx,
-              dy,
-              gs.baseGapX,
-              gs.baseGapY,
-            );
-          } else {
-            finalNodes = latestDataRef.current.nodes.map((n) => {
-              if (n.id === updatedId) {
-                return {
-                  ...n,
-                  x: Math.round(startX + dx),
-                  y: Math.round(startY + dy),
-                };
-              }
-              const contained = containedMap.get(n.id);
-              if (contained) {
-                return {
-                  ...n,
-                  x: Math.round(contained.startX + dx),
-                  y: Math.round(contained.startY + dy),
-                };
-              }
-              return n;
-            });
-          }
-
-          // Re-sync straight/arc metadata with the settled layout so the
-          // rendered frame matches where the cards ended up.
-          const settledEdges = syncLoopEdgeGeometry(finalNodes, latestDataRef.current.edges);
-
-          const finalData = {
-            ...latestDataRef.current,
-            nodes: finalNodes,
-            edges: settledEdges,
-          };
-          latestDataRef.current = finalData;
-          setData(finalData);
-          emitChange(finalData);
-          pushHistory(finalData);
-        }
-
-        nodeDragRef.current = null;
-      }
-
-      if (resizeDragRef.current) {
-        const resizeInfo = resizeDragRef.current;
-        const currentZoom = viewportRef.current.zoom;
-        const dw = (e.clientX - resizeInfo.mouseStartX) / currentZoom;
-        const dh = (e.clientY - resizeInfo.mouseStartY) / currentZoom;
-
-        if (rafResizeIdRef.current) {
-          cancelAnimationFrame(rafResizeIdRef.current);
-          rafResizeIdRef.current = null;
-        }
-
-        if (Math.abs(dw) > 0 || Math.abs(dh) > 0) {
-          const updatedId = resizeInfo.nodeId;
-          const startW = resizeInfo.startW;
-          const startH = resizeInfo.startH;
-          const finalNodes = latestDataRef.current.nodes.map((n) => {
-            if (n.id === updatedId) {
-              return {
-                ...n,
-                width: Math.max(120, Math.round(startW + dw)),
-                height: Math.max(60, Math.round(startH + dh)),
-              };
-            }
-            return n;
-          });
-          const finalData = { ...latestDataRef.current, nodes: finalNodes };
-          latestDataRef.current = finalData;
-          setData(finalData);
-          emitChange(finalData);
-          pushHistory(finalData);
-        } else {
-          pushHistory(latestDataRef.current);
-        }
-
-        resizeDragRef.current = null;
-      }
-      // Unconditional: React bails out when the value is already null, and this
-      // keeps `connectingState` out of the listener's dependency list so the
-      // listeners are attached once instead of on every connection update.
-      setConnectingState(null);
-    };
-
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-      if (rafDragIdRef.current) cancelAnimationFrame(rafDragIdRef.current);
-      if (rafResizeIdRef.current) cancelAnimationFrame(rafResizeIdRef.current);
-      if (rafGroupDragIdRef.current) cancelAnimationFrame(rafGroupDragIdRef.current);
-      if (rafPanIdRef.current) cancelAnimationFrame(rafPanIdRef.current);
-      if (rafBoxSelectIdRef.current) cancelAnimationFrame(rafBoxSelectIdRef.current);
-      if (rafConnectIdRef.current) cancelAnimationFrame(rafConnectIdRef.current);
-      if (rafStepBendIdRef.current) cancelAnimationFrame(rafStepBendIdRef.current);
-      if (rafWheelIdRef.current) cancelAnimationFrame(rafWheelIdRef.current);
-    };
-  }, [pushHistory]);
 
   // Keyboard Shortcuts
   useEffect(() => {
