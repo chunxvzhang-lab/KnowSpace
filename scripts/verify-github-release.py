@@ -195,10 +195,22 @@ def main() -> int:
         if asset["size"] == local_size and asset["state"] == "uploaded":
             print(f"✅ {name}")
             print(f"     {asset['size']} 字节（与本地一致）state={asset['state']}")
+            continue
+
+        failures.append(f"{name} 字节数或状态不符")
+        print(f"❌ {name}")
+        print(f"     远端 {asset['size']} / 本地 {local_size}  state={asset['state']}")
+        if asset["state"] != "uploaded":
+            print("     → 远端资产没传完（截断或中断），需要重传。")
         else:
-            failures.append(f"{name} 字节数或状态不符")
-            print(f"❌ {name}")
-            print(f"     远端 {asset['size']} / 本地 {local_size}  state={asset['state']}")
+            # The common benign cause, and the one worth naming: the local tree was
+            # rebuilt after this release went out, so the published asset is simply
+            # older. That is not a broken release — but it does mean the published
+            # one does not contain whatever the rebuild added, which is exactly the
+            # situation that needs a version bump rather than a re-upload.
+            print("     → 远端已传完但与本地不同：本地在这版发布之后重新构建过。")
+            print("       发布本身没坏，但它**不含**本地新增的改动。")
+            print("       要送到用户手上需要升版本号重发，不能重打同一个版本号。")
 
     print()
     print("=== 3. 正文 ===")
