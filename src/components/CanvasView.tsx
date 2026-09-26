@@ -1,26 +1,11 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { ThemeMode } from "../core/types";
-import type { CanvasNode, CanvasEdge, CanvasObstacle } from "../types/canvasTypes";
-import {
-  computeBoundingBox,
-  extractCanvasToMarkdown,
-  computeSourceDisplayColorMap,
-  expandLoopEdgeSelection,
-  isPointInsideNodeHull,
-  downloadCanvasAsImage,
-  copyCanvasImageToClipboard,
-} from "../services/canvasService";
+import { expandLoopEdgeSelection, isPointInsideNodeHull } from "../services/canvasService";
 import { getCanvasThemeColors } from "../services/canvasTheme";
-import {
-  applySlashCommand,
-  detectSlashTrigger,
-  matchSlashCommands,
-  type SlashCommand,
-} from "../services/slashCommands";
 import type { LightboxMedia } from "./MediaLightbox";
 // Extracted during the R2 split (batch B2).
-import { CanvasCardSuggestMenu, type CanvasCardSuggestItem } from "./canvas/CanvasCardSuggestMenu";
+import { CanvasCardSuggestMenu } from "./canvas/CanvasCardSuggestMenu";
 import { MarqueeSelectionBox } from "./canvas/MarqueeSelectionBox";
 import { CanvasMinimap } from "./canvas/CanvasMinimap";
 import { CanvasEdgeBatchToolbar } from "./canvas/CanvasEdgeBatchToolbar";
@@ -41,6 +26,13 @@ import { useCanvasPointer } from "./canvas/useCanvasPointer";
 import { useCanvasNodeOps } from "./canvas/useCanvasNodeOps";
 import { useCanvasEdgeOps } from "./canvas/useCanvasEdgeOps";
 import { useCanvasMediaClipboard } from "./canvas/useCanvasMediaClipboard";
+// The in-card suggestion engine, the context-menu domain, the export/extract
+// domain and the derived geometry memos, extracted during the wave-6
+// CanvasView decomposition.
+import { useCanvasCardSuggest } from "./canvas/useCanvasCardSuggest";
+import { useCanvasContextMenu } from "./canvas/useCanvasContextMenu";
+import { useCanvasExportExtract } from "./canvas/useCanvasExportExtract";
+import { useCanvasDerived } from "./canvas/useCanvasDerived";
 // The node layer (the group hulls and the card chrome), extracted during the
 // wave-3 CanvasView decomposition.
 import { CanvasNodeLayer } from "./canvas/CanvasNodeLayer";
@@ -143,6 +135,10 @@ export const CanvasView = memo(function CanvasView({
   // The align menu's open flag deliberately stays here rather than inside
   // CanvasToolbar: the context-menu keydown handler below also closes it on
   // Escape, so two domains write it and it cannot be toolbar-local.
+  // The menu domain itself (clamping, dismissal, openers) moved into
+  // useCanvasContextMenu (wave 6); only this state stays here because
+  // useCanvasDocument's save path consumes setContextMenu before that hook's
+  // other dependencies exist.
   const [showAlignMenu, setShowAlignMenu] = useState(false);
   const [contextMenu, setContextMenu] = useState<CanvasContextMenuState | null>(null);
   const contextMenuRef = useRef<HTMLDivElement | null>(null);
@@ -211,104 +207,25 @@ export const CanvasView = memo(function CanvasView({
 
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
 
-  /**
-   * The suggestion popup inside a card's textarea.
-   *
-   * A card is Markdown like any other, and its editor is a plain textarea, so
-   * both of the things the document editor offers while typing have to be offered
-   * here too, by the same triggers: `[[` opens the workspace's notes, and `/`
-   * opens the slash commands. They share one popup — and, for `/`, the very same
-   * command list and trigger rule the document editor uses
-   * (`services/slashCommands.ts`), so the two editors cannot drift apart.
-   */
-  const [cardSuggest, setCardSuggest] = useState<{
-    /** Which list is open. */
-    kind: "note" | "command";
-    /** What has been typed after the trigger, lower-cased. */
-    query: string;
-    /** Where the trigger (`/` or `[[`) begins, in the textarea's value. */
-    startIndex: number;
-    selectedIndex: number;
-    items: CanvasCardSuggestItem[];
-    /** Where to draw the popup, in screen pixels. */
-    x: number;
-    y: number;
-  } | null>(null);
-  const cardEditorRef = useRef<HTMLTextAreaElement | null>(null);
+  // The in-card suggestion engine (`[[` notes, `/` commands): the popup state,
+  // trigger detection and insertions (extracted hook, wave 6). The textarea's
+  // keydown wiring stays in the card JSX and the menu portal stays below; the
+  // editor draft (editingText) itself stays here because the document hook's
+  // save paths commit it.
+  const {
+    cardSuggest,
+    setCardSuggest,
+    cardEditorRef,
+    handleCardEditorChange,
+    pickCardSuggest,
+    moveCardSuggest,
+  } = useCanvasCardSuggest({ allChapters, editingText, setEditingText });
 
   // The media file-input refs and the media-insert position ref moved into
   // useCanvasMediaClipboard (wave 5); this component attaches the returned refs
   // to the hidden inputs further down.
   /** Media preview opened by double-clicking an image / video / audio card. */
   const [lightboxMedia, setLightboxMedia] = useState<LightboxMedia | null>(null);
-
-  // Dynamically clamp context menu position against the actual viewport so
-  // the menu never spills off-screen, even when the canvas is nested in a
-  // narrow layout (e.g. dual-document workspace).
-  useLayoutEffect(() => {
-    if (!contextMenu || !contextMenuRef.current) return;
-    const menuEl = contextMenuRef.current;
-
-    const padding = 12;
-    const viewportW = typeof window !== "undefined" ? window.innerWidth : 1024;
-    const viewportH = typeof window !== "undefined" ? window.innerHeight : 768;
-
-    // Constrain maximum height to viewport so content can always be reached
-    menuEl.style.maxHeight = `${Math.max(160, viewportH - padding * 2)}px`;
-
-    // Measure actual rendered dimensions
-    const menuW = menuEl.offsetWidth || 260;
-    const menuH = menuEl.offsetHeight || 320;
-
-    let clampedX = contextMenu.x;
-    let clampedY = contextMenu.y;
-
-    // Clamp horizontally within the viewport
-    if (clampedX + menuW > viewportW - padding) {
-      clampedX = Math.max(padding, viewportW - menuW - padding);
-    }
-    if (clampedX < padding) {
-      clampedX = padding;
-    }
-
-    // Clamp vertically: if overflowing bottom, flip upward (preferred over
-    // compressing the menu) so the user can always see the option closest to
-    // the cursor.
-    if (clampedY + menuH > viewportH - padding) {
-      const flippedY = contextMenu.y - menuH;
-      clampedY = Math.max(padding, flippedY < padding ? padding : flippedY);
-    }
-    if (clampedY < padding) {
-      clampedY = padding;
-    }
-
-    menuEl.style.left = `${clampedX}px`;
-    menuEl.style.top = `${clampedY}px`;
-  }, [contextMenu]);
-
-  useEffect(() => {
-    if (!contextMenu) return;
-    const handleOutside = (e: MouseEvent) => {
-      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
-        setContextMenu(null);
-      }
-    };
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setContextMenu(null);
-        setShowAlignMenu(false);
-      }
-    };
-    const handleResize = () => setContextMenu(null);
-    window.addEventListener("mousedown", handleOutside);
-    window.addEventListener("keydown", handleKey);
-    window.addEventListener("resize", handleResize);
-    return () => {
-      window.removeEventListener("mousedown", handleOutside);
-      window.removeEventListener("keydown", handleKey);
-      window.removeEventListener("resize", handleResize);
-    };
-  }, [contextMenu]);
 
   // Close the toolbar align dropdown on any outside click
   useEffect(() => {
@@ -329,16 +246,10 @@ export const CanvasView = memo(function CanvasView({
 
   // Modals & Panels
   // (The file picker's search draft moved into CanvasOverlayMenus in wave 4 —
-  // only its wiring read or wrote it.)
+  // only its wiring read or wrote it. The extract/export modal states moved
+  // into useCanvasExportExtract in wave 6; showFilePicker stays here because
+  // the node-ops domain (add-file-card) and the toolbar also write it.)
   const [showFilePicker, setShowFilePicker] = useState(false);
-  const [showExtractModal, setShowExtractModal] = useState(false);
-  const [extractedMarkdown, setExtractedMarkdown] = useState("");
-  const [copiedNotification, setCopiedNotification] = useState(false);
-  const [showExportModal, setShowExportModal] = useState(false);
-  const [exportFormat, setExportFormat] = useState<"png" | "svg">("png");
-  const [exportBg, setExportBg] = useState<"theme" | "white" | "transparent">("theme");
-  const [isExporting, setIsExporting] = useState(false);
-  const [exportCopyFeedback, setExportCopyFeedback] = useState(false);
   const [spawnModalState, setSpawnModalState] = useState<{
     nodeId: string;
     count: number;
@@ -350,6 +261,28 @@ export const CanvasView = memo(function CanvasView({
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 2200);
   }, []);
+
+  // Extract-to-note and image-export modal state and actions (extracted hook,
+  // wave 6). The toast stays above because six other hooks also raise it.
+  const {
+    showExtractModal,
+    setShowExtractModal,
+    extractedMarkdown,
+    copiedNotification,
+    showExportModal,
+    setShowExportModal,
+    exportFormat,
+    setExportFormat,
+    exportBg,
+    setExportBg,
+    isExporting,
+    exportCopyFeedback,
+    handleOpenExtractModal,
+    handleCopyExtracted,
+    handleSaveAsNote,
+    handleDownloadExport,
+    handleCopyExport,
+  } = useCanvasExportExtract({ data, title, theme, showToast, onExtractToNote });
 
   // Node id → node lookup. Declared before the presentation hook (which reads
   // it to frame slides) and before the gesture hooks; previously it lived
@@ -386,6 +319,34 @@ export const CanvasView = memo(function CanvasView({
     isFullscreen,
     onToggleFullscreen,
     showToast,
+  });
+
+  // Right-click context-menu domain: the position clamp, the dismissal paths
+  // and the three openers (extracted hook, wave 6). The menu state itself
+  // stays above — useCanvasDocument's save path consumes setContextMenu before
+  // this hook's other dependencies exist.
+  const {
+    handleContextMenuCanvas,
+    handleContextMenuNode,
+    handleContextMenuEdge,
+    handleSaveEdgeLabel,
+  } = useCanvasContextMenu({
+    contextMenu,
+    setContextMenu,
+    contextMenuRef,
+    setShowAlignMenu,
+    containerRef,
+    viewportRef,
+    isPresentationMode,
+    selectedNodeIds,
+    setSelectedNodeIds,
+    selectedEdgeIds,
+    setSelectedEdgeIds,
+    latestDataRef,
+    pushHistory,
+    editingEdgeId,
+    editingEdgeLabel,
+    setEditingEdgeId,
   });
 
   // Escape-key priority chain. F5 and the in-presentation slide keys live in
@@ -686,6 +647,37 @@ export const CanvasView = memo(function CanvasView({
     editingEdgeId,
   });
 
+  // Derived geometry: minimap box/scale, frustum-culling bounds and tests,
+  // node/edge relationship maps, multi-selection root and the batch
+  // colour-picker seeds (extracted hook, wave 6; a separate file rather than
+  // an extension of useCanvasViewport because these memos read the selection,
+  // editing, hover and connect state).
+  const {
+    canvasObstacles,
+    minimapBBox,
+    minimapScale,
+    minimapOffsetX,
+    minimapOffsetY,
+    nodeOutgoingMap,
+    sourceDisplayColorMap,
+    currentMultiRootNode,
+    currentMultiRootTitle,
+    isNodeInViewport,
+    isEdgeInViewport,
+    batchCustomColor,
+    batchEdgeCustomColor,
+  } = useCanvasDerived({
+    data,
+    viewport,
+    containerRef,
+    selectedNodeIds,
+    selectedEdgeIds,
+    editingNodeId,
+    editingEdgeId,
+    hoveredNodeId,
+    connectingState,
+  });
+
   // ResizeObserver for canvas container to ensure smooth updates
   useEffect(() => {
     if (!containerRef.current || typeof ResizeObserver === "undefined") return;
@@ -842,308 +834,6 @@ export const CanvasView = memo(function CanvasView({
     };
   };
 
-  // Node lookups & relationship maps (nodeMap moved up next to the
-  // presentation hook, which consumes it).
-  const canvasObstacles = useMemo<CanvasObstacle[]>(
-    () =>
-      data.nodes.map((n) => ({
-        id: n.id,
-        x: n.x,
-        y: n.y,
-        width: n.width,
-        height: n.height,
-      })),
-    [data.nodes],
-  );
-
-  const handleContextMenuCanvas = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      if (isPresentationMode) return;
-      if (!containerRef.current) return;
-      const rect = containerRef.current.getBoundingClientRect();
-      const localX = e.clientX - rect.left;
-      const localY = e.clientY - rect.top;
-      const canvasX = Math.round((localX - viewportRef.current.panX) / viewportRef.current.zoom);
-      const canvasY = Math.round((localY - viewportRef.current.panY) / viewportRef.current.zoom);
-
-      setContextMenu({
-        // Use viewport-absolute coordinates so the portal-rendered menu can use
-        // position: fixed and never be clipped by ancestor `overflow: hidden`.
-        x: e.clientX,
-        y: e.clientY,
-        canvasX,
-        canvasY,
-      });
-    },
-    [isPresentationMode],
-  );
-
-  const handleContextMenuNode = useCallback(
-    (e: React.MouseEvent, node: CanvasNode) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (isPresentationMode) return;
-      if (!containerRef.current) return;
-      const rect = containerRef.current.getBoundingClientRect();
-      const localX = e.clientX - rect.left;
-      const localY = e.clientY - rect.top;
-      const canvasX = Math.round((localX - viewportRef.current.panX) / viewportRef.current.zoom);
-      const canvasY = Math.round((localY - viewportRef.current.panY) / viewportRef.current.zoom);
-
-      if (!selectedNodeIds.has(node.id)) {
-        setSelectedNodeIds(new Set([node.id]));
-      }
-
-      setContextMenu({
-        x: e.clientX,
-        y: e.clientY,
-        canvasX,
-        canvasY,
-        targetNodeId: node.id,
-      });
-    },
-    [isPresentationMode, selectedNodeIds],
-  );
-
-  const handleContextMenuEdge = useCallback(
-    (e: React.MouseEvent, edge: CanvasEdge) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (isPresentationMode) return;
-      if (!containerRef.current) return;
-      const rect = containerRef.current.getBoundingClientRect();
-      const localX = e.clientX - rect.left;
-      const localY = e.clientY - rect.top;
-      const canvasX = Math.round((localX - viewportRef.current.panX) / viewportRef.current.zoom);
-      const canvasY = Math.round((localY - viewportRef.current.panY) / viewportRef.current.zoom);
-
-      if (selectedEdgeIds.has(edge.id) && selectedEdgeIds.size > 1) {
-        // keep multiple selection
-      } else {
-        setSelectedEdgeIds(new Set([edge.id]));
-      }
-      setSelectedNodeIds(new Set());
-
-      setContextMenu({
-        x: e.clientX,
-        y: e.clientY,
-        canvasX,
-        canvasY,
-        targetEdgeId: edge.id,
-      });
-    },
-    [selectedEdgeIds],
-  );
-
-  const handleSaveEdgeLabel = () => {
-    if (!editingEdgeId) return;
-    const currentData = latestDataRef.current;
-    pushHistory({
-      ...currentData,
-      edges: currentData.edges.map((e) =>
-        e.id === editingEdgeId ? { ...e, label: editingEdgeLabel.trim() || undefined } : e,
-      ),
-    });
-    setEditingEdgeId(null);
-  };
-
-  /**
-   * Where the caret is, in screen pixels.
-   *
-   * The card editor is a monospace textarea inside a transformed canvas world,
-   * so the popup is drawn through a portal at fixed coordinates — and the only
-   * way to know those is to measure. CJK counts double, which is what a
-   * monospace font does with it.
-   */
-  /**
-   * Where the caret is on screen, for a given value and caret index.
-   *
-   * The value and the caret are passed in rather than read off the textarea: an
-   * insertion has already computed them, and the DOM still holds the previous
-   * value until React re-renders. Only the layout is read from the element.
-   */
-  const caretScreenPosition = (textarea: HTMLTextAreaElement, text: string, caret: number) => {
-    const style = getComputedStyle(textarea);
-    const value = text.slice(0, caret);
-    const lines = value.split("\n");
-    const column = Array.from(lines[lines.length - 1] ?? "").reduce(
-      (width, ch) => width + (ch.charCodeAt(0) > 0x2e7f ? 2 : 1),
-      0,
-    );
-    const probe = document.createElement("span");
-    probe.style.cssText = `position:absolute;visibility:hidden;white-space:pre;font:${style.font}`;
-    probe.textContent = "0000000000";
-    document.body.appendChild(probe);
-    const charWidth = probe.getBoundingClientRect().width / 10;
-    probe.remove();
-    const rect = textarea.getBoundingClientRect();
-    const scale = rect.width / textarea.offsetWidth || 1;
-    return {
-      x: rect.left + (parseFloat(style.paddingLeft) || 0) * scale + column * charWidth * scale,
-      y:
-        rect.top +
-        (parseFloat(style.paddingTop) || 0) * scale +
-        (lines.length - 1) * (parseFloat(style.lineHeight) || 20) * scale,
-    };
-  };
-
-  /** Notes whose title or file name contains what has been typed so far. */
-  const matchCardRefTargets = (query: string) => {
-    const clean = query.trim().toLowerCase();
-    return allChapters
-      .map((c) => ({
-        title: c.title,
-        relativePath: c.src,
-        absolutePath: c.absolutePath,
-      }))
-      .filter((t) => {
-        if (!clean) return true;
-        const title = t.title.toLowerCase();
-        const fileName = (t.relativePath.split("/").pop() ?? "").toLowerCase();
-        return title.includes(clean) || fileName.includes(clean);
-      })
-      .slice(0, 8);
-  };
-
-  /** The rows the popup shows, in the order it shows them. */
-  const buildCardSuggestItems = (
-    kind: "note" | "command",
-    query: string,
-  ): CanvasCardSuggestItem[] => {
-    if (kind === "command") {
-      return matchSlashCommands(query).map((cmd) => ({
-        key: `command:${cmd.id}`,
-        icon: cmd.icon,
-        title: cmd.title,
-        subtitle: cmd.description,
-      }));
-    }
-    return matchCardRefTargets(query).map((target) => ({
-      key: `note:${target.relativePath}:${target.title}`,
-      title: target.title,
-      subtitle: target.relativePath,
-    }));
-  };
-
-  /**
-   * Open (or move) the popup for whatever the caret now sits in.
-   *
-   * Called on every keystroke, and again after an insertion, so picking `[[]]`
-   * from the command list offers the notes straight away rather than waiting for
-   * the next key — the document editor does the same.
-   */
-  const openCardSuggestFor = (textarea: HTMLTextAreaElement, value: string, caret: number) => {
-    const before = value.slice(0, caret);
-    let kind: "note" | "command" | null = null;
-    let query = "";
-    let startIndex = 0;
-
-    const wiki = before.match(/\[\[([^\]\n]*)$/);
-    if (wiki) {
-      kind = "note";
-      query = wiki[1];
-      startIndex = caret - wiki[0].length;
-    } else {
-      // The same rule the document editor uses, which is what keeps a slash in
-      // the middle of a path or a URL from opening anything.
-      const slash = detectSlashTrigger(value, caret);
-      if (slash) {
-        kind = "command";
-        query = slash.query;
-        startIndex = slash.startIndex;
-      }
-    }
-
-    if (!kind || startIndex < 0) {
-      setCardSuggest(null);
-      return;
-    }
-
-    const caretPos = caretScreenPosition(textarea, value, caret);
-    setCardSuggest({
-      kind,
-      query: query.toLowerCase(),
-      startIndex,
-      selectedIndex: 0,
-      items: buildCardSuggestItems(kind, query),
-      x: caretPos.x,
-      y: caretPos.y,
-    });
-  };
-
-  const handleCardEditorChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setEditingText(e.target.value);
-    openCardSuggestFor(e.target, e.target.value, e.target.selectionStart ?? e.target.value.length);
-  };
-
-  /**
-   * Put the caret where an insertion left it, and re-open the popup for whatever
-   * it landed in — picking `[[]]` from the command list offers the notes straight
-   * away rather than waiting for the next key, the way the document editor does.
-   *
-   * The popup is refreshed before the frame is requested: it is positioned from
-   * the value and caret we already have, so it does not have to wait for React to
-   * write the new value into the textarea. Only the caret itself has to.
-   */
-  const commitCardEdit = (next: string, caret: number) => {
-    setEditingText(next);
-    const textarea = cardEditorRef.current;
-    if (!textarea) return;
-    openCardSuggestFor(textarea, next, caret);
-    requestAnimationFrame(() => {
-      textarea.focus();
-      textarea.setSelectionRange(caret, caret);
-    });
-  };
-
-  /**
-   * Insert whatever row `index` of the open popup stands for.
-   *
-   * The rows are re-derived from the query rather than carried in the state:
-   * both builders are pure and take the query the popup was drawn with, so the
-   * inserted row cannot disagree with the row the user was looking at.
-   */
-  const pickCardSuggest = (index: number) => {
-    const suggest = cardSuggest;
-    const textarea = cardEditorRef.current;
-    if (!suggest || !textarea) return;
-    const caret = textarea.selectionStart ?? editingText.length;
-
-    if (suggest.kind === "command") {
-      const command: SlashCommand | undefined = matchSlashCommands(suggest.query)[index];
-      if (!command) return;
-      const applied = applySlashCommand(
-        editingText,
-        { query: suggest.query, startIndex: suggest.startIndex },
-        caret,
-        command,
-      );
-      commitCardEdit(applied.text, applied.caret);
-      return;
-    }
-
-    const target = matchCardRefTargets(suggest.query)[index];
-    if (!target) return;
-    const inserted = `[[${target.title}]]`;
-    commitCardEdit(
-      `${editingText.slice(0, suggest.startIndex)}${inserted}${editingText.slice(caret)}`,
-      suggest.startIndex + inserted.length,
-    );
-  };
-
-  /** Move the popup's highlight by `delta`, wrapping at both ends. */
-  const moveCardSuggest = (delta: number) => {
-    setCardSuggest((prev) =>
-      prev && prev.items.length > 0
-        ? {
-            ...prev,
-            selectedIndex: (prev.selectedIndex + delta + prev.items.length) % prev.items.length,
-          }
-        : prev,
-    );
-  };
-
   // Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -1251,246 +941,6 @@ export const CanvasView = memo(function CanvasView({
     handleUndo,
     handleRedo,
   ]);
-
-  // Extract article
-  const handleOpenExtractModal = () => {
-    const markdown = extractCanvasToMarkdown(data, title || "空间白板萃取长文");
-    setExtractedMarkdown(markdown);
-    setShowExtractModal(true);
-  };
-
-  const handleCopyExtracted = () => {
-    navigator.clipboard.writeText(extractedMarkdown);
-    setCopiedNotification(true);
-    setTimeout(() => setCopiedNotification(false), 2000);
-  };
-
-  const handleSaveAsNote = () => {
-    if (onExtractToNote) {
-      onExtractToNote(`${title}-萃取长文`, extractedMarkdown);
-      setShowExtractModal(false);
-    }
-  };
-
-  // Export canvas image
-  const handleDownloadExport = async () => {
-    if (isExporting) return;
-    setIsExporting(true);
-    try {
-      const result = await downloadCanvasAsImage(data, title || "KnowSpace白板", exportFormat, {
-        theme,
-        background: exportBg,
-        scale: 2,
-      });
-      if (result === "canceled") {
-        showToast("已取消导出");
-        return;
-      }
-      setShowExportModal(false);
-      if (result === "svg" && exportFormat !== "svg") {
-        // The rasteriser was vetoed by the browser's security model and the
-        // vector file was saved instead — say so, rather than silently
-        // handing the user a different format than they asked for.
-        showToast("浏览器安全限制无法生成 PNG，已改为导出矢量 SVG");
-      } else if (result === "svg") {
-        showToast("已导出矢量 SVG");
-      } else {
-        showToast("白板图片已导出");
-      }
-    } catch (err) {
-      console.error("导出白板图片失败:", err);
-      // Surface the failure instead of dying silently — a previous hard crash
-      // here left the user staring at a closed window with no explanation.
-      showToast(`导出失败：${err instanceof Error ? err.message : "未知错误"}`);
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
-  const handleCopyExport = async () => {
-    if (isExporting) return;
-    setIsExporting(true);
-    try {
-      const ok = await copyCanvasImageToClipboard(data, {
-        theme,
-        background: exportBg,
-        scale: 2,
-      });
-      if (ok) {
-        setExportCopyFeedback(true);
-        setTimeout(() => setExportCopyFeedback(false), 2200);
-      } else {
-        showToast("复制失败：当前环境不支持剪贴板图片写入");
-      }
-    } catch (err) {
-      console.error("复制白板图片失败:", err);
-      showToast(`复制失败：${err instanceof Error ? err.message : "未知错误"}`);
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
-  // Minimap bounding calculations - padded to ensure all nodes (including standalone & groups) are fully visible
-  const minimapBBox = useMemo(() => {
-    const box = computeBoundingBox(data.nodes);
-    const padX = Math.max(60, box.width * 0.08);
-    const padY = Math.max(60, box.height * 0.08);
-    return {
-      minX: box.minX - padX,
-      minY: box.minY - padY,
-      maxX: box.maxX + padX,
-      maxY: box.maxY + padY,
-      width: box.width + padX * 2,
-      height: box.height + padY * 2,
-    };
-  }, [data.nodes]);
-
-  const { minimapScale, minimapOffsetX, minimapOffsetY } = useMemo(() => {
-    const targetW = 180;
-    const targetH = 130;
-    const pad = 10;
-    const availW = targetW - pad * 2;
-    const availH = targetH - pad * 2;
-    const scaleX = availW / Math.max(100, minimapBBox.width);
-    const scaleY = availH / Math.max(100, minimapBBox.height);
-    const scale = Math.min(scaleX, scaleY, 0.4);
-
-    const contentW = minimapBBox.width * scale;
-    const contentH = minimapBBox.height * scale;
-    const offsetX = (targetW - contentW) / 2;
-    const offsetY = (targetH - contentH) / 2;
-
-    return { minimapScale: scale, minimapOffsetX: offsetX, minimapOffsetY: offsetY };
-  }, [minimapBBox]);
-
-  // Node lookups & relationship maps
-  const nodeOutgoingMap = useMemo(() => {
-    const map = new Map<string, { count: number; color?: string; targets: string[] }>();
-    for (const e of data.edges) {
-      if (e.fromNode) {
-        const item = map.get(e.fromNode) || { count: 0, color: e.color, targets: [] };
-        item.count++;
-        if (e.color) item.color = e.color;
-        item.targets.push(e.toNode);
-        map.set(e.fromNode, item);
-      }
-    }
-    return map;
-  }, [data.edges]);
-
-  // Dynamic source-aware color mapping (shared with the SVG/PNG export
-  // pipeline so that on-screen and exported colors stay perfectly in sync).
-  const sourceDisplayColorMap = useMemo(
-    () => computeSourceDisplayColorMap(data.nodes, data.edges),
-    [data.nodes, data.edges],
-  );
-
-  const currentMultiRootNode = useMemo(() => {
-    if (selectedNodeIds.size < 2) return undefined;
-    const selectedNodes = data.nodes.filter((n) => selectedNodeIds.has(n.id));
-    const firstSelectedId = Array.from(selectedNodeIds)[0];
-    return (
-      selectedNodes.find((n) => n.id === firstSelectedId) ||
-      [...selectedNodes].sort((a, b) => (Math.abs(a.x - b.x) > 30 ? a.x - b.x : a.y - b.y))[0]
-    );
-  }, [selectedNodeIds, data.nodes]);
-
-  const currentMultiRootTitle = useMemo(() => {
-    if (!currentMultiRootNode) return "首选卡片";
-    if (currentMultiRootNode.type === "text") {
-      return (
-        currentMultiRootNode.text
-          .split("\n")[0]
-          .replace(/^[#\s*->]+/, "")
-          .slice(0, 8) || "卡片"
-      );
-    }
-    if (currentMultiRootNode.type === "group") {
-      return currentMultiRootNode.label || "分组";
-    }
-    if (currentMultiRootNode.type === "file") {
-      return currentMultiRootNode.file || "笔记";
-    }
-    if (currentMultiRootNode.type === "link") {
-      return currentMultiRootNode.url || "链接";
-    }
-    return "卡片";
-  }, [currentMultiRootNode]);
-
-  // Viewport frustum bounds for culling off-screen elements with a generous 600px buffer
-  const viewportBounds = useMemo(() => {
-    const width =
-      containerRef.current?.clientWidth ||
-      (typeof window !== "undefined" ? window.innerWidth : 1920);
-    const height =
-      containerRef.current?.clientHeight ||
-      (typeof window !== "undefined" ? window.innerHeight : 1080);
-    const zoom = viewport.zoom;
-    const buffer = 600 / zoom;
-    return {
-      minX: -viewport.panX / zoom - buffer,
-      minY: -viewport.panY / zoom - buffer,
-      maxX: (width - viewport.panX) / zoom + buffer,
-      maxY: (height - viewport.panY) / zoom + buffer,
-    };
-  }, [viewport.panX, viewport.panY, viewport.zoom]);
-
-  const isNodeInViewport = useCallback(
-    (node: CanvasNode): boolean => {
-      if (selectedNodeIds.has(node.id)) return true;
-      if (editingNodeId === node.id) return true;
-      if (hoveredNodeId === node.id) return true;
-      if (connectingState && connectingState.fromNodeId === node.id) return true;
-      const nw = node.width || 300;
-      const nh = node.height || 200;
-      return !(
-        node.x + nw < viewportBounds.minX ||
-        node.x > viewportBounds.maxX ||
-        node.y + nh < viewportBounds.minY ||
-        node.y > viewportBounds.maxY
-      );
-    },
-    [selectedNodeIds, editingNodeId, hoveredNodeId, connectingState, viewportBounds],
-  );
-
-  const isEdgeInViewport = useCallback(
-    (edge: CanvasEdge, fromNode: CanvasNode, toNode: CanvasNode): boolean => {
-      if (selectedEdgeIds.has(edge.id)) return true;
-      if (selectedNodeIds.has(edge.fromNode) || selectedNodeIds.has(edge.toNode)) return true;
-      if (editingEdgeId === edge.id) return true;
-      const minX = Math.min(fromNode.x, toNode.x);
-      const maxX = Math.max(fromNode.x + (fromNode.width || 300), toNode.x + (toNode.width || 300));
-      const minY = Math.min(fromNode.y, toNode.y);
-      const maxY = Math.max(
-        fromNode.y + (fromNode.height || 200),
-        toNode.y + (toNode.height || 200),
-      );
-      return !(
-        maxX < viewportBounds.minX ||
-        minX > viewportBounds.maxX ||
-        maxY < viewportBounds.minY ||
-        minY > viewportBounds.maxY
-      );
-    },
-    [selectedEdgeIds, selectedNodeIds, editingEdgeId, viewportBounds],
-  );
-
-  // Seed for the batch custom-colour picker: reuse a custom colour already set
-  // on one of the selected cards, otherwise start from a neutral blue.
-  const batchCustomColor = useMemo(() => {
-    const withHex = data.nodes.find(
-      (n) => selectedNodeIds.has(n.id) && typeof n.color === "string" && n.color.startsWith("#"),
-    );
-    return (withHex?.color as string | undefined) ?? "#3b82f6";
-  }, [data.nodes, selectedNodeIds]);
-
-  // Same idea for the selection of edges.
-  const batchEdgeCustomColor = useMemo(() => {
-    const withHex = data.edges.find(
-      (e) => selectedEdgeIds.has(e.id) && typeof e.color === "string" && e.color.startsWith("#"),
-    );
-    return (withHex?.color as string | undefined) ?? "#3b82f6";
-  }, [data.edges, selectedEdgeIds]);
 
   return (
     <div
