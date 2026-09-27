@@ -17,7 +17,7 @@
 | `as-any` | 10 | 只减不增（`as any`） |
 | `files-over-1000-lines` | 12 | 只减不增（src 非测试代码，> 1000 行） |
 | `max-file-lines` | 1353 | 只减不增（最大单文件行数） |
-| `src-lines` | 64693 | 记录趋势，不设闸 |
+| `src-lines` | 64690 | 记录趋势，不设闸 |
 | `test-cases` | 见 `TEST_BASELINE.md` | 只增不减——由测试基线守护，本文件不重复设闸 |
 
 ---
