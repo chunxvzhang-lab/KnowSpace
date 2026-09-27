@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { resolveThemeMode } from "../services/themeMode";
 import { loadPreferences } from "../services/storage";
@@ -75,18 +75,31 @@ describe("胶囊窗口解析 data-theme 的前提", () => {
   /**
    * 组件实际会挂上去的类名。
    *
+   * 胶囊窗口的 UI 拆在 FlashCapsule.tsx（根）与 `components/flash/` 下的视图
+   * 组件里，所以类名集合 = 根 + flash 目录下全部 .tsx（视图是逐字搬过去的，
+   * 集合与拆分前一致；新增视图文件会被自动纳入守卫范围）。
+   *
    * 模板字符串里的三元分支（`` `flash-tab-btn ${x ? "active" : ""}` ``）里的字面量也是
    * 真实类名，所以先把 `${…}` 换成它内部的字符串字面量，再按空白切。
    */
   function capsuleClassNames(): Set<string> {
-    const src = readFileSync(resolve(__dirname, "../components/FlashCapsule.tsx"), "utf8");
+    const flashDir = resolve(__dirname, "../components/flash");
+    const sources = [
+      resolve(__dirname, "../components/FlashCapsule.tsx"),
+      ...readdirSync(flashDir, { withFileTypes: true })
+        .filter((e) => e.isFile() && e.name.endsWith(".tsx"))
+        .map((e) => resolve(flashDir, e.name)),
+    ];
     const out = new Set<string>();
-    for (const m of src.matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`\}|\{([^}]*)\})/g)) {
-      const chunk = (m[1] ?? m[2] ?? m[3] ?? "").replace(/\$\{([^}]*)\}/g, (_all, expr: string) =>
-        (expr.match(/"([^"]*)"/g) ?? []).join(" "),
-      );
-      for (const token of chunk.replace(/["'`]/g, " ").split(/\s+/)) {
-        if (/^[a-z][\w-]*$/.test(token)) out.add(token);
+    for (const file of sources) {
+      const src = readFileSync(file, "utf8");
+      for (const m of src.matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`\}|\{([^}]*)\})/g)) {
+        const chunk = (m[1] ?? m[2] ?? m[3] ?? "").replace(/\$\{([^}]*)\}/g, (_all, expr: string) =>
+          (expr.match(/"([^"]*)"/g) ?? []).join(" "),
+        );
+        for (const token of chunk.replace(/["'`]/g, " ").split(/\s+/)) {
+          if (/^[a-z][\w-]*$/.test(token)) out.add(token);
+        }
       }
     }
     return out;

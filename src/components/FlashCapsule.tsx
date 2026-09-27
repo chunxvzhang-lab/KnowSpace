@@ -1,223 +1,121 @@
-import React, { useState, useEffect, useRef } from "react";
-import {
-  Zap,
-  Settings,
-  X,
-  Check,
-  Hash,
-  Link,
-  Clock,
-  Lightbulb,
-  Keyboard,
-  AlertCircle,
-  FileText,
-  Pin,
-  PinOff,
-  Folder,
-  RotateCcw,
-  Copy,
-  StickyNote,
-  Sparkles,
-  Trash2,
-} from "lucide-react";
-import { loadPreferences, savePreferences } from "../services/storage";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { loadPreferences } from "../services/storage";
 import { resolveThemeMode } from "../services/themeMode";
 import type { ThemeMode } from "../core/types";
+import { FlashHeader } from "./flash/FlashHeader";
+import { FlashSettingsDrawer } from "./flash/FlashSettingsDrawer";
+import { FlashNoteTab, type FlashSaveStatus } from "./flash/FlashNoteTab";
+import { FlashPersistentTab } from "./flash/FlashPersistentTab";
+import { useFlashSettings } from "./flash/useFlashSettings";
+import { useFlashPersistentNote } from "./flash/useFlashPersistentNote";
+import { useWikiLinkSuggest } from "./flash/useWikiLinkSuggest";
+import { useFlashWindowResize } from "./flash/useFlashWindowResize";
 
+/**
+ * 闪念胶囊独立窗口的根组件（src/main.tsx 在 `?mode=flash` 时挂载）。
+ *
+ * 拆分后的职责边界：
+ * - 域状态/订阅在 `flash/` 下的三个 hook：useFlashSettings（热键与存储域，含
+ *   onFlashShortcutUpdated / onAppSettingsUpdated 订阅）、useFlashPersistentNote
+ *   （350ms 防抖常驻便签）、useWikiLinkSuggest（[[ 联想 + 目标节流加载）。
+ * - 视图在 `flash/` 下的四个组件：FlashHeader / FlashSettingsDrawer /
+ *   FlashNoteTab / FlashPersistentTab（逐字搬出，prop 驱动）。
+ * - 留在根上的是跨域的东西：主题（解析 data-theme + onThemeUpdated + storage
+ *   监听）、窗口图钉、归档动作，以及横跨四个域的 onFlashFocus 订阅（热键呼出
+ *   要刷新目标/主题/Space 路径并聚焦当前输入框）。窗口尺寸拖拽在
+ *   useFlashWindowResize 里（rAF 节流逐字保留）。
+ */
 export const FlashCapsule: React.FC = () => {
   const [activeTab, setActiveTab] = useState<"note" | "persistent">("note");
   const [content, setContent] = useState("");
-  const [persistentContent, setPersistentContent] = useState("");
   const [isPinned, setIsPinned] = useState(false);
-  const [shortcut, setShortcut] = useState("Alt+Space");
-  const [targetDisplay, setTargetDisplay] = useState("Space/YYYY-MM-DD_HHmm.md");
   const [theme, setTheme] = useState<ThemeMode>("system");
   const [systemPrefersLight, setSystemPrefersLight] = useState(
     () => window.matchMedia?.("(prefers-color-scheme: light)")?.matches ?? false,
   );
   const resolvedTheme = resolveThemeMode(theme, systemPrefersLight);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordedShortcut, setRecordedShortcut] = useState("");
-  const [autoLaunch, setAutoLaunch] = useState(false);
-  const [runInBackground, setRunInBackground] = useState(true);
-  const [spaceConfig, setSpaceConfig] = useState<{
-    currentDir: string;
-    isCustom: boolean;
-    defaultDir: string;
-  }>({
-    currentDir: "",
-    isCustom: false,
-    defaultDir: "",
-  });
-  const [settingsError, setSettingsError] = useState("");
-  const [settingsSuccess, setSettingsSuccess] = useState("");
-  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [saveStatus, setSaveStatus] = useState<FlashSaveStatus>("idle");
   const [statusMessage, setStatusMessage] = useState("");
-  const [persistentFeedback, setPersistentFeedback] = useState("");
-  const [availableTargets, setAvailableTargets] = useState<string[]>([]);
-  const [wikiSuggestState, setWikiSuggestState] = useState<{
-    isOpen: boolean;
-    query: string;
-    startIndex: number;
-    selectedIndex: number;
-    filtered: string[];
-  }>({
-    isOpen: false,
-    query: "",
-    startIndex: -1,
-    selectedIndex: 0,
-    filtered: [],
-  });
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const persistentTextareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const persistentSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const desktop = typeof window !== "undefined" ? window.knowSpaceDesktop : undefined;
 
-  const refreshSpaceConfig = () => {
-    if (desktop?.capture.getFlashSpaceConfig) {
-      desktop.capture
-        .getFlashSpaceConfig()
-        .then((cfg) => {
-          if (cfg) setSpaceConfig(cfg);
-        })
-        .catch(() => {});
-    }
-    if (desktop?.capture.getFlashTargetPath) {
-      desktop.capture
-        .getFlashTargetPath()
-        .then((res) => {
-          if (res?.relativeDisplay) {
-            setTargetDisplay(res.relativeDisplay);
-          }
-        })
-        .catch(() => {});
-    }
+  // —— 速记正文域的基础件：插入片段 / 切回速记页（被下方 hook 以参数注入复用）——
+  const insertSnippet = (snippet: string) => {
+    if (!textareaRef.current) return;
+    const el = textareaRef.current;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const prev = el.value;
+    const next = prev.substring(0, start) + snippet + prev.substring(end);
+    setContent(next);
+    setTimeout(() => {
+      el.focus();
+      const pos = start + snippet.length;
+      el.setSelectionRange(pos, pos);
+    }, 0);
   };
 
-  // Initialize preferences, theme, hotkey, pin, persistent note and space config
-  useEffect(() => {
-    const applyTheme = (t?: string) => {
-      const prefs = loadPreferences();
-      setTheme((t as ThemeMode) || prefs.theme || "system");
-    };
+  const switchToNoteTab = () => {
+    setActiveTab("note");
+    setTimeout(() => textareaRef.current?.focus(), 50);
+  };
 
-    applyTheme();
+  const selectPersistentTab = () => {
+    setActiveTab("persistent");
+    setTimeout(() => persistentTextareaRef.current?.focus(), 50);
+  };
+
+  const {
+    shortcut,
+    targetDisplay,
+    isSettingsOpen,
+    setIsSettingsOpen,
+    isRecording,
+    setIsRecording,
+    recordedShortcut,
+    setRecordedShortcut,
+    autoLaunch,
+    setAutoLaunch,
+    runInBackground,
+    setRunInBackground,
+    spaceConfig,
+    settingsError,
+    settingsSuccess,
+    setSettingsSuccess,
+    handleShortcutKeyDown,
+    applyShortcut,
+    handleSelectSpaceDir,
+    handleResetSpaceDir,
+    refreshSpaceConfig,
+  } = useFlashSettings({ noteTextareaRef: textareaRef });
+
+  const {
+    persistentContent,
+    persistentFeedback,
+    persistentTextareaRef,
+    handlePersistentChange,
+    handleCopyPersistent,
+    handleClearPersistent,
+    handleInsertPersistentToNote,
+  } = useFlashPersistentNote({ insertSnippet, switchToNoteTab });
+
+  const {
+    wikiSuggestState,
+    handleContentChange,
+    insertWikiSuggestion,
+    handleSuggestKeyDown,
+    loadTargets,
+  } = useWikiLinkSuggest({ content, setContent, textareaRef });
+
+  const applyTheme = useCallback((t?: string) => {
     const prefs = loadPreferences();
+    setTheme((t as ThemeMode) || prefs.theme || "system");
+  }, []);
 
-    // Load initial hotkey
-    if (desktop?.capture.getFlashShortcut) {
-      desktop.capture
-        .getFlashShortcut()
-        .then((sc) => {
-          if (sc) {
-            setShortcut(sc);
-            setRecordedShortcut(sc);
-          }
-        })
-        .catch(() => {});
-    } else if (prefs.flashCapsuleShortcut) {
-      setShortcut(prefs.flashCapsuleShortcut);
-      setRecordedShortcut(prefs.flashCapsuleShortcut);
-    }
-
-    // Load pin status
-    if (desktop?.capture.getFlashPin) {
-      desktop.capture
-        .getFlashPin()
-        .then((res) => {
-          if (res && typeof res.pinned === "boolean") {
-            setIsPinned(res.pinned);
-          }
-        })
-        .catch(() => {});
-    }
-
-    // Load app settings
-    if (desktop?.system.getAppSettings) {
-      desktop.system
-        .getAppSettings()
-        .then((st) => {
-          if (st) {
-            setAutoLaunch(st.autoLaunch);
-            setRunInBackground(st.runInBackground);
-          }
-        })
-        .catch(() => {});
-    }
-
-    // Load Space path info
-    refreshSpaceConfig();
-
-    // Load persistent note / prompt template
-    if (desktop?.capture.getPersistentNote) {
-      desktop.capture
-        .getPersistentNote()
-        .then((res) => {
-          if (res && typeof res.text === "string") {
-            setPersistentContent(res.text);
-          }
-        })
-        .catch(() => {});
-    } else {
-      try {
-        const cached = localStorage.getItem("knowspace_persistent_note");
-        if (cached) setPersistentContent(cached);
-      } catch {}
-    }
-
-    // Load historical flash notes and available targets for [[ suggestion
-    let lastTargetsLoadTime = 0;
-    const loadTargets = async (force = false) => {
-      const now = Date.now();
-      if (!force && now - lastTargetsLoadTime < 3000) return;
-      lastTargetsLoadTime = now;
-      try {
-        if (desktop?.capture.getFlashNotesSummary) {
-          const res = await desktop.capture.getFlashNotesSummary();
-          if (res?.success && res.notes) {
-            const titles = res.notes.map((n) => n.fileName.replace(/\.md$/i, ""));
-            setAvailableTargets((prev) => Array.from(new Set([...prev, ...titles])));
-          }
-        }
-      } catch {}
-    };
-    loadTargets(true);
-
-    // Auto-focus textarea on mount
-    textareaRef.current?.focus();
-    requestAnimationFrame(() => textareaRef.current?.focus());
-
-    // Listen for focus event from main process when hotkey is triggered
-    let cleanupFocus: (() => void) | undefined;
-    if (desktop?.capture.onFlashFocus) {
-      cleanupFocus = desktop.capture.onFlashFocus(() => {
-        loadTargets();
-        applyTheme();
-        refreshSpaceConfig();
-        const targetTextarea =
-          activeTab === "note" ? textareaRef.current : persistentTextareaRef.current;
-        targetTextarea?.focus();
-        requestAnimationFrame(() => targetTextarea?.focus());
-      });
-    }
-
-    let cleanupShortcut: (() => void) | undefined;
-    if (desktop?.capture.onFlashShortcutUpdated) {
-      cleanupShortcut = desktop.capture.onFlashShortcutUpdated((newSc) => {
-        setShortcut(newSc);
-        setRecordedShortcut(newSc);
-      });
-    }
-
-    let cleanupSettings: (() => void) | undefined;
-    if (desktop?.system.onAppSettingsUpdated) {
-      cleanupSettings = desktop.system.onAppSettingsUpdated((st) => {
-        setAutoLaunch(st.autoLaunch);
-        setRunInBackground(st.runInBackground);
-      });
-    }
+  // Initialize theme, and listen for theme / preference updates (main process + storage)
+  useEffect(() => {
+    applyTheme();
 
     let cleanupTheme: (() => void) | undefined;
     if (desktop?.system.onThemeUpdated) {
@@ -234,17 +132,10 @@ export const FlashCapsule: React.FC = () => {
     window.addEventListener("storage", onStorage);
 
     return () => {
-      cleanupFocus?.();
-      cleanupShortcut?.();
-      cleanupSettings?.();
       cleanupTheme?.();
       window.removeEventListener("storage", onStorage);
-      if (persistentSaveTimerRef.current) {
-        clearTimeout(persistentSaveTimerRef.current);
-      }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- activeTab/refreshSpaceConfig are read inside one-time IPC handlers; adding them would tear down and re-subscribe all desktop listeners whenever the tab changes
-  }, [desktop]);
+  }, [desktop, applyTheme]);
 
   // 主题设成"跟随系统"时，操作系统在浅色/深色之间切换必须立刻反映到配色上。
   // 改前这一步是 CSS 媒体查询自动完成的；把系统主题解析成具体主题之后，
@@ -266,6 +157,46 @@ export const FlashCapsule: React.FC = () => {
     document.documentElement.setAttribute("data-theme", resolvedTheme);
     document.documentElement.dataset.theme = resolvedTheme;
   }, [resolvedTheme]);
+
+  // Pin status, autofocus, and the cross-domain focus subscription. The hotkey
+  // focus handler refreshes targets/theme/Space path and refocuses the input —
+  // it spans four domains, so it stays on the root.
+  useEffect(() => {
+    // Load pin status
+    if (desktop?.capture.getFlashPin) {
+      desktop.capture
+        .getFlashPin()
+        .then((res) => {
+          if (res && typeof res.pinned === "boolean") {
+            setIsPinned(res.pinned);
+          }
+        })
+        .catch(() => {});
+    }
+
+    // Auto-focus textarea on mount
+    textareaRef.current?.focus();
+    requestAnimationFrame(() => textareaRef.current?.focus());
+
+    // Listen for focus event from main process when hotkey is triggered
+    let cleanupFocus: (() => void) | undefined;
+    if (desktop?.capture.onFlashFocus) {
+      cleanupFocus = desktop.capture.onFlashFocus(() => {
+        loadTargets();
+        applyTheme();
+        refreshSpaceConfig();
+        const targetTextarea =
+          activeTab === "note" ? textareaRef.current : persistentTextareaRef.current;
+        targetTextarea?.focus();
+        requestAnimationFrame(() => targetTextarea?.focus());
+      });
+    }
+
+    return () => {
+      cleanupFocus?.();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- activeTab is read inside a one-time IPC handler on purpose (same stale-closure as before the split); adding it would tear down and re-subscribe the desktop listener whenever the tab changes
+  }, [desktop, applyTheme, loadTargets, refreshSpaceConfig]);
 
   const handleClose = () => {
     if (desktop?.capture.hideFlashCapsule) {
@@ -331,239 +262,17 @@ export const FlashCapsule: React.FC = () => {
     }
   };
 
-  const insertSnippet = (snippet: string) => {
-    if (!textareaRef.current) return;
-    const el = textareaRef.current;
-    const start = el.selectionStart;
-    const end = el.selectionEnd;
-    const prev = el.value;
-    const next = prev.substring(0, start) + snippet + prev.substring(end);
-    setContent(next);
-    setTimeout(() => {
-      el.focus();
-      const pos = start + snippet.length;
-      el.setSelectionRange(pos, pos);
-    }, 0);
-  };
-
   const handleInsertTime = () => {
     const now = new Date();
     const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")} `;
     insertSnippet(timeStr);
   };
 
-  const handleInsertPersistentToNote = () => {
-    if (!persistentContent.trim()) {
-      setPersistentFeedback("便签暂无内容");
-      setTimeout(() => setPersistentFeedback(""), 1200);
-      return;
-    }
-    insertSnippet(persistentContent + "\n\n");
-    setActiveTab("note");
-    setTimeout(() => {
-      textareaRef.current?.focus();
-    }, 50);
-  };
-
-  const handleResizeMouseDown = (e: React.MouseEvent, direction: "se" | "e" | "s") => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    const startX = e.screenX;
-    const startY = e.screenY;
-    const startWidth = window.innerWidth;
-    const startHeight = window.innerHeight;
-
-    let rafId: number | null = null;
-    let latestWidth = startWidth;
-    let latestHeight = startHeight;
-
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      const deltaX = moveEvent.screenX - startX;
-      const deltaY = moveEvent.screenY - startY;
-
-      if (direction === "se" || direction === "e") {
-        latestWidth = Math.max(520, Math.min(1600, Math.round(startWidth + deltaX)));
-      }
-      if (direction === "se" || direction === "s") {
-        latestHeight = Math.max(320, Math.min(1200, Math.round(startHeight + deltaY)));
-      }
-
-      if (rafId === null) {
-        rafId = requestAnimationFrame(() => {
-          desktop?.capture.setFlashSize?.({ width: latestWidth, height: latestHeight });
-          rafId = null;
-        });
-      }
-    };
-
-    const handleMouseUp = () => {
-      if (rafId !== null) {
-        cancelAnimationFrame(rafId);
-      }
-      desktop?.capture.setFlashSize?.({ width: latestWidth, height: latestHeight });
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    };
-
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
-  };
-
-  const handlePersistentChange = (val: string) => {
-    setPersistentContent(val);
-    try {
-      localStorage.setItem("knowspace_persistent_note", val);
-    } catch {}
-    if (persistentSaveTimerRef.current) {
-      clearTimeout(persistentSaveTimerRef.current);
-    }
-    persistentSaveTimerRef.current = setTimeout(() => {
-      desktop?.capture.savePersistentNote?.(val);
-    }, 350);
-  };
-
-  const handleCopyPersistent = () => {
-    if (!persistentContent) return;
-    navigator.clipboard.writeText(persistentContent).then(() => {
-      setPersistentFeedback("✓ 已复制全文");
-      setTimeout(() => setPersistentFeedback(""), 1500);
-    });
-  };
-
-  const handleClearPersistent = () => {
-    if (window.confirm("确定要清空常驻便签/提示模板内容吗？此操作不会影响已归档的文档。")) {
-      handlePersistentChange("");
-      setPersistentFeedback("✓ 已清空");
-      setTimeout(() => setPersistentFeedback(""), 1500);
-    }
-  };
-
-  const handleSelectSpaceDir = async () => {
-    if (!desktop?.capture.selectFlashSpaceDir) return;
-    setSettingsError("");
-    setSettingsSuccess("");
-    const res = await desktop.capture.selectFlashSpaceDir();
-    if (res?.success && res.newDir) {
-      setSettingsSuccess("✓ 已成功切换 Space 存储目录");
-      refreshSpaceConfig();
-      setTimeout(() => setSettingsSuccess(""), 2000);
-    } else if (res?.error) {
-      setSettingsError(res.error);
-    }
-  };
-
-  const handleResetSpaceDir = async () => {
-    if (!desktop?.capture.resetFlashSpaceDir) return;
-    setSettingsError("");
-    setSettingsSuccess("");
-    const res = await desktop.capture.resetFlashSpaceDir();
-    if (res?.success) {
-      setSettingsSuccess("✓ 已恢复为默认 Space 目录");
-      refreshSpaceConfig();
-      setTimeout(() => setSettingsSuccess(""), 2000);
-    }
-  };
-
-  const starterTemplates = [
-    {
-      label: "📌 今日任务待办",
-      text: "## 今日核心待办\n- [ ] 核心目标 1\n- [ ] 核心目标 2\n- [ ] 临时插入事项\n",
-    },
-    {
-      label: "💡 提示词审查模板",
-      text: "作为资深工程师，请对以下代码或方案进行深度代码审查，指出潜在性能与逻辑隐患：\n\n",
-    },
-    {
-      label: "📝 会议与访谈速记",
-      text: "## 沟通纪要\n- **参与人**：\n- **关键决议**：\n- **下一步行动 (Next Actions)**：\n  - [ ] ",
-    },
-    {
-      label: "🔬 闪念知识卡片",
-      text: "### 闪念知识卡片\n- **核心概念**：\n- **知识洞察**：\n- **双链关联**：[[]]\n",
-    },
-  ];
-
-  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const val = e.target.value;
-    setContent(val);
-
-    const cursorPos = e.target.selectionStart ?? val.length;
-    const textBefore = val.slice(0, cursorPos);
-    const match = textBefore.match(/\[\[([^\]\n]*)$/);
-
-    if (match) {
-      const query = match[1].toLowerCase().trim();
-      const startIndex = cursorPos - match[0].length;
-      const filtered = availableTargets
-        .filter((t) => !query || t.toLowerCase().includes(query))
-        .slice(0, 8);
-
-      setWikiSuggestState({
-        isOpen: filtered.length > 0,
-        query,
-        startIndex,
-        selectedIndex: 0,
-        filtered,
-      });
-    } else {
-      if (wikiSuggestState.isOpen) {
-        setWikiSuggestState((prev) => ({ ...prev, isOpen: false }));
-      }
-    }
-  };
-
-  const insertWikiSuggestion = (title: string) => {
-    if (wikiSuggestState.startIndex < 0 || !textareaRef.current) return;
-    const cursorPos = textareaRef.current.selectionStart ?? content.length;
-    const before = content.slice(0, wikiSuggestState.startIndex);
-    const after = content.slice(cursorPos);
-    const inserted = `[[${title}]]`;
-    const newContent = `${before}${inserted}${after}`;
-    setContent(newContent);
-    setWikiSuggestState((prev) => ({ ...prev, isOpen: false }));
-
-    setTimeout(() => {
-      if (textareaRef.current) {
-        const newPos = before.length + inserted.length;
-        textareaRef.current.focus();
-        textareaRef.current.setSelectionRange(newPos, newPos);
-      }
-    }, 20);
-  };
+  const handleResizeMouseDown = useFlashWindowResize();
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (wikiSuggestState.isOpen) {
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        setWikiSuggestState((prev) => ({
-          ...prev,
-          selectedIndex: (prev.selectedIndex + 1) % prev.filtered.length,
-        }));
-        return;
-      }
-      if (e.key === "ArrowUp") {
-        e.preventDefault();
-        setWikiSuggestState((prev) => ({
-          ...prev,
-          selectedIndex: (prev.selectedIndex - 1 + prev.filtered.length) % prev.filtered.length,
-        }));
-        return;
-      }
-      if (e.key === "Enter" || e.key === "Tab") {
-        const selected = wikiSuggestState.filtered[wikiSuggestState.selectedIndex];
-        if (selected) {
-          e.preventDefault();
-          insertWikiSuggestion(selected);
-          return;
-        }
-      }
-      if (e.key === "Escape") {
-        e.preventDefault();
-        setWikiSuggestState((prev) => ({ ...prev, isOpen: false }));
-        return;
-      }
-    }
+    // [[ 联想下拉的按键导航（方向键 / Enter / Tab / Esc）——消费了才短路
+    if (handleSuggestKeyDown(e)) return;
 
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
       e.preventDefault();
@@ -581,568 +290,78 @@ export const FlashCapsule: React.FC = () => {
     }
   };
 
-  const handleShortcutKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (!isRecording) return;
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (["Control", "Alt", "Shift", "Meta"].includes(e.key)) {
-      return;
-    }
-
-    const parts: string[] = [];
-    if (e.ctrlKey) parts.push("Ctrl");
-    if (e.altKey) parts.push("Alt");
-    if (e.shiftKey) parts.push("Shift");
-    if (e.metaKey) parts.push("Command");
-
-    let key = e.key;
-    if (key === " ") key = "Space";
-    else if (key.length === 1) key = key.toUpperCase();
-
-    const isFKey = /^F[1-9][0-2]?$/i.test(key);
-    if (parts.length === 0 && !isFKey) {
-      setSettingsError("请至少配合 Ctrl / Alt / Shift 修饰键使用（或单按 F1-F12）");
-      return;
-    }
-
-    parts.push(key);
-    const newSc = parts.join("+");
-    setRecordedShortcut(newSc);
-    setIsRecording(false);
-    setSettingsError("");
-  };
-
-  const applyShortcut = async (targetSc: string) => {
-    setSettingsError("");
-    setSettingsSuccess("");
-    if (!targetSc || !targetSc.trim()) {
-      setSettingsError("热键不能为空");
-      return;
-    }
-
-    if (desktop?.capture.setFlashShortcut) {
-      const res = await desktop.capture.setFlashShortcut(targetSc.trim());
-      if (res.success) {
-        setShortcut(targetSc.trim());
-        setRecordedShortcut(targetSc.trim());
-        setSettingsSuccess(`✓ 全局快捷键已设定为 [ ${targetSc.trim()} ]`);
-        const prefs = loadPreferences();
-        savePreferences({ ...prefs, flashCapsuleShortcut: targetSc.trim() });
-        setTimeout(() => {
-          setIsSettingsOpen(false);
-          setSettingsSuccess("");
-          textareaRef.current?.focus();
-        }, 1200);
-      } else {
-        setSettingsError(res.error || "热键已被系统或其它程序占用");
-      }
-    } else {
-      setShortcut(targetSc.trim());
-      setRecordedShortcut(targetSc.trim());
-      setSettingsSuccess("✓ 已保存热键偏好");
-      setTimeout(() => {
-        setIsSettingsOpen(false);
-        setSettingsSuccess("");
-      }, 1000);
-    }
-  };
-
   return (
     <div className={`flash-capsule-overlay theme-${resolvedTheme}`}>
       <div className="flash-capsule-container">
         {/* Header Bar - Draggable */}
-        <div className="flash-header" style={{ WebkitAppRegion: "drag" } as React.CSSProperties}>
-          <div className="flash-header-left">
-            <span className="flash-logo-badge">
-              <Zap size={15} className="flash-zap-icon" />
-              <span className="flash-title">闪念胶囊</span>
-            </span>
-
-            {/* Segmented Tab Switcher */}
-            <div
-              className="flash-tab-group"
-              style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
-            >
-              <button
-                type="button"
-                className={`flash-tab-btn ${activeTab === "note" ? "active" : ""}`}
-                onClick={() => {
-                  setActiveTab("note");
-                  setTimeout(() => textareaRef.current?.focus(), 50);
-                }}
-                title="即时闪念速记（Ctrl+Enter 瞬时归档）"
-              >
-                <Zap size={12} />
-                <span>闪念速记</span>
-              </button>
-              <button
-                type="button"
-                className={`flash-tab-btn ${activeTab === "persistent" ? "active" : ""}`}
-                onClick={() => {
-                  setActiveTab("persistent");
-                  setTimeout(() => persistentTextareaRef.current?.focus(), 50);
-                }}
-                title="常驻便签 / 提示模板（随写随存，归档不被清空）"
-              >
-                <StickyNote size={12} />
-                <span>常驻模板</span>
-              </button>
-            </div>
-          </div>
-
-          <div
-            className="flash-header-right"
-            style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
-          >
-            <span
-              className="flash-target-path"
-              title={`自动按分钟保存至: ${targetDisplay} (同一分钟追加)`}
-            >
-              <FileText size={12} />
-              <span>{targetDisplay}</span>
-            </span>
-
-            {/* Window Pin Toggle Button */}
-            <button
-              type="button"
-              className={`flash-icon-btn ${isPinned ? "active pinned" : ""}`}
-              onClick={handleTogglePin}
-              title={
-                isPinned
-                  ? "已固定窗口：鼠标点击别处不会退出 (再次点击取消固定)"
-                  : "固定窗口：开启后鼠标点击外部不退出微窗"
-              }
-            >
-              {isPinned ? <Pin size={15} className="text-orange" /> : <PinOff size={15} />}
-            </button>
-
-            {/* Hotkey Badge */}
-            <button
-              type="button"
-              className="flash-shortcut-badge"
-              onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-              title="点击自定义全局呼出热键与存储目录"
-            >
-              <Keyboard size={12} />
-              <span>{shortcut}</span>
-            </button>
-
-            {/* Settings Button */}
-            <button
-              type="button"
-              className={`flash-icon-btn ${isSettingsOpen ? "active" : ""}`}
-              onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-              title="设置全局热键与存储路径"
-            >
-              <Settings size={15} />
-            </button>
-
-            {/* Close Button */}
-            <button
-              type="button"
-              className="flash-icon-btn flash-close-btn"
-              onClick={handleClose}
-              title="关闭微窗 (Esc)"
-            >
-              <X size={16} />
-            </button>
-          </div>
-        </div>
+        <FlashHeader
+          activeTab={activeTab}
+          onSelectNoteTab={switchToNoteTab}
+          onSelectPersistentTab={selectPersistentTab}
+          targetDisplay={targetDisplay}
+          isPinned={isPinned}
+          onTogglePin={handleTogglePin}
+          shortcut={shortcut}
+          isSettingsOpen={isSettingsOpen}
+          onToggleSettings={() => setIsSettingsOpen(!isSettingsOpen)}
+          onClose={handleClose}
+        />
 
         {/* Hotkey & Space Directory Settings Drawer */}
         {isSettingsOpen && (
-          <div className="flash-settings-drawer">
-            <div className="flash-settings-header">
-              <span className="flash-settings-title">
-                <Settings size={14} />
-                <span>闪念胶囊偏好与存储设置</span>
-              </span>
-              <button
-                type="button"
-                className="flash-settings-close-btn"
-                onClick={() => setIsSettingsOpen(false)}
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="flash-settings-body">
-              {/* Space Storage Directory Section */}
-              <div className="flash-dir-settings-card">
-                <div className="flash-dir-settings-top">
-                  <span className="flash-dir-label">
-                    <Folder size={13} className="text-orange" />
-                    <strong>Space 存储目录：</strong>
-                  </span>
-                  <span
-                    className="flash-dir-path"
-                    title={spaceConfig.currentDir || "工作区默认 Space 目录"}
-                  >
-                    {spaceConfig.currentDir || "加载中..."}
-                  </span>
-                  <span
-                    className={`flash-dir-badge ${spaceConfig.isCustom ? "custom" : "default"}`}
-                  >
-                    {spaceConfig.isCustom ? "已自定义" : "工作区默认"}
-                  </span>
-                </div>
-                <div className="flash-dir-settings-actions">
-                  <button
-                    type="button"
-                    className="flash-mini-btn"
-                    onClick={handleSelectSpaceDir}
-                    title="选择本地任意文件夹作为 Space 存储路径"
-                  >
-                    <Folder size={12} /> 更改存储位置
-                  </button>
-                  {spaceConfig.isCustom && (
-                    <button
-                      type="button"
-                      className="flash-mini-btn secondary"
-                      onClick={handleResetSpaceDir}
-                      title="重置为当前知识库工作区默认的 Space 目录"
-                    >
-                      <RotateCcw size={12} /> 恢复默认
-                    </button>
-                  )}
-                  <span className="flash-dir-hint">
-                    按时间分钟保存在单独 Space 文件夹中，同一分钟追加合并，不重复新建文件夹。
-                  </span>
-                </div>
-              </div>
-
-              {/* Hotkey Settings */}
-              <div className="flash-preset-row">
-                <span className="flash-preset-label">快捷热键：</span>
-                {["Alt+Space", "Ctrl+Shift+Space", "Alt+N", "Ctrl+Alt+N", "F9"].map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    className={`flash-preset-tag ${shortcut === preset ? "current" : ""}`}
-                    onClick={() => {
-                      setRecordedShortcut(preset);
-                      applyShortcut(preset);
-                    }}
-                  >
-                    {preset}
-                  </button>
-                ))}
-              </div>
-
-              <div className="flash-recorder-row">
-                <span className="flash-preset-label">自定义录制：</span>
-                <input
-                  type="text"
-                  readOnly
-                  className={`flash-recorder-input ${isRecording ? "recording" : ""}`}
-                  placeholder="点击此处后直接按下键盘组合键..."
-                  value={isRecording ? "请按下组合键 (如 Ctrl+Shift+K)..." : recordedShortcut}
-                  onFocus={() => setIsRecording(true)}
-                  onBlur={() => setIsRecording(false)}
-                  onKeyDown={handleShortcutKeyDown}
-                />
-                <button
-                  type="button"
-                  className="flash-btn flash-btn-primary"
-                  onClick={() => applyShortcut(recordedShortcut)}
-                  disabled={!recordedShortcut || recordedShortcut === shortcut}
-                >
-                  <Check size={14} /> 保存并生效
-                </button>
-              </div>
-
-              <div className="flash-settings-toggles-row">
-                <label className="flash-toggle-label">
-                  <input
-                    type="checkbox"
-                    checked={autoLaunch}
-                    onChange={async (e) => {
-                      const val = e.target.checked;
-                      setAutoLaunch(val);
-                      const res = await desktop?.system.setAppSettings?.({ autoLaunch: val });
-                      if (res?.settings) {
-                        setAutoLaunch(res.settings.autoLaunch);
-                        setRunInBackground(res.settings.runInBackground);
-                      }
-                    }}
-                  />
-                  <span>开机自启 (静默就绪)</span>
-                </label>
-                <label className="flash-toggle-label">
-                  <input
-                    type="checkbox"
-                    checked={runInBackground}
-                    onChange={async (e) => {
-                      const val = e.target.checked;
-                      setRunInBackground(val);
-                      const res = await desktop?.system.setAppSettings?.({ runInBackground: val });
-                      if (res?.settings) {
-                        setAutoLaunch(res.settings.autoLaunch);
-                        setRunInBackground(res.settings.runInBackground);
-                      }
-                    }}
-                  />
-                  <span>保持后台运行 (关闭至托盘)</span>
-                </label>
-                <label className="flash-toggle-label">
-                  <input
-                    type="checkbox"
-                    checked={isPinned}
-                    onChange={(e) => {
-                      setIsPinned(e.target.checked);
-                      desktop?.capture.setFlashPin?.(e.target.checked);
-                    }}
-                  />
-                  <span>固定胶囊窗口 (点击外部不退出)</span>
-                </label>
-                <button
-                  type="button"
-                  className="flash-btn flash-btn-secondary"
-                  style={{
-                    marginLeft: "auto",
-                    fontSize: "11px",
-                    padding: "4px 9px",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "5px",
-                  }}
-                  onClick={async () => {
-                    if (desktop?.capture.resetFlashSize) {
-                      await desktop.capture.resetFlashSize();
-                      setSettingsSuccess("✓ 已恢复精炼胶囊尺寸 (600×360)");
-                      setTimeout(() => setSettingsSuccess(""), 1500);
-                    }
-                  }}
-                  title="将闪念胶囊窗口恢复为轻巧标准胶囊尺寸 (600×360)"
-                >
-                  <RotateCcw size={12} />
-                  <span>恢复轻巧尺寸 (600×360)</span>
-                </button>
-              </div>
-
-              {settingsError && (
-                <div className="flash-feedback flash-feedback-error">
-                  <AlertCircle size={14} />
-                  <span>{settingsError}</span>
-                </div>
-              )}
-              {settingsSuccess && (
-                <div className="flash-feedback flash-feedback-success">
-                  <Check size={14} />
-                  <span>{settingsSuccess}</span>
-                </div>
-              )}
-            </div>
-          </div>
+          <FlashSettingsDrawer
+            desktop={desktop}
+            spaceConfig={spaceConfig}
+            shortcut={shortcut}
+            isRecording={isRecording}
+            setIsRecording={setIsRecording}
+            recordedShortcut={recordedShortcut}
+            setRecordedShortcut={setRecordedShortcut}
+            autoLaunch={autoLaunch}
+            setAutoLaunch={setAutoLaunch}
+            runInBackground={runInBackground}
+            setRunInBackground={setRunInBackground}
+            isPinned={isPinned}
+            setIsPinned={setIsPinned}
+            settingsError={settingsError}
+            settingsSuccess={settingsSuccess}
+            setSettingsSuccess={setSettingsSuccess}
+            onApplyShortcut={applyShortcut}
+            onShortcutKeyDown={handleShortcutKeyDown}
+            onSelectSpaceDir={handleSelectSpaceDir}
+            onResetSpaceDir={handleResetSpaceDir}
+            onClose={() => setIsSettingsOpen(false)}
+          />
         )}
 
-        {/* Tab 1: Instant Note Mode */}
+        {/* Tab 1: Instant Note Mode / Tab 2: Persistent Note Mode */}
         {activeTab === "note" ? (
-          <>
-            {/* Quick Insertion Tools Bar */}
-            <div className="flash-tools-bar">
-              <button
-                type="button"
-                className="flash-tool-tag"
-                onClick={() => insertSnippet("- [ ] ")}
-                title="插入待办复选框"
-              >
-                <Check size={13} /> 待办
-              </button>
-              <button
-                type="button"
-                className="flash-tool-tag"
-                onClick={() => insertSnippet("#")}
-                title="插入标签"
-              >
-                <Hash size={13} /> 标签
-              </button>
-              <button
-                type="button"
-                className="flash-tool-tag"
-                onClick={() => insertSnippet("[[")}
-                title="关联双链"
-              >
-                <Link size={13} /> 双链
-              </button>
-              <button
-                type="button"
-                className="flash-tool-tag"
-                onClick={handleInsertTime}
-                title="插入当前时间"
-              >
-                <Clock size={13} /> 时间
-              </button>
-              <button
-                type="button"
-                className="flash-tool-tag"
-                onClick={() => insertSnippet("> 💡 ")}
-                title="灵感重点"
-              >
-                <Lightbulb size={13} /> 灵感
-              </button>
-              {persistentContent.trim() && (
-                <button
-                  type="button"
-                  className="flash-tool-tag flash-tool-insert-persistent"
-                  onClick={handleInsertPersistentToNote}
-                  title="一键插入常驻便签/提示模板内容"
-                >
-                  <Sparkles size={13} className="text-orange" /> 引用常驻模板
-                </button>
-              )}
-            </div>
-
-            {/* Text Input Area */}
-            <div className="flash-input-wrapper" style={{ position: "relative" }}>
-              <textarea
-                ref={textareaRef}
-                className="flash-textarea"
-                placeholder="捕捉此刻灵感火花、临时待办或知识线索... (键入 [[ 关联双链，Ctrl + Enter 瞬时归档)"
-                value={content}
-                onChange={handleContentChange}
-                onKeyDown={handleKeyDown}
-                rows={5}
-              />
-
-              {/* WikiLink Autocomplete Dropdown */}
-              {wikiSuggestState.isOpen && (
-                <div className="flash-wikilink-dropdown">
-                  <div className="flash-wikilink-header">
-                    <span>关联双向链接</span>
-                    <span className="hint">↑↓ 选词 · Enter 插入 · Esc 取消</span>
-                  </div>
-                  <div className="flash-wikilink-list">
-                    {wikiSuggestState.filtered.map((item, idx) => (
-                      <button
-                        key={item}
-                        type="button"
-                        className={`flash-wikilink-item ${idx === wikiSuggestState.selectedIndex ? "active" : ""}`}
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          insertWikiSuggestion(item);
-                        }}
-                      >
-                        <Link size={12} className="text-cyan" />
-                        <span>{item}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Footer Bar */}
-            <div className="flash-footer">
-              <div className="flash-footer-left">
-                <span className="flash-char-count">{content.length} 字</span>
-                {statusMessage && (
-                  <span className={`flash-status-msg ${saveStatus}`}>{statusMessage}</span>
-                )}
-              </div>
-
-              <div className="flash-footer-right">
-                <button
-                  type="button"
-                  className="flash-btn flash-btn-secondary"
-                  onClick={handleClose}
-                >
-                  取消 (Esc)
-                </button>
-                <button
-                  type="button"
-                  className="flash-btn flash-btn-primary flash-save-btn"
-                  onClick={handleSave}
-                  disabled={saveStatus === "saving"}
-                >
-                  <Zap size={14} />
-                  <span>瞬时归档 (Ctrl+↵)</span>
-                </button>
-              </div>
-            </div>
-          </>
+          <FlashNoteTab
+            content={content}
+            textareaRef={textareaRef}
+            wikiSuggestState={wikiSuggestState}
+            onContentChange={handleContentChange}
+            onKeyDown={handleKeyDown}
+            onInsertWikiSuggestion={insertWikiSuggestion}
+            insertSnippet={insertSnippet}
+            onInsertTime={handleInsertTime}
+            persistentContent={persistentContent}
+            onInsertPersistentToNote={handleInsertPersistentToNote}
+            statusMessage={statusMessage}
+            saveStatus={saveStatus}
+            onClose={handleClose}
+            onSave={handleSave}
+          />
         ) : (
-          /* Tab 2: Persistent Note / Prompt Template Mode */
-          <div className="flash-persistent-container">
-            {/* Banner info */}
-            <div className="flash-persistent-banner">
-              <span className="flash-persistent-banner-text">
-                📌 <strong>常驻便签与提示模板</strong>：实时自动保存，在归档闪念时
-                <strong>绝不清空</strong>，随时备查、复用或作为 AI 常用 Prompt 提示词使用。
-              </span>
-              {persistentFeedback && (
-                <span className="flash-persistent-badge-feedback">{persistentFeedback}</span>
-              )}
-            </div>
-
-            {/* Starter Template Pills */}
-            <div className="flash-starter-row">
-              <span className="flash-starter-label">常用构型：</span>
-              {starterTemplates.map((t, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  className="flash-starter-tag"
-                  onClick={() => {
-                    const next = persistentContent ? `${persistentContent}\n\n${t.text}` : t.text;
-                    handlePersistentChange(next);
-                  }}
-                  title="点击追加此结构到常驻便签"
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Persistent Textarea */}
-            <div className="flash-persistent-input-wrapper">
-              <textarea
-                ref={persistentTextareaRef}
-                className="flash-textarea flash-persistent-textarea"
-                placeholder="在此记录永久常驻便签、重要 Checklist、常用 Prompt 提示词或固定参考资料... (内容实时自动保存在本地，永不清空)"
-                value={persistentContent}
-                onChange={(e) => handlePersistentChange(e.target.value)}
-                rows={6}
-              />
-            </div>
-
-            {/* Persistent Footer Actions */}
-            <div className="flash-footer">
-              <div className="flash-footer-left">
-                <span className="flash-char-count">{persistentContent.length} 字 · 自动持久化</span>
-              </div>
-              <div className="flash-footer-right">
-                <button
-                  type="button"
-                  className="flash-btn flash-btn-secondary"
-                  onClick={handleClearPersistent}
-                  title="清空常驻便签内容"
-                >
-                  <Trash2 size={13} />
-                  <span>清空</span>
-                </button>
-                <button
-                  type="button"
-                  className="flash-btn flash-btn-secondary"
-                  onClick={handleCopyPersistent}
-                  title="复制常驻便签全文到剪贴板"
-                >
-                  <Copy size={13} />
-                  <span>复制全文</span>
-                </button>
-                <button
-                  type="button"
-                  className="flash-btn flash-btn-primary"
-                  onClick={handleInsertPersistentToNote}
-                  title="将当前模板内容填入闪念速记区"
-                >
-                  <Zap size={14} />
-                  <span>填入速记</span>
-                </button>
-              </div>
-            </div>
-          </div>
+          <FlashPersistentTab
+            persistentContent={persistentContent}
+            persistentTextareaRef={persistentTextareaRef}
+            persistentFeedback={persistentFeedback}
+            onPersistentChange={handlePersistentChange}
+            onClearPersistent={handleClearPersistent}
+            onCopyPersistent={handleCopyPersistent}
+            onInsertToNote={handleInsertPersistentToNote}
+          />
         )}
 
         {/* Window Drag Resize Handles */}
