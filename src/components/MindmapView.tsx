@@ -26,44 +26,16 @@ import {
   moveWithinSiblings,
   copySubtree,
   pasteSubtree,
-  searchMindmapNodes,
-  exportMindmapToOpml,
-  exportMindmapToFreeMind,
-  exportMindmapToXmind,
-  exportMindmapToMarkdownOutline,
   calculateNodeDimensions,
 } from "../services/mindmapService";
 import type { MindmapNode } from "../core/types";
-import {
-  loadMindmapCollapsed,
-  saveMindmapCollapsed,
-  loadMindmapTheme,
-  saveMindmapTheme,
-  loadMindmapLayout,
-  saveMindmapLayout,
-  loadMindmapNumbering,
-  saveMindmapNumbering,
-} from "../services/storage";
-import { buildStandaloneMindmapSvg } from "../services/mindmapSvgExport";
-import { describeMindmapIcon } from "../core/mindmapIcons";
+import { loadMindmapCollapsed, saveMindmapCollapsed } from "../services/storage";
 import { MindmapCanvasMenu } from "./MindmapCanvasMenu";
 import { MindmapNodeStyleMenu } from "./MindmapNodeStyleMenu";
 import { MindmapInlineEditor } from "./MindmapInlineEditor";
 import { MindmapToolbar } from "./MindmapToolbar";
-import {
-  DEFAULT_THEME_ID,
-  MINDMAP_THEMES,
-  branchColorFor,
-  freezeAppearance,
-  resolveThemeId,
-  type MindmapTheme,
-} from "../core/mindmapThemes";
-import {
-  DEFAULT_LAYOUT_ID,
-  layoutMindmap,
-  resolveLayoutId,
-  type MindmapLayoutNode,
-} from "../services/mindmapLayout";
+import { branchColorFor, freezeAppearance } from "../core/mindmapThemes";
+import { layoutMindmap, type MindmapLayoutNode } from "../services/mindmapLayout";
 import {
   allTags,
   emptySidecar,
@@ -110,11 +82,13 @@ import { MindmapFloatingTopics, type FloatingBox } from "./MindmapFloatingTopics
 import { MindmapSummaries, type SummaryBox } from "./MindmapSummaries";
 import { MindmapBoundaries, type BoundaryBox } from "./MindmapBoundaries";
 import { MindmapFloatingAnnotationMenu } from "./MindmapFloatingAnnotationMenu";
-import { downloadFile } from "../services/fileDownload";
-import { numberingFor } from "../core/mindmapNumbering";
 import { parseMindmapLink } from "../core/mindmapLinks";
 import { NodeIcon, NodeLinkMark, NodeMarks, NodeNoteMark, NodeTags } from "./MindmapMarks";
 import { MindmapRelationLines } from "./MindmapRelationLines";
+import { useMindmapAppearance } from "./mindmap/useMindmapAppearance";
+import { useMindmapSearch } from "./mindmap/useMindmapSearch";
+import { useMindmapExport } from "./mindmap/useMindmapExport";
+import { useMindmapShortcuts } from "./mindmap/useMindmapShortcuts";
 
 /**
  * How long a note waits before it is written.
@@ -193,20 +167,6 @@ function getContrastTextColor(hexColor?: string): string {
 }
 
 /**
- * Whether the app's own chrome is dark.
- *
- * Only the exports need it, and only as the fallback for a node that has no
- * colour of its own: a map written to a file has no stylesheet behind it, so
- * "transparent" would mean "whatever the program opening it decides".
- */
-function isDarkUi(theme: ThemeMode): boolean {
-  return (
-    theme === "twitter" ||
-    (theme === "system" && !!window.matchMedia?.("(prefers-color-scheme: dark)").matches)
-  );
-}
-
-/**
  * Where the collapse toggle sits on a node: just outside the edge its children
  * are on.
  *
@@ -237,87 +197,6 @@ export const MindmapView = memo(function MindmapView({
   documentKey,
   themeId,
 }: MindmapViewProps) {
-  /**
-   * The theme the reader picked, or null while the document's own is unknown.
-   *
-   * Null is a real state rather than a placeholder: it means nobody has chosen
-   * for this document yet, so the stored value — or the caller's prop, or the
-   * default — applies. Collapsing that into a single string would lose the
-   * difference between "this document says dark" and "dark is what we fall back
-   * to", and the first is what has to be written back unchanged.
-   */
-  const [pickedThemeId, setPickedThemeId] = useState<string | null>(null);
-
-  // Load the document's theme when the document changes. Unlike the folds,
-  // there is no matching save effect, so no guard is needed here: the write
-  // happens in the handler below, which only runs on a deliberate choice.
-  useEffect(() => {
-    setPickedThemeId(documentKey ? loadMindmapTheme(documentKey) : null);
-  }, [documentKey]);
-
-  const activeThemeId = resolveThemeId(pickedThemeId ?? themeId ?? DEFAULT_THEME_ID);
-  const mindmapTheme: MindmapTheme = MINDMAP_THEMES[activeThemeId];
-
-  const handlePickTheme = useCallback(
-    (next: string) => {
-      setPickedThemeId(next);
-      // Only a document with a path can be remembered. A preview of unsaved
-      // text has nowhere to file the choice, and inventing a key for it would
-      // mean every such preview shared one.
-      if (documentKey) saveMindmapTheme(documentKey, next);
-    },
-    [documentKey],
-  );
-
-  /**
-   * The layout the reader picked, or null while the document's own is unknown.
-   *
-   * Same shape as the theme above, and for the same reason: null means "nobody
-   * has chosen for this document", which is not the same as "this document chose
-   * the default", and the deliberate choice has to survive a round trip as
-   * itself. There is no caller-supplied prop to fall back to — a layout has no
-   * equivalent of the theme's frontmatter, and inventing one would be a second
-   * source of truth for a value only this view reads.
-   */
-  const [pickedLayoutId, setPickedLayoutId] = useState<string | null>(null);
-
-  useEffect(() => {
-    setPickedLayoutId(documentKey ? loadMindmapLayout(documentKey) : null);
-  }, [documentKey]);
-
-  const activeLayoutId = resolveLayoutId(pickedLayoutId ?? DEFAULT_LAYOUT_ID);
-
-  const handlePickLayout = useCallback(
-    (next: string) => {
-      setPickedLayoutId(next);
-      // A layout is a property of the document, like the theme, so it is filed
-      // under the same key. A preview with no path behind it cannot be
-      // remembered, and inventing a key would make all such previews share one.
-      if (documentKey) saveMindmapLayout(documentKey, next);
-    },
-    [documentKey],
-  );
-
-  /**
-   * Whether outline numbers are drawn beside the nodes.
-   *
-   * A view state, remembered per document like the layout and the theme: some
-   * maps are read as outlines and want numbers, others are read as pictures and
-   * do not. Nothing about the tree changes either way — the numbers are drawn,
-   * never written — so there is nothing to undo when it is switched off.
-   */
-  const [showNumbering, setShowNumbering] = useState(false);
-
-  useEffect(() => {
-    setShowNumbering(documentKey ? loadMindmapNumbering(documentKey) : false);
-  }, [documentKey]);
-
-  const handleToggleNumbering = useCallback(() => {
-    const next = !showNumbering;
-    setShowNumbering(next);
-    if (documentKey) saveMindmapNumbering(documentKey, next);
-  }, [documentKey, showNumbering]);
-
   /**
    * The document's companion file: what the map knows that the document does not.
    *
@@ -625,6 +504,25 @@ export const MindmapView = memo(function MindmapView({
   const [tree, setTree] = useState<MindmapNode>(initialTree);
   const [hasUnsyncedChanges, setHasUnsyncedChanges] = useState(false);
 
+  // Per-document look & feel: the theme, layout and numbering the reader picks,
+  // remembered under the document's key, plus the responsive breakpoints the
+  // container class and the toolbar listen to. Extracted to useMindmapAppearance
+  // (batch 3, wave 2a); it reads `tree` only for the numbering it derives.
+  const {
+    handlePickTheme,
+    activeThemeId,
+    mindmapTheme,
+    handlePickLayout,
+    activeLayoutId,
+    showNumbering,
+    handleToggleNumbering,
+    numbering,
+    isSemiCompact,
+    isCompact,
+    isNarrow,
+    isUltraNarrow,
+  } = useMindmapAppearance({ documentKey, themeId, containerRef, tree });
+
   // Keep tree in sync if external document structure changes, while protecting active unsynced mindmap edits
   useEffect(() => {
     if (source && source.trim() && source !== lastEmittedSourceRef.current) {
@@ -785,18 +683,6 @@ export const MindmapView = memo(function MindmapView({
   }, [tree, collapsedIds, activeLayoutId, statedSides]);
 
   /**
-   * Numbers by node id, or nothing while the switch is off.
-   *
-   * Derived from the tree rather than from the layout, which is the point of the
-   * split: folding a branch or changing the layout cannot renumber anything,
-   * because neither is an input here — only the document's own structure is.
-   */
-  const numbering = useMemo(
-    () => (showNumbering ? numberingFor(tree) : null),
-    [showNumbering, tree],
-  );
-
-  /**
    * The floating topics, measured the same way the layout measures nodes.
    *
    * Measured rather than stored: a topic's box follows its text, so renaming one
@@ -922,91 +808,30 @@ export const MindmapView = memo(function MindmapView({
     hasMoved: boolean;
   } | null>(null);
 
-  // In-canvas search state
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchMatchIds, setSearchMatchIds] = useState<string[]>([]);
-  const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
-  const searchInputRef = useRef<HTMLInputElement | null>(null);
-
-  const focusOnNode = useCallback(
-    (nodeId: string) => {
-      if (!layout || !containerRef.current) return;
-      const target = layout.nodes.find((n) => n.id === nodeId);
-      if (!target) return;
-      const cWidth = containerRef.current.clientWidth;
-      const cHeight = containerRef.current.clientHeight;
-      const targetCenterX = target.x + target.width / 2;
-      const targetCenterY = target.y + target.height / 2;
-      setTransform((prev) => ({
-        ...prev,
-        x: Math.round(cWidth / 2 - targetCenterX * prev.scale),
-        y: Math.round(cHeight / 2 - targetCenterY * prev.scale),
-      }));
-      setSelectedNodeIds(new Set([nodeId]));
-    },
-    [layout],
-  );
-
-  const handleSearch = useCallback(
-    (q: string) => {
-      setSearchQuery(q);
-      if (!q.trim()) {
-        setSearchMatchIds([]);
-        setCurrentSearchIndex(0);
-        return;
-      }
-      // Two things are searchable: the words in the topics, and the type a topic wears.
-      // The types live in the companion file, so only this side can name them — and being
-      // findable by name is half of what makes the row of icons a way to ask "what is
-      // still open in this map" instead of a row of pictures.
-      const matches = searchMindmapNodes(tree, q, (nodeId) =>
-        describeMindmapIcon(iconFor(sidecar, nodeId)),
-      );
-      setSearchMatchIds(matches);
-      setCurrentSearchIndex(0);
-      if (matches.length > 0) {
-        focusOnNode(matches[0]);
-      }
-    },
-    [focusOnNode, sidecar, tree],
-  );
-
-  const handleNextSearch = useCallback(() => {
-    if (searchMatchIds.length === 0) return;
-    const nextIdx = (currentSearchIndex + 1) % searchMatchIds.length;
-    setCurrentSearchIndex(nextIdx);
-    focusOnNode(searchMatchIds[nextIdx]);
-  }, [currentSearchIndex, focusOnNode, searchMatchIds]);
-
-  const handlePrevSearch = useCallback(() => {
-    if (searchMatchIds.length === 0) return;
-    const prevIdx = (currentSearchIndex - 1 + searchMatchIds.length) % searchMatchIds.length;
-    setCurrentSearchIndex(prevIdx);
-    focusOnNode(searchMatchIds[prevIdx]);
-  }, [currentSearchIndex, focusOnNode, searchMatchIds]);
-
-  /**
-   * Closes the search and clears it.
-   *
-   * One callback rather than the same three setters written out at each of the
-   * four places that dismiss the search — the field's Escape, its close button,
-   * the canvas Escape and now the extracted group. Clearing the query on close
-   * is part of it: leaving it behind means reopening shows stale matches with
-   * no focused node, which reads as the search being broken.
-   */
-  const handleCloseSearch = useCallback(() => {
-    setIsSearchOpen(false);
-    setSearchQuery("");
-    setSearchMatchIds([]);
-    setCurrentSearchIndex(0);
-  }, []);
-
-  // Select all nodes handler
-  const handleSelectAll = useCallback(() => {
-    if (!layout || layout.nodes.length === 0) return;
-    setSelectedNodeIds(new Set(layout.nodes.map((n) => n.id)));
-  }, [layout]);
+  // In-canvas search: the field's state, the match set, walking between the
+  // matches, and select-all — which shares the "point at topics the reader
+  // named" gesture. Extracted to useMindmapSearch (batch 3, wave 2a); the
+  // viewport, selection and container stay with the view and thread in here.
+  const {
+    isSearchOpen,
+    setIsSearchOpen,
+    searchQuery,
+    searchMatchIds,
+    currentSearchIndex,
+    searchInputRef,
+    handleSearch,
+    handleNextSearch,
+    handlePrevSearch,
+    handleCloseSearch,
+    handleSelectAll,
+  } = useMindmapSearch({
+    tree,
+    sidecar,
+    layout,
+    containerRef,
+    setTransform,
+    setSelectedNodeIds,
+  });
 
   // Fit to screen helper
   const handleFitToScreen = useCallback(() => {
@@ -1526,219 +1351,40 @@ export const MindmapView = memo(function MindmapView({
     [primarySelectedId, tree],
   );
 
-  // Global Mindmap Keydown shortcuts
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (editingNodeId) {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          handleCommitEdit();
-        } else if (e.key === "Escape") {
-          e.preventDefault();
-          handleCancelEdit();
-        }
-        return;
-      }
-
-      // Keys belong to the field the reader is typing in, not to the map.
-      //
-      // The same rule as the block above, and it has to be written twice because these
-      // shortcuts are bound to the window: they fired while the caret was in the panel's
-      // own fields. Delete inside the note field deleted the topic the note was on;
-      // Ctrl+V inside the tag or link field pasted a branch — reading a menu of text
-      // fields and getting the map rearranged behind it. Anything with a caret is left
-      // alone now: the annotation fields, the search box, the colour inputs. Escape is
-      // the exception, because it changes nothing — it drops the focus and then closes
-      // whatever is open, which is what it already did everywhere else.
-      const focused = e.target as HTMLElement | null;
-      const focusedTag = focused?.tagName;
-      const isTextEntry =
-        focusedTag === "INPUT" ||
-        focusedTag === "TEXTAREA" ||
-        focusedTag === "SELECT" ||
-        Boolean(focused?.isContentEditable);
-      if (isTextEntry) {
-        if (e.key !== "Escape") return;
-        focused?.blur();
-      }
-
-      // Ctrl+F In-Canvas Search
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") {
-        e.preventDefault();
-        setIsSearchOpen(true);
-        setTimeout(() => searchInputRef.current?.focus(), 60);
-        return;
-      }
-
-      // Ctrl+A Select All
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a") {
-        e.preventDefault();
-        handleSelectAll();
-        return;
-      }
-
-      // Copy, cut and paste the selected branch. These sit after the
-      // editing guard at the top of this handler, so they never fire while
-      // text is being edited — Ctrl+C in the inline editor has to stay the
-      // browser's copy.
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "c") {
-        e.preventDefault();
-        handleCopyNode();
-        return;
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "x") {
-        e.preventDefault();
-        handleCutNode();
-        return;
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "v") {
-        e.preventDefault();
-        handlePasteNode();
-        return;
-      }
-
-      // Escape closes search, the side question, the context menu, deselects nodes, or
-      // closes view
-      if (e.key === "Escape") {
-        e.preventDefault();
-        if (isSearchOpen) {
-          handleCloseSearch();
-          return;
-        }
-        if (sideChooser) {
-          setSideChooser(null);
-          return;
-        }
-        if (contextMenu) {
-          setContextMenu(null);
-          return;
-        }
-        if (selectedNodeIds.size > 0) {
-          setSelectedNodeIds(new Set());
-          return;
-        }
-        if (onClose) {
-          onClose();
-          return;
-        }
-        return;
-      }
-
-      if (e.ctrlKey && e.key.toLowerCase() === "z") {
-        e.preventDefault();
-        handleUndo();
-        return;
-      }
-      if (
-        (e.ctrlKey && e.key.toLowerCase() === "y") ||
-        (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "z")
-      ) {
-        e.preventDefault();
-        handleRedo();
-        return;
-      }
-
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
-        e.preventDefault();
-        handleSyncToDocument();
-        return;
-      }
-
-      if (e.key === "Tab" || e.key === "Insert") {
-        e.preventDefault();
-        handleAddChild();
-        return;
-      }
-      if (e.key === "Enter") {
-        e.preventDefault();
-        handleAddSibling();
-        return;
-      }
-      if (e.key === "Delete" || e.key === "Backspace") {
-        e.preventDefault();
-        handleDeleteNode();
-        return;
-      }
-      if (e.key === "F2" || e.key === " ") {
-        e.preventDefault();
-        startEditing();
-        return;
-      }
-      // Zoom. Ctrl/Cmd with the usual keys, plus Ctrl+0 for fit-to-screen,
-      // which until now only ran once when the canvas mounted.
-      if ((e.ctrlKey || e.metaKey) && (e.key === "=" || e.key === "+")) {
-        e.preventDefault();
-        handleZoomStep(1.15);
-        return;
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key === "-") {
-        e.preventDefault();
-        handleZoomStep(0.87);
-        return;
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key === "0") {
-        e.preventDefault();
-        handleFitToScreen();
-        return;
-      }
-
-      // Alt+arrows reorder among siblings. This has to be tested before the
-      // plain arrow navigation below, which does not look at the modifier and
-      // would otherwise swallow both of these.
-      if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
-        e.preventDefault();
-        handleMoveSibling(e.key === "ArrowUp" ? -1 : 1);
-        return;
-      }
-
-      if (e.key === "ArrowUp") {
-        e.preventDefault();
-        handleNavigate("up");
-        return;
-      }
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        handleNavigate("down");
-        return;
-      }
-      if (e.key === "ArrowLeft") {
-        e.preventDefault();
-        handleNavigate("left");
-        return;
-      }
-      if (e.key === "ArrowRight") {
-        e.preventDefault();
-        handleNavigate("right");
-        return;
-      }
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [
+  // Global Mindmap Keydown shortcuts. The handler body — guards, order,
+  // preventDefaults — lives verbatim in useMindmapShortcuts (batch 3, wave 2a);
+  // everything it composes threads in from the view's own hooks and locals.
+  useMindmapShortcuts({
     editingNodeId,
+    isSearchOpen,
+    sideChooser,
     contextMenu,
     selectedNodeIds,
+    setIsSearchOpen,
+    searchInputRef,
+    handleCloseSearch,
+    setSideChooser,
+    setContextMenu,
+    setSelectedNodeIds,
     handleSelectAll,
     handleCommitEdit,
     handleCancelEdit,
+    handleCopyNode,
+    handleCutNode,
+    handlePasteNode,
     handleUndo,
     handleRedo,
+    handleSyncToDocument,
     handleAddChild,
     handleAddSibling,
     handleDeleteNode,
     startEditing,
-    handleNavigate,
-    handleMoveSibling,
-    handleCopyNode,
-    handleCutNode,
-    handlePasteNode,
     handleZoomStep,
     handleFitToScreen,
+    handleMoveSibling,
+    handleNavigate,
     onClose,
-    isSearchOpen,
-    handleSyncToDocument,
-  ]);
+  });
 
   // Focus and select input on entering edit mode
   useEffect(() => {
@@ -1977,153 +1623,18 @@ export const MindmapView = memo(function MindmapView({
     setCollapsedIds(toCollapse);
   }, [layout.nodes]);
 
-  // Export as PNG (100% Transparent Background, correct node & text fills, zero black blocks)
-  const handleExportPng = useCallback(() => {
-    const svgEl = svgRef.current;
-    if (!svgEl || !layout) return;
-
-    // The canvas cannot be written out as it is: the pan and zoom, the
-    // interactive-only elements and the stylesheet colours all have to be
-    // resolved first. That is one function, shared with the SVG export — the PNG
-    // below is that SVG rasterised, so the two formats cannot drift apart.
-    const built = buildStandaloneMindmapSvg(svgEl, {
-      bounds: frameBounds,
-      dark: isDarkUi(theme),
-    });
-    if (!built) return;
-
-    const { svg: svgString, width: exportWidth, height: exportHeight } = built;
-
-    const blob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      // How many device pixels each layout pixel gets in the file.
-      //
-      // This used to be `devicePixelRatio`, which made the exported image depend on the
-      // monitor the export happened on: on a 1× display a 1200px map became a 1200px
-      // file, and zooming into it was blurry — the picture was already at 100%. An
-      // export is a document rather than a screenshot, so its resolution is a decision:
-      // three device pixels per layout pixel, capped so a very large map cannot ask for
-      // a canvas the browser refuses to allocate (and refuses silently, which would be
-      // worse than a soft image).
-      const MAX_SIDE = 12000;
-      const scale = Math.max(1, Math.min(3, MAX_SIDE / Math.max(exportWidth, exportHeight, 1)));
-      canvas.width = Math.max(1, Math.round(exportWidth * scale));
-      canvas.height = Math.max(1, Math.round(exportHeight * scale));
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-
-      ctx.scale(scale, scale);
-      // Transparent background: clearRect without any fillRect
-      ctx.clearRect(0, 0, exportWidth, exportHeight);
-      ctx.drawImage(img, 0, 0, exportWidth, exportHeight);
-
-      canvas.toBlob((pngBlob) => {
-        if (!pngBlob) return;
-        downloadFile({
-          fileName: `${title || "mindmap"}-思维导图.png`,
-          data: pngBlob,
-          mime: "image/png",
-        });
-        // The URL the image was loaded from, not a download's: it is ours to give
-        // back now that the canvas has the pixels.
-        URL.revokeObjectURL(url);
-      }, "image/png");
-    };
-    img.src = url;
-  }, [layout, title, theme]);
-
-  /**
-   * Export as SVG.
-   *
-   * The same string the PNG is rasterised from, written out as it is — so a
-   * vector file costs one download and no second implementation. Text stays
-   * text, which is the reason to want one: the file can be opened in an
-   * illustration program and edited, or printed at any size.
-   */
-  const handleExportSvg = useCallback(() => {
-    const built = buildStandaloneMindmapSvg(svgRef.current, {
-      bounds: frameBounds,
-      dark: isDarkUi(theme),
-    });
-    if (!built) return;
-
-    downloadFile({
-      fileName: `${title || "mindmap"}-思维导图.svg`,
-      data: built.svg,
-      mime: "image/svg+xml;charset=utf-8",
-    });
-  }, [layout, title, theme]);
-
-  /**
-   * Print the map, which is also how a PDF comes out of it.
-   *
-   * The application already owns this path — a print stylesheet and the main
-   * process's `printToPdf` — so a map does not need a converter of its own, and
-   * asking the operating system for a PDF costs no dependency. Landscape is
-   * asked for because a map is wider than it is tall; the reader can still change
-   * it in the dialog.
-   *
-   * The view box the page is drawn with is swapped in by the effect above, on the
-   * event Electron fires while printing — the same event a browser fires for
-   * Ctrl+P, which is the fallback when there is no bridge.
-   */
-  const handlePrintPdf = useCallback(() => {
-    const bridge =
-      typeof window !== "undefined" ? (window.knowSpaceDesktop ?? window.bookMDDesktop) : undefined;
-
-    if (bridge?.printToPdf) {
-      void bridge.printToPdf({ title: `${title || "mindmap"}-思维导图`, landscape: true });
-      return;
-    }
-    window.print();
-  }, [title]);
-
-  const handleExportOpml = useCallback(() => {
-    downloadFile({
-      fileName: `${title || "mindmap"}.opml`,
-      data: exportMindmapToOpml(tree, title, sidecar),
-      mime: "text/x-opml+xml;charset=utf-8",
-    });
-  }, [tree, title, sidecar]);
-
-  const handleExportFreeMind = useCallback(() => {
-    // Collapsed state lives here, not on the tree, so the exporter has to be
-    // told about it — without this the FOLDED attribute was never written.
-    downloadFile({
-      fileName: `${title || "mindmap"}.mm`,
-      data: exportMindmapToFreeMind(tree, collapsedIds, sidecar),
-      mime: "application/x-freemind;charset=utf-8",
-    });
-  }, [tree, title, collapsedIds, sidecar]);
-
-  /**
-   * The map as an `.xmind` file, which is also the one export the app can read.
-   *
-   * Bytes rather than text, because the format is a ZIP: the same download the
-   * other exports use, with a different type on the blob. Everything the companion
-   * file holds that XMind has a counterpart for goes with it — the tree alone would
-   * be the smaller half of the map.
-   */
-  const handleExportXmind = useCallback(() => {
-    downloadFile({
-      fileName: `${title || "mindmap"}.xmind`,
-      data: exportMindmapToXmind(tree, { sidecar, sheetTitle: tree.text || title }),
-      mime: "application/zip",
-    });
-  }, [tree, sidecar, title]);
-
-  const handleExportMarkdownOutline = useCallback(() => {
-    downloadFile({
-      fileName: `${title || "mindmap"}-outline.md`,
-      data: exportMindmapToMarkdownOutline(tree),
-      mime: "text/markdown;charset=utf-8",
-    });
-  }, [tree, title]);
+  // The seven ways a map leaves the app — PNG, SVG, print/PDF, OPML, FreeMind,
+  // XMind and the Markdown outline. Extracted to useMindmapExport (batch 3,
+  // wave 2a); isDarkUi went with it, as the image exports' only reader.
+  const {
+    handleExportPng,
+    handleExportSvg,
+    handlePrintPdf,
+    handleExportOpml,
+    handleExportFreeMind,
+    handleExportXmind,
+    handleExportMarkdownOutline,
+  } = useMindmapExport({ title, tree, theme, svgRef, layout, frameBounds, collapsedIds, sidecar });
 
   const editingNode = useMemo(() => {
     if (!editingNodeId) return null;
@@ -2178,27 +1689,6 @@ export const MindmapView = memo(function MindmapView({
     },
     [primarySelectedId, tree.id],
   );
-
-  const [isSemiCompact, setIsSemiCompact] = useState(false);
-  const [isCompact, setIsCompact] = useState(false);
-  const [isNarrow, setIsNarrow] = useState(false);
-  const [isUltraNarrow, setIsUltraNarrow] = useState(false);
-
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const w = entry.contentRect.width;
-        setIsSemiCompact(w < 1220);
-        setIsCompact(w < 1000);
-        setIsNarrow(w < 820);
-        setIsUltraNarrow(w < 650);
-      }
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
 
   /**
    * The node the style panel describes and every annotation control writes to:
