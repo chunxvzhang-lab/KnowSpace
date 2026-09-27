@@ -1,11 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  type Dispatch,
-  type RefObject,
-  type SetStateAction,
-} from "react";
+import { useEffect, useRef, type Dispatch, type RefObject, type SetStateAction } from "react";
 import type { CanvasData, CanvasNode, CanvasViewport } from "../../types/canvasTypes";
 import {
   computeGridLayout,
@@ -14,7 +7,6 @@ import {
   resizeGridSpacing,
   resizeRingSpacing,
   syncLoopEdgeGeometry,
-  toggleChecklistInMarkdown,
 } from "../../services/canvasService";
 import {
   computeBoxSelectionEdgeHits,
@@ -30,8 +22,6 @@ import type { CanvasContextMenuState } from "./CanvasOverlayMenus";
  * nothing else moves alongside the dragged card.
  */
 const EMPTY_DRAG_MAP = new Map<string, { id: string; startX: number; startY: number }>();
-
-type AllChapters = Array<{ id: string; title: string; src: string; absolutePath?: string }>;
 
 /**
  * The pointer system of the canvas: the single pair of global mousemove /
@@ -78,9 +68,6 @@ type UseCanvasPointerParams = {
   rafConnectIdRef: RefObject<number | null>;
   latestConnectPosRef: RefObject<{ clientX: number; clientY: number } | null>;
   stepBendDragRef: RefObject<StepBendDragState | null>;
-  // ── card body activation ──────────────────────────────────────────────────
-  allChapters: AllChapters;
-  onOpenFile?: (filePath: string) => void;
   // ── background mousedown (the handler moved here from CanvasView, final
   //    trim wave) ────────────────────────────────────────────────────────────
   /** Render-current viewport — seeds the pan / slide-drag start coordinates. */
@@ -109,7 +96,6 @@ type UseCanvasPointerParams = {
    * closure, exactly like the inline CanvasView handler it moved from.
    */
   isPresentationMode: boolean;
-  showToast: (msg: string) => void;
 };
 
 export function useCanvasPointer({
@@ -144,10 +130,7 @@ export function useCanvasPointer({
   isBoxSelectMode,
   handleStartBoxSelection,
   selectedNodeIds,
-  allChapters,
-  onOpenFile,
   isPresentationMode,
-  showToast,
 }: UseCanvasPointerParams) {
   // Dragging card or canvas refs
   const isDraggingCanvasRef = useRef(false);
@@ -225,59 +208,6 @@ export function useCanvasPointer({
    * during a presentation.
    */
   const isPresentationModeAtMountRef = useRef(isPresentationMode);
-
-  // What a press on a rendered card body means: a link opens the note it names,
-  // a checkbox toggles its line. One handler for both, kept stable so the card
-  // body can be memoised (see CanvasCardMarkdown in CanvasView).
-  const handleCardBodyActivate = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      const target = e.target as HTMLElement | null;
-      const cardEl = target?.closest(".canvas-card-markdown") as HTMLElement | null;
-      if (!target || !cardEl) return;
-
-      // A rendered [[link]] goes to the note it names.
-      const link = target.closest("a[data-wikilink-target]") as HTMLAnchorElement | null;
-      if (link) {
-        e.stopPropagation();
-        const wanted = (link.getAttribute("data-wikilink-target") || "")
-          .replace(/\.md$/i, "")
-          .trim()
-          .toLowerCase();
-        const hit = allChapters.find((c) => {
-          const title = c.title.trim().toLowerCase();
-          const fileName = (c.src.split("/").pop() ?? "").replace(/\.md$/i, "").toLowerCase();
-          return title === wanted || fileName === wanted;
-        });
-        if (hit?.absolutePath && onOpenFile) {
-          onOpenFile(hit.absolutePath);
-          showToast(`已打开：${hit.title}`);
-        } else {
-          showToast(`找不到笔记：${link.getAttribute("data-wikilink-target")}`);
-        }
-        return;
-      }
-
-      // A checkbox flips its own line in the Markdown.
-      if (target.tagName === "INPUT" && (target as HTMLInputElement).type === "checkbox") {
-        e.stopPropagation();
-        const nodeId = cardEl.dataset.nodeId;
-        if (!nodeId) return;
-        const idx = Array.from(cardEl.querySelectorAll('input[type="checkbox"]')).indexOf(
-          target as HTMLInputElement,
-        );
-        if (idx === -1) return;
-        const live = latestDataRef.current;
-        const node = live.nodes.find((n) => n.id === nodeId);
-        if (!node || node.type !== "text") return;
-        const updatedText = toggleChecklistInMarkdown(node.text, idx);
-        pushHistory({
-          ...live,
-          nodes: live.nodes.map((n) => (n.id === nodeId ? { ...n, text: updatedText } : n)),
-        });
-      }
-    },
-    [allChapters, onOpenFile, pushHistory, showToast, latestDataRef],
-  );
 
   // Background drag to pan or start box selection — moved verbatim from
   // CanvasView (final trim wave). A plain per-render function, exactly like
@@ -1027,7 +957,6 @@ export function useCanvasPointer({
     canvasDragStartRef,
     /** Armed by the background mousedown for a hollow-middle group drag. */
     groupDragRef,
-    handleCardBodyActivate,
     handleMouseDownBackground,
   };
 }

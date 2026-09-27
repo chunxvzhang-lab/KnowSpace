@@ -66,6 +66,7 @@ function measure() {
   const asAny = [];
   const oversized = [];
   let totalLines = 0;
+  let maxLines = 0;
 
   for (const filePath of listSources(srcDir)) {
     const rel = path.relative(root, filePath).replace(/\\/g, "/");
@@ -89,6 +90,7 @@ function measure() {
 
     const lines = countLines(filePath);
     totalLines += lines;
+    if (lines > maxLines) maxLines = lines;
     if (lines > 1000) oversized.push({ file: rel, lines });
   }
 
@@ -98,7 +100,11 @@ function measure() {
     "colon-any": colonAny.length,
     "as-any": asAny.length,
     "files-over-1000-lines": oversized.length,
-    "max-file-lines": oversized.length ? oversized[0].lines : 0,
+    // The largest file overall, not just among the >1000 list: with the list
+    // empty the previous version recorded 0, and `--check` would then reject
+    // every non-empty file. The metric's job is a floor the codebase may not
+    // grow past, so it must be the real maximum.
+    "max-file-lines": maxLines,
     "src-lines": totalLines,
     _detail: { colonAny, asAny, oversized },
   };

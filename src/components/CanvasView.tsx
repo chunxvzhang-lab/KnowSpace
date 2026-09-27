@@ -15,6 +15,7 @@ import { useCanvasSelection } from "./canvas/useCanvasSelection";
 import { useCanvasNodeDrag } from "./canvas/useCanvasNodeDrag";
 import { useCanvasConnect } from "./canvas/useCanvasConnect";
 import { useCanvasPointer } from "./canvas/useCanvasPointer";
+import { useCanvasCardBodyActivation } from "./canvas/useCanvasCardBodyActivation";
 // Node CRUD, edge mutations and media/clipboard IO domains, extracted during
 // the wave-5 CanvasView decomposition.
 import { useCanvasNodeOps } from "./canvas/useCanvasNodeOps";
@@ -373,7 +374,7 @@ export const CanvasView = memo(function CanvasView({
   // the shared rAF-throttling refs (extracted hook). The background-mousedown
   // handler (pan / box-select / group grab / presentation tap) moved there too
   // in the final trim wave — it arms exactly the drag refs that hook owns.
-  const { handleCardBodyActivate, handleMouseDownBackground } = useCanvasPointer({
+  const { handleMouseDownBackground } = useCanvasPointer({
     containerRef,
     latestDataRef,
     setData,
@@ -396,10 +397,7 @@ export const CanvasView = memo(function CanvasView({
     rafConnectIdRef,
     latestConnectPosRef,
     stepBendDragRef,
-    allChapters,
-    onOpenFile,
     isPresentationMode,
-    showToast,
     // Background-mousedown inputs (final trim wave):
     setContextMenu,
     editingNodeIdRef,
@@ -410,6 +408,17 @@ export const CanvasView = memo(function CanvasView({
     selectedNodeIds,
     showSlideDrawer,
     setShowSlideDrawer,
+  });
+
+  // What a press on a rendered card body means — wikilink open + checkbox
+  // toggle. Its own hook since the final trim wave (it was in useCanvasPointer,
+  // which multiplexes drags; this belongs to the card, not the drag system).
+  const { handleCardBodyActivate } = useCanvasCardBodyActivation({
+    allChapters,
+    onOpenFile,
+    latestDataRef,
+    pushHistory,
+    showToast,
   });
 
   // Node CRUD / arrangement domain: card, group and clipboard-text operations
