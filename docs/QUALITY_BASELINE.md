@@ -15,9 +15,9 @@
 | :--- | ---: | :--- |
 | `colon-any` | 30 | 只减不增（`: any`，含 `any[]`；不含 `Array<any>` 泛型） |
 | `as-any` | 10 | 只减不增（`as any`） |
-| `files-over-1000-lines` | 8 | 只减不增（src 非测试代码，> 1000 行） |
+| `files-over-1000-lines` | 7 | 只减不增（src 非测试代码，> 1000 行） |
 | `max-file-lines` | 1350 | 只减不增（最大单文件行数） |
-| `src-lines` | 64954 | 记录趋势，不设闸 |
+| `src-lines` | 65340 | 记录趋势，不设闸 |
 | `test-cases` | 见 `TEST_BASELINE.md` | 只增不减——由测试基线守护，本文件不重复设闸 |
 
 ---
@@ -31,7 +31,6 @@
 | `src/components/FlashCapsule.tsx` | 1176 |
 | `src/App.tsx` | 1148 |
 | `src/components/EditorContextMenu.tsx` | 1095 |
-| `src/components/GraphViewPane.tsx` | 1075 |
 | `src/components/CanvasView.tsx` | 1054 |
 | `src/components/AboutDialog.tsx` | 1048 |
 
@@ -56,14 +55,14 @@
 | `src/components/GlobalGraphDialog.tsx:512` | `: any) => Boolean(e.data("isCrossFolder"` |
 | `src/components/GlobalGraphDialog.tsx:586` | `: any) => {` |
 | `src/components/GlobalGraphDialog.tsx:607` | `: any) => Boolean(e.data("isCrossFolder"` |
-| `src/components/GraphViewPane.tsx:263` | `: any) => {` |
-| `src/components/GraphViewPane.tsx:267` | `: any) => {` |
-| `src/components/GraphViewPane.tsx:271` | `: any) => {` |
-| `src/components/GraphViewPane.tsx:407` | `: any) => positions.get(node.data("id"))` |
-| `src/components/GraphViewPane.tsx:481` | `: any) => Boolean(e.data("isCrossFolder"` |
-| `src/components/GraphViewPane.tsx:562` | `: any) => Boolean(e.data("isCrossFolder"` |
-| `src/components/GraphViewPane.tsx:659` | `: any) => {` |
-| `src/components/GraphViewPane.tsx:680` | `: any) =>` |
+| `src/components/graph/graphCytoscapeStyle.ts:66` | `: any) => {` |
+| `src/components/graph/graphCytoscapeStyle.ts:70` | `: any) => {` |
+| `src/components/graph/graphCytoscapeStyle.ts:74` | `: any) => {` |
+| `src/components/graph/useCytoscapeGraph.ts:176` | `: any) => positions.get(node.data("id"))` |
+| `src/components/graph/useCytoscapeGraph.ts:250` | `: any) => Boolean(e.data("isCrossFolder"` |
+| `src/components/graph/useCytoscapeGraph.ts:331` | `: any) => Boolean(e.data("isCrossFolder"` |
+| `src/components/graph/useCytoscapeGraph.ts:449` | `: any) => {` |
+| `src/components/graph/useCytoscapeGraph.ts:470` | `: any) =>` |
 | `src/components/LocalGraphView.tsx:92` | `: any) => {` |
 | `src/components/LocalGraphView.tsx:96` | `: any) => {` |
 | `src/components/LocalGraphView.tsx:100` | `: any) => {` |
@@ -82,9 +81,9 @@
 | `src/components/GlobalGraphDialog.tsx:362` | `as any,` |
 | `src/components/GlobalGraphDialog.tsx:510` | `as any)` |
 | `src/components/GlobalGraphDialog.tsx:759` | `as any)}` |
-| `src/components/GraphViewPane.tsx:404` | `as any,` |
-| `src/components/GraphViewPane.tsx:408` | `as any,` |
-| `src/components/GraphViewPane.tsx:560` | `as any)` |
+| `src/components/graph/graphCytoscapeStyle.ts:207` | `as any;` |
+| `src/components/graph/useCytoscapeGraph.ts:177` | `as any,` |
+| `src/components/graph/useCytoscapeGraph.ts:329` | `as any)` |
 | `src/components/LocalGraphView.tsx:138` | `as any,` |
 | `src/components/LocalGraphView.tsx:146` | `as any,` |
 | `src/services/markdownPlugins.ts:88` | `as any)("block_anchor", "span", 0);` |
