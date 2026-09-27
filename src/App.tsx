@@ -1,36 +1,30 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { ActivityBar } from "./components/ActivityBar";
-import { ChapterList } from "./components/ChapterList";
 import { AppOverlays } from "./components/AppOverlays";
+import { AppShellChrome } from "./components/AppShellChrome";
 import { SidebarPanel } from "./components/SidebarPanel";
-import { StatusBar } from "./components/StatusBar";
 import { TabBar } from "./components/TabBar";
-import { Toolbar } from "./components/Toolbar";
 import { WorkspaceRouter } from "./components/WorkspaceRouter";
-import type { CommandAction } from "./components/CommandPalette";
 import type {
   BookManifest,
   Bookmark,
   ChapterSource,
   RenderedChapter,
   SearchResult,
-  SidebarTab,
-  ThemeMode,
 } from "./core/types";
 import { EditorView } from "@codemirror/view";
+import { useAppActions } from "./hooks/useAppActions";
+import { useAppCommands } from "./hooks/useAppCommands";
 import { useChapterLoading } from "./hooks/useChapterLoading";
 import { useChapterRename } from "./hooks/useChapterRename";
 import { useColumnResize } from "./hooks/useColumnResize";
+import { useDesktopBridgeSync } from "./hooks/useDesktopBridgeSync";
 import { useDocumentAuthoring } from "./hooks/useDocumentAuthoring";
 import { useDocumentCreation } from "./hooks/useDocumentCreation";
 import { useVaultOpening } from "./hooks/useVaultOpening";
 import { useSearch } from "./hooks/useSearch";
 import { useBacklinkIndex } from "./hooks/useBacklinkIndex";
 import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
-import { useCommandRegistrations } from "./hooks/useCommandRegistrations";
-import { commandBus } from "./services/commandBus";
-import { listPaletteCommands } from "./core/commands";
 import { useBookmarks } from "./hooks/useBookmarks";
 import { useDocumentSession } from "./hooks/useDocumentSession";
 import { useReadingPersistence } from "./hooks/useReadingPersistence";
@@ -67,7 +61,6 @@ export function App() {
   // and the search fields. Same aliasing as the earlier batches — `manifest`
   // alone is read in over a hundred places and not one of them changed.
   const manifest = useVaultStore((s) => s.manifest);
-  const setManifest = useVaultStore((s) => s.setManifest);
   const bookmarks = useVaultStore((s) => s.bookmarks);
   const persistBookmarks = useVaultStore((s) => s.persistBookmarks);
   const searchQuery = useVaultStore((s) => s.searchQuery);
@@ -121,13 +114,10 @@ export function App() {
   const directoryOpen = useUiStore((s) => s.directoryOpen);
   const sidebarTab = useUiStore((s) => s.sidebarTab);
   const isFullscreen = useUiStore((s) => s.isFullscreen);
-  const typewriterMode = useUiStore((s) => s.typewriterMode);
   const notice = useUiStore((s) => s.notice);
   const preferences = useUiStore((s) => s.preferences);
   const isGraphPaneOpen = useUiStore((s) => s.isGraphPaneOpen);
   const isReviewFocus = useUiStore((s) => s.isReviewFocus);
-  const directoryWidth = useUiStore((s) => s.directoryWidth);
-  const resizingType = useUiStore((s) => s.resizingType);
 
   const setSidebarOpen = useUiStore((s) => s.setSidebarOpen);
   const setDirectoryOpen = useUiStore((s) => s.setDirectoryOpen);
@@ -135,54 +125,16 @@ export function App() {
   // The store calls this one setFullscreen; the local alias keeps the existing
   // call sites reading naturally.
   const setIsFullscreen = useUiStore((s) => s.setFullscreen);
-  const setTypewriterMode = useUiStore((s) => s.setTypewriterMode);
   const setNotice = useUiStore((s) => s.setNotice);
-  const setPreferences = useUiStore((s) => s.setPreferences);
-  const patchPreferences = useUiStore((s) => s.patchPreferences);
-  const setAboutOpen = useUiStore((s) => s.setAboutOpen);
-  const setCommandPaletteOpen = useUiStore((s) => s.setCommandPaletteOpen);
-  const setVersionHistoryOpen = useUiStore((s) => s.setVersionHistoryOpen);
   const setIsGraphPaneOpen = useUiStore((s) => s.setGraphPaneOpen);
-  const setReviewFocus = useUiStore((s) => s.setReviewFocus);
-  // The width setters and persistLayout moved into useColumnResize along with
-  // the drag that drives them. The widths themselves are still subscribed here
-  // because the resizers and panels render them.
+  // The chrome-side setters (themes, about, palette, history, typewriter,
+  // preferences) and the pane widths the chrome renders are no longer aliased
+  // here: AppShellChrome, useAppCommands and useAppActions read the same store
+  // fields directly.
 
   // Where the reader has scrolled to. Stays here because it describes the
   // rendered document, not the vault.
   const [activeHeadingId, setActiveHeadingId] = useState<string | undefined>();
-
-  const handleOpenCommandPalette = useCallback(() => {
-    setCommandPaletteOpen(true);
-  }, []);
-
-  // isGraphPaneOpen defaults to false in the store: the app launches on a pure
-  // document view and the graph pane is opened on demand.
-
-  const handleToggleGraphPane = useCallback(() => {
-    setIsGraphPaneOpen((prev) => !prev);
-  }, []);
-
-  const handleCloseGraphPane = useCallback(() => {
-    setIsGraphPaneOpen(false);
-  }, []);
-
-  /**
-   * Entering the flashcard review gets the workspace to itself.
-   *
-   * The document tree is collapsed on the way in because the review, the tree
-   * and the reader were all competing for the same width and the cards ended up
-   * squeezed. The reader is not unmounted, only collapsed by the shell's CSS, so
-   * returning from the review finds the document exactly as it was left —
-   * scroll position, editor state and all.
-   */
-  const handleReviewActiveChange = useCallback(
-    (active: boolean) => {
-      setReviewFocus(active);
-      if (active) setDirectoryOpen(false);
-    },
-    [setReviewFocus, setDirectoryOpen],
-  );
 
   // Pane widths and the "a divider is being dragged" flag come from the store,
   // which reads and writes the same localStorage keys as the initialisers that
@@ -230,7 +182,6 @@ export function App() {
    * rather than as a flag it might already be showing.
    */
   const reviewRequest = useReviewStore((s) => s.reviewRequest);
-  const requestReview = useReviewStore((s) => s.requestReview);
 
   /**
    * The open document as the review can use it, or null.
@@ -385,18 +336,10 @@ export function App() {
     });
   }, [activeChapter, ensureTab]);
 
-  // The store persists the flag when it changes, so this callback does not.
-  const toggleTypewriterMode = useCallback(() => {
-    setTypewriterMode((prev) => !prev);
-  }, [setTypewriterMode]);
-
-  const openMarkdownFile = useCallback(
-    (file: File) => {
-      guardAction({ type: "open-file", file });
-    },
-    [guardAction],
-  );
-
+  // The other guardAction wrappers (the open/create entry points) and the
+  // command bindings that consume them live in useAppCommands below. This one
+  // stays here because the ref that carries it into useWikiLinkNavigation and
+  // useGlobalShortcuts is created before those hooks are called.
   const openDesktopMarkdownPath = useCallback(
     (absolutePath: string, preloadedSource?: ChapterSource | null) => {
       if (samePath(session?.absolutePath, absolutePath)) {
@@ -406,22 +349,6 @@ export function App() {
     },
     [session?.absolutePath, guardAction],
   );
-
-  const openMarkdownDirectory = useCallback(() => {
-    guardAction({ type: "open-directory" });
-  }, [guardAction]);
-
-  const createNewFile = useCallback(() => {
-    guardAction({ type: "new-file" });
-  }, [guardAction]);
-
-  const createNewMindmap = useCallback(() => {
-    guardAction({ type: "new-mindmap" });
-  }, [guardAction]);
-
-  const createNewCanvas = useCallback(() => {
-    guardAction({ type: "new-canvas" });
-  }, [guardAction]);
 
   const openDesktopMarkdownPathRef = useRef(openDesktopMarkdownPath);
   const guardActionRef = useRef(guardAction);
@@ -482,24 +409,6 @@ export function App() {
     pendingBookmarkRef,
   });
 
-  const focusSearch = useCallback(() => {
-    setSidebarOpen(true);
-    setSidebarTab("search");
-    requestAnimationFrame(() => {
-      document.querySelector<HTMLInputElement>("[data-search-input]")?.focus();
-    });
-  }, []);
-
-  const goPrevious = useCallback(() => {
-    if (!manifest || activeIndex <= 0) return;
-    selectChapter(manifest.chapters[activeIndex - 1].id);
-  }, [activeIndex, manifest, selectChapter]);
-
-  const goNext = useCallback(() => {
-    if (!manifest || activeIndex < 0 || activeIndex >= manifest.chapters.length - 1) return;
-    selectChapter(manifest.chapters[activeIndex + 1].id);
-  }, [activeIndex, manifest, selectChapter]);
-
   // ── Reading-position persistence (R1 batch) ──────────────────────────────
   //
   // Saving the position as the reader settles, restoring it (or a queued
@@ -532,21 +441,6 @@ export function App() {
     onScrollIdle: saveCurrentReadingPosition,
     navLockUntilRef,
   });
-
-  const toggleFullscreen = useCallback(async () => {
-    if (window.bookMDDesktop?.system.toggleFullScreen) {
-      const next = await window.bookMDDesktop.system.toggleFullScreen();
-      setIsFullscreen(Boolean(next));
-    } else if (typeof document !== "undefined") {
-      if (!document.fullscreenElement) {
-        await document.documentElement.requestFullscreen?.().catch(() => {});
-        setIsFullscreen(true);
-      } else {
-        await document.exitFullscreen?.().catch(() => {});
-        setIsFullscreen(false);
-      }
-    }
-  }, []);
 
   // Sync fullscreen state
   useEffect(() => {
@@ -585,204 +479,69 @@ export function App() {
     setSecondaryRenderedChapter,
   });
 
-  // Apply the theme to the document and the native window frame.
+  // ── Preferences pushed to the main process (final trim) ──────────────────
   //
-  // Persisting preferences is no longer part of this effect — the store writes
-  // them when they change — so only the DOM and Electron side effects remain.
-  useEffect(() => {
-    document.documentElement.dataset.theme = preferences.theme;
-    window.bookMDDesktop?.system.setNativeTheme?.(preferences.theme);
-  }, [preferences]);
+  // Native window-frame theme and the hidden-files scan setting (with the
+  // re-listing that makes it visible at once) — see useDesktopBridgeSync.
+  useDesktopBridgeSync({ manifestRef });
 
-  /**
-   * Tells the main process whether hidden documents should be listed, and
-   * re-lists the open folder so the change is visible immediately.
-   *
-   * The preference is read in the main process, because that is where the
-   * directory is walked — so it has to be pushed rather than simply stored. And
-   * pushing it is only half the job: the tree already on screen was built under
-   * the old setting, and without the re-listing below, turning the option on
-   * would appear to do nothing until the reader happened to reopen the folder.
-   *
-   * Keyed on the preference alone. Depending on `manifest` would re-run this on
-   * every refresh, and the refresh itself changes the manifest — a loop.
-   */
-  useEffect(() => {
-    const desktop = window.bookMDDesktop;
-    desktop?.files.setScanOptions?.({ includeHidden: preferences.showHiddenFiles === true });
-
-    const rootPath = manifestRef.current?.rootPath;
-    if (!rootPath || !desktop?.files.refreshDirectory) return;
-
-    let cancelled = false;
-    void (async () => {
-      try {
-        const next = await desktop.files.refreshDirectory(rootPath);
-        if (!cancelled && next) setManifest(next);
-      } catch {
-        // A failed re-listing leaves the tree as it is. The setting is already
-        // stored, so the next open picks it up — no need to say anything.
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [preferences.showHiddenFiles, setManifest]);
-
-  const handlePrintDocument = useCallback(async () => {
-    if (renderPreviewNow) {
-      try {
-        await renderPreviewNow();
-      } catch {
-        // ignore
-      }
-    }
-    const desktop = typeof window !== "undefined" ? window.knowSpaceDesktop : undefined;
-    const title = activeChapter?.title || session?.fileName || "KnowSpace_文档";
-    if (desktop?.system.printToPdf) {
-      try {
-        await desktop.system.printToPdf({ title });
-      } catch (err) {
-        console.error("Print to PDF failed:", err);
-      }
-    } else {
-      window.print();
-    }
-  }, [activeChapter?.title, renderPreviewNow, session?.fileName]);
-
-  const handleExtractSelectionToNote = useCallback(
-    async (selectedText: string, suggestedTitle: string) => {
-      if (!session) return;
-      const desktop = typeof window !== "undefined" ? window.knowSpaceDesktop : undefined;
-      const cleanTitle = suggestedTitle.replace(/[\\/:*?"<>|]/g, "").trim() || "未命名笔记";
-
-      if (desktop?.files.createMarkdownFile && session.absolutePath) {
-        const parentDir = session.absolutePath.replace(/[\\/][^\\/]+$/, "");
-        try {
-          const res = await desktop.files.createMarkdownFile({
-            rootPath: parentDir,
-            defaultName: cleanTitle,
-            initialContent: `# ${cleanTitle}\n\n${selectedText}\n`,
-          });
-          if (res.canceled || !res.success) {
-            return;
-          }
-          if (manifest?.rootPath && desktop.files.refreshDirectory) {
-            const next = await desktop.files.refreshDirectory(manifest.rootPath);
-            setManifest(next);
-          }
-          const finalTitle = res.chapter?.title || cleanTitle;
-          if (editorViewRef.current) {
-            const sel = editorViewRef.current.state.selection.main;
-            editorViewRef.current.dispatch({
-              changes: { from: sel.from, to: sel.to, insert: `[[${finalTitle}]]` },
-              selection: { anchor: sel.from + finalTitle.length + 4 },
-            });
-          }
-        } catch (err) {
-          console.error("Failed to extract selection to note:", err);
-        }
-      } else if (editorViewRef.current) {
-        const sel = editorViewRef.current.state.selection.main;
-        editorViewRef.current.dispatch({
-          changes: { from: sel.from, to: sel.to, insert: `[[${cleanTitle}]]` },
-          selection: { anchor: sel.from + cleanTitle.length + 4 },
-        });
-      }
-    },
-    [manifest?.rootPath, session],
-  );
-
-  const handleSendSelectionToFlash = useCallback(async (text: string) => {
-    const desktop = typeof window !== "undefined" ? window.knowSpaceDesktop : undefined;
-    if (desktop?.capture.saveFlashNote && text.trim()) {
-      try {
-        await desktop.capture.saveFlashNote({
-          content: text.trim(),
-          tags: ["正文摘录"],
-        });
-      } catch (err) {
-        console.error("Failed to send selection to flash:", err);
-      }
-    }
-  }, []);
-
-  const handleToggleMindmap = useCallback(() => {
-    setViewMode((prev) => (prev === "mindmap" ? "split" : "mindmap"));
-  }, []);
-
-  const handleRevealInToc = useCallback(() => {
-    setSidebarTab("toc");
-    setSidebarOpen(true);
-  }, []);
-
-  // Commands: the registry in core/commands.ts is the single source of truth
-  // for WHAT commands exist; the bindings below wire each id to its handler
-  // exactly once. The palette `>` list, the keyboard and the Electron menu all
-  // execute through the bus — the same action can no longer be re-implemented
-  // per entry point (that duplication is how the mindmap toggle grew two
-  // verbatim copies and the typewriter toggle two divergent ones).
-  useCommandRegistrations({
-    "view.read": () => setViewMode("read"),
-    "view.split": () => setViewMode("split"),
-    "view.source": () => setViewMode("source"),
-    "view.toggleMindmap": () => setViewMode((m) => (m === "mindmap" ? "split" : "mindmap")),
-    "view.toggleCanvas": () =>
-      setViewMode((m) => {
-        const next = m === "canvas" ? "split" : "canvas";
-        if (next === "canvas") {
-          setDirectoryOpen(false);
-          setSidebarOpen(false);
-        }
-        return next;
-      }),
-    "view.toggleGraph": handleToggleGraphPane,
-    "view.toggleTypewriter": toggleTypewriterMode,
-    "review.start": () => {
-      // Opened rather than toggled: asking to start a review while the Space panel
-      // is already open on another tab should still open the review, which the
-      // sidebar's own toggle would not do.
-      setSidebarTab("space");
-      setSidebarOpen(true);
-      requestReview();
-    },
-    "document.print": handlePrintDocument,
-    "document.newFile": createNewFile,
-    "document.newCanvas": createNewCanvas,
-    "document.save": saveSession,
-    "document.saveAs": saveSessionAs,
-    // The toolbar hosts the real file input; opening a single file reuses it
-    // instead of building a second dialog path (pre-existing wiring, moved here
-    // from the keyboard handler so both entries share it).
-    "document.openFile": () =>
-      document.querySelector<HTMLInputElement>(".toolbar input[type='file']")?.click(),
-    "document.openDirectory": openMarkdownDirectory,
-    "document.addBookmark": addBookmark,
-    "navigation.focusSearch": focusSearch,
-    "navigation.previous": goPrevious,
-    "navigation.next": goNext,
-    "ui.openVersionHistory": () => setVersionHistoryOpen(true),
-    "navigation.toggleDirectory": () => setDirectoryOpen((open) => !open),
-    "ui.toggleFullscreen": toggleFullscreen,
-    "ui.themeTwitter": () => setPreferences((p) => ({ ...p, theme: "twitter" })),
-    "ui.themeLight": () => setPreferences((p) => ({ ...p, theme: "light" })),
-    "ui.themeEink": () => setPreferences((p) => ({ ...p, theme: "eink" })),
-    "ui.about": () => setAboutOpen(true),
+  // ── Document actions for the workspace and overlays (final trim) ──────────
+  //
+  // Print, extract-to-note, flash capture, mindmap toggle, TOC reveal, flash
+  // merge, review focus and history revert: the single-caller actions of the
+  // editing session that WorkspaceRouter, SidebarPanel and AppOverlays bind as
+  // props. The hook reads the stores it needs itself.
+  const {
+    handleReviewActiveChange,
+    handlePrintDocument,
+    handleExtractSelectionToNote,
+    handleSendSelectionToFlash,
+    handleToggleMindmap,
+    handleRevealInToc,
+    handleMergeFlashNote,
+    handleRevertToContent,
+  } = useAppActions({
+    session,
+    setViewMode,
+    updateSource,
+    renderPreviewNow,
+    saveSession,
+    activeChapter,
+    editorViewRef,
   });
 
-  const commandActions = useMemo<CommandAction[]>(
-    () =>
-      listPaletteCommands().map((d) => ({
-        id: d.id,
-        title: d.title,
-        description: d.description,
-        shortcut: d.shortcut,
-        category: d.category,
-        run: () => commandBus.execute(d.id),
-      })),
-    [],
-  );
+  // ── Command bindings and the guardAction wrappers (final trim) ────────────
+  //
+  // The 27 command ids bound once here, the open/create wrappers both the
+  // bindings and the chrome share, the palette action list, and the
+  // navigation/appearance callbacks the commands exist around (focus search,
+  // previous/next, fullscreen, typewriter, graph pane). focusSearch stays
+  // inside the hook — nothing outside the bindings uses it.
+  const {
+    handleOpenCommandPalette,
+    handleToggleGraphPane,
+    handleCloseGraphPane,
+    openMarkdownFile,
+    openMarkdownDirectory,
+    createNewFile,
+    createNewMindmap,
+    createNewCanvas,
+    goPrevious,
+    goNext,
+    toggleTypewriterMode,
+    toggleFullscreen,
+    commandActions,
+  } = useAppCommands({
+    guardAction,
+    setViewMode,
+    saveSession,
+    saveSessionAs,
+    addBookmark,
+    selectChapter,
+    manifest,
+    activeIndex,
+    handlePrintDocument,
+  });
 
   // Global keybindings
   // ── Desktop shell wiring and keyboard shortcuts (R1 batch B3b-6) ─────────
@@ -807,37 +566,6 @@ export function App() {
     }, 4500);
     return () => clearTimeout(timer);
   }, [notice]);
-
-  const handleSelectSidebarTab = useCallback(
-    (tab: SidebarTab) => {
-      if (sidebarOpen && sidebarTab === tab) {
-        setSidebarOpen(false);
-      } else {
-        setSidebarTab(tab);
-        setSidebarOpen(true);
-      }
-    },
-    [sidebarOpen, sidebarTab],
-  );
-
-  const handleMergeFlashNote = useCallback(
-    (content: string, fileName: string) => {
-      const formatted = `\n\n> 📥 来自闪念 [${fileName}]\n\n${content.trim()}\n\n`;
-      if (editorViewRef.current) {
-        const view = editorViewRef.current;
-        const selection = view.state.selection.main;
-        const insertPos =
-          selection.empty && selection.from > 0 ? selection.from : view.state.doc.length;
-        view.dispatch({
-          changes: { from: insertPos, to: insertPos, insert: formatted },
-          selection: { anchor: insertPos + formatted.length },
-        });
-      } else if (session) {
-        updateSource(session.source + formatted);
-      }
-    },
-    [session, updateSource],
-  );
 
   // Backlink Index & Mentions
   // backlinkIndex and the vault search index live in useVaultStore alongside the
@@ -876,244 +604,149 @@ export function App() {
     <div
       className={`app-shell theme-${preferences.theme} ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}${directoryOpen ? "" : " directory-closed"}${manifest ? "" : " empty-source"}${isFullscreen ? " is-fullscreen" : ""}${isCanvasFullscreen ? " is-canvas-fullscreen" : ""}${isDualSplitMode ? " is-dual-split-mode" : ""}${isReviewFocus ? " is-review-focus" : ""}`}
     >
-      {!isDualSplitMode && !isCanvasFullscreen && (
-        <ActivityBar
-          directoryOpen={directoryOpen}
-          onToggleDirectory={() => setDirectoryOpen((open) => !open)}
-          sidebarOpen={sidebarOpen}
-          activeSidebarTab={sidebarTab}
-          onSelectSidebarTab={handleSelectSidebarTab}
-          viewMode={viewMode}
-          onViewModeChange={setViewMode}
-          theme={preferences.theme}
-          onThemeChange={(theme: ThemeMode) => setPreferences((current) => ({ ...current, theme }))}
-          isFullscreen={isFullscreen}
-          onToggleFullscreen={toggleFullscreen}
-          onNewFile={window.bookMDDesktop ? createNewFile : undefined}
-          onOpenDirectory={window.bookMDDesktop ? openMarkdownDirectory : undefined}
-          onOpenAbout={() => setAboutOpen(true)}
-          isDirty={isDirty}
-          backlinksCount={currentLinkedReferences.length}
-          onOpenGlobalGraph={handleToggleGraphPane}
-          isGraphOpen={isGraphPaneOpen}
-          onOpenCommandPalette={handleOpenCommandPalette}
-        />
-      )}
-
-      <div className="main-viewport-container">
-        {!isDualSplitMode && !isCanvasFullscreen && (
-          <Toolbar
-            title={manifest?.title ?? "Markdown Viewer"}
-            chapterTitle={activeChapter?.title ?? "打开 Markdown 文件或目录"}
-            isDirty={isDirty}
-            viewMode={viewMode}
-            onViewModeChange={setViewMode}
-            canGoPrevious={activeIndex > 0}
-            canGoNext={Boolean(
-              manifest && activeIndex >= 0 && activeIndex < manifest.chapters.length - 1,
-            )}
-            sidebarOpen={sidebarOpen}
-            directoryOpen={directoryOpen}
+      {/* Shell chrome — dock, toolbar, directory, status bar. Everything the
+          stores own is read inside AppShellChrome; children are the workspace's
+          session-driven middle. */}
+      <AppShellChrome
+        session={session}
+        viewMode={viewMode}
+        setViewMode={setViewMode}
+        isDirty={isDirty}
+        isLargeDocument={isLargeDocument}
+        activeChapter={activeChapter}
+        activeIndex={activeIndex}
+        backlinksCount={currentLinkedReferences.length}
+        selectChapter={selectChapter}
+        handleRenameChapter={handleRenameChapter}
+        handleImportOutline={handleImportOutline}
+        createNewFile={createNewFile}
+        createNewMindmap={createNewMindmap}
+        createNewCanvas={createNewCanvas}
+        openMarkdownFile={openMarkdownFile}
+        openMarkdownDirectory={openMarkdownDirectory}
+        toggleFullscreen={toggleFullscreen}
+        toggleTypewriterMode={toggleTypewriterMode}
+        goPrevious={goPrevious}
+        goNext={goNext}
+        addBookmark={addBookmark}
+        saveSession={saveSession}
+        handlePrintDocument={handlePrintDocument}
+        handleToggleGraphPane={handleToggleGraphPane}
+        handleOpenCommandPalette={handleOpenCommandPalette}
+        handleDirResizeMouseDown={handleDirResizeMouseDown}
+        handleDirDoubleClick={handleDirDoubleClick}
+      >
+        {!isDualSplitMode &&
+        !isCanvasFullscreen &&
+        sidebarOpen &&
+        (manifest || sidebarTab === "space") ? (
+          <SidebarPanel
+            manifest={manifest}
+            session={session}
+            renderedChapter={renderedChapter}
+            activeHeadingId={activeHeadingId}
+            bookmarkedHeadingIds={bookmarkedHeadingIds}
+            jumpToHeading={jumpToHeading}
+            jumpBookmark={jumpBookmark}
+            bookmarks={bookmarks}
+            persistBookmarks={persistBookmarks}
+            searchQuery={searchQuery}
+            searchResults={searchResults}
+            activeSearchMatchId={activeSearchMatchId}
+            searchScope={searchScope}
+            onQueryChange={(q) => {
+              setSearchQuery(q);
+              setActiveSearchMatchId(null);
+              if (!q.trim()) {
+                clearSearchHighlights();
+              }
+            }}
+            onScopeChange={setSearchScope}
+            handleSearchJump={handleSearchJump}
+            reviewableDocument={reviewableDocument}
+            openReviewRequest={reviewRequest}
+            onOpenNoteFile={(filePath) => openDesktopMarkdownPathRef.current?.(filePath)}
+            handleReviewActiveChange={handleReviewActiveChange}
+            handleMergeFlashNote={handleMergeFlashNote}
+            handleSidebarResizeMouseDown={handleSidebarResizeMouseDown}
+            handleSidebarDoubleClick={handleSidebarDoubleClick}
+            backlinks={{
+              currentDocTitle,
+              currentLinkedReferences,
+              currentUnlinkedMentions,
+              handleJumpToBacklink,
+              handleConvertMention,
+              graphData,
+            }}
             theme={preferences.theme}
-            fontScale={preferences.fontScale}
-            showLineNumbers={preferences.showLineNumbers}
-            onToggleLineNumbers={() =>
-              patchPreferences({ showLineNumbers: !preferences.showLineNumbers })
-            }
-            showHiddenFiles={preferences.showHiddenFiles}
-            hasDirectory={Boolean(manifest?.rootPath)}
-            onToggleHiddenFiles={() =>
-              patchPreferences({ showHiddenFiles: !preferences.showHiddenFiles })
-            }
-            typewriterMode={typewriterMode}
-            onToggleTypewriterMode={toggleTypewriterMode}
-            isFullscreen={isFullscreen}
-            onToggleFullscreen={toggleFullscreen}
-            onPrevious={goPrevious}
-            onNext={goNext}
-            onToggleSidebar={() => setSidebarOpen((open) => !open)}
-            onToggleDirectory={() => setDirectoryOpen((open) => !open)}
-            onAddBookmark={addBookmark}
-            onNewFile={window.bookMDDesktop ? createNewFile : undefined}
-            onSave={() => saveSession()}
-            canSave={Boolean(session?.writable)}
-            onOpenMarkdown={openMarkdownFile}
-            onOpenDirectory={window.bookMDDesktop ? openMarkdownDirectory : undefined}
-            onFontScaleChange={(fontScale) => patchPreferences({ fontScale })}
-            onPrint={handlePrintDocument}
-            onOpenCommandPalette={handleOpenCommandPalette}
-            onOpenVersionHistory={() => setVersionHistoryOpen(true)}
+            onOpenGlobalGraph={() => setIsGraphPaneOpen(true)}
           />
-        )}
+        ) : null}
 
-        <div className="workspace">
-          {!isDualSplitMode && !isCanvasFullscreen && directoryOpen ? (
-            manifest ? (
-              <div
-                style={{ width: directoryWidth, flex: `0 0 ${directoryWidth}px` }}
-                className="chapter-list-container"
-              >
-                <ChapterList
-                  manifest={manifest}
-                  activeChapterId={chapterId}
-                  isDirty={isDirty}
-                  onSelectChapter={selectChapter}
-                  onRenameChapter={handleRenameChapter}
-                  onNewMindmap={window.bookMDDesktop ? createNewMindmap : undefined}
-                  onNewCanvas={window.bookMDDesktop ? createNewCanvas : undefined}
-                  onImportOutline={
-                    window.bookMDDesktop?.files.pickOutlineFile ? handleImportOutline : undefined
-                  }
-                />
-              </div>
-            ) : (
-              <aside
-                className="chapter-list empty-library"
-                style={{ width: directoryWidth, flex: `0 0 ${directoryWidth}px` }}
-                aria-label="文档目录"
-              >
-                <div className="tree-heading">DOCUMENT</div>
-                <p>打开一个 Markdown 文件，新建文件，或在桌面版中打开文件目录。</p>
-              </aside>
-            )
-          ) : null}
-
-          {!isDualSplitMode && !isCanvasFullscreen && directoryOpen && (
-            <div
-              className={`layout-resizer ${resizingType === "dir" ? "is-active" : ""}`}
-              onMouseDown={handleDirResizeMouseDown}
-              onDoubleClick={handleDirDoubleClick}
-              role="separator"
-              aria-orientation="vertical"
-              title="拖拽调整文档目录栏宽度（双击自适应最佳宽度）"
+        <section className="reader-frame">
+          {!isCanvasFullscreen && tabs.length > 0 && (
+            <TabBar
+              tabs={tabsForDisplay}
+              activeTabId={chapterId}
+              dualSplitTabId={dualSplitTabId}
+              onSelectTab={selectChapter}
+              onCloseTab={handleCloseTab}
+              onCloseOtherTabs={handleCloseOtherTabs}
+              onCloseRightTabs={handleCloseRightTabs}
+              onOpenDualSplit={handleOpenDualSplit}
+              onCloseDualSplit={handleCloseDualSplit}
+              onDetachTab={handleDetachTab}
+              isGraphPaneOpen={isGraphPaneOpen}
+              onToggleGraphPane={handleToggleGraphPane}
             />
           )}
-
-          {!isDualSplitMode &&
-          !isCanvasFullscreen &&
-          sidebarOpen &&
-          (manifest || sidebarTab === "space") ? (
-            <SidebarPanel
-              manifest={manifest}
-              session={session}
-              renderedChapter={renderedChapter}
-              activeHeadingId={activeHeadingId}
-              bookmarkedHeadingIds={bookmarkedHeadingIds}
-              jumpToHeading={jumpToHeading}
-              jumpBookmark={jumpBookmark}
-              bookmarks={bookmarks}
-              persistBookmarks={persistBookmarks}
-              searchQuery={searchQuery}
-              searchResults={searchResults}
-              activeSearchMatchId={activeSearchMatchId}
-              searchScope={searchScope}
-              onQueryChange={(q) => {
-                setSearchQuery(q);
-                setActiveSearchMatchId(null);
-                if (!q.trim()) {
-                  clearSearchHighlights();
-                }
-              }}
-              onScopeChange={setSearchScope}
-              handleSearchJump={handleSearchJump}
-              reviewableDocument={reviewableDocument}
-              openReviewRequest={reviewRequest}
-              onOpenNoteFile={(filePath) => openDesktopMarkdownPathRef.current?.(filePath)}
-              handleReviewActiveChange={handleReviewActiveChange}
-              handleMergeFlashNote={handleMergeFlashNote}
-              handleSidebarResizeMouseDown={handleSidebarResizeMouseDown}
-              handleSidebarDoubleClick={handleSidebarDoubleClick}
-              backlinks={{
-                currentDocTitle,
-                currentLinkedReferences,
-                currentUnlinkedMentions,
-                handleJumpToBacklink,
-                handleConvertMention,
-                graphData,
-              }}
-              theme={preferences.theme}
-              onOpenGlobalGraph={() => setIsGraphPaneOpen(true)}
-            />
-          ) : null}
-
-          <section className="reader-frame">
-            {!isCanvasFullscreen && tabs.length > 0 && (
-              <TabBar
-                tabs={tabsForDisplay}
-                activeTabId={chapterId}
-                dualSplitTabId={dualSplitTabId}
-                onSelectTab={selectChapter}
-                onCloseTab={handleCloseTab}
-                onCloseOtherTabs={handleCloseOtherTabs}
-                onCloseRightTabs={handleCloseRightTabs}
-                onOpenDualSplit={handleOpenDualSplit}
-                onCloseDualSplit={handleCloseDualSplit}
-                onDetachTab={handleDetachTab}
-                isGraphPaneOpen={isGraphPaneOpen}
-                onToggleGraphPane={handleToggleGraphPane}
-              />
-            )}
-            <WorkspaceRouter
-              session={session}
-              activeChapter={activeChapter}
-              renderedChapter={renderedChapter}
-              secondaryRenderedChapter={secondaryRenderedChapter}
-              viewMode={viewMode}
-              isDirty={isDirty}
-              isSaving={isSaving}
-              isLargeDocument={isLargeDocument}
-              autoPreviewPaused={autoPreviewPaused}
-              isDualSplitMode={isDualSplitMode}
-              readerRef={readerRef}
-              secondaryReaderRef={secondaryReaderRef}
-              editorViewRef={editorViewRef}
-              navLockUntilRef={navLockUntilRef}
-              updateSource={updateSource}
-              renderPreviewNow={renderPreviewNow}
-              saveSession={saveSession}
-              setViewMode={setViewMode}
-              toggleFullscreen={toggleFullscreen}
-              isFullscreen={isFullscreen}
-              handleCloseDualSplit={handleCloseDualSplit}
-              handlePrintDocument={handlePrintDocument}
-              handleExtractSelectionToNote={handleExtractSelectionToNote}
-              handleSendSelectionToFlash={handleSendSelectionToFlash}
-              handleCreateCanvasExtractNote={handleCreateCanvasExtractNote}
-              handleWikiLinkClick={handleWikiLinkClick}
-              handleJumpToBacklink={handleJumpToBacklink}
-              handleToggleMindmap={handleToggleMindmap}
-              handleRevealInToc={handleRevealInToc}
-              handleOpenBacklinks={() => {
-                setSidebarTab("backlinks");
-                setSidebarOpen(true);
-              }}
-              wikiLinkTargets={wikiLinkTargets}
-              backlinksCount={currentLinkedReferences.length}
-              graph={{ graphData, currentActiveId }}
-              handleCloseGraphPane={handleCloseGraphPane}
-              onOpenDesktopMarkdownPath={(p) => openDesktopMarkdownPathRef.current?.(p)}
-              jumpToHeading={jumpToHeading}
-              createNewFile={createNewFile}
-              createNewMindmap={createNewMindmap}
-              createNewCanvas={createNewCanvas}
-              openMarkdownDirectory={openMarkdownDirectory}
-            />
-          </section>
-        </div>
-
-        {!isCanvasFullscreen && (
-          <StatusBar
-            fileName={session?.fileName}
-            chapterTitle={activeChapter?.title}
-            source={session?.source}
-            isDirty={isDirty}
-            writable={session?.writable}
-            lineEnding={session?.lineEnding}
+          <WorkspaceRouter
+            session={session}
+            activeChapter={activeChapter}
+            renderedChapter={renderedChapter}
+            secondaryRenderedChapter={secondaryRenderedChapter}
             viewMode={viewMode}
+            isDirty={isDirty}
+            isSaving={isSaving}
             isLargeDocument={isLargeDocument}
+            autoPreviewPaused={autoPreviewPaused}
+            isDualSplitMode={isDualSplitMode}
+            readerRef={readerRef}
+            secondaryReaderRef={secondaryReaderRef}
+            editorViewRef={editorViewRef}
+            navLockUntilRef={navLockUntilRef}
+            updateSource={updateSource}
+            renderPreviewNow={renderPreviewNow}
+            saveSession={saveSession}
+            setViewMode={setViewMode}
+            toggleFullscreen={toggleFullscreen}
+            isFullscreen={isFullscreen}
+            handleCloseDualSplit={handleCloseDualSplit}
+            handlePrintDocument={handlePrintDocument}
+            handleExtractSelectionToNote={handleExtractSelectionToNote}
+            handleSendSelectionToFlash={handleSendSelectionToFlash}
+            handleCreateCanvasExtractNote={handleCreateCanvasExtractNote}
+            handleWikiLinkClick={handleWikiLinkClick}
+            handleJumpToBacklink={handleJumpToBacklink}
+            handleToggleMindmap={handleToggleMindmap}
+            handleRevealInToc={handleRevealInToc}
+            handleOpenBacklinks={() => {
+              setSidebarTab("backlinks");
+              setSidebarOpen(true);
+            }}
+            wikiLinkTargets={wikiLinkTargets}
+            backlinksCount={currentLinkedReferences.length}
+            graph={{ graphData, currentActiveId }}
+            handleCloseGraphPane={handleCloseGraphPane}
+            onOpenDesktopMarkdownPath={(p) => openDesktopMarkdownPathRef.current?.(p)}
+            jumpToHeading={jumpToHeading}
+            createNewFile={createNewFile}
+            createNewMindmap={createNewMindmap}
+            createNewCanvas={createNewCanvas}
+            openMarkdownDirectory={openMarkdownDirectory}
           />
-        )}
-      </div>
+        </section>
+      </AppShellChrome>
 
       {/* Floating surfaces — lightbox, guard dialogs, palette, history, about, toast.
           They read the lightbox, open flags, notice and preferences from the
@@ -1134,12 +767,7 @@ export function App() {
         onOverwrite={() => saveSession({ force: true })}
         onSaveAs={saveSessionAs}
         onClearConflict={clearConflict}
-        onRevertToContent={async (revertedContent) => {
-          updateSource(revertedContent);
-          await saveSession({ force: true });
-          setNotice("已成功从历史快照安全还原当前文档。");
-          return true;
-        }}
+        onRevertToContent={handleRevertToContent}
       />
     </div>
   );

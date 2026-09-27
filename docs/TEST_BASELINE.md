@@ -1,7 +1,7 @@
 # KnowSpace · 测试基线快照
 
 > **文档性质**：重构安全网的权威口径（release plan R3 交付物）
-> **生成时间**：2026-09-26
+> **生成时间**：2026-09-27
 > **应用版本**：`2.6.5`
 > **生成方式**：`node scripts/capture-test-baseline.cjs`（自动生成，请勿手工编辑）
 
@@ -12,8 +12,8 @@
 | 项目 | 数值 |
 | :--- | ---: |
 | 测试文件 | **113** |
-| 用例总数 | **1411** |
-| 通过 | 1410 |
+| 用例总数 | **1414** |
+| 通过 | 1413 |
 | 失败 | 0 |
 | 跳过 | 1 |
 | 通过率 | 99.9% |
@@ -46,12 +46,12 @@
 | `src/__tests__/search-index-service.test.ts` | 20 | ✅ |
 | `src/__tests__/column-resize.test.tsx` | 19 | ✅ |
 | `src/__tests__/vault-store.test.ts` | 19 | ✅ |
+| `src/__tests__/ipc-channel-contract.test.ts` | 16 | ✅ |
 | `src/__tests__/canvas-card-interactions.test.tsx` | 15 | ✅ |
 | `src/__tests__/mindmap-svg-export.test.tsx` | 15 | ✅ |
 | `src/__tests__/perf-regressions.test.ts` | 14 | ✅ |
 | `src/__tests__/table-generator.test.ts` | 14 | ✅ |
 | `src/__tests__/document-creation.test.ts` | 13 | ✅ |
-| `src/__tests__/ipc-channel-contract.test.ts` | 13 | ✅ |
 | `src/__tests__/mindmap-export-ecosystem.test.ts` | 13 | ✅ |
 | `src/__tests__/backlink-index-hook.test.ts` | 12 | ✅ |
 | `src/__tests__/mindmap-relations.test.ts` | 12 | ✅ |
@@ -149,15 +149,15 @@
 
 | 文件 | 当前行数 | 目标 |
 | :--- | ---: | :--- |
-| `src/components/CanvasView.tsx` | 7179 | R2 待拆分: 目标各模块 < 2500 行 |
-| `src/App.tsx` | 1151 | R1: < 500 行 |
-| `src/services/canvasGraph.ts` | 1150 | R2 已拆分 ✅ |
-| `src/services/canvasExport.ts` | 1123 | R2 已拆分 ✅ |
-| `src/services/canvasGeometry.ts` | 998 | R2 已拆分 ✅ |
+| `src/components/CanvasView.tsx` | 795 | R2 待拆分: 目标各模块 < 2500 行 |
+| `src/App.tsx` | 776 | R1: < 500 行 |
+| `src/services/canvasGraph.ts` | 26 | R2 已拆分 ✅ |
+| `src/services/canvasExport.ts` | 598 | R2 已拆分 ✅ |
+| `src/services/canvasGeometry.ts` | 126 | R2 已拆分 ✅ |
 | `src/services/canvasService.ts` | 120 | R2 门面（127 行）✅ |
-| `src/services/fsrsService.ts` | 1062 | F1 新增 · 观察项 |
-| `src/components/MindmapView.tsx` | 3586 | 观察项（已达标） |
-| `src/services/mindmapService.ts` | 1194 | 观察项 |
+| `src/services/fsrsService.ts` | 21 | F1 新增 · 观察项 |
+| `src/components/MindmapView.tsx` | 773 | 观察项（已达标） |
+| `src/services/mindmapService.ts` | 23 | 观察项 |
 
 ---
 
@@ -165,7 +165,7 @@
 
 任何重构都必须满足：
 
-1. 用例总数 **不低于 1411**（删除测试需在 PR 说明中论证）
+1. 用例总数 **不低于 1414**（删除测试需在 PR 说明中论证）
 2. 通过率 **100%**
 3. 单文件用例数**不得下降**（防止测试被静默删除）
 
