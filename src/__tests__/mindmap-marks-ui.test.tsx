@@ -37,8 +37,10 @@ function sidecarWithMarks(priority: number | null, progress: number | null): str
 
 function installBridge() {
   const api = {
-    readMindmapSidecar: vi.fn().mockResolvedValue({ success: true, exists: false }),
-    saveMindmapSidecar: vi.fn().mockResolvedValue({ success: true }),
+    files: {
+      readMindmapSidecar: vi.fn().mockResolvedValue({ success: true, exists: false }),
+      saveMindmapSidecar: vi.fn().mockResolvedValue({ success: true }),
+    },
   };
   (window as unknown as Record<string, unknown>).knowSpaceDesktop = api;
   return api;
@@ -54,7 +56,7 @@ const badges = () => document.querySelectorAll(".mindmap-priority-badge");
 const dials = () => document.querySelectorAll(".mindmap-node-progress");
 
 function lastWritten(api: ReturnType<typeof installBridge>) {
-  const call = api.saveMindmapSidecar.mock.calls.at(-1);
+  const call = api.files.saveMindmapSidecar.mock.calls.at(-1);
   return call ? parseSidecar(call[0].content as string) : null;
 }
 
@@ -76,7 +78,7 @@ describe("优先级与进度标记", () => {
 
   it("打开文档时读出两个标记，各画各的", async () => {
     const api = installBridge();
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: sidecarWithMarks(2, 5),
@@ -94,7 +96,7 @@ describe("优先级与进度标记", () => {
 
   it("只设优先级就不画表盘，只设进度就不画角标", async () => {
     const api = installBridge();
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: sidecarWithMarks(6, null),
@@ -105,7 +107,7 @@ describe("优先级与进度标记", () => {
     expect(dials().length).toBe(0);
     unmount();
 
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: sidecarWithMarks(null, 7),
@@ -158,30 +160,30 @@ describe("优先级与进度标记", () => {
     // it and quietly rewriting it would be this build deciding the reader's "12"
     // was really a "9".
     const api = installBridge();
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: JSON.stringify({ version: 1, markers: { [firstBranchId()]: { priority: 12 } } }),
     });
 
     render(<MindmapView title="测试" source={SOURCE} documentKey={DOC} />);
-    await waitFor(() => expect(api.readMindmapSidecar).toHaveBeenCalled());
+    await waitFor(() => expect(api.files.readMindmapSidecar).toHaveBeenCalled());
 
     expect(screen.getByText("父节点")).toBeTruthy();
     expect(marks().length).toBe(0);
-    expect(api.saveMindmapSidecar).not.toHaveBeenCalled();
+    expect(api.files.saveMindmapSidecar).not.toHaveBeenCalled();
   });
 
   it("伴生文件坏了：面板照常，两处都显示未设", async () => {
     const api = installBridge();
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: "坏掉的内容",
     });
 
     render(<MindmapView title="测试" source={SOURCE} documentKey={DOC} />);
-    await waitFor(() => expect(api.readMindmapSidecar).toHaveBeenCalled());
+    await waitFor(() => expect(api.files.readMindmapSidecar).toHaveBeenCalled());
 
     openPanelFor("父节点");
 

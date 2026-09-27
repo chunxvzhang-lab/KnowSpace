@@ -534,8 +534,8 @@ export function App() {
   });
 
   const toggleFullscreen = useCallback(async () => {
-    if (window.bookMDDesktop?.toggleFullScreen) {
-      const next = await window.bookMDDesktop.toggleFullScreen();
+    if (window.bookMDDesktop?.system.toggleFullScreen) {
+      const next = await window.bookMDDesktop.system.toggleFullScreen();
       setIsFullscreen(Boolean(next));
     } else if (typeof document !== "undefined") {
       if (!document.fullscreenElement) {
@@ -550,12 +550,12 @@ export function App() {
 
   // Sync fullscreen state
   useEffect(() => {
-    if (window.bookMDDesktop?.isFullScreen) {
-      window.bookMDDesktop.isFullScreen().then((full) => {
+    if (window.bookMDDesktop?.system.isFullScreen) {
+      window.bookMDDesktop.system.isFullScreen().then((full) => {
         setIsFullscreen(Boolean(full));
       });
     }
-    const unsubDesktop = window.bookMDDesktop?.onFullScreenChanged?.((full) => {
+    const unsubDesktop = window.bookMDDesktop?.system.onFullScreenChanged?.((full) => {
       setIsFullscreen(Boolean(full));
     });
     const handleDocFullscreenChange = () => {
@@ -591,7 +591,7 @@ export function App() {
   // them when they change — so only the DOM and Electron side effects remain.
   useEffect(() => {
     document.documentElement.dataset.theme = preferences.theme;
-    window.bookMDDesktop?.setNativeTheme?.(preferences.theme);
+    window.bookMDDesktop?.system.setNativeTheme?.(preferences.theme);
   }, [preferences]);
 
   /**
@@ -609,15 +609,15 @@ export function App() {
    */
   useEffect(() => {
     const desktop = window.bookMDDesktop;
-    desktop?.setScanOptions?.({ includeHidden: preferences.showHiddenFiles === true });
+    desktop?.files.setScanOptions?.({ includeHidden: preferences.showHiddenFiles === true });
 
     const rootPath = manifestRef.current?.rootPath;
-    if (!rootPath || !desktop?.refreshDirectory) return;
+    if (!rootPath || !desktop?.files.refreshDirectory) return;
 
     let cancelled = false;
     void (async () => {
       try {
-        const next = await desktop.refreshDirectory(rootPath);
+        const next = await desktop.files.refreshDirectory(rootPath);
         if (!cancelled && next) setManifest(next);
       } catch {
         // A failed re-listing leaves the tree as it is. The setting is already
@@ -638,12 +638,11 @@ export function App() {
         // ignore
       }
     }
-    const desktop =
-      typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
+    const desktop = typeof window !== "undefined" ? window.knowSpaceDesktop : undefined;
     const title = activeChapter?.title || session?.fileName || "KnowSpace_文档";
-    if (desktop?.printToPdf) {
+    if (desktop?.system.printToPdf) {
       try {
-        await desktop.printToPdf({ title });
+        await desktop.system.printToPdf({ title });
       } catch (err) {
         console.error("Print to PDF failed:", err);
       }
@@ -655,14 +654,13 @@ export function App() {
   const handleExtractSelectionToNote = useCallback(
     async (selectedText: string, suggestedTitle: string) => {
       if (!session) return;
-      const desktop =
-        typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
+      const desktop = typeof window !== "undefined" ? window.knowSpaceDesktop : undefined;
       const cleanTitle = suggestedTitle.replace(/[\\/:*?"<>|]/g, "").trim() || "未命名笔记";
 
-      if (desktop?.createMarkdownFile && session.absolutePath) {
+      if (desktop?.files.createMarkdownFile && session.absolutePath) {
         const parentDir = session.absolutePath.replace(/[\\/][^\\/]+$/, "");
         try {
-          const res = await desktop.createMarkdownFile({
+          const res = await desktop.files.createMarkdownFile({
             rootPath: parentDir,
             defaultName: cleanTitle,
             initialContent: `# ${cleanTitle}\n\n${selectedText}\n`,
@@ -670,8 +668,8 @@ export function App() {
           if (res.canceled || !res.success) {
             return;
           }
-          if (manifest?.rootPath && desktop.refreshDirectory) {
-            const next = await desktop.refreshDirectory(manifest.rootPath);
+          if (manifest?.rootPath && desktop.files.refreshDirectory) {
+            const next = await desktop.files.refreshDirectory(manifest.rootPath);
             setManifest(next);
           }
           const finalTitle = res.chapter?.title || cleanTitle;
@@ -697,11 +695,10 @@ export function App() {
   );
 
   const handleSendSelectionToFlash = useCallback(async (text: string) => {
-    const desktop =
-      typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
-    if (desktop?.saveFlashNote && text.trim()) {
+    const desktop = typeof window !== "undefined" ? window.knowSpaceDesktop : undefined;
+    if (desktop?.capture.saveFlashNote && text.trim()) {
       try {
-        await desktop.saveFlashNote({
+        await desktop.capture.saveFlashNote({
           content: text.trim(),
           tags: ["正文摘录"],
         });
@@ -965,7 +962,7 @@ export function App() {
                   onNewMindmap={window.bookMDDesktop ? createNewMindmap : undefined}
                   onNewCanvas={window.bookMDDesktop ? createNewCanvas : undefined}
                   onImportOutline={
-                    window.bookMDDesktop?.pickOutlineFile ? handleImportOutline : undefined
+                    window.bookMDDesktop?.files.pickOutlineFile ? handleImportOutline : undefined
                   }
                 />
               </div>

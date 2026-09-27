@@ -58,15 +58,15 @@ export function useDocumentCreation({
 
     try {
       const rootPath = manifest?.rootPath;
-      const result = await window.bookMDDesktop.createMarkdownFile({ rootPath });
+      const result = await window.bookMDDesktop.files.createMarkdownFile({ rootPath });
       if (result.canceled || !result.success) {
         if (!result.canceled && result.message) setNotice(result.message);
         return;
       }
 
       let nextManifest = manifest;
-      if (rootPath && window.bookMDDesktop.refreshDirectory) {
-        nextManifest = await window.bookMDDesktop.refreshDirectory(rootPath);
+      if (rootPath && window.bookMDDesktop.files.refreshDirectory) {
+        nextManifest = await window.bookMDDesktop.files.refreshDirectory(rootPath);
       } else {
         const newChapter = result.chapter;
         nextManifest = {
@@ -136,7 +136,7 @@ export function useDocumentCreation({
     try {
       const rootPath = manifest?.rootPath;
       const initialContent = `# 中心主题\n\n- 主要分支 1\n  - 子主题 1.1\n  - 子主题 1.2\n- 主要分支 2\n  - 子主题 2.1\n- 主要分支 3\n`;
-      const result = await window.bookMDDesktop.createMarkdownFile({
+      const result = await window.bookMDDesktop.files.createMarkdownFile({
         rootPath,
         defaultName: "新建思维导图.mindmap.md",
         initialContent,
@@ -147,8 +147,8 @@ export function useDocumentCreation({
       }
 
       let nextManifest = manifest;
-      if (rootPath && window.bookMDDesktop.refreshDirectory) {
-        nextManifest = await window.bookMDDesktop.refreshDirectory(rootPath);
+      if (rootPath && window.bookMDDesktop.files.refreshDirectory) {
+        nextManifest = await window.bookMDDesktop.files.refreshDirectory(rootPath);
       } else {
         const newChapter = result.chapter;
         nextManifest = {
@@ -217,7 +217,7 @@ export function useDocumentCreation({
     try {
       const rootPath = manifest?.rootPath;
       const initialContent = JSON.stringify(createDefaultCanvas(), null, 2);
-      const result = await window.bookMDDesktop.createMarkdownFile({
+      const result = await window.bookMDDesktop.files.createMarkdownFile({
         rootPath,
         defaultName: "新建空间白板.canvas",
         initialContent,
@@ -228,8 +228,8 @@ export function useDocumentCreation({
       }
 
       let nextManifest = manifest;
-      if (rootPath && window.bookMDDesktop.refreshDirectory) {
-        nextManifest = await window.bookMDDesktop.refreshDirectory(rootPath);
+      if (rootPath && window.bookMDDesktop.files.refreshDirectory) {
+        nextManifest = await window.bookMDDesktop.files.refreshDirectory(rootPath);
       } else {
         const newChapter = result.chapter;
         nextManifest = {

@@ -202,11 +202,8 @@ export const MindmapView = memo(function MindmapView({
       if (!link) return;
 
       if (link.kind === "external") {
-        const bridge =
-          typeof window !== "undefined"
-            ? (window.knowSpaceDesktop ?? window.bookMDDesktop)
-            : undefined;
-        void bridge?.openExternal?.(link.target);
+        const bridge = typeof window !== "undefined" ? window.knowSpaceDesktop : undefined;
+        void bridge?.system.openExternal?.(link.target);
         return;
       }
 

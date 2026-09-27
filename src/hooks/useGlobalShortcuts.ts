@@ -78,12 +78,12 @@ export function useGlobalShortcuts({
     let cancelled = false;
 
     // 1. Fast path: check if synchronous launch data & pre-read source was injected during window creation
-    const syncData = window.bookMDDesktop.getInitialSyncData?.();
+    const syncData = window.bookMDDesktop.system.getInitialSyncData?.();
     if (syncData?.filePath && !initialHandledRef.current) {
       initialHandledRef.current = true;
       openDesktopMarkdownPathRef.current(syncData.filePath, syncData.source);
     } else {
-      window.bookMDDesktop
+      window.bookMDDesktop.system
         .getLaunchFilePath()
         .then((filePath) => {
           if (!cancelled && filePath && !initialHandledRef.current) {
@@ -96,24 +96,24 @@ export function useGlobalShortcuts({
         });
     }
 
-    const unsubscribeOpen = window.bookMDDesktop.onOpenFilePath((filePath) => {
+    const unsubscribeOpen = window.bookMDDesktop.system.onOpenFilePath((filePath) => {
       openDesktopMarkdownPathRef.current(filePath);
     });
 
-    const unsubscribeMenu = window.bookMDDesktop.onMenuCommand?.((command) => {
+    const unsubscribeMenu = window.bookMDDesktop.system.onMenuCommand?.((command) => {
       // The menu speaks Electron ids; the bus speaks command ids. One mapping,
       // here — the handlers themselves are bound once in App.
       const commandId = MENU_COMMAND_TO_COMMAND_ID[command];
       if (commandId) commandBus.execute(commandId);
     });
 
-    const unsubscribeClose = window.bookMDDesktop.onBeforeClose?.(({ requestId }) => {
+    const unsubscribeClose = window.bookMDDesktop.system.onBeforeClose?.(({ requestId }) => {
       guardActionRef.current({ type: "close-window", requestId });
     });
 
-    const unsubscribeFlashNote = window.bookMDDesktop.onFlashNoteSaved?.(() => {
-      if (manifest?.rootPath && window.bookMDDesktop?.refreshDirectory) {
-        window.bookMDDesktop
+    const unsubscribeFlashNote = window.bookMDDesktop.capture.onFlashNoteSaved?.(() => {
+      if (manifest?.rootPath && window.bookMDDesktop?.files.refreshDirectory) {
+        window.bookMDDesktop.files
           .refreshDirectory(manifest.rootPath)
           .then((nextManifest) => {
             if (nextManifest) {

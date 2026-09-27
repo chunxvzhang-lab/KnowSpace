@@ -39,12 +39,14 @@ function nodeIdOf(text: string): string {
 
 function installBridge(content?: string) {
   const api = {
-    readMindmapSidecar: vi
-      .fn()
-      .mockResolvedValue(
-        content ? { success: true, exists: true, content } : { success: true, exists: false },
-      ),
-    saveMindmapSidecar: vi.fn().mockResolvedValue({ success: true }),
+    files: {
+      readMindmapSidecar: vi
+        .fn()
+        .mockResolvedValue(
+          content ? { success: true, exists: true, content } : { success: true, exists: false },
+        ),
+      saveMindmapSidecar: vi.fn().mockResolvedValue({ success: true }),
+    },
   };
   (window as unknown as Record<string, unknown>).knowSpaceDesktop = api;
   return api;
@@ -71,7 +73,7 @@ function rightClickLine() {
 }
 
 function lastWritten(api: ReturnType<typeof installBridge>) {
-  const call = api.saveMindmapSidecar.mock.calls.at(-1);
+  const call = api.files.saveMindmapSidecar.mock.calls.at(-1);
   return call ? parseSidecar(call[0].content as string) : null;
 }
 

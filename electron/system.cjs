@@ -32,6 +32,21 @@ const { getAppConfig, getAutoLaunch, saveAppConfig } = require("./shared.cjs");
  */
 
 function registerSystemHandlers(context) {
+  // Startup handshake: preload invokes this once per window with the bridge's
+  // API_VERSION literal (electron/preload.cjs). If it and the app version drift
+  // apart — one bumped without the other — every renderer warns at first
+  // launch instead of the contract silently desyncing. Returns the real app
+  // version so a future renderer-side check can compare without a new channel.
+  ipcMain.handle("bookmd:api-version", (_event, reportedVersion) => {
+    const appVersion = app.getVersion();
+    if (typeof reportedVersion === "string" && reportedVersion !== appVersion) {
+      console.warn(
+        `[bookmd] desktop bridge API version ${reportedVersion} != app version ${appVersion} — bump electron/preload.cjs API_VERSION together with package.json "version".`,
+      );
+    }
+    return appVersion;
+  });
+
   ipcMain.handle("bookmd:open-in-new-window", async (_event, absolutePath) => {
     if (typeof absolutePath !== "string" || !isValidMarkdownPath(absolutePath)) {
       throw new Error("无效的 Markdown 文件路径。");

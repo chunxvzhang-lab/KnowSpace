@@ -165,11 +165,10 @@ export function useMindmapExport({
    * Ctrl+P, which is the fallback when there is no bridge.
    */
   const handlePrintPdf = useCallback(() => {
-    const bridge =
-      typeof window !== "undefined" ? (window.knowSpaceDesktop ?? window.bookMDDesktop) : undefined;
+    const bridge = typeof window !== "undefined" ? window.knowSpaceDesktop : undefined;
 
-    if (bridge?.printToPdf) {
-      void bridge.printToPdf({ title: `${title || "mindmap"}-思维导图`, landscape: true });
+    if (bridge?.system.printToPdf) {
+      void bridge.system.printToPdf({ title: `${title || "mindmap"}-思维导图`, landscape: true });
       return;
     }
     window.print();

@@ -108,8 +108,8 @@ export const MediaLightbox = memo(function MediaLightbox({ media, onClose }: Med
           try {
             // 1. Direct high-DPI rasterization from the live rendered SVG in the active DOM
             const pngDataUrl = await rasterizeRenderedSvgToPng(svgElem, theme, 3);
-            if (window.bookMDDesktop?.savePngData) {
-              const res = await window.bookMDDesktop.savePngData({
+            if (window.bookMDDesktop?.media.savePngData) {
+              const res = await window.bookMDDesktop.media.savePngData({
                 dataUrl: pngDataUrl,
                 filename,
               });
@@ -126,8 +126,8 @@ export const MediaLightbox = memo(function MediaLightbox({ media, onClose }: Med
         }
 
         // 2. Fallback to offscreen capture if direct rasterization is not available
-        if (media.svgHtml && window.bookMDDesktop?.exportSvgAsPng) {
-          const res = await window.bookMDDesktop.exportSvgAsPng({
+        if (media.svgHtml && window.bookMDDesktop?.media.exportSvgAsPng) {
+          const res = await window.bookMDDesktop.media.exportSvgAsPng({
             svgHtml: media.svgHtml,
             theme,
             filename,

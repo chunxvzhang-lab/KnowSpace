@@ -15,9 +15,10 @@ const path = require("node:path");
 const root = path.resolve(__dirname, "..");
 const defaultTargets = ["src/App.tsx"];
 
-/** Matches `desktop.foo`, `desktop?.foo`, `window.knowSpaceDesktop.foo`, … */
+/** Matches the namespaced bridge calls: `desktop.files.openDirectory`,
+ * `window.knowSpaceDesktop?.system.setNativeTheme?.(...)`, … */
 const CALL_RE =
-  /(?:desktop|knowSpaceDesktop|bookMDDesktop)\??\s*\.\s*([A-Za-z_$][\w$]*)\s*(?:\?\.)?\(/g;
+  /(?:desktop|knowSpaceDesktop|bookMDDesktop)\??\s*\.\s*(?:files|history|media|system|capture)\??\s*\.\s*([A-Za-z_$][\w$]*)\s*(?:\?\.)?\(/g;
 
 function collect(file) {
   const text = fs.readFileSync(path.join(root, file), "utf8");

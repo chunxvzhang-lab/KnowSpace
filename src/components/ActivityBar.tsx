@@ -213,12 +213,9 @@ export function ActivityBar({
             type="button"
             className="activity-btn flash-notes-activity-btn"
             onClick={() => {
-              const desktop =
-                typeof window !== "undefined"
-                  ? window.knowSpaceDesktop || window.bookMDDesktop
-                  : undefined;
-              if (desktop?.openFlashCapsule) {
-                desktop.openFlashCapsule();
+              const desktop = typeof window !== "undefined" ? window.knowSpaceDesktop : undefined;
+              if (desktop?.capture.openFlashCapsule) {
+                desktop.capture.openFlashCapsule();
               }
             }}
             data-tooltip="闪念胶囊 (全局热键唤起)"

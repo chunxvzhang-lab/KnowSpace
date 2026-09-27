@@ -42,9 +42,13 @@ function sidecarWithLink(text: string, link: string): string {
 
 function installBridge() {
   const api = {
-    readMindmapSidecar: vi.fn().mockResolvedValue({ success: true, exists: false }),
-    saveMindmapSidecar: vi.fn().mockResolvedValue({ success: true }),
-    openExternal: vi.fn().mockResolvedValue(true),
+    files: {
+      readMindmapSidecar: vi.fn().mockResolvedValue({ success: true, exists: false }),
+      saveMindmapSidecar: vi.fn().mockResolvedValue({ success: true }),
+    },
+    system: {
+      openExternal: vi.fn().mockResolvedValue(true),
+    },
   };
   (window as unknown as Record<string, unknown>).knowSpaceDesktop = api;
   return api;
@@ -60,7 +64,7 @@ const linkField = () => document.querySelector(".mindmap-link-input") as HTMLInp
 const openButton = () => screen.queryByRole("button", { name: "打开" }) as HTMLButtonElement | null;
 
 function lastWritten(api: ReturnType<typeof installBridge>) {
-  const call = api.saveMindmapSidecar.mock.calls.at(-1);
+  const call = api.files.saveMindmapSidecar.mock.calls.at(-1);
   return call ? parseSidecar(call[0].content as string) : null;
 }
 
@@ -81,7 +85,7 @@ describe("节点链接", () => {
 
   it("外链：画布上有标记，面板说去哪儿，「打开」交给系统", async () => {
     const api = installBridge();
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: sidecarWithLink("父节点", "https://example.com/spec"),
@@ -97,14 +101,14 @@ describe("节点链接", () => {
 
     fireEvent.click(openButton()!);
 
-    expect(api.openExternal).toHaveBeenCalledWith("https://example.com/spec");
+    expect(api.system.openExternal).toHaveBeenCalledWith("https://example.com/spec");
   });
 
   it("本文档标题：走既有的跳转通道，并且真的找到了那个节点", async () => {
     vi.useFakeTimers();
     const api = installBridge();
     const onJumpToHeading = vi.fn();
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: sidecarWithLink("父节点", "#子节点甲"),
@@ -132,7 +136,7 @@ describe("节点链接", () => {
     vi.useFakeTimers();
     const api = installBridge();
     const onJumpToHeading = vi.fn();
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: sidecarWithLink("父节点", "#不存在的标题"),
@@ -158,7 +162,7 @@ describe("节点链接", () => {
     vi.useFakeTimers();
     const api = installBridge();
     const onWikiLinkClick = vi.fn();
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: sidecarWithLink("父节点", "[[产品设计#验收标准]]"),
@@ -185,7 +189,7 @@ describe("节点链接", () => {
   it("调用方没能打开另一篇文档时，「打开」是禁用的并说明原因", async () => {
     vi.useFakeTimers();
     const api = installBridge();
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: sidecarWithLink("父节点", "[[产品设计]]"),
@@ -222,7 +226,7 @@ describe("节点链接", () => {
   it("清除后标记消失，文件里也不再留着", async () => {
     vi.useFakeTimers();
     const api = installBridge();
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: sidecarWithLink("父节点", "https://example.com"),

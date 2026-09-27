@@ -33,8 +33,10 @@ function firstBranchId(): string {
 
 function installBridge() {
   const api = {
-    readMindmapSidecar: vi.fn().mockResolvedValue({ success: true, exists: false }),
-    saveMindmapSidecar: vi.fn().mockResolvedValue({ success: true }),
+    files: {
+      readMindmapSidecar: vi.fn().mockResolvedValue({ success: true, exists: false }),
+      saveMindmapSidecar: vi.fn().mockResolvedValue({ success: true }),
+    },
   };
   (window as unknown as Record<string, unknown>).knowSpaceDesktop = api;
   return api;
@@ -60,7 +62,7 @@ describe("节点备注", () => {
 
   it("打开文档时读出备注，节点上有标记，面板里能看到全文", async () => {
     const api = installBridge();
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: sidecarWithNote(firstBranchId(), "记得跟产品确认口径"),
@@ -79,7 +81,7 @@ describe("节点备注", () => {
     // The rule that keeps the file worth trusting: it says what the reader
     // wrote, so nothing that only reads may write.
     const api = installBridge();
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: sidecarWithNote(firstBranchId(), "已存在的备注"),
@@ -88,7 +90,7 @@ describe("节点备注", () => {
     render(<MindmapView title="测试" source={SOURCE} documentKey={DOC} />);
 
     await waitFor(() => expect(markers().length).toBe(1));
-    expect(api.saveMindmapSidecar).not.toHaveBeenCalled();
+    expect(api.files.saveMindmapSidecar).not.toHaveBeenCalled();
   });
 
   it("改完停一下才写，写的是这份文档的伴生文件", async () => {
@@ -103,17 +105,17 @@ describe("节点备注", () => {
 
     await vi.advanceTimersByTimeAsync(300);
     // ...and not yet on disk: a write per keystroke would be a write per character.
-    expect(api.saveMindmapSidecar).not.toHaveBeenCalled();
+    expect(api.files.saveMindmapSidecar).not.toHaveBeenCalled();
 
     await vi.advanceTimersByTimeAsync(400);
-    expect(api.saveMindmapSidecar).toHaveBeenCalledTimes(1);
-    expect(api.saveMindmapSidecar).toHaveBeenCalledWith({
+    expect(api.files.saveMindmapSidecar).toHaveBeenCalledTimes(1);
+    expect(api.files.saveMindmapSidecar).toHaveBeenCalledWith({
       documentPath: DOC,
       content: expect.stringContaining("先别写"),
     });
 
     // And what was written is a file this app can read back.
-    const written = api.saveMindmapSidecar.mock.calls[0][0].content as string;
+    const written = api.files.saveMindmapSidecar.mock.calls[0][0].content as string;
     expect(parseSidecar(written)?.notes[firstBranchId()]).toBe("先别写");
   });
 
@@ -129,14 +131,14 @@ describe("节点备注", () => {
     }
     await vi.advanceTimersByTimeAsync(700);
 
-    expect(api.saveMindmapSidecar).toHaveBeenCalledTimes(1);
-    expect(api.saveMindmapSidecar.mock.calls[0][0].content).toContain("记得改");
+    expect(api.files.saveMindmapSidecar).toHaveBeenCalledTimes(1);
+    expect(api.files.saveMindmapSidecar.mock.calls[0][0].content).toContain("记得改");
   });
 
   it("清空备注后标记消失，文件里也不再留着空条目", async () => {
     vi.useFakeTimers();
     const api = installBridge();
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: sidecarWithNote(firstBranchId(), "要删掉的"),
@@ -154,7 +156,7 @@ describe("节点备注", () => {
     await vi.advanceTimersByTimeAsync(700);
 
     expect(markers().length).toBe(0);
-    expect(parseSidecar(api.saveMindmapSidecar.mock.calls[0][0].content)?.notes).toEqual({});
+    expect(parseSidecar(api.files.saveMindmapSidecar.mock.calls[0][0].content)?.notes).toEqual({});
   });
 
   it("没有文档键的预览：能看能改，只是不落盘", () => {
@@ -166,20 +168,20 @@ describe("节点备注", () => {
     fireEvent.change(noteField(), { target: { value: "临时写点" } });
 
     expect(noteField().value).toBe("临时写点");
-    expect(api.readMindmapSidecar).not.toHaveBeenCalled();
-    expect(api.saveMindmapSidecar).not.toHaveBeenCalled();
+    expect(api.files.readMindmapSidecar).not.toHaveBeenCalled();
+    expect(api.files.saveMindmapSidecar).not.toHaveBeenCalled();
   });
 
   it("伴生文件坏了：按纯树渲染，备注栏是空的", async () => {
     const api = installBridge();
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: '{ "version": 1, "notes": { 坏掉了',
     });
 
     render(<MindmapView title="测试" source={SOURCE} documentKey={DOC} />);
-    await waitFor(() => expect(api.readMindmapSidecar).toHaveBeenCalled());
+    await waitFor(() => expect(api.files.readMindmapSidecar).toHaveBeenCalled());
 
     // The tree is the document's, so it is unaffected either way.
     expect(screen.getByText("父节点")).toBeTruthy();

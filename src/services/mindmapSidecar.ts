@@ -333,7 +333,7 @@ export function sidecarIsEmpty(sidecar: MindmapSidecar | null): boolean {
 
 function bridge() {
   if (typeof window === "undefined") return undefined;
-  return window.knowSpaceDesktop ?? window.bookMDDesktop;
+  return window.knowSpaceDesktop;
 }
 
 /**
@@ -351,10 +351,10 @@ export async function loadSidecar(
   if (!documentKey) return null;
 
   const api = bridge();
-  if (!api?.readMindmapSidecar) return null;
+  if (!api?.files.readMindmapSidecar) return null;
 
   try {
-    const result = await api.readMindmapSidecar({ documentPath: documentKey });
+    const result = await api.files.readMindmapSidecar({ documentPath: documentKey });
     if (!result?.success || !result.exists) return null;
     return parseSidecar(result.content);
   } catch {
@@ -377,10 +377,10 @@ export async function saveSidecar(
   if (!documentKey) return false;
 
   const api = bridge();
-  if (!api?.saveMindmapSidecar) return false;
+  if (!api?.files.saveMindmapSidecar) return false;
 
   try {
-    const result = await api.saveMindmapSidecar({
+    const result = await api.files.saveMindmapSidecar({
       documentPath: documentKey,
       content: serializeSidecar(sidecar),
     });

@@ -163,8 +163,7 @@ function writeStoredChoices(choices: ReviewFolderChoice[]): void {
  * gets the old behaviour.
  */
 export function useReviewFolders(enabled = true) {
-  const bridge =
-    typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
+  const bridge = typeof window !== "undefined" ? window.knowSpaceDesktop : undefined;
 
   const [choices, setChoices] = useState<ReviewFolderChoice[]>(() => readStoredChoices());
   const [documents, setDocuments] = useState<ReviewSourceDocument[]>([]);
@@ -190,13 +189,13 @@ export function useReviewFolders(enabled = true) {
   const rememberedPaths = choices.map((choice) => choice.rootPath).join("\u0000");
   useEffect(() => {
     if (!enabled) return;
-    if (!rememberedPaths || !bridge?.listReviewFolder || !restoredRef.current) return;
+    if (!rememberedPaths || !bridge?.files.listReviewFolder || !restoredRef.current) return;
 
     void (async () => {
       const listed = await Promise.all(
         rememberedPaths.split("\u0000").map(async (rootPath) => {
           try {
-            const answer = await bridge.listReviewFolder?.(rootPath);
+            const answer = await bridge.files.listReviewFolder?.(rootPath);
             const paths = answer?.paths;
             // A listing that failed says so, and a failure must not empty a folder the
             // reader chose: "the folder could not be read" and "the folder has no cards"
@@ -242,7 +241,7 @@ export function useReviewFolders(enabled = true) {
         return next;
       });
     })();
-  }, [enabled, rememberedPaths, bridge?.listReviewFolder, bridge]);
+  }, [enabled, rememberedPaths, bridge?.files.listReviewFolder, bridge]);
 
   /**
    * Reads the documents of a set of folders.
@@ -265,7 +264,7 @@ export function useReviewFolders(enabled = true) {
         return;
       }
 
-      if (!bridge?.readMarkdownFile && !bridge?.readMarkdownBatch) {
+      if (!bridge?.files.readMarkdownFile && !bridge?.files.readMarkdownBatch) {
         setError("当前环境不支持读取文件夹。");
         setLoaded(true);
         setProgress(null);
@@ -295,7 +294,7 @@ export function useReviewFolders(enabled = true) {
       setError(null);
       setProgress({ done: 0, total: paths.length });
       try {
-        const documents = await readReviewDocumentsChunked(bridge, paths, {
+        const documents = await readReviewDocumentsChunked(bridge.files, paths, {
           onProgress: (done, total) => {
             if (loadTokenRef.current === token) setProgress({ done, total });
           },
@@ -330,12 +329,12 @@ export function useReviewFolders(enabled = true) {
    * which is what a reader who moved it and wants it re-read would mean anyway.
    */
   const choose = useCallback(async (): Promise<void> => {
-    if (!bridge?.pickReviewFolder) {
+    if (!bridge?.files.pickReviewFolder) {
       setError("当前环境不支持选择文件夹。");
       return;
     }
 
-    const picked = await bridge.pickReviewFolder();
+    const picked = await bridge.files.pickReviewFolder();
     if (picked?.canceled) return;
     if (!picked?.rootPath || !Array.isArray(picked.paths)) {
       setError(picked?.message || "无法读取这个文件夹。");

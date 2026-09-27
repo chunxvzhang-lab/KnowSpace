@@ -44,8 +44,7 @@ export function useVaultCards() {
   const chapterCount = manifest?.chapters.length ?? 0;
 
   const load = useCallback(async () => {
-    const bridge =
-      typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
+    const bridge = typeof window !== "undefined" ? window.knowSpaceDesktop : undefined;
 
     const paths = (manifest?.chapters ?? [])
       .map((chapter) => chapter.absolutePath)
@@ -65,7 +64,7 @@ export function useVaultCards() {
     setError(null);
     setProgress({ done: 0, total: paths.length });
     try {
-      const documents = await readReviewDocumentsChunked(bridge, paths, {
+      const documents = await readReviewDocumentsChunked(bridge.files, paths, {
         onProgress: (done, total) => {
           if (loadTokenRef.current === token) setProgress({ done, total });
         },

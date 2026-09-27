@@ -80,7 +80,7 @@ describe("useDocumentCreation", () => {
     });
 
     it("builds a single-document manifest when no folder is open", async () => {
-      desktop.createMarkdownFile.mockResolvedValue(createdAt("C:/vault/新笔记.md"));
+      desktop.files.createMarkdownFile.mockResolvedValue(createdAt("C:/vault/新笔记.md"));
 
       await mount().result.current.doCreateNewFile();
 
@@ -93,18 +93,18 @@ describe("useDocumentCreation", () => {
 
     it("refreshes the folder instead when one is open", async () => {
       useVaultStore.getState().setManifest(SAMPLE_MANIFEST);
-      desktop.createMarkdownFile.mockResolvedValue(createdAt("C:/vault/新笔记.md"));
+      desktop.files.createMarkdownFile.mockResolvedValue(createdAt("C:/vault/新笔记.md"));
 
       await mount().result.current.doCreateNewFile();
 
-      expect(desktop.refreshDirectory).toHaveBeenCalledWith(SAMPLE_MANIFEST.rootPath);
+      expect(desktop.files.refreshDirectory).toHaveBeenCalledWith(SAMPLE_MANIFEST.rootPath);
       // The refreshed manifest replaces the old one wholesale rather than being
       // merged with a locally constructed chapter list.
       expect(useVaultStore.getState().manifest).toEqual(SAMPLE_MANIFEST);
     });
 
     it("points the tab list, the panel and the session at the new document", async () => {
-      desktop.createMarkdownFile.mockResolvedValue(createdAt("C:/vault/新笔记.md"));
+      desktop.files.createMarkdownFile.mockResolvedValue(createdAt("C:/vault/新笔记.md"));
 
       await mount().result.current.doCreateNewFile();
 
@@ -127,7 +127,7 @@ describe("useDocumentCreation", () => {
     });
 
     it("says which document was created", async () => {
-      desktop.createMarkdownFile.mockResolvedValue(createdAt("C:/vault/新笔记.md"));
+      desktop.files.createMarkdownFile.mockResolvedValue(createdAt("C:/vault/新笔记.md"));
 
       await mount().result.current.doCreateNewFile();
 
@@ -135,7 +135,7 @@ describe("useDocumentCreation", () => {
     });
 
     it("reports a failure rather than swallowing it", async () => {
-      desktop.createMarkdownFile.mockRejectedValue(new Error("磁盘只读"));
+      desktop.files.createMarkdownFile.mockRejectedValue(new Error("磁盘只读"));
 
       await mount().result.current.doCreateNewFile();
 
@@ -144,7 +144,7 @@ describe("useDocumentCreation", () => {
     });
 
     it("passes on a message from a failed create", async () => {
-      desktop.createMarkdownFile.mockResolvedValue({
+      desktop.files.createMarkdownFile.mockResolvedValue({
         canceled: false,
         success: false,
         message: "名称已存在",
@@ -156,7 +156,7 @@ describe("useDocumentCreation", () => {
     });
 
     it("stays quiet when a failed create carries no message", async () => {
-      desktop.createMarkdownFile.mockResolvedValue({ canceled: false, success: false });
+      desktop.files.createMarkdownFile.mockResolvedValue({ canceled: false, success: false });
 
       await mount().result.current.doCreateNewFile();
 
@@ -166,29 +166,29 @@ describe("useDocumentCreation", () => {
 
   describe("creating a mind map", () => {
     it("opens the editor on the mind map view", async () => {
-      desktop.createMarkdownFile.mockResolvedValue(createdAt("C:/vault/新导图.mindmap.md"));
+      desktop.files.createMarkdownFile.mockResolvedValue(createdAt("C:/vault/新导图.mindmap.md"));
 
       await mount().result.current.doCreateNewMindmap();
 
       expect(setViewMode).toHaveBeenCalledWith("mindmap");
-      expect(desktop.createMarkdownFile).toHaveBeenCalledWith(
+      expect(desktop.files.createMarkdownFile).toHaveBeenCalledWith(
         expect.objectContaining({ defaultName: "新建思维导图.mindmap.md" }),
       );
     });
 
     it("seeds the document with a starter outline", async () => {
-      desktop.createMarkdownFile.mockResolvedValue(createdAt("C:/vault/新导图.mindmap.md"));
+      desktop.files.createMarkdownFile.mockResolvedValue(createdAt("C:/vault/新导图.mindmap.md"));
 
       await mount().result.current.doCreateNewMindmap();
 
-      const call = desktop.createMarkdownFile.mock.calls[0][0] as { initialContent: string };
+      const call = desktop.files.createMarkdownFile.mock.calls[0][0] as { initialContent: string };
       expect(call.initialContent).toContain("# 中心主题");
     });
   });
 
   describe("creating a space canvas", () => {
     it("opens the editor on the canvas view", async () => {
-      desktop.createMarkdownFile.mockResolvedValue(createdAt("C:/vault/新白板.canvas"));
+      desktop.files.createMarkdownFile.mockResolvedValue(createdAt("C:/vault/新白板.canvas"));
 
       await mount().result.current.doCreateNewCanvas();
 
@@ -196,11 +196,11 @@ describe("useDocumentCreation", () => {
     });
 
     it("seeds a valid empty canvas", async () => {
-      desktop.createMarkdownFile.mockResolvedValue(createdAt("C:/vault/新白板.canvas"));
+      desktop.files.createMarkdownFile.mockResolvedValue(createdAt("C:/vault/新白板.canvas"));
 
       await mount().result.current.doCreateNewCanvas();
 
-      const call = desktop.createMarkdownFile.mock.calls[0][0] as { initialContent: string };
+      const call = desktop.files.createMarkdownFile.mock.calls[0][0] as { initialContent: string };
       const canvas = JSON.parse(call.initialContent);
       // createDefaultCanvas is the single source of a blank board; this asserts
       // the hook still routes through it rather than inlining a literal.

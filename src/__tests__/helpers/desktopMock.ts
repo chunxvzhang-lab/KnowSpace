@@ -3,15 +3,20 @@ import { vi } from "vitest";
 /**
  * A fake for the Electron preload bridge.
  *
- * `KnowSpaceDesktopAPI` declares 60+ methods, but App.tsx only calls 23 of them
- * (list them with `node scripts/list-desktop-api-usage.cjs src/App.tsx`). Faking
- * exactly those keeps the harness small enough to read and lets App-level tests
- * exist at all — before this, not a single test rendered `<App />`, so the R1
- * refactor had no safety net whatsoever.
+ * `KnowSpaceDesktopAPI` declares 67 methods across five namespaces, but
+ * App.tsx only calls ~23 of them (list them with
+ * `node scripts/list-desktop-api-usage.cjs src/App.tsx`). Faking exactly those
+ * keeps the harness small enough to read and lets App-level tests exist at
+ * all — before this, not a single test rendered `<App />`, so the R1 refactor
+ * had no safety net whatsoever.
  *
- * Every method resolves to an empty but well-formed result, which is enough for
- * the app to mount and be driven through its happy paths. Individual tests
- * override only the calls they care about.
+ * The mock mirrors the bridge's namespaced shape (files/history/media/system/
+ * capture — see desktop.d.ts). Every method resolves to an empty but
+ * well-formed result, which is enough for the app to mount and be driven
+ * through its happy paths. Individual tests override only the calls they care
+ * about. Namespaces absent from the mock read as `undefined`, which the
+ * optional chaining at the call sites tolerates — the same "missing methods
+ * are tolerated" property the flat mock had.
  */
 
 export type DesktopMock = ReturnType<typeof createDesktopMock>;
@@ -61,73 +66,80 @@ export function createDesktopMock() {
   const noop = vi.fn().mockResolvedValue(undefined);
 
   const mock = {
-    // ── Vault / directory ────────────────────────────────────────────────
-    getInitialSyncData: vi.fn().mockResolvedValue({
-      manifest: SAMPLE_MANIFEST,
-      windowTitle: "KnowSpace",
-    }),
-    openDirectory: vi.fn().mockResolvedValue({ canceled: true }),
-    refreshDirectory: vi.fn().mockResolvedValue(SAMPLE_MANIFEST),
-    getDirectoryForFile: vi.fn().mockResolvedValue(SAMPLE_MANIFEST),
+    apiVersion: "0.0.0",
 
-    // ── Documents ────────────────────────────────────────────────────────
-    // Note the argument shapes: readMarkdownFile/readMarkdownBatch take a bare
-    // path (or paths), while saveMarkdownFile takes a request object.
-    readMarkdownFile: vi
-      .fn()
-      .mockImplementation((absolutePath: string) =>
-        Promise.resolve(sampleSource(`# loaded ${absolutePath}`, absolutePath)),
-      ),
-    readMarkdownBatch: vi
-      .fn()
-      .mockImplementation((paths: string[]) =>
-        Promise.resolve(paths.map((p) => sampleSource(`# batch ${p}`, p))),
-      ),
-    // A folder to revise from: cancelled by default, so a test that does not care
-    // about it sees the same thing as a reader who closed the dialog.
-    pickReviewFolder: vi.fn().mockResolvedValue({ canceled: true }),
-    listReviewFolder: vi.fn().mockResolvedValue({ paths: [] }),
-    createMarkdownFile: vi.fn().mockResolvedValue({
-      canceled: true,
-    }),
-    saveMarkdownFile: vi
-      .fn()
-      .mockImplementation((request: { absolutePath: string; content: string }) =>
-        Promise.resolve({
-          success: true,
-          absolutePath: request.absolutePath,
-          baseUrl: `file:///${request.absolutePath}/`,
-          cacheKey: request.absolutePath,
-          diskVersion: { size: request.content.length, mtimeMs: 2 },
-        }),
-      ),
-    renameMarkdownFile: vi.fn().mockResolvedValue({ success: true }),
+    files: {
+      openDirectory: vi.fn().mockResolvedValue({ canceled: true }),
+      refreshDirectory: vi.fn().mockResolvedValue(SAMPLE_MANIFEST),
+      getDirectoryForFile: vi.fn().mockResolvedValue(SAMPLE_MANIFEST),
 
-    // ── Window / shell ───────────────────────────────────────────────────
-    toggleFullScreen: noop,
-    isFullScreen: vi.fn().mockResolvedValue(false),
-    onFullScreenChanged: vi.fn().mockReturnValue(() => {}),
-    openInNewWindow: noop,
-    setNativeTheme: noop,
-    getLaunchFilePath: vi.fn().mockResolvedValue(null),
+      // Note the argument shapes: readMarkdownFile/readMarkdownBatch take a bare
+      // path (or paths), while saveMarkdownFile takes a request object.
+      readMarkdownFile: vi
+        .fn()
+        .mockImplementation((absolutePath: string) =>
+          Promise.resolve(sampleSource(`# loaded ${absolutePath}`, absolutePath)),
+        ),
+      readMarkdownBatch: vi
+        .fn()
+        .mockImplementation((paths: string[]) =>
+          Promise.resolve(paths.map((p) => sampleSource(`# batch ${p}`, p))),
+        ),
+      // A folder to revise from: cancelled by default, so a test that does not care
+      // about it sees the same thing as a reader who closed the dialog.
+      pickReviewFolder: vi.fn().mockResolvedValue({ canceled: true }),
+      listReviewFolder: vi.fn().mockResolvedValue({ paths: [] }),
+      createMarkdownFile: vi.fn().mockResolvedValue({
+        canceled: true,
+      }),
+      saveMarkdownFile: vi
+        .fn()
+        .mockImplementation((request: { absolutePath: string; content: string }) =>
+          Promise.resolve({
+            success: true,
+            absolutePath: request.absolutePath,
+            baseUrl: `file:///${request.absolutePath}/`,
+            cacheKey: request.absolutePath,
+            diskVersion: { size: request.content.length, mtimeMs: 2 },
+          }),
+        ),
+      renameMarkdownFile: vi.fn().mockResolvedValue({ success: true }),
+    },
 
-    // ── Main-process events ──────────────────────────────────────────────
-    onOpenFilePath: vi.fn().mockReturnValue(() => {}),
-    onMenuCommand: vi.fn().mockReturnValue(() => {}),
-    onBeforeClose: vi.fn().mockReturnValue(() => {}),
-    onFlashNoteSaved: vi.fn().mockReturnValue(() => {}),
-    resolveBeforeClose: noop,
+    system: {
+      getInitialSyncData: vi.fn().mockResolvedValue({
+        manifest: SAMPLE_MANIFEST,
+        windowTitle: "KnowSpace",
+      }),
+      // ── Window / shell ────────────────────────────────────────────────
+      toggleFullScreen: noop,
+      isFullScreen: vi.fn().mockResolvedValue(false),
+      onFullScreenChanged: vi.fn().mockReturnValue(() => {}),
+      openInNewWindow: noop,
+      setNativeTheme: noop,
+      getLaunchFilePath: vi.fn().mockResolvedValue(null),
+      resolveBeforeClose: noop,
 
-    // ── Flash notes / export ─────────────────────────────────────────────
-    saveFlashNote: vi.fn().mockResolvedValue({ success: true }),
-    getFlashNotesSummary: vi.fn().mockResolvedValue({
-      success: true,
-      spaceDir: "C:/vault/Space",
-      notes: [],
-      totalTodos: 0,
-      completedTodos: 0,
-    }),
-    printToPdf: vi.fn().mockResolvedValue({ success: true }),
+      // ── Main-process events ───────────────────────────────────────────
+      onOpenFilePath: vi.fn().mockReturnValue(() => {}),
+      onMenuCommand: vi.fn().mockReturnValue(() => {}),
+      onBeforeClose: vi.fn().mockReturnValue(() => {}),
+
+      printToPdf: vi.fn().mockResolvedValue({ success: true }),
+    },
+
+    capture: {
+      // ── Flash notes / export ────────────────────────────────────────────
+      saveFlashNote: vi.fn().mockResolvedValue({ success: true }),
+      onFlashNoteSaved: vi.fn().mockReturnValue(() => {}),
+      getFlashNotesSummary: vi.fn().mockResolvedValue({
+        success: true,
+        spaceDir: "C:/vault/Space",
+        notes: [],
+        totalTodos: 0,
+        completedTodos: 0,
+      }),
+    },
   };
 
   return mock;

@@ -44,14 +44,14 @@ describe("App - shell smoke tests", () => {
 
   /** Opens the sample vault through the activity bar, as a user would. */
   async function openSampleVault() {
-    desktop.openDirectory.mockResolvedValue({
+    desktop.files.openDirectory.mockResolvedValue({
       canceled: false,
       directory: SAMPLE_MANIFEST,
     });
     const button = await screen.findByLabelText("打开文件夹");
     button.click();
     await waitFor(() => {
-      expect(desktop.openDirectory).toHaveBeenCalled();
+      expect(desktop.files.openDirectory).toHaveBeenCalled();
     });
     // A chapter title appears in more than one place (tree, tab strip), so the
     // list is what we assert on rather than a single node.
@@ -88,7 +88,7 @@ describe("App - shell smoke tests", () => {
 
     // readMarkdownFile takes a bare path, not a request object
     await waitFor(() => {
-      expect(desktop.readMarkdownFile).toHaveBeenCalledWith(SAMPLE_CHAPTERS[0].absolutePath);
+      expect(desktop.files.readMarkdownFile).toHaveBeenCalledWith(SAMPLE_CHAPTERS[0].absolutePath);
     });
 
     // The markdown reaches the reader. Its "#" becomes a heading element, so
@@ -106,8 +106,8 @@ describe("App - shell smoke tests", () => {
     const button = await screen.findByLabelText("打开文件夹");
     button.click();
 
-    await waitFor(() => expect(desktop.openDirectory).toHaveBeenCalled());
-    expect(desktop.readMarkdownFile).not.toHaveBeenCalled();
+    await waitFor(() => expect(desktop.files.openDirectory).toHaveBeenCalled());
+    expect(desktop.files.readMarkdownFile).not.toHaveBeenCalled();
   });
 
   it("subscribes to the main-process event channels", async () => {
@@ -116,10 +116,10 @@ describe("App - shell smoke tests", () => {
     // The shell wires these once; a refactor that moves them into a store must
     // keep them registered exactly once.
     await waitFor(() => {
-      expect(desktop.onOpenFilePath).toHaveBeenCalled();
+      expect(desktop.system.onOpenFilePath).toHaveBeenCalled();
     });
-    expect(desktop.onMenuCommand).toHaveBeenCalled();
-    expect(desktop.onBeforeClose).toHaveBeenCalled();
+    expect(desktop.system.onMenuCommand).toHaveBeenCalled();
+    expect(desktop.system.onBeforeClose).toHaveBeenCalled();
   });
 
   it("writes UI chrome into the store rather than local state", async () => {
@@ -185,12 +185,12 @@ describe("App - shell smoke tests", () => {
 
   it("cleans up its subscriptions on unmount", async () => {
     const unsubscribe = vi.fn();
-    desktop.onOpenFilePath.mockReturnValue(unsubscribe);
-    desktop.onMenuCommand.mockReturnValue(unsubscribe);
-    desktop.onBeforeClose.mockReturnValue(unsubscribe);
+    desktop.system.onOpenFilePath.mockReturnValue(unsubscribe);
+    desktop.system.onMenuCommand.mockReturnValue(unsubscribe);
+    desktop.system.onBeforeClose.mockReturnValue(unsubscribe);
 
     const { unmount } = render(<App />);
-    await waitFor(() => expect(desktop.onOpenFilePath).toHaveBeenCalled());
+    await waitFor(() => expect(desktop.system.onOpenFilePath).toHaveBeenCalled());
 
     unmount();
 

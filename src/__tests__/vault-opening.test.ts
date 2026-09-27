@@ -57,7 +57,7 @@ describe("useVaultOpening", () => {
     });
 
     it("adopts the folder and opens its first document", async () => {
-      desktop.openDirectory.mockResolvedValue({
+      desktop.files.openDirectory.mockResolvedValue({
         canceled: false,
         directory: SAMPLE_MANIFEST,
       });
@@ -72,7 +72,7 @@ describe("useVaultOpening", () => {
     });
 
     it("registers a tab for the document it opened", async () => {
-      desktop.openDirectory.mockResolvedValue({
+      desktop.files.openDirectory.mockResolvedValue({
         canceled: false,
         directory: SAMPLE_MANIFEST,
       });
@@ -86,11 +86,11 @@ describe("useVaultOpening", () => {
 
   describe("opening a file by path", () => {
     it("opens the session on that file", async () => {
-      desktop.getDirectoryForFile.mockResolvedValue(null);
+      desktop.files.getDirectoryForFile.mockResolvedValue(null);
 
       await mount().result.current.doOpenDesktopMarkdownPath("/vault/note.md");
 
-      expect(desktop.readMarkdownFile).toHaveBeenCalledWith("/vault/note.md");
+      expect(desktop.files.readMarkdownFile).toHaveBeenCalledWith("/vault/note.md");
       expect(openSession).toHaveBeenCalledTimes(1);
       expect(useVaultStore.getState().manifest).not.toBeNull();
       expect(useTabStore.getState().activeTabId).not.toBe("");
@@ -100,9 +100,9 @@ describe("useVaultOpening", () => {
       // openRequestRef counts requests. A read that resolves after a newer open
       // began must abandon its result rather than overwrite the newer one —
       // otherwise opening two files quickly leaves whichever finished last.
-      desktop.getDirectoryForFile.mockResolvedValue(null);
+      desktop.files.getDirectoryForFile.mockResolvedValue(null);
       let releaseFirst: (value: unknown) => void = () => {};
-      desktop.readMarkdownFile.mockImplementationOnce(
+      desktop.files.readMarkdownFile.mockImplementationOnce(
         () =>
           new Promise((resolve) => {
             releaseFirst = resolve;
@@ -117,7 +117,7 @@ describe("useVaultOpening", () => {
       releaseFirst(sampleSource("# slow", "/vault/slow.md"));
       await first;
 
-      expect(desktop.readMarkdownFile).toHaveBeenCalledTimes(2);
+      expect(desktop.files.readMarkdownFile).toHaveBeenCalledTimes(2);
       expect(openSession).toHaveBeenCalledTimes(1);
     });
   });

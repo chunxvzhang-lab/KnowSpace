@@ -48,8 +48,10 @@ describe("DailyReviewPanel - 卡片来源", () => {
     readMarkdownBatch = vi.fn().mockResolvedValue([]);
     saveMarkdownFile = vi.fn().mockResolvedValue({ success: true });
     (window as unknown as Record<string, unknown>).knowSpaceDesktop = {
-      saveMarkdownFile,
-      readMarkdownBatch,
+      files: {
+        saveMarkdownFile: saveMarkdownFile,
+        readMarkdownBatch: readMarkdownBatch,
+      },
     };
     useVaultStore.setState({ ...pristineVault, manifest: VAULT });
   });
@@ -209,10 +211,12 @@ describe("DailyReviewPanel - 记住上次的来源", () => {
   beforeEach(() => {
     readMarkdownBatch = vi.fn().mockResolvedValue([]);
     (window as unknown as Record<string, unknown>).knowSpaceDesktop = {
-      saveMarkdownFile: vi.fn().mockResolvedValue({ success: true }),
-      readMarkdownBatch,
-      pickReviewFolder: vi.fn().mockResolvedValue({ canceled: true }),
-      listReviewFolder: vi.fn().mockResolvedValue({ paths: [] }),
+      files: {
+        saveMarkdownFile: vi.fn().mockResolvedValue({ success: true }),
+        readMarkdownBatch: readMarkdownBatch,
+        pickReviewFolder: vi.fn().mockResolvedValue({ canceled: true }),
+        listReviewFolder: vi.fn().mockResolvedValue({ paths: [] }),
+      },
     };
     useVaultStore.setState({ ...pristineVault, manifest: VAULT });
   });
@@ -279,7 +283,9 @@ describe("DailyReviewPanel - 当前文档来源", () => {
   beforeEach(() => {
     localStorage.clear();
     (window as unknown as Record<string, unknown>).knowSpaceDesktop = {
-      saveMarkdownFile: vi.fn().mockResolvedValue({ success: true }),
+      files: {
+        saveMarkdownFile: vi.fn().mockResolvedValue({ success: true }),
+      },
     };
   });
 
@@ -311,7 +317,11 @@ describe("DailyReviewPanel - 当前文档来源", () => {
 
   it("评分写回这一篇自己的文件", async () => {
     const saveMarkdownFile = vi.fn().mockResolvedValue({ success: true });
-    (window as unknown as Record<string, unknown>).knowSpaceDesktop = { saveMarkdownFile };
+    (window as unknown as Record<string, unknown>).knowSpaceDesktop = {
+      files: {
+        saveMarkdownFile: saveMarkdownFile,
+      },
+    };
     render(<DailyReviewPanel notes={[]} currentDocument={{ ...NOTE, dirty: false }} />);
 
     await act(async () => {
@@ -395,10 +405,12 @@ describe("DailyReviewPanel - 自定义文件夹来源", () => {
     pickReviewFolder = vi.fn().mockResolvedValue({ canceled: true });
     listReviewFolder = vi.fn().mockResolvedValue({ paths: [] });
     (window as unknown as Record<string, unknown>).knowSpaceDesktop = {
-      saveMarkdownFile,
-      readMarkdownBatch,
-      pickReviewFolder,
-      listReviewFolder,
+      files: {
+        saveMarkdownFile: saveMarkdownFile,
+        readMarkdownBatch: readMarkdownBatch,
+        pickReviewFolder: pickReviewFolder,
+        listReviewFolder: listReviewFolder,
+      },
     };
     useVaultStore.setState({ ...pristineVault, manifest: VAULT });
   });

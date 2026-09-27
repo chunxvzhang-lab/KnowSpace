@@ -26,9 +26,13 @@ function firstBranchId(): string {
 
 function installBridge() {
   const api = {
-    readMindmapSidecar: vi.fn().mockResolvedValue({ success: true, exists: false }),
-    saveMindmapSidecar: vi.fn().mockResolvedValue({ success: true }),
-    openExternal: vi.fn().mockResolvedValue({ success: true }),
+    files: {
+      readMindmapSidecar: vi.fn().mockResolvedValue({ success: true, exists: false }),
+      saveMindmapSidecar: vi.fn().mockResolvedValue({ success: true }),
+    },
+    system: {
+      openExternal: vi.fn().mockResolvedValue({ success: true }),
+    },
   };
   (window as unknown as Record<string, unknown>).knowSpaceDesktop = api;
   return api;
@@ -46,7 +50,7 @@ describe("节点上的链接徽章", () => {
 
   it("点它就把外链交给系统浏览器打开", async () => {
     const api = installBridge();
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: serializeSidecar(
@@ -61,13 +65,13 @@ describe("节点上的链接徽章", () => {
       fireEvent.click(badge() as Element);
     });
 
-    expect(api.openExternal).toHaveBeenCalledTimes(1);
-    expect(api.openExternal.mock.calls[0][0]).toBe("https://example.com/docs");
+    expect(api.system.openExternal).toHaveBeenCalledTimes(1);
+    expect(api.system.openExternal.mock.calls[0][0]).toBe("https://example.com/docs");
   });
 
   it("点徽章不会把主题选中，也不会开始拖拽", async () => {
     const api = installBridge();
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: serializeSidecar(
@@ -103,7 +107,7 @@ describe("节点上的链接徽章", () => {
     });
 
     expect(badge()).toBeNull();
-    expect(api.openExternal).not.toHaveBeenCalled();
+    expect(api.system.openExternal).not.toHaveBeenCalled();
   });
 
   it("样式表把可点的那枚徽章的指针事件重新打开", () => {

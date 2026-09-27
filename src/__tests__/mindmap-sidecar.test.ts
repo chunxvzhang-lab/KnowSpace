@@ -65,8 +65,10 @@ import {
 /** The bridge, faked locally so each test can name the exact payloads. */
 function installBridge() {
   const api = {
-    readMindmapSidecar: vi.fn().mockResolvedValue({ success: true, exists: false }),
-    saveMindmapSidecar: vi.fn().mockResolvedValue({ success: true }),
+    files: {
+      readMindmapSidecar: vi.fn().mockResolvedValue({ success: true, exists: false }),
+      saveMindmapSidecar: vi.fn().mockResolvedValue({ success: true }),
+    },
   };
   (window as unknown as Record<string, unknown>).knowSpaceDesktop = api;
   return api;
@@ -1079,32 +1081,32 @@ describe("导图伴生文件", () => {
       expect(await loadSidecar(undefined)).toBeNull();
       expect(await loadSidecar("")).toBeNull();
       // Nothing was asked of the disk for a document with no path behind it.
-      expect(api.readMindmapSidecar).not.toHaveBeenCalled();
+      expect(api.files.readMindmapSidecar).not.toHaveBeenCalled();
 
       expect(await loadSidecar("/vault/a.md")).toBeNull();
-      expect(api.readMindmapSidecar).toHaveBeenCalledWith({ documentPath: "/vault/a.md" });
+      expect(api.files.readMindmapSidecar).toHaveBeenCalledWith({ documentPath: "/vault/a.md" });
     });
 
     it("读失败、内容坏了、桥抛异常，都只是没有备注", async () => {
       const api = installBridge();
 
-      api.readMindmapSidecar.mockResolvedValueOnce({ success: false, message: "权限不足" });
+      api.files.readMindmapSidecar.mockResolvedValueOnce({ success: false, message: "权限不足" });
       expect(await loadSidecar("/vault/a.md")).toBeNull();
 
-      api.readMindmapSidecar.mockResolvedValueOnce({
+      api.files.readMindmapSidecar.mockResolvedValueOnce({
         success: true,
         exists: true,
         content: "{ 坏",
       });
       expect(await loadSidecar("/vault/a.md")).toBeNull();
 
-      api.readMindmapSidecar.mockRejectedValueOnce(new Error("通道断了"));
+      api.files.readMindmapSidecar.mockRejectedValueOnce(new Error("通道断了"));
       expect(await loadSidecar("/vault/a.md")).toBeNull();
     });
 
     it("读到的备注原样回来", async () => {
       const api = installBridge();
-      api.readMindmapSidecar.mockResolvedValueOnce({
+      api.files.readMindmapSidecar.mockResolvedValueOnce({
         success: true,
         exists: true,
         content: JSON.stringify({ version: 1, notes: { "node-a": "备注" } }),
@@ -1121,7 +1123,7 @@ describe("导图伴生文件", () => {
 
       expect(await saveSidecar("/vault/a.md", sidecar)).toBe(true);
 
-      expect(api.saveMindmapSidecar).toHaveBeenCalledWith({
+      expect(api.files.saveMindmapSidecar).toHaveBeenCalledWith({
         documentPath: "/vault/a.md",
         // The path is the document's; deriving the companion's name from it is
         // the main process's job, so the renderer never names a file itself.
@@ -1136,16 +1138,16 @@ describe("导图伴生文件", () => {
       const api = installBridge();
       expect(await saveSidecar(null, emptySidecar())).toBe(false);
       expect(await saveSidecar(undefined, emptySidecar())).toBe(false);
-      expect(api.saveMindmapSidecar).not.toHaveBeenCalled();
+      expect(api.files.saveMindmapSidecar).not.toHaveBeenCalled();
     });
 
     it("写失败只回答 false", async () => {
       const api = installBridge();
-      api.saveMindmapSidecar.mockResolvedValueOnce({ success: false, message: "磁盘忙" });
+      api.files.saveMindmapSidecar.mockResolvedValueOnce({ success: false, message: "磁盘忙" });
 
       expect(await saveSidecar("/vault/a.md", emptySidecar())).toBe(false);
 
-      api.saveMindmapSidecar.mockRejectedValueOnce(new Error("通道断了"));
+      api.files.saveMindmapSidecar.mockRejectedValueOnce(new Error("通道断了"));
       expect(await saveSidecar("/vault/a.md", emptySidecar())).toBe(false);
     });
 
@@ -1153,7 +1155,7 @@ describe("导图伴生文件", () => {
       // The rule that keeps the file trustworthy: it says what the reader wrote,
       // so nothing that only reads may write.
       const api = installBridge();
-      api.readMindmapSidecar.mockResolvedValueOnce({
+      api.files.readMindmapSidecar.mockResolvedValueOnce({
         success: true,
         exists: true,
         content: JSON.stringify({ version: 1, notes: { "node-a": "备注" } }),
@@ -1161,7 +1163,7 @@ describe("导图伴生文件", () => {
 
       await loadSidecar("/vault/a.md");
 
-      expect(api.saveMindmapSidecar).not.toHaveBeenCalled();
+      expect(api.files.saveMindmapSidecar).not.toHaveBeenCalled();
     });
   });
 });

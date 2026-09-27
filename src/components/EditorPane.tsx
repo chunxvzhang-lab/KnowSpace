@@ -350,9 +350,8 @@ export const EditorPane = memo(function EditorPane({
   typewriterModeRef.current = typewriterMode;
 
   const saveAndInsertImage = (file: File, view: EditorView) => {
-    const desktop =
-      typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
-    if (!desktop?.savePastedImage) return;
+    const desktop = typeof window !== "undefined" ? window.knowSpaceDesktop : undefined;
+    if (!desktop?.capture.savePastedImage) return;
 
     try {
       const reader = new FileReader();
@@ -363,7 +362,7 @@ export const EditorPane = memo(function EditorPane({
         const originalName = file.name || "pasted_image";
         const ext = file.type ? file.type.replace("image/", "") : "png";
 
-        const res = await desktop.savePastedImage?.({
+        const res = await desktop.capture.savePastedImage?.({
           currentFilePath: currentFilePathRef.current,
           bufferBase64: base64,
           originalName,

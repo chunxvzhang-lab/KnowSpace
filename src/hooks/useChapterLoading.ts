@@ -85,7 +85,7 @@ export function useChapterLoading({
 
     const loadPromise =
       targetAbsPath && window.bookMDDesktop
-        ? window.bookMDDesktop.readMarkdownFile(targetAbsPath)
+        ? window.bookMDDesktop.files.readMarkdownFile(targetAbsPath)
         : manifest
           ? loadPackagedChapterMarkdown(manifest, chapterId)
           : Promise.reject(new Error("无法加载章节内容。"));
@@ -161,7 +161,7 @@ export function useChapterLoading({
 
     const loadPromise =
       targetAbsPath && window.bookMDDesktop
-        ? window.bookMDDesktop.readMarkdownFile(targetAbsPath)
+        ? window.bookMDDesktop.files.readMarkdownFile(targetAbsPath)
         : manifest
           ? loadPackagedChapterMarkdown(manifest, dualSplitTabId)
           : null;

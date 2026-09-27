@@ -567,10 +567,10 @@ async function readUrlAsDataUrl(url: string): Promise<string | null> {
   // what lets card images survive instead of being dropped from the export.
   const localPath = fileUrlToPath(url);
   if (localPath && typeof window !== "undefined") {
-    const desktop = window.knowSpaceDesktop ?? window.bookMDDesktop;
-    if (desktop?.readFileAsDataUrl) {
+    const desktop = window.knowSpaceDesktop;
+    if (desktop?.media.readFileAsDataUrl) {
       try {
-        const res = await desktop.readFileAsDataUrl({ filePath: localPath });
+        const res = await desktop.media.readFileAsDataUrl({ filePath: localPath });
         if (res?.success && res.dataUrl) return res.dataUrl;
       } catch {
         // fall through to the network paths
@@ -990,8 +990,7 @@ export async function downloadCanvasAsImage(
     return "svg";
   }
 
-  const desktop =
-    typeof window !== "undefined" ? (window.knowSpaceDesktop ?? window.bookMDDesktop) : undefined;
+  const desktop = typeof window !== "undefined" ? window.knowSpaceDesktop : undefined;
 
   const buildExportSvg = (): string =>
     serializeSvgForExport(valueBooleanAttributes(exportCanvasToSvg(data, options)));
@@ -1008,8 +1007,8 @@ export async function downloadCanvasAsImage(
     console.warn("渲染进程栅格化失败，改用主进程离屏渲染:", err);
   }
 
-  if (!blob && desktop?.exportCanvasAsPng) {
-    const res = await desktop.exportCanvasAsPng({
+  if (!blob && desktop?.media.exportCanvasAsPng) {
+    const res = await desktop.media.exportCanvasAsPng({
       svg: buildExportSvg(),
       filename: `${cleanName}.png`,
       scale: 2,
@@ -1029,9 +1028,9 @@ export async function downloadCanvasAsImage(
   // Preferred path: hand the raw bytes to the main process. Passing a base64
   // data URL instead meant the payload was duplicated as a string and then
   // again during IPC serialisation, which is what made big exports crash.
-  if (desktop?.savePngBuffer) {
+  if (desktop?.media.savePngBuffer) {
     const buffer = await blob.arrayBuffer();
-    const res = await desktop.savePngBuffer({
+    const res = await desktop.media.savePngBuffer({
       buffer,
       filename: `${cleanName}.png`,
     });
@@ -1041,9 +1040,9 @@ export async function downloadCanvasAsImage(
   }
 
   // Legacy bridge without the buffer API
-  if (desktop?.savePngData && blob.type === "image/png") {
+  if (desktop?.media.savePngData && blob.type === "image/png") {
     const dataUrl = await blobToDataUrl(blob);
-    const res = await desktop.savePngData({ dataUrl, filename: `${cleanName}.png` });
+    const res = await desktop.media.savePngData({ dataUrl, filename: `${cleanName}.png` });
     if (res?.canceled) return "canceled";
     if (res?.success) return "png";
     throw new Error(res?.message || "保存图片失败");
@@ -1068,8 +1067,7 @@ export async function copyCanvasImageToClipboard(
   data: CanvasData,
   options?: CanvasExportOptions,
 ): Promise<boolean> {
-  const desktop =
-    typeof window !== "undefined" ? (window.knowSpaceDesktop ?? window.bookMDDesktop) : undefined;
+  const desktop = typeof window !== "undefined" ? window.knowSpaceDesktop : undefined;
 
   let blob: Blob | null = null;
   try {
@@ -1082,9 +1080,9 @@ export async function copyCanvasImageToClipboard(
     // The native clipboard is preferred: navigator.clipboard.write() needs the
     // window to be focused and a live user gesture, both of which are easy to
     // lose inside Electron — which is why copying used to do nothing at all.
-    if (desktop?.copyPngToClipboard) {
+    if (desktop?.media.copyPngToClipboard) {
       try {
-        const res = await desktop.copyPngToClipboard({ buffer: await blob.arrayBuffer() });
+        const res = await desktop.media.copyPngToClipboard({ buffer: await blob.arrayBuffer() });
         if (res?.success) return true;
       } catch (err) {
         console.warn("原生剪贴板写入失败，回退到 Web API:", err);
@@ -1108,10 +1106,10 @@ export async function copyCanvasImageToClipboard(
   // Last resort: let the main process render the board offscreen and put the
   // result on the clipboard itself. capturePage() is not subject to the canvas
   // tainting rules, so this still works when the renderer path was blocked.
-  if (desktop?.copyCanvasAsImage) {
+  if (desktop?.media.copyCanvasAsImage) {
     try {
       const svg = serializeSvgForExport(valueBooleanAttributes(exportCanvasToSvg(data, options)));
-      const res = await desktop.copyCanvasAsImage({ svg, scale: 2 });
+      const res = await desktop.media.copyCanvasAsImage({ svg, scale: 2 });
       if (res?.success) return true;
       console.warn("离屏渲染复制失败:", res?.message);
     } catch (err) {

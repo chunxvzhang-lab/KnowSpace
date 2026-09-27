@@ -39,8 +39,10 @@ function nodeIdOf(text: string): string {
 
 function installBridge() {
   const api = {
-    readMindmapSidecar: vi.fn().mockResolvedValue({ success: true, exists: false }),
-    saveMindmapSidecar: vi.fn().mockResolvedValue({ success: true }),
+    files: {
+      readMindmapSidecar: vi.fn().mockResolvedValue({ success: true, exists: false }),
+      saveMindmapSidecar: vi.fn().mockResolvedValue({ success: true }),
+    },
   };
   (window as unknown as Record<string, unknown>).knowSpaceDesktop = api;
   return api;
@@ -61,7 +63,7 @@ function select(text: string, additive = false) {
 }
 
 function lastWritten(api: ReturnType<typeof installBridge>) {
-  const call = api.saveMindmapSidecar.mock.calls.at(-1);
+  const call = api.files.saveMindmapSidecar.mock.calls.at(-1);
   return call ? parseSidecar(call[0].content as string) : null;
 }
 
@@ -124,7 +126,7 @@ describe("边界", () => {
       [nodeIdOf("子节点甲"), nodeIdOf("子节点乙")],
       "这两种走法",
     );
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: serializeSidecar(sidecar),
@@ -143,7 +145,7 @@ describe("边界", () => {
     vi.useFakeTimers();
     const api = installBridge();
     const { sidecar } = addBoundary(emptySidecar(), [nodeIdOf("父节点")], "原名");
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: serializeSidecar(sidecar),
@@ -168,7 +170,7 @@ describe("边界", () => {
     vi.useFakeTimers();
     const api = installBridge();
     const { sidecar } = addBoundary(emptySidecar(), [nodeIdOf("父节点")], "一组");
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: serializeSidecar(sidecar),
@@ -199,7 +201,7 @@ describe("边界", () => {
     vi.useFakeTimers();
     const api = installBridge();
     const { sidecar } = addBoundary(emptySidecar(), [nodeIdOf("父节点")], "要删的");
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: serializeSidecar(sidecar),
@@ -229,7 +231,7 @@ describe("边界", () => {
       [nodeIdOf("子节点甲"), nodeIdOf("子节点乙")],
       "这两种走法",
     );
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: serializeSidecar(setBoundaryColor(sidecar, id, "emerald")),

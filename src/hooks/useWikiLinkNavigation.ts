@@ -98,9 +98,9 @@ export function useWikiLinkNavigation({
 
       // 2. Check in Space flash notes
       const desktop = window.bookMDDesktop;
-      if (desktop?.getFlashNotesSummary) {
+      if (desktop?.capture.getFlashNotesSummary) {
         try {
-          const summary = await desktop.getFlashNotesSummary();
+          const summary = await desktop.capture.getFlashNotesSummary();
           if (summary?.success && summary.notes) {
             const foundNote = summary.notes.find((n) => {
               const baseName = n.fileName.replace(/\.md$/i, "").toLowerCase();
@@ -120,20 +120,20 @@ export function useWikiLinkNavigation({
 
       // 3. Document not found: ask user to create in current workspace
       const rootPath = manifest?.rootPath;
-      if (rootPath && manifest && desktop?.createMarkdownFile) {
+      if (rootPath && manifest && desktop?.files.createMarkdownFile) {
         const confirmCreate = window.confirm(
           `双链文档「${cleanTarget}」尚未创建。\n\n是否立即在当前知识库新建「${cleanTarget}.md」？`,
         );
         if (confirmCreate) {
           try {
-            const newRes = await desktop.createMarkdownFile({
+            const newRes = await desktop.files.createMarkdownFile({
               rootPath,
               defaultName: `${cleanTarget}.md`,
             });
             if (!newRes.canceled && newRes.success) {
               let nextManifest = manifest;
-              if (desktop.refreshDirectory) {
-                nextManifest = await desktop.refreshDirectory(rootPath);
+              if (desktop.files.refreshDirectory) {
+                nextManifest = await desktop.files.refreshDirectory(rootPath);
               } else {
                 nextManifest = {
                   ...manifest,

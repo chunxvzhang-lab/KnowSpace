@@ -134,7 +134,8 @@ export function useVaultOpening({
 
     try {
       // 1. Immediately read and display the file (use preloadedSource if available for zero-latency instant render)
-      const source = preloadedSource || (await window.bookMDDesktop.readMarkdownFile(absolutePath));
+      const source =
+        preloadedSource || (await window.bookMDDesktop.files.readMarkdownFile(absolutePath));
       if (openRequestRef.current !== requestId) return;
 
       const fileName = absolutePath.split(/[\\/]/).pop() ?? "Markdown.md";
@@ -267,8 +268,8 @@ export function useVaultOpening({
       setNotice(`已打开：${fileName}`);
 
       // 2. Only asynchronously index directory if opening a non-Space file and NO workspace was already active
-      if (!hasActiveWorkspace && !isSpaceFile && window.bookMDDesktop.getDirectoryForFile) {
-        window.bookMDDesktop
+      if (!hasActiveWorkspace && !isSpaceFile && window.bookMDDesktop.files.getDirectoryForFile) {
+        window.bookMDDesktop.files
           .getDirectoryForFile(absolutePath)
           .then((dirResult) => {
             if (openRequestRef.current !== requestId) return;
@@ -313,7 +314,7 @@ export function useVaultOpening({
 
     openRequestRef.current += 1;
     try {
-      const result = await window.bookMDDesktop.openDirectory();
+      const result = await window.bookMDDesktop.files.openDirectory();
       if (result.canceled) return;
       if (result.directory.chapters.length === 0) {
         setNotice("该目录中没有 .md 或 .markdown 文件。");
@@ -361,7 +362,9 @@ export function useVaultOpening({
 
       if (targetChapter.absolutePath) {
         activeLoadedChapterIdRef.current = targetChapter.id;
-        const source = await window.bookMDDesktop.readMarkdownFile(targetChapter.absolutePath);
+        const source = await window.bookMDDesktop.files.readMarkdownFile(
+          targetChapter.absolutePath,
+        );
         openSession({
           chapterId: targetChapter.id,
           absolutePath: targetChapter.absolutePath,

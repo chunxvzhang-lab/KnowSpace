@@ -147,8 +147,8 @@ export function useDocumentSession() {
 
   // Sync state with Electron main process
   useEffect(() => {
-    if (window.bookMDDesktop?.setDocumentState) {
-      window.bookMDDesktop.setDocumentState({
+    if (window.bookMDDesktop?.system.setDocumentState) {
+      window.bookMDDesktop.system.setDocumentState({
         activePath: session?.absolutePath ?? null,
         isDirty,
       });
@@ -322,7 +322,7 @@ export function useDocumentSession() {
         return { success: false, message: "文档不可写或未关联磁盘文件。" };
       }
 
-      if (!window.bookMDDesktop?.saveMarkdownFile) {
+      if (!window.bookMDDesktop?.files.saveMarkdownFile) {
         return { success: false, message: "当前环境不支持保存。" };
       }
 
@@ -330,7 +330,7 @@ export function useDocumentSession() {
       try {
         const contentToSave =
           options.content !== undefined ? options.content : currentSession.source;
-        const result = await window.bookMDDesktop.saveMarkdownFile({
+        const result = await window.bookMDDesktop.files.saveMarkdownFile({
           absolutePath: currentSession.absolutePath,
           content: contentToSave,
           expectedVersion: currentSession.diskVersion,
@@ -377,13 +377,13 @@ export function useDocumentSession() {
   );
 
   const saveSessionAs = useCallback(async () => {
-    if (!session || !window.bookMDDesktop?.saveMarkdownFileAs) {
+    if (!session || !window.bookMDDesktop?.files.saveMarkdownFileAs) {
       return { success: false, message: "当前环境不支持另存为。" };
     }
 
     setIsSaving(true);
     try {
-      const result = await window.bookMDDesktop.saveMarkdownFileAs({
+      const result = await window.bookMDDesktop.files.saveMarkdownFileAs({
         currentPath: session.absolutePath ?? undefined,
         content: session.source,
       });
@@ -418,9 +418,9 @@ export function useDocumentSession() {
   }, [session]);
 
   const reloadFromDisk = useCallback(async () => {
-    if (!session?.absolutePath || !window.bookMDDesktop?.readMarkdownFile) return;
+    if (!session?.absolutePath || !window.bookMDDesktop?.files.readMarkdownFile) return;
     try {
-      const source = await window.bookMDDesktop.readMarkdownFile(session.absolutePath);
+      const source = await window.bookMDDesktop.files.readMarkdownFile(session.absolutePath);
       openSession({
         chapterId: session.chapterId,
         absolutePath: session.absolutePath,

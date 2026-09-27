@@ -39,8 +39,10 @@ function nodeIdOf(text: string): string {
 
 function installBridge() {
   const api = {
-    readMindmapSidecar: vi.fn().mockResolvedValue({ success: true, exists: false }),
-    saveMindmapSidecar: vi.fn().mockResolvedValue({ success: true }),
+    files: {
+      readMindmapSidecar: vi.fn().mockResolvedValue({ success: true, exists: false }),
+      saveMindmapSidecar: vi.fn().mockResolvedValue({ success: true }),
+    },
   };
   (window as unknown as Record<string, unknown>).knowSpaceDesktop = api;
   return api;
@@ -78,7 +80,7 @@ function collapseToggleOf(text: string): Element {
 }
 
 function lastWritten(api: ReturnType<typeof installBridge>) {
-  const call = api.saveMindmapSidecar.mock.calls.at(-1);
+  const call = api.files.saveMindmapSidecar.mock.calls.at(-1);
   return call ? parseSidecar(call[0].content as string) : null;
 }
 
@@ -100,7 +102,7 @@ describe("关系线", () => {
 
   it("打开文档时读出关系，画在节点之下", async () => {
     const api = installBridge();
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: serializeSidecar(
@@ -185,14 +187,14 @@ describe("关系线", () => {
     const row = screen.getByRole("button", { name: /连接这两个主题/ }) as HTMLButtonElement;
     expect(row.disabled).toBe(true);
     expect(row.getAttribute("title")).toContain("先选中两个主题");
-    expect(api.saveMindmapSidecar).not.toHaveBeenCalled();
+    expect(api.files.saveMindmapSidecar).not.toHaveBeenCalled();
   });
 
   it("一端被折叠时线不画 —— 但关系本身还在", async () => {
     // The line needs both boxes, and a folded branch keeps its children off the
     // canvas. The relation is not the thing that should be lost over that.
     const api = installBridge();
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: serializeSidecar(
@@ -208,12 +210,12 @@ describe("关系线", () => {
 
     expect(lines().length).toBe(0);
     // Nothing was written: hiding a node is not a decision about the relation.
-    expect(api.saveMindmapSidecar).not.toHaveBeenCalled();
+    expect(api.files.saveMindmapSidecar).not.toHaveBeenCalled();
   });
 
   it("关系线跟着导出出门，并且带着它的虚线", async () => {
     const api = installBridge();
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: serializeSidecar(

@@ -449,8 +449,10 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
     const savePngBufferMock = vi.fn().mockResolvedValue({ success: true });
     const savePngDataMock = vi.fn().mockResolvedValue({ success: true });
     (window as any).knowSpaceDesktop = {
-      savePngBuffer: savePngBufferMock,
-      savePngData: savePngDataMock,
+      media: {
+        savePngBuffer: savePngBufferMock,
+        savePngData: savePngDataMock,
+      },
     };
     // The raw-buffer bridge must be preferred: base64 data URLs used to
     // duplicate a multi-megabyte string across the IPC boundary and crash.
@@ -591,7 +593,11 @@ describe("canvasService - JSON Canvas 1.0 Specification", () => {
     // returned false and copying did nothing at all. The main process must
     // take over via offscreen rendering.
     const copyCanvasAsImage = vi.fn().mockResolvedValue({ success: true });
-    (window as any).knowSpaceDesktop = { copyCanvasAsImage };
+    (window as any).knowSpaceDesktop = {
+      media: {
+        copyCanvasAsImage: copyCanvasAsImage,
+      },
+    };
 
     expect(await copyCanvasImageToClipboard(data)).toBe(true);
     expect(copyCanvasAsImage).toHaveBeenCalled();

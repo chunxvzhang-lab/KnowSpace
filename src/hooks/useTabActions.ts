@@ -86,9 +86,9 @@ export function useTabActions(params: {
       const targetChap = manifest?.chapters.find((c) => c.id === tabId);
       const absPath = targetTab?.absolutePath || targetChap?.absolutePath;
 
-      if (absPath && window.bookMDDesktop?.openInNewWindow) {
+      if (absPath && window.bookMDDesktop?.system.openInNewWindow) {
         try {
-          await window.bookMDDesktop.openInNewWindow(absPath);
+          await window.bookMDDesktop.system.openInNewWindow(absPath);
           setNotice(`已将文档「${targetTab?.title ?? "Markdown"}」分离至独立新窗口。`);
           if (tabs.length > 1) {
             handleCloseTab(tabId);

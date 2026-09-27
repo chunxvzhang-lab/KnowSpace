@@ -34,8 +34,10 @@ function firstBranchId(): string {
 
 function installBridge() {
   const api = {
-    readMindmapSidecar: vi.fn().mockResolvedValue({ success: true, exists: false }),
-    saveMindmapSidecar: vi.fn().mockResolvedValue({ success: true }),
+    files: {
+      readMindmapSidecar: vi.fn().mockResolvedValue({ success: true, exists: false }),
+      saveMindmapSidecar: vi.fn().mockResolvedValue({ success: true }),
+    },
   };
   (window as unknown as Record<string, unknown>).knowSpaceDesktop = api;
   return api;
@@ -50,7 +52,7 @@ const nodeIcons = () => document.querySelectorAll(".mindmap-node-icon");
 
 /** What the last write asked the bridge to store. */
 function lastWritten(api: ReturnType<typeof installBridge>) {
-  const call = api.saveMindmapSidecar.mock.calls.at(-1);
+  const call = api.files.saveMindmapSidecar.mock.calls.at(-1);
   return call ? parseSidecar(call[0].content as string) : null;
 }
 
@@ -65,7 +67,7 @@ describe("节点图标", () => {
 
   it("打开文档时读出图标，画在节点上", async () => {
     const api = installBridge();
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: sidecarWithIcon(firstBranchId(), "star"),
@@ -97,8 +99,8 @@ describe("节点图标", () => {
     });
 
     // ...and in the file a pause later, under this document.
-    expect(api.saveMindmapSidecar).toHaveBeenCalledTimes(1);
-    expect(api.saveMindmapSidecar.mock.calls[0][0].documentPath).toBe(DOC);
+    expect(api.files.saveMindmapSidecar).toHaveBeenCalledTimes(1);
+    expect(api.files.saveMindmapSidecar.mock.calls[0][0].documentPath).toBe(DOC);
     expect(lastWritten(api)?.icons[firstBranchId()]).toBe("todo");
   });
 
@@ -126,7 +128,7 @@ describe("节点图标", () => {
 
   it("按类型的名字搜索：找得到标了它的主题 —— 这才是标记的用处", async () => {
     const api = installBridge();
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: sidecarWithIcon(firstBranchId(), "todo"),
@@ -148,7 +150,7 @@ describe("节点图标", () => {
   it("面板上的清除按钮做同一件事", async () => {
     vi.useFakeTimers();
     const api = installBridge();
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: sidecarWithIcon(firstBranchId(), "star"),
@@ -171,7 +173,7 @@ describe("节点图标", () => {
 
   it("文件里的图标 id 不认识：不画，也不报错，id 还留着", async () => {
     const api = installBridge();
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: sidecarWithIcon(firstBranchId(), "未来的图标"),
@@ -179,24 +181,24 @@ describe("节点图标", () => {
 
     render(<MindmapView title="测试" source={SOURCE} documentKey={DOC} />);
 
-    await waitFor(() => expect(api.readMindmapSidecar).toHaveBeenCalled());
+    await waitFor(() => expect(api.files.readMindmapSidecar).toHaveBeenCalled());
     // The tree is the document's and is unaffected either way.
     expect(screen.getByText("父节点")).toBeTruthy();
     expect(nodeIcons().length).toBe(0);
     // Nothing is written back for merely opening it, so the unknown id survives.
-    expect(api.saveMindmapSidecar).not.toHaveBeenCalled();
+    expect(api.files.saveMindmapSidecar).not.toHaveBeenCalled();
   });
 
   it("伴生文件坏了：按纯树渲染，图标区空着", async () => {
     const api = installBridge();
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: "{ 这不是 json",
     });
 
     render(<MindmapView title="测试" source={SOURCE} documentKey={DOC} />);
-    await waitFor(() => expect(api.readMindmapSidecar).toHaveBeenCalled());
+    await waitFor(() => expect(api.files.readMindmapSidecar).toHaveBeenCalled());
 
     expect(screen.getByText("父节点")).toBeTruthy();
     expect(nodeIcons().length).toBe(0);
@@ -208,7 +210,7 @@ describe("节点图标", () => {
 
   it("图标画在盒子上方左角 —— 不压在连线上", async () => {
     const api = installBridge();
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: sidecarWithIcon(firstBranchId(), "todo"),

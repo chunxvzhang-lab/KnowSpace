@@ -168,14 +168,8 @@ export function useCanvasKeyboard({
         document.exitFullscreen?.().catch(() => {});
         return;
       }
-      const desktopFs = (
-        window as unknown as {
-          bookMDDesktop?: {
-            isFullScreen?: () => Promise<boolean>;
-            toggleFullScreen?: () => Promise<boolean>;
-          };
-        }
-      ).bookMDDesktop;
+      // The namespaced bridge; `system` holds the fullscreen calls.
+      const desktopFs = window.bookMDDesktop?.system;
       if (desktopFs?.isFullScreen && desktopFs?.toggleFullScreen) {
         e.preventDefault();
         desktopFs

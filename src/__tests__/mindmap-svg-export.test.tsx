@@ -295,8 +295,8 @@ describe("打印 / 导出 PDF", () => {
     fireEvent.click(screen.getByRole("button", { name: /导出/ }));
     fireEvent.click(screen.getByText("打印 / 导出 PDF"));
 
-    expect(desktop.printToPdf).toHaveBeenCalledTimes(1);
-    expect(desktop.printToPdf).toHaveBeenCalledWith({
+    expect(desktop.system.printToPdf).toHaveBeenCalledTimes(1);
+    expect(desktop.system.printToPdf).toHaveBeenCalledWith({
       title: "测试-思维导图",
       landscape: true,
     });
@@ -368,12 +368,14 @@ describe("标注与导出", () => {
     sidecar = setNodeLink(sidecar, nodeId, "https://example.com");
 
     const api = {
-      readMindmapSidecar: vi.fn().mockResolvedValue({
-        success: true,
-        exists: true,
-        content: serializeSidecar(sidecar),
-      }),
-      saveMindmapSidecar: vi.fn().mockResolvedValue({ success: true }),
+      files: {
+        readMindmapSidecar: vi.fn().mockResolvedValue({
+          success: true,
+          exists: true,
+          content: serializeSidecar(sidecar),
+        }),
+        saveMindmapSidecar: vi.fn().mockResolvedValue({ success: true }),
+      },
     };
     (window as unknown as Record<string, unknown>).knowSpaceDesktop = api;
     saveMindmapNumbering(DOC, true);

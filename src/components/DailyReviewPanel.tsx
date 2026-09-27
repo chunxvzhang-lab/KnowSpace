@@ -178,8 +178,7 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
   tabsSlot,
   active = true,
 }) => {
-  const desktop =
-    typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
+  const desktop = typeof window !== "undefined" ? window.knowSpaceDesktop : undefined;
 
   /**
    * Where the cards come from.
@@ -575,7 +574,7 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
 
       setSaving(true);
       try {
-        if (!desktop?.saveMarkdownFile) throw new Error("当前环境不支持写回笔记");
+        if (!desktop?.files.saveMarkdownFile) throw new Error("当前环境不支持写回笔记");
 
         // The note is read again before it is written to, and the new scheduling is
         // merged into *that* rather than into the copy this panel loaded.
@@ -593,7 +592,7 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
         // what there is, which is what the panel used to write unconditionally.
         let baseContent = source.content;
         try {
-          const fresh = await desktop.readMarkdownFile?.(source.path);
+          const fresh = await desktop.files.readMarkdownFile?.(source.path);
           if (typeof fresh?.markdown === "string") baseContent = fresh.markdown;
         } catch {
           // Falls through to the copy in hand.
@@ -604,7 +603,7 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
           new Map([[current.card.id, result.progress]]),
         );
 
-        const res = await desktop.saveMarkdownFile({
+        const res = await desktop.files.saveMarkdownFile({
           absolutePath: source.path,
           content: updatedContent,
           // Still forced, and now for a narrower reason: the version check would refuse
@@ -698,13 +697,13 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
 
     setSaving(true);
     try {
-      if (!desktop?.saveMarkdownFile) throw new Error("当前环境不支持写回笔记");
+      if (!desktop?.files.saveMarkdownFile) throw new Error("当前环境不支持写回笔记");
 
       // Read first, like a rating does: the file may have been written to since, and
       // what is being written back is one card's scheduling, not a whole document.
       let baseContent = "";
       try {
-        const fresh = await desktop.readMarkdownFile?.(last.filePath);
+        const fresh = await desktop.files.readMarkdownFile?.(last.filePath);
         if (typeof fresh?.markdown === "string") baseContent = fresh.markdown;
       } catch {
         // Falls through to the refusal below: without the file's own text there is
@@ -717,7 +716,7 @@ export const DailyReviewPanel: React.FC<DailyReviewPanelProps> = ({
       else progress.set(last.cardId, last.previous);
 
       const undoneContent = serializeFsrsMetadata(baseContent, progress);
-      const res = await desktop.saveMarkdownFile({
+      const res = await desktop.files.saveMarkdownFile({
         absolutePath: last.filePath,
         content: undoneContent,
         force: true,

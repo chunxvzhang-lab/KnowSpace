@@ -178,9 +178,8 @@ export function useCanvasPresentation({
       onToggleFullscreen();
       return;
     }
-    const desktopWin = (
-      window as unknown as { bookMDDesktop?: { toggleFullScreen?: () => Promise<boolean> } }
-    ).bookMDDesktop;
+    // The namespaced bridge; `system` holds the fullscreen calls.
+    const desktopWin = window.bookMDDesktop?.system;
     if (desktopWin?.toggleFullScreen) {
       const next = await desktopWin.toggleFullScreen();
       setIsPresentationFullscreen(Boolean(next));

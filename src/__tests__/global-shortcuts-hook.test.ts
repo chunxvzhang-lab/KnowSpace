@@ -29,12 +29,19 @@ function makeParams(overrides: Partial<Params> = {}): Params {
 function captureDesktopHandlers(desktop: DesktopMock) {
   const captured: Record<string, ((arg: never) => void) | undefined> = {};
   const unsubscribes: Record<string, ReturnType<typeof vi.fn>> = {};
-  const bridge = desktop as unknown as Record<string, unknown>;
 
-  for (const name of ["onOpenFilePath", "onMenuCommand", "onBeforeClose", "onFlashNoteSaved"]) {
+  // The hook registers through the namespaced bridge: the three shell events
+  // live under `system`, the Flash note event under `capture`.
+  const targets: Array<[Record<string, unknown>, string]> = [
+    [desktop.system, "onOpenFilePath"],
+    [desktop.system, "onMenuCommand"],
+    [desktop.system, "onBeforeClose"],
+    [desktop.capture, "onFlashNoteSaved"],
+  ];
+  for (const [namespace, name] of targets) {
     const unsubscribe = vi.fn();
     unsubscribes[name] = unsubscribe;
-    bridge[name] = vi.fn((handler: (arg: never) => void) => {
+    namespace[name] = vi.fn((handler: (arg: never) => void) => {
       captured[name] = handler;
       return unsubscribe;
     });
@@ -51,8 +58,8 @@ describe("useGlobalShortcuts - desktop wiring", () => {
     desktop = installDesktopMock();
     // Keep the launch-file path out of the way so these tests are about the
     // registrations rather than about opening a document at startup.
-    (desktop as unknown as Record<string, unknown>).getInitialSyncData = () => undefined;
-    (desktop as unknown as Record<string, unknown>).getLaunchFilePath = () =>
+    (desktop.system as unknown as Record<string, unknown>).getInitialSyncData = () => undefined;
+    (desktop.system as unknown as Record<string, unknown>).getLaunchFilePath = () =>
       Promise.resolve(undefined);
   });
 

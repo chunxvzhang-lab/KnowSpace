@@ -34,7 +34,7 @@ export function useChapterRename({ session, updateSource, openSession }: UseChap
   const handleRenameChapter = useCallback(
     async (chapter: ChapterManifest) => {
       const desktop = window.bookMDDesktop;
-      if (!desktop?.renameMarkdownFile || !chapter.absolutePath) {
+      if (!desktop?.files.renameMarkdownFile || !chapter.absolutePath) {
         setNotice("当前环境不支持文件重命名");
         return;
       }
@@ -60,7 +60,7 @@ export function useChapterRename({ session, updateSource, openSession }: UseChap
       }
 
       // 2. Perform native file rename
-      const renameRes = await desktop.renameMarkdownFile({
+      const renameRes = await desktop.files.renameMarkdownFile({
         oldPath: chapter.absolutePath,
         newTitle,
       });
@@ -91,9 +91,13 @@ export function useChapterRename({ session, updateSource, openSession }: UseChap
 
           // If it's another chapter on disk
           const otherCh = manifest?.chapters.find((c) => c.id === sourceId);
-          if (otherCh?.absolutePath && desktop.readMarkdownFile && desktop.saveMarkdownFile) {
+          if (
+            otherCh?.absolutePath &&
+            desktop.files.readMarkdownFile &&
+            desktop.files.saveMarkdownFile
+          ) {
             try {
-              const fileRes = await desktop.readMarkdownFile(otherCh.absolutePath);
+              const fileRes = await desktop.files.readMarkdownFile(otherCh.absolutePath);
               if (fileRes?.markdown) {
                 const { newContent, changedCount } = refactorWikiLinksInContent(
                   fileRes.markdown,
@@ -101,7 +105,7 @@ export function useChapterRename({ session, updateSource, openSession }: UseChap
                   newTitle,
                 );
                 if (changedCount > 0) {
-                  await desktop.saveMarkdownFile({
+                  await desktop.files.saveMarkdownFile({
                     absolutePath: otherCh.absolutePath,
                     content: newContent,
                   });
@@ -123,9 +127,9 @@ export function useChapterRename({ session, updateSource, openSession }: UseChap
       }
 
       // 4. Refresh directory manifest
-      if (manifest?.rootPath && desktop.refreshDirectory) {
+      if (manifest?.rootPath && desktop.files.refreshDirectory) {
         try {
-          const nextManifest = await desktop.refreshDirectory(manifest.rootPath);
+          const nextManifest = await desktop.files.refreshDirectory(manifest.rootPath);
           setManifest(nextManifest);
         } catch {}
       }
@@ -150,10 +154,10 @@ export function useChapterRename({ session, updateSource, openSession }: UseChap
         session &&
         session.chapterId === chapter.id &&
         renameRes.newPath &&
-        desktop.readMarkdownFile
+        desktop.files.readMarkdownFile
       ) {
         try {
-          const nextSource = await desktop.readMarkdownFile(renameRes.newPath);
+          const nextSource = await desktop.files.readMarkdownFile(renameRes.newPath);
           openSession({
             chapterId: chapter.id,
             absolutePath: renameRes.newPath,

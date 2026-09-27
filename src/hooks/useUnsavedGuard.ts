@@ -121,8 +121,8 @@ export function useUnsavedGuard({
           break;
         }
         case "close-window": {
-          if (window.bookMDDesktop?.resolveBeforeClose) {
-            window.bookMDDesktop.resolveBeforeClose({
+          if (window.bookMDDesktop?.system.resolveBeforeClose) {
+            window.bookMDDesktop.system.resolveBeforeClose({
               requestId: action.requestId,
               action: "proceed",
             });
@@ -188,7 +188,7 @@ export function useUnsavedGuard({
 
   const handleDialogCancel = useCallback(() => {
     if (pendingActionRef.current?.type === "close-window") {
-      window.bookMDDesktop?.resolveBeforeClose?.({
+      window.bookMDDesktop?.system.resolveBeforeClose?.({
         requestId: pendingActionRef.current.requestId,
         action: "cancel",
       });

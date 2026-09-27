@@ -109,12 +109,9 @@ export function useCanvasMediaClipboard({
           });
 
           let finalFilePath = base64;
-          const desktop =
-            typeof window !== "undefined"
-              ? window.knowSpaceDesktop || window.bookMDDesktop
-              : undefined;
-          if (desktop?.savePastedImage) {
-            const res = await desktop.savePastedImage({
+          const desktop = typeof window !== "undefined" ? window.knowSpaceDesktop : undefined;
+          if (desktop?.capture.savePastedImage) {
+            const res = await desktop.capture.savePastedImage({
               currentFilePath,
               bufferBase64: base64,
               originalName: "pasted_image",
@@ -235,8 +232,7 @@ export function useCanvasMediaClipboard({
       const files = Array.from(e.target.files || []);
       if (files.length === 0 || !editable) return;
 
-      const desktop =
-        typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
+      const desktop = typeof window !== "undefined" ? window.knowSpaceDesktop : undefined;
       const newNodes: CanvasNode[] = [];
 
       // Right-click inserts land exactly where the user clicked; toolbar /
@@ -266,8 +262,8 @@ export function useCanvasMediaClipboard({
           });
 
           let finalFilePath = base64;
-          if (desktop?.savePastedImage) {
-            const res = await desktop.savePastedImage({
+          if (desktop?.capture.savePastedImage) {
+            const res = await desktop.capture.savePastedImage({
               currentFilePath,
               bufferBase64: base64,
               originalName: file.name,
@@ -339,8 +335,7 @@ export function useCanvasMediaClipboard({
       const files = Array.from(e.dataTransfer.files || []);
       if (files.length === 0) return;
 
-      const desktop =
-        typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
+      const desktop = typeof window !== "undefined" ? window.knowSpaceDesktop : undefined;
       const newNodes: CanvasNode[] = [];
 
       for (let i = 0; i < files.length; i++) {
@@ -358,8 +353,8 @@ export function useCanvasMediaClipboard({
             });
 
             let finalFilePath = base64;
-            if (desktop?.savePastedImage) {
-              const res = await desktop.savePastedImage({
+            if (desktop?.capture.savePastedImage) {
+              const res = await desktop.capture.savePastedImage({
                 currentFilePath,
                 bufferBase64: base64,
                 originalName: file.name,

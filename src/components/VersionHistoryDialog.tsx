@@ -59,8 +59,8 @@ export const VersionHistoryDialog = memo(function VersionHistoryDialog({
   const loadSnapshots = useCallback(async () => {
     setLoading(true);
     try {
-      if (window.bookMDDesktop?.listSnapshots && filePath) {
-        const list = await window.bookMDDesktop.listSnapshots({ filePath, rootPath });
+      if (window.bookMDDesktop?.history.listSnapshots && filePath) {
+        const list = await window.bookMDDesktop.history.listSnapshots({ filePath, rootPath });
         setSnapshots(list);
         setSelectedSnapshotId((prev) =>
           prev && list.some((s) => s.id === prev) ? prev : list[0]?.id || null,
@@ -96,8 +96,8 @@ export const VersionHistoryDialog = memo(function VersionHistoryDialog({
 
     let cancelled = false;
     async function fetchDetail() {
-      if (window.bookMDDesktop?.readSnapshot && filePath) {
-        const detail = await window.bookMDDesktop.readSnapshot({
+      if (window.bookMDDesktop?.history.readSnapshot && filePath) {
+        const detail = await window.bookMDDesktop.history.readSnapshot({
           filePath,
           rootPath,
           snapshotId: selectedSnapshotId!,
@@ -144,8 +144,8 @@ export const VersionHistoryDialog = memo(function VersionHistoryDialog({
   const handleCreateManual = useCallback(async () => {
     setCreatingManual(true);
     try {
-      if (window.bookMDDesktop?.createManualSnapshot && filePath) {
-        await window.bookMDDesktop.createManualSnapshot({
+      if (window.bookMDDesktop?.history.createManualSnapshot && filePath) {
+        await window.bookMDDesktop.history.createManualSnapshot({
           filePath,
           rootPath,
           content: currentContent,

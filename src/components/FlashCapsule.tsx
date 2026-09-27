@@ -73,20 +73,19 @@ export const FlashCapsule: React.FC = () => {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const persistentTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const persistentSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const desktop =
-    typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
+  const desktop = typeof window !== "undefined" ? window.knowSpaceDesktop : undefined;
 
   const refreshSpaceConfig = () => {
-    if (desktop?.getFlashSpaceConfig) {
-      desktop
+    if (desktop?.capture.getFlashSpaceConfig) {
+      desktop.capture
         .getFlashSpaceConfig()
         .then((cfg) => {
           if (cfg) setSpaceConfig(cfg);
         })
         .catch(() => {});
     }
-    if (desktop?.getFlashTargetPath) {
-      desktop
+    if (desktop?.capture.getFlashTargetPath) {
+      desktop.capture
         .getFlashTargetPath()
         .then((res) => {
           if (res?.relativeDisplay) {
@@ -108,8 +107,8 @@ export const FlashCapsule: React.FC = () => {
     const prefs = loadPreferences();
 
     // Load initial hotkey
-    if (desktop?.getFlashShortcut) {
-      desktop
+    if (desktop?.capture.getFlashShortcut) {
+      desktop.capture
         .getFlashShortcut()
         .then((sc) => {
           if (sc) {
@@ -124,8 +123,8 @@ export const FlashCapsule: React.FC = () => {
     }
 
     // Load pin status
-    if (desktop?.getFlashPin) {
-      desktop
+    if (desktop?.capture.getFlashPin) {
+      desktop.capture
         .getFlashPin()
         .then((res) => {
           if (res && typeof res.pinned === "boolean") {
@@ -136,8 +135,8 @@ export const FlashCapsule: React.FC = () => {
     }
 
     // Load app settings
-    if (desktop?.getAppSettings) {
-      desktop
+    if (desktop?.system.getAppSettings) {
+      desktop.system
         .getAppSettings()
         .then((st) => {
           if (st) {
@@ -152,8 +151,8 @@ export const FlashCapsule: React.FC = () => {
     refreshSpaceConfig();
 
     // Load persistent note / prompt template
-    if (desktop?.getPersistentNote) {
-      desktop
+    if (desktop?.capture.getPersistentNote) {
+      desktop.capture
         .getPersistentNote()
         .then((res) => {
           if (res && typeof res.text === "string") {
@@ -175,8 +174,8 @@ export const FlashCapsule: React.FC = () => {
       if (!force && now - lastTargetsLoadTime < 3000) return;
       lastTargetsLoadTime = now;
       try {
-        if (desktop?.getFlashNotesSummary) {
-          const res = await desktop.getFlashNotesSummary();
+        if (desktop?.capture.getFlashNotesSummary) {
+          const res = await desktop.capture.getFlashNotesSummary();
           if (res?.success && res.notes) {
             const titles = res.notes.map((n) => n.fileName.replace(/\.md$/i, ""));
             setAvailableTargets((prev) => Array.from(new Set([...prev, ...titles])));
@@ -192,8 +191,8 @@ export const FlashCapsule: React.FC = () => {
 
     // Listen for focus event from main process when hotkey is triggered
     let cleanupFocus: (() => void) | undefined;
-    if (desktop?.onFlashFocus) {
-      cleanupFocus = desktop.onFlashFocus(() => {
+    if (desktop?.capture.onFlashFocus) {
+      cleanupFocus = desktop.capture.onFlashFocus(() => {
         loadTargets();
         applyTheme();
         refreshSpaceConfig();
@@ -205,24 +204,24 @@ export const FlashCapsule: React.FC = () => {
     }
 
     let cleanupShortcut: (() => void) | undefined;
-    if (desktop?.onFlashShortcutUpdated) {
-      cleanupShortcut = desktop.onFlashShortcutUpdated((newSc) => {
+    if (desktop?.capture.onFlashShortcutUpdated) {
+      cleanupShortcut = desktop.capture.onFlashShortcutUpdated((newSc) => {
         setShortcut(newSc);
         setRecordedShortcut(newSc);
       });
     }
 
     let cleanupSettings: (() => void) | undefined;
-    if (desktop?.onAppSettingsUpdated) {
-      cleanupSettings = desktop.onAppSettingsUpdated((st) => {
+    if (desktop?.system.onAppSettingsUpdated) {
+      cleanupSettings = desktop.system.onAppSettingsUpdated((st) => {
         setAutoLaunch(st.autoLaunch);
         setRunInBackground(st.runInBackground);
       });
     }
 
     let cleanupTheme: (() => void) | undefined;
-    if (desktop?.onThemeUpdated) {
-      cleanupTheme = desktop.onThemeUpdated((newTheme) => {
+    if (desktop?.system.onThemeUpdated) {
+      cleanupTheme = desktop.system.onThemeUpdated((newTheme) => {
         applyTheme(newTheme);
       });
     }
@@ -269,17 +268,17 @@ export const FlashCapsule: React.FC = () => {
   }, [resolvedTheme]);
 
   const handleClose = () => {
-    if (desktop?.hideFlashCapsule) {
-      desktop.hideFlashCapsule();
+    if (desktop?.capture.hideFlashCapsule) {
+      desktop.capture.hideFlashCapsule();
     }
   };
 
   const handleTogglePin = async () => {
     const next = !isPinned;
     setIsPinned(next);
-    if (desktop?.setFlashPin) {
+    if (desktop?.capture.setFlashPin) {
       try {
-        const res = await desktop.setFlashPin(next);
+        const res = await desktop.capture.setFlashPin(next);
         if (res && typeof res.pinned === "boolean") {
           setIsPinned(res.pinned);
         }
@@ -297,8 +296,8 @@ export const FlashCapsule: React.FC = () => {
     setStatusMessage("正在归档至 Space...");
 
     try {
-      if (desktop?.saveFlashNote) {
-        const res = await desktop.saveFlashNote({ content: content.trim() });
+      if (desktop?.capture.saveFlashNote) {
+        const res = await desktop.capture.saveFlashNote({ content: content.trim() });
         if (res.success) {
           setSaveStatus("saved");
           const targetName = res.fileName || "Space";
@@ -392,7 +391,7 @@ export const FlashCapsule: React.FC = () => {
 
       if (rafId === null) {
         rafId = requestAnimationFrame(() => {
-          desktop?.setFlashSize?.({ width: latestWidth, height: latestHeight });
+          desktop?.capture.setFlashSize?.({ width: latestWidth, height: latestHeight });
           rafId = null;
         });
       }
@@ -402,7 +401,7 @@ export const FlashCapsule: React.FC = () => {
       if (rafId !== null) {
         cancelAnimationFrame(rafId);
       }
-      desktop?.setFlashSize?.({ width: latestWidth, height: latestHeight });
+      desktop?.capture.setFlashSize?.({ width: latestWidth, height: latestHeight });
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
     };
@@ -420,7 +419,7 @@ export const FlashCapsule: React.FC = () => {
       clearTimeout(persistentSaveTimerRef.current);
     }
     persistentSaveTimerRef.current = setTimeout(() => {
-      desktop?.savePersistentNote?.(val);
+      desktop?.capture.savePersistentNote?.(val);
     }, 350);
   };
 
@@ -441,10 +440,10 @@ export const FlashCapsule: React.FC = () => {
   };
 
   const handleSelectSpaceDir = async () => {
-    if (!desktop?.selectFlashSpaceDir) return;
+    if (!desktop?.capture.selectFlashSpaceDir) return;
     setSettingsError("");
     setSettingsSuccess("");
-    const res = await desktop.selectFlashSpaceDir();
+    const res = await desktop.capture.selectFlashSpaceDir();
     if (res?.success && res.newDir) {
       setSettingsSuccess("✓ 已成功切换 Space 存储目录");
       refreshSpaceConfig();
@@ -455,10 +454,10 @@ export const FlashCapsule: React.FC = () => {
   };
 
   const handleResetSpaceDir = async () => {
-    if (!desktop?.resetFlashSpaceDir) return;
+    if (!desktop?.capture.resetFlashSpaceDir) return;
     setSettingsError("");
     setSettingsSuccess("");
-    const res = await desktop.resetFlashSpaceDir();
+    const res = await desktop.capture.resetFlashSpaceDir();
     if (res?.success) {
       setSettingsSuccess("✓ 已恢复为默认 Space 目录");
       refreshSpaceConfig();
@@ -622,8 +621,8 @@ export const FlashCapsule: React.FC = () => {
       return;
     }
 
-    if (desktop?.setFlashShortcut) {
-      const res = await desktop.setFlashShortcut(targetSc.trim());
+    if (desktop?.capture.setFlashShortcut) {
+      const res = await desktop.capture.setFlashShortcut(targetSc.trim());
       if (res.success) {
         setShortcut(targetSc.trim());
         setRecordedShortcut(targetSc.trim());
@@ -861,7 +860,7 @@ export const FlashCapsule: React.FC = () => {
                     onChange={async (e) => {
                       const val = e.target.checked;
                       setAutoLaunch(val);
-                      const res = await desktop?.setAppSettings?.({ autoLaunch: val });
+                      const res = await desktop?.system.setAppSettings?.({ autoLaunch: val });
                       if (res?.settings) {
                         setAutoLaunch(res.settings.autoLaunch);
                         setRunInBackground(res.settings.runInBackground);
@@ -877,7 +876,7 @@ export const FlashCapsule: React.FC = () => {
                     onChange={async (e) => {
                       const val = e.target.checked;
                       setRunInBackground(val);
-                      const res = await desktop?.setAppSettings?.({ runInBackground: val });
+                      const res = await desktop?.system.setAppSettings?.({ runInBackground: val });
                       if (res?.settings) {
                         setAutoLaunch(res.settings.autoLaunch);
                         setRunInBackground(res.settings.runInBackground);
@@ -892,7 +891,7 @@ export const FlashCapsule: React.FC = () => {
                     checked={isPinned}
                     onChange={(e) => {
                       setIsPinned(e.target.checked);
-                      desktop?.setFlashPin?.(e.target.checked);
+                      desktop?.capture.setFlashPin?.(e.target.checked);
                     }}
                   />
                   <span>固定胶囊窗口 (点击外部不退出)</span>
@@ -909,8 +908,8 @@ export const FlashCapsule: React.FC = () => {
                     gap: "5px",
                   }}
                   onClick={async () => {
-                    if (desktop?.resetFlashSize) {
-                      await desktop.resetFlashSize();
+                    if (desktop?.capture.resetFlashSize) {
+                      await desktop.capture.resetFlashSize();
                       setSettingsSuccess("✓ 已恢复精炼胶囊尺寸 (600×360)");
                       setTimeout(() => setSettingsSuccess(""), 1500);
                     }

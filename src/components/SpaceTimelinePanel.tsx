@@ -76,17 +76,16 @@ export const SpaceTimelinePanel: React.FC<SpaceTimelinePanelProps> = ({
   const [todoFilter, setTodoFilter] = useState<"all" | "pending" | "done">("pending");
   const [feedback, setFeedback] = useState<string>("");
 
-  const desktop =
-    typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
+  const desktop = typeof window !== "undefined" ? window.knowSpaceDesktop : undefined;
 
   const loadSummary = useCallback(async () => {
-    if (!desktop?.getFlashNotesSummary) {
+    if (!desktop?.capture.getFlashNotesSummary) {
       setLoading(false);
       return;
     }
     setLoading(true);
     try {
-      const res: FlashNotesSummaryResult = await desktop.getFlashNotesSummary();
+      const res: FlashNotesSummaryResult = await desktop.capture.getFlashNotesSummary();
       if (res && res.success) {
         setNotes(res.notes || []);
         setSpaceDir(res.spaceDir || "");
@@ -102,8 +101,8 @@ export const SpaceTimelinePanel: React.FC<SpaceTimelinePanelProps> = ({
     loadSummary();
 
     let cleanupSaved: (() => void) | undefined;
-    if (desktop?.onFlashNoteSaved) {
-      cleanupSaved = desktop.onFlashNoteSaved(() => {
+    if (desktop?.capture.onFlashNoteSaved) {
+      cleanupSaved = desktop.capture.onFlashNoteSaved(() => {
         loadSummary();
       });
     }
@@ -123,7 +122,7 @@ export const SpaceTimelinePanel: React.FC<SpaceTimelinePanelProps> = ({
     lineIndex: number,
     currentCompleted: boolean,
   ) => {
-    if (!desktop?.toggleFlashTodo) return;
+    if (!desktop?.capture.toggleFlashTodo) return;
     const nextCompleted = !currentCompleted;
 
     // Optimistic UI update
@@ -141,7 +140,7 @@ export const SpaceTimelinePanel: React.FC<SpaceTimelinePanelProps> = ({
     );
 
     try {
-      const res = await desktop.toggleFlashTodo({
+      const res = await desktop.capture.toggleFlashTodo({
         filePath,
         lineIndex,
         completed: nextCompleted,
@@ -159,8 +158,8 @@ export const SpaceTimelinePanel: React.FC<SpaceTimelinePanelProps> = ({
     if (!window.confirm(`确定要删除闪念记录 [ ${fileName} ] 吗？此操作无法撤销。`)) {
       return;
     }
-    if (desktop?.deleteFlashNote) {
-      const res = await desktop.deleteFlashNote({ filePath });
+    if (desktop?.capture.deleteFlashNote) {
+      const res = await desktop.capture.deleteFlashNote({ filePath });
       if (res.success) {
         setNotes((prev) => prev.filter((n) => n.filePath !== filePath));
         showToast("✓ 已删除闪念文件");
@@ -334,7 +333,7 @@ export const SpaceTimelinePanel: React.FC<SpaceTimelinePanelProps> = ({
                   type="button"
                   className="space-icon-btn"
                   onClick={() => {
-                    desktop?.openFlashCapsule?.();
+                    desktop?.capture.openFlashCapsule?.();
                   }}
                   title="呼出闪念胶囊 (Alt+Space)"
                 >
@@ -387,7 +386,7 @@ export const SpaceTimelinePanel: React.FC<SpaceTimelinePanelProps> = ({
                 <button
                   type="button"
                   className="space-btn-primary"
-                  onClick={() => desktop?.openFlashCapsule?.()}
+                  onClick={() => desktop?.capture.openFlashCapsule?.()}
                 >
                   <Zap size={14} /> 呼出闪念胶囊
                 </button>

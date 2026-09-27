@@ -6,7 +6,8 @@ import { describe, expect, it } from "vitest";
 /**
  * IPC channel contract guard.
  *
- * `electron/preload.cjs` exposes ~60 methods; `electron/main.cjs` registers the
+ * `electron/preload.cjs` exposes ~67 methods under five namespaces
+ * (files/history/media/system/capture); `electron/main.cjs` registers the
  * handlers; `src/types/desktop.d.ts` tells the renderer what exists. Nothing
  * cross-checks these three surfaces: TypeScript never sees the .cjs files, and
  * the channel name is a string literal on both ends. A renderer call whose
@@ -17,7 +18,8 @@ import { describe, expect, it } from "vitest";
  *
  * Guard shape follows the five-element template the CSS guards established:
  *  1. single source of truth — the .cjs / .d.ts files are parsed, never copied;
- *  2. set assertions — caller ⊆ handler, handler ⊆ caller, type ⊆ impl;
+ *  2. set assertions — caller ⊆ handler, handler ⊆ caller, type ⊆ impl, and
+ *     per-namespace method equality between preload and the .d.ts;
  *  3. negative contrast — the parsers must flag a missing handler on a fixture
  *     and must pass a complete one (a guard that cannot fail is worse than none);
  *  4. parser self-check — a regex that silently matches nothing would turn every
@@ -29,6 +31,7 @@ import { describe, expect, it } from "vitest";
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const preloadPath = join(repoRoot, "electron", "preload.cjs");
 const dtsPath = join(repoRoot, "src", "types", "desktop.d.ts");
+const packageJsonPath = join(repoRoot, "package.json");
 
 const read = (p: string) => readFileSync(p, "utf8");
 
@@ -49,27 +52,58 @@ const parsePreloadSendSync = (text: string) =>
 const parsePreloadListeners = (text: string) =>
   matchChannels(text, /ipcRenderer\.on\(\s*["']([^"']+)["']/g);
 
-/** Keys of the `const desktopApi = { ... }` literal: 2-space indented. */
-function parsePreloadMethods(text: string) {
-  const names = new Map<string, number>();
-  for (const m of text.matchAll(/^ {2}([A-Za-z_$][\w$]*):/gm)) {
-    names.set(m[1], lineOf(text, m.index ?? 0));
+/** The five namespaces of the bridge, in both preload.cjs and desktop.d.ts. */
+const NAMESPACE_KEYS = ["files", "history", "media", "system", "capture"] as const;
+
+/**
+ * Methods inside the namespace blocks of the bridge shape. A namespace opens
+ * with `  files: {` (2-space indent), its methods sit at 4-space indent, and
+ * the block closes with a 2-space `}` — deeper-nested object members (request
+ * payload shapes, listener bodies) sit at 6+ spaces and never match.
+ */
+function parseBridgeNamespaces(text: string) {
+  const namespaces = new Map<string, Map<string, { line: number }>>();
+  const opener = new RegExp(`^ {2}(${NAMESPACE_KEYS.join("|")}): \\{$`);
+  const closer = /^ {2}[},][,;]?$/;
+  const member = /^ {4}([A-Za-z_$][\w$]*)\??:/;
+  let current: string | null = null;
+  const lines = text.split(/\r?\n/);
+  for (const [index, line] of lines.entries()) {
+    if (current === null) {
+      const open = line.match(opener);
+      if (open) {
+        current = open[1];
+        namespaces.set(current, new Map());
+      }
+      continue;
+    }
+    if (closer.test(line)) {
+      current = null;
+      continue;
+    }
+    const key = line.match(member);
+    if (key) {
+      namespaces.get(current)?.set(key[1], { line: index + 1 });
+    }
   }
-  return names;
+  return namespaces;
 }
 
-/** Keys of the `KnowSpaceDesktopAPI` type: 2-space indent, nested object
- * members sit at 4 and must not be mistaken for methods. */
-function parseDtsMethods(text: string) {
-  const start = text.indexOf("export type KnowSpaceDesktopAPI = {");
-  if (start === -1) return new Map<string, number>();
-  const end = text.indexOf("\n};", start);
-  const block = text.slice(start, end === -1 ? undefined : end);
-  const names = new Map<string, number>();
-  for (const m of block.matchAll(/^ {2}([A-Za-z_$][\w$]*)\??:/gm)) {
-    names.set(m[1], lineOf(text, start + (m.index ?? 0)));
+/** Union of every method across the five namespaces, with its namespace. */
+function flattenNamespaces(namespaces: ReturnType<typeof parseBridgeNamespaces>) {
+  const flat = new Map<string, { namespace: string }>();
+  for (const [namespace, methods] of namespaces) {
+    for (const name of methods.keys()) {
+      flat.set(name, { namespace });
+    }
   }
-  return names;
+  return flat;
+}
+
+/** The `API_VERSION` literal preload reports during the startup handshake. */
+function parsePreloadApiVersion(text: string) {
+  const m = text.match(/^const API_VERSION = "([^"]+)";$/m);
+  return m?.[1] ?? null;
 }
 
 function parseElectronDirectory() {
@@ -116,13 +150,16 @@ function missingHandlers(preloadText: string, mainText: string) {
 describe("IPC channel contract (preload.cjs ↔ main.cjs ↔ desktop.d.ts)", () => {
   const preload = read(preloadPath);
   const dts = read(dtsPath);
+  const packageVersion = JSON.parse(read(packageJsonPath)).version as string;
   const main = parseElectronDirectory();
 
   const invoke = parsePreloadInvoke(preload);
   const sendSync = parsePreloadSendSync(preload);
   const listeners = parsePreloadListeners(preload);
-  const methods = parsePreloadMethods(preload);
-  const dtsMethods = parseDtsMethods(dts);
+  const preloadNamespaces = parseBridgeNamespaces(preload);
+  const dtsNamespaces = parseBridgeNamespaces(dts);
+  const methods = flattenNamespaces(preloadNamespaces);
+  const dtsMethods = flattenNamespaces(dtsNamespaces);
 
   it("parser self-check: parsed surfaces are above plausible-empty thresholds", () => {
     // Element ④. A broken regex would yield empty sets and everything below
@@ -131,10 +168,27 @@ describe("IPC channel contract (preload.cjs ↔ main.cjs ↔ desktop.d.ts)", () 
     expect(invoke.size).toBeGreaterThanOrEqual(40);
     expect(sendSync.size).toBeGreaterThanOrEqual(1);
     expect(listeners.size).toBeGreaterThanOrEqual(5);
-    expect(methods.size).toBeGreaterThanOrEqual(50);
-    expect(dtsMethods.size).toBeGreaterThanOrEqual(50);
     expect(main.handles.size).toBeGreaterThanOrEqual(40);
     expect(main.sends.size).toBeGreaterThanOrEqual(5);
+    // Five namespaces must all be present on both surfaces.
+    for (const namespace of NAMESPACE_KEYS) {
+      expect(preloadNamespaces.has(namespace)).toBe(true);
+      expect(dtsNamespaces.has(namespace)).toBe(true);
+    }
+    // ≥40 methods across the namespaces, and a floor per namespace a bad
+    // parse of exactly that block would break.
+    expect(methods.size).toBeGreaterThanOrEqual(40);
+    expect(dtsMethods.size).toBeGreaterThanOrEqual(40);
+    expect(preloadNamespaces.get("files")?.size).toBeGreaterThanOrEqual(10);
+    expect(preloadNamespaces.get("history")?.size).toBeGreaterThanOrEqual(4);
+    expect(preloadNamespaces.get("media")?.size).toBeGreaterThanOrEqual(7);
+    expect(preloadNamespaces.get("system")?.size).toBeGreaterThanOrEqual(15);
+    expect(preloadNamespaces.get("capture")?.size).toBeGreaterThanOrEqual(20);
+    expect(dtsNamespaces.get("files")?.size).toBeGreaterThanOrEqual(10);
+    expect(dtsNamespaces.get("history")?.size).toBeGreaterThanOrEqual(4);
+    expect(dtsNamespaces.get("media")?.size).toBeGreaterThanOrEqual(7);
+    expect(dtsNamespaces.get("system")?.size).toBeGreaterThanOrEqual(15);
+    expect(dtsNamespaces.get("capture")?.size).toBeGreaterThanOrEqual(20);
   });
 
   it("parser self-check: channel names are string literals, not template expressions", () => {
@@ -150,7 +204,7 @@ describe("IPC channel contract (preload.cjs ↔ main.cjs ↔ desktop.d.ts)", () 
 
   it("every preload invoke channel has a registered handler in main", () => {
     // Failure output carries preload.cjs:line — line numbers are the only way
-    // to navigate a 130-line bridge file from a test report.
+    // to navigate the bridge file from a test report.
     const unhandled = [...invoke.entries()]
       .filter(([channel]) => !main.handles.has(channel))
       .map(([channel, loc]) => `${channel} (preload.cjs:${loc.line})`);
@@ -186,12 +240,18 @@ describe("IPC channel contract (preload.cjs ↔ main.cjs ↔ desktop.d.ts)", () 
     expect(preload).toContain('exposeInMainWorld("bookMDDesktop"');
   });
 
-  it("every method preload exposes is declared in desktop.d.ts", () => {
-    const { onlyA } = diffSets(methods, dtsMethods);
-    const undeclared = [...onlyA].filter(
-      (name) => !ALLOWED_PRELOAD_ONLY.some((a) => a.name === name),
-    );
-    expect(undeclared).toEqual([]);
+  it("every method preload exposes is declared in desktop.d.ts (per namespace)", () => {
+    for (const namespace of NAMESPACE_KEYS) {
+      const preloadMethods = preloadNamespaces.get(namespace) ?? new Map();
+      const dtsBlock = dtsNamespaces.get(namespace) ?? new Map();
+      const { onlyA, onlyB } = diffSets(preloadMethods, dtsBlock);
+      const undeclared = [...onlyA].filter(
+        (name) => !ALLOWED_PRELOAD_ONLY.some((a) => a.name === name),
+      );
+      const extra = [...onlyB].filter((name) => !ALLOWED_DTS_ONLY.some((a) => a.name === name));
+      expect(undeclared, `${namespace}: undeclared in desktop.d.ts`).toEqual([]);
+      expect(extra, `${namespace}: not implemented by preload`).toEqual([]);
+    }
   });
 
   it("every method desktop.d.ts declares is implemented by preload", () => {
@@ -200,6 +260,21 @@ describe("IPC channel contract (preload.cjs ↔ main.cjs ↔ desktop.d.ts)", () 
       (name) => !ALLOWED_DTS_ONLY.some((a) => a.name === name),
     );
     expect(unimplemented).toEqual([]);
+  });
+
+  it("bridge apiVersion matches the app version (startup handshake stays honest)", () => {
+    // preload reports API_VERSION over bookmd:api-version; system.cjs compares
+    // it with app.getVersion() and warns on drift. This test catches the same
+    // drift statically: the literal must equal package.json "version".
+    const apiVersion = parsePreloadApiVersion(preload);
+    expect(apiVersion).toBeTruthy();
+    expect(apiVersion).toMatch(/^\d+\.\d+\.\d+/);
+    expect(apiVersion).toBe(packageVersion);
+    expect(preload).toContain("apiVersion: API_VERSION");
+    expect(preload).toContain('ipcRenderer.invoke("bookmd:api-version"');
+    expect(main.handles.has("bookmd:api-version")).toBe(true);
+    // The .d.ts side of the contract: apiVersion is a non-optional string.
+    expect(dts).toContain("apiVersion: string;");
   });
 
   it("allowlist decay: every waiver is still a real mismatch with a real reason", () => {
@@ -236,5 +311,48 @@ describe("IPC guard negative contrast (the guard itself must be able to fail)", 
   it("an empty parse fails the self-check threshold instead of passing vacuously", () => {
     expect(parsePreloadInvoke("").size).toBe(0);
     expect(parsePreloadInvoke("").size).toBeLessThan(40);
+  });
+
+  it("the namespace parser finds methods in a miniature bridge shape", () => {
+    const fixture = [
+      "const desktopApi = {",
+      '  apiVersion: "0.0.0",',
+      "",
+      "  files: {",
+      '    openDirectory: () => ipcRenderer.invoke("t:open"),',
+      '    saveMarkdownFile: (request) => ipcRenderer.invoke("t:save", request),',
+      "  },",
+      "",
+      "  system: {",
+      "    onMenuCommand: (callback) => {",
+      "      const listener = (_event, command) => callback(command);",
+      '      ipcRenderer.on("t:menu", listener);',
+      '      return () => ipcRenderer.removeListener("t:menu", listener);',
+      "    },",
+      "  },",
+      "};",
+    ].join("\n");
+    const parsed = parseBridgeNamespaces(fixture);
+    expect(parsed.get("files")?.size).toBe(2);
+    expect([...(parsed.get("files")?.keys() ?? [])]).toEqual(["openDirectory", "saveMarkdownFile"]);
+    expect(parsed.get("system")?.size).toBe(1);
+    expect(parsed.get("history")).toBeUndefined();
+    // Method-typed request shapes nested at 6 spaces must not leak in.
+    const nested = [
+      "  files: {",
+      "    readSnapshot?: (params: {",
+      "      filePath: string;",
+      "      snapshotId: string;",
+      "    }) => Promise<unknown>;",
+      "  };",
+    ].join("\n");
+    const parsedNested = parseBridgeNamespaces(nested);
+    expect(parsedNested.get("files")?.size).toBe(1);
+    expect([...(parsedNested.get("files")?.keys() ?? [])]).toEqual(["readSnapshot"]);
+  });
+
+  it("the namespace parser returns nothing for an empty or flat document", () => {
+    expect(parseBridgeNamespaces("").size).toBe(0);
+    expect(parseBridgeNamespaces("const flat = { ping: () => {} };").size).toBe(0);
   });
 });

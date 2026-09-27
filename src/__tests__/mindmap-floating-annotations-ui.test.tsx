@@ -26,14 +26,16 @@ const DOC = "/vault/notes/a.md";
 
 function installBridge(read?: { exists?: boolean; content?: string }) {
   const api = {
-    readMindmapSidecar: vi
-      .fn()
-      .mockResolvedValue(
-        read?.content
-          ? { success: true, exists: true, content: read.content }
-          : { success: true, exists: read?.exists ?? false },
-      ),
-    saveMindmapSidecar: vi.fn().mockResolvedValue({ success: true }),
+    files: {
+      readMindmapSidecar: vi
+        .fn()
+        .mockResolvedValue(
+          read?.content
+            ? { success: true, exists: true, content: read.content }
+            : { success: true, exists: read?.exists ?? false },
+        ),
+      saveMindmapSidecar: vi.fn().mockResolvedValue({ success: true }),
+    },
   };
   (window as unknown as Record<string, unknown>).knowSpaceDesktop = api;
   return api;
@@ -57,7 +59,7 @@ function rightClickTopic() {
 }
 
 function lastWritten(api: ReturnType<typeof installBridge>) {
-  const call = api.saveMindmapSidecar.mock.calls.at(-1);
+  const call = api.files.saveMindmapSidecar.mock.calls.at(-1);
   return call ? parseSidecar(call[0].content as string) : null;
 }
 
@@ -89,7 +91,7 @@ describe("自由主题的标注", () => {
     // that panel describes things a floating topic does not have.
     expect(topicTitle()).toContain("画布上的想法");
     expect(screen.queryByText("节点背景颜色")).toBeNull();
-    expect(api.saveMindmapSidecar).not.toHaveBeenCalled();
+    expect(api.files.saveMindmapSidecar).not.toHaveBeenCalled();
   });
 
   it("在面板里写备注，落在同一个文件的同一个 id 下", async () => {

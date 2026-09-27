@@ -61,7 +61,7 @@ export function useDocumentAuthoring({
 
       try {
         const rootPath = manifest?.rootPath;
-        const result = await desktop.createMarkdownFile({
+        const result = await desktop.files.createMarkdownFile({
           rootPath,
           defaultName: options.defaultName,
           initialContent: options.content,
@@ -75,8 +75,8 @@ export function useDocumentAuthoring({
         // in it — and otherwise assemble the listing around the new file. Both rules
         // live with the listing, not here: see listingWithNewChapter.
         const nextManifest =
-          rootPath && desktop.refreshDirectory
-            ? await desktop.refreshDirectory(rootPath)
+          rootPath && desktop.files.refreshDirectory
+            ? await desktop.files.refreshDirectory(rootPath)
             : listingWithNewChapter(manifest, result.chapter, result.absolutePath);
 
         // The listing is the authority on what the file became when it knows the
@@ -156,12 +156,12 @@ export function useDocumentAuthoring({
    */
   const handleImportOutline = useCallback(async () => {
     const desktop = window.bookMDDesktop;
-    if (!desktop?.pickOutlineFile) {
+    if (!desktop?.files.pickOutlineFile) {
       setNotice("导入大纲需要桌面版。");
       return;
     }
 
-    const picked = await desktop.pickOutlineFile();
+    const picked = await desktop.files.pickOutlineFile();
     if (picked.canceled) return;
     if (!picked.success || typeof picked.contentBase64 !== "string") {
       setNotice(picked.message || "无法读取这个文件。");

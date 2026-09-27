@@ -38,16 +38,15 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
 
   useEffect(() => {
     if (!isOpen) return undefined;
-    const desktop =
-      typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
-    desktop?.getAppSettings?.().then((settings) => {
+    const desktop = typeof window !== "undefined" ? window.knowSpaceDesktop : undefined;
+    desktop?.system.getAppSettings?.().then((settings) => {
       if (settings) {
         setAutoLaunch(settings.autoLaunch);
         setRunInBackground(settings.runInBackground);
       }
     });
 
-    const unsubscribe = desktop?.onAppSettingsUpdated?.((settings) => {
+    const unsubscribe = desktop?.system.onAppSettingsUpdated?.((settings) => {
       setAutoLaunch(settings.autoLaunch);
       setRunInBackground(settings.runInBackground);
     });
@@ -57,9 +56,8 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
 
   const handleToggleAutoLaunch = async (val: boolean) => {
     setAutoLaunch(val);
-    const desktop =
-      typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
-    const res = await desktop?.setAppSettings?.({ autoLaunch: val });
+    const desktop = typeof window !== "undefined" ? window.knowSpaceDesktop : undefined;
+    const res = await desktop?.system.setAppSettings?.({ autoLaunch: val });
     if (res?.settings) {
       setAutoLaunch(res.settings.autoLaunch);
       setRunInBackground(res.settings.runInBackground);
@@ -68,9 +66,8 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
 
   const handleToggleRunInBackground = async (val: boolean) => {
     setRunInBackground(val);
-    const desktop =
-      typeof window !== "undefined" ? window.knowSpaceDesktop || window.bookMDDesktop : undefined;
-    const res = await desktop?.setAppSettings?.({ runInBackground: val });
+    const desktop = typeof window !== "undefined" ? window.knowSpaceDesktop : undefined;
+    const res = await desktop?.system.setAppSettings?.({ runInBackground: val });
     if (res?.settings) {
       setAutoLaunch(res.settings.autoLaunch);
       setRunInBackground(res.settings.runInBackground);
@@ -79,20 +76,10 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
 
   const handleOpenExternal = useCallback((url: string) => {
     if (typeof window !== "undefined") {
-      const desktop =
-        (
-          window as unknown as {
-            knowSpaceDesktop?: { openExternal?: (url: string) => Promise<boolean> };
-            bookMDDesktop?: { openExternal?: (url: string) => Promise<boolean> };
-          }
-        ).knowSpaceDesktop ||
-        (
-          window as unknown as {
-            bookMDDesktop?: { openExternal?: (url: string) => Promise<boolean> };
-          }
-        ).bookMDDesktop;
-      if (desktop?.openExternal) {
-        desktop.openExternal(url);
+      // Both window keys expose the same namespaced bridge; one read is enough.
+      const desktop = window.knowSpaceDesktop;
+      if (desktop?.system.openExternal) {
+        desktop.system.openExternal(url);
       } else {
         window.open(url, "_blank", "noopener,noreferrer");
       }
@@ -736,16 +723,9 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
                 className="flash-btn flash-btn-primary"
                 style={{ fontSize: 12, padding: "4px 12px" }}
                 onClick={() => {
-                  const desktop =
-                    (
-                      window as unknown as {
-                        knowSpaceDesktop?: { openFlashCapsule?: () => void };
-                        bookMDDesktop?: { openFlashCapsule?: () => void };
-                      }
-                    ).knowSpaceDesktop ||
-                    (window as unknown as { bookMDDesktop?: { openFlashCapsule?: () => void } })
-                      .bookMDDesktop;
-                  desktop?.openFlashCapsule?.();
+                  // Both window keys expose the same namespaced bridge.
+                  const desktop = window.knowSpaceDesktop;
+                  desktop?.capture.openFlashCapsule?.();
                 }}
               >
                 <Zap size={13} /> 立即呼出闪念胶囊 (设置热键)

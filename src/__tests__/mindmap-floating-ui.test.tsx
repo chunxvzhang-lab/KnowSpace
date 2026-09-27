@@ -26,8 +26,10 @@ const DOC = "/vault/notes/a.md";
 
 function installBridge() {
   const api = {
-    readMindmapSidecar: vi.fn().mockResolvedValue({ success: true, exists: false }),
-    saveMindmapSidecar: vi.fn().mockResolvedValue({ success: true }),
+    files: {
+      readMindmapSidecar: vi.fn().mockResolvedValue({ success: true, exists: false }),
+      saveMindmapSidecar: vi.fn().mockResolvedValue({ success: true }),
+    },
   };
   (window as unknown as Record<string, unknown>).knowSpaceDesktop = api;
   return api;
@@ -44,7 +46,7 @@ function openCanvasMenu(clientX = 400, clientY = 300) {
 }
 
 function lastWritten(api: ReturnType<typeof installBridge>) {
-  const call = api.saveMindmapSidecar.mock.calls.at(-1);
+  const call = api.files.saveMindmapSidecar.mock.calls.at(-1);
   return call ? parseSidecar(call[0].content as string) : null;
 }
 
@@ -87,7 +89,7 @@ describe("自由主题", () => {
   it("打开文档时它在原处", async () => {
     const api = installBridge();
     const { sidecar } = addFloatingTopic(emptySidecar(), "画布上的想法", 250, 80);
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: serializeSidecar(sidecar),
@@ -131,7 +133,7 @@ describe("自由主题", () => {
     vi.useFakeTimers();
     const api = installBridge();
     const { sidecar } = addFloatingTopic(emptySidecar(), "原名", 100, 100);
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: serializeSidecar(sidecar),
@@ -156,7 +158,7 @@ describe("自由主题", () => {
     vi.useFakeTimers();
     const api = installBridge();
     const { sidecar } = addFloatingTopic(emptySidecar(), "要删掉的", 100, 100);
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: serializeSidecar(sidecar),
@@ -178,7 +180,7 @@ describe("自由主题", () => {
     vi.useFakeTimers();
     const api = installBridge();
     const { sidecar } = addFloatingTopic(emptySidecar(), "要删掉的", 100, 100);
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: serializeSidecar(sidecar),
@@ -207,7 +209,7 @@ describe("自由主题", () => {
   it("导出带上它，却不带它的选中圈", async () => {
     const api = installBridge();
     const { sidecar } = addFloatingTopic(emptySidecar(), "画布上的想法", 250, 80);
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: serializeSidecar(sidecar),

@@ -38,8 +38,10 @@ function nodeIdOf(text: string): string {
 
 function installBridge() {
   const api = {
-    readMindmapSidecar: vi.fn().mockResolvedValue({ success: true, exists: false }),
-    saveMindmapSidecar: vi.fn().mockResolvedValue({ success: true }),
+    files: {
+      readMindmapSidecar: vi.fn().mockResolvedValue({ success: true, exists: false }),
+      saveMindmapSidecar: vi.fn().mockResolvedValue({ success: true }),
+    },
   };
   (window as unknown as Record<string, unknown>).knowSpaceDesktop = api;
   return api;
@@ -60,7 +62,7 @@ function select(text: string, additive = false) {
 }
 
 function lastWritten(api: ReturnType<typeof installBridge>) {
-  const call = api.saveMindmapSidecar.mock.calls.at(-1);
+  const call = api.files.saveMindmapSidecar.mock.calls.at(-1);
   return call ? parseSidecar(call[0].content as string) : null;
 }
 
@@ -113,7 +115,7 @@ describe("概要", () => {
     const row = screen.getByRole("button", { name: /为本组加概要/ }) as HTMLButtonElement;
     expect(row.disabled).toBe(true);
     expect(row.getAttribute("title")).toContain("先选中两个或更多");
-    expect(api.saveMindmapSidecar).not.toHaveBeenCalled();
+    expect(api.files.saveMindmapSidecar).not.toHaveBeenCalled();
   });
 
   it("打开文档时读出概要：括号与标签都在", async () => {
@@ -123,7 +125,7 @@ describe("概要", () => {
       [nodeIdOf("子节点甲"), nodeIdOf("子节点乙")],
       "两种走法",
     );
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: serializeSidecar(sidecar),
@@ -146,7 +148,7 @@ describe("概要", () => {
       [nodeIdOf("子节点甲"), nodeIdOf("子节点乙")],
       "原名",
     );
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: serializeSidecar(sidecar),
@@ -175,7 +177,7 @@ describe("概要", () => {
       [nodeIdOf("子节点甲"), nodeIdOf("子节点乙")],
       "要删掉的",
     );
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: serializeSidecar(sidecar),
@@ -212,7 +214,7 @@ describe("概要", () => {
       [nodeIdOf("子节点甲"), nodeIdOf("子节点乙")],
       "两种走法",
     );
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: serializeSidecar(sidecar),

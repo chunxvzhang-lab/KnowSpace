@@ -139,9 +139,9 @@ export function useBacklinkIndex({
             .filter((p): p is string => Boolean(p && !p.toLowerCase().endsWith(".canvas")));
 
           const chunkResults = new Map<string, string>();
-          if (window.bookMDDesktop?.readMarkdownBatch && validAbsPaths.length > 0) {
+          if (window.bookMDDesktop?.files.readMarkdownBatch && validAbsPaths.length > 0) {
             try {
-              const batchData = await window.bookMDDesktop.readMarkdownBatch(validAbsPaths);
+              const batchData = await window.bookMDDesktop.files.readMarkdownBatch(validAbsPaths);
               if (!active) return;
               for (const item of batchData) {
                 if (item.absolutePath) {
@@ -158,9 +158,9 @@ export function useBacklinkIndex({
             let content = "";
             if (ch.absolutePath && chunkResults.has(ch.absolutePath.toLowerCase())) {
               content = chunkResults.get(ch.absolutePath.toLowerCase()) || "";
-            } else if (ch.absolutePath && window.bookMDDesktop?.readMarkdownFile) {
+            } else if (ch.absolutePath && window.bookMDDesktop?.files.readMarkdownFile) {
               try {
-                const res = await window.bookMDDesktop.readMarkdownFile(ch.absolutePath);
+                const res = await window.bookMDDesktop.files.readMarkdownFile(ch.absolutePath);
                 content = res?.markdown || "";
               } catch {}
             }
@@ -344,18 +344,18 @@ export function useBacklinkIndex({
       const targetCh = manifest?.chapters.find((c) => c.id === mention.sourceId);
       if (
         targetCh?.absolutePath &&
-        window.bookMDDesktop?.saveMarkdownFile &&
-        window.bookMDDesktop?.readMarkdownFile
+        window.bookMDDesktop?.files.saveMarkdownFile &&
+        window.bookMDDesktop?.files.readMarkdownFile
       ) {
         try {
-          const fileRes = await window.bookMDDesktop.readMarkdownFile(targetCh.absolutePath);
+          const fileRes = await window.bookMDDesktop.files.readMarkdownFile(targetCh.absolutePath);
           if (fileRes?.markdown) {
             const updated = convertUnlinkedMentionInText(
               fileRes.markdown,
               mention.line,
               mention.mentionText,
             );
-            await window.bookMDDesktop.saveMarkdownFile({
+            await window.bookMDDesktop.files.saveMarkdownFile({
               absolutePath: targetCh.absolutePath,
               content: updated,
             });

@@ -218,7 +218,7 @@ export function useReadingPersistence({
         preloadedRef.current.add(seenKey);
 
         try {
-          const source = await window.bookMDDesktop?.readMarkdownFile(absolutePath);
+          const source = await window.bookMDDesktop?.files.readMarkdownFile(absolutePath);
           if (cancelled || !source?.markdown) continue;
           const rendered = await renderMarkdown(source.markdown, source.baseUrl);
           if (cancelled) continue;

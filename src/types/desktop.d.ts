@@ -94,260 +94,290 @@ export type BeforeCloseData = {
   requestId: number;
 };
 
+/**
+ * The renderer-facing contract of the preload bridge, grouped by the handler
+ * module that owns each channel (files.cjs / history.cjs / media.cjs /
+ * system.cjs / capture.cjs). The five namespaces are always present when the
+ * bridge exists; method optionality records which calls tolerate an older
+ * bridge. `apiVersion` is checked against the app version by the startup
+ * handshake (`bookmd:api-version`).
+ */
 export type KnowSpaceDesktopAPI = {
-  getInitialSyncData?: () => { filePath: string; source: ChapterSource | null } | null;
-  getLaunchFilePath: () => Promise<string | null>;
-  setNativeTheme: (theme: string) => Promise<void>;
-  /**
-   * Applies the reader's directory-scan preferences.
-   *
-   * A setting rather than an argument on each listing call: a directory is
-   * listed from many places in the app, and a preference threaded through all of
-   * them would eventually be missed on one — showing up as hidden files coming
-   * back on whichever path was forgotten.
-   */
-  setScanOptions?: (options: { includeHidden?: boolean }) => Promise<{ ok: boolean }>;
-  openDirectory: () => Promise<DirectoryOpenResult>;
-  refreshDirectory: (rootPath: string) => Promise<BookManifest & { rootPath: string }>;
-  readMarkdownFile: (absolutePath: string) => Promise<ChapterSource>;
-  readMarkdownBatch?: (paths: string[]) => Promise<ChapterSource[]>;
-  /**
-   * A folder to revise from, picked without opening it as the workspace.
-   *
-   * Answers with the paths rather than the contents: reading every file is the
-   * review's own decision to make on demand, and the picker is a dialog that has
-   * already made the reader wait once.
-   */
-  pickReviewFolder?: () => Promise<{
-    canceled: boolean;
-    rootPath?: string;
-    name?: string;
-    paths?: string[];
-    message?: string;
-    scanTruncated?: ManifestScanTruncation;
-    scanUnreadable?: ManifestScanUnreadable;
-  }>;
-  /** The Markdown files in a folder chosen earlier, listed again with no side effects. */
-  listReviewFolder?: (rootPath: string) => Promise<{
-    paths?: string[];
-    message?: string;
-    scanTruncated?: ManifestScanTruncation;
-    scanUnreadable?: ManifestScanUnreadable;
-  }>;
-  /**
-   * The mind map's companion file, which holds what the document cannot.
-   *
-   * A Markdown file stays the source of truth for the tree; notes, markers and
-   * anything else the tree cannot express live in `<document>.mindmap.json`
-   * beside it. `exists: false` is a normal answer rather than an error — a
-   * document that never carried a note is exactly that — and the map then
-   * degrades to a plain tree.
-   *
-   * The path is not passed in: the renderer names a document it has open, and
-   * the main process derives the companion's name from it.
-   */
-  /**
-   * Asks the reader for an outline file to import, and reads it.
-   *
-   * The dialog and the read both happen in the main process: the renderer never
-   * names a path, and what comes back is the file's bytes rather than a handle it
-   * could write to. Bytes, because one of the formats is a ZIP — so which format
-   * this is gets decided by the content, in the renderer, which owns the parsers.
-   *
-   * `canceled` is a normal answer — the reader changed their mind — and a file that
-   * cannot be read comes back as a message instead.
-   */
-  pickOutlineFile?: () => Promise<{
-    canceled?: boolean;
-    success?: boolean;
-    contentBase64?: string;
-    fileName?: string;
-    message?: string;
-  }>;
-  readMindmapSidecar?: (params: {
-    documentPath: string;
-  }) => Promise<{ success?: boolean; exists?: boolean; content?: string; message?: string }>;
-  saveMindmapSidecar?: (params: {
-    documentPath: string;
-    content: string;
-  }) => Promise<{ success?: boolean; path?: string; message?: string }>;
-  getDirectoryForFile: (absolutePath: string) => Promise<{
-    directory: BookManifest & { rootPath: string };
-    activeChapterId: string | null;
-  }>;
-  saveMarkdownFile: (request: SaveMarkdownRequest) => Promise<SaveMarkdownResult>;
-  createMarkdownFile: (options?: CreateMarkdownOptions) => Promise<CreateMarkdownResult>;
-  renameMarkdownFile?: (params: { oldPath: string; newTitle: string }) => Promise<{
-    success: boolean;
-    newPath?: string;
-    newTitle?: string;
-    fileName?: string;
-    error?: string;
-  }>;
-  saveMarkdownFileAs: (request?: SaveMarkdownAsRequest) => Promise<SaveMarkdownAsResult>;
-  setDocumentState: (state: { activePath: string | null; isDirty: boolean }) => Promise<void>;
-  resolveBeforeClose: (result: {
-    requestId: number;
-    action: "proceed" | "cancel";
-  }) => Promise<void>;
-  openExternal?: (url: string) => Promise<boolean>;
-  toggleFullScreen?: () => Promise<boolean>;
-  isFullScreen?: () => Promise<boolean>;
-  exportSvgAsPng?: (params: {
-    svgHtml: string;
-    width?: number;
-    height?: number;
-    theme?: string;
-    filename?: string;
-  }) => Promise<{ success?: boolean; canceled?: boolean; filePath?: string; message?: string }>;
-  savePngData?: (params: {
-    dataUrl: string;
-    filename?: string;
-  }) => Promise<{ success?: boolean; canceled?: boolean; filePath?: string; message?: string }>;
-  /**
-   * Saves raw PNG bytes. Preferred over `savePngData` because it avoids
-   * base64-encoding a multi-megabyte image before sending it over IPC.
-   */
-  savePngBuffer?: (params: {
-    buffer: ArrayBuffer | Uint8Array;
-    filename?: string;
-  }) => Promise<{ success?: boolean; canceled?: boolean; filePath?: string; message?: string }>;
-  /**
-   * Reads a local image back as a data URL. Used when exporting the canvas:
-   * the rasteriser refuses to run on a canvas that referenced a file:// image,
-   * and fetch/XHR cannot reach those paths reliably.
-   */
-  readFileAsDataUrl?: (params: {
-    filePath: string;
-  }) => Promise<{ success?: boolean; dataUrl?: string; message?: string }>;
-  /**
-   * Rasterises the board SVG in an offscreen window in the main process.
-   * `capturePage()` composites inside Chromium, so it is not subject to the
-   * canvas tainting rules that can make `toBlob()` fail in the renderer.
-   */
-  exportCanvasAsPng?: (params: {
-    svg: string;
-    filename?: string;
-    scale?: number;
-  }) => Promise<{ success?: boolean; canceled?: boolean; filePath?: string; message?: string }>;
-  /** Same offscreen rendering path, but writes straight to the clipboard. */
-  copyCanvasAsImage?: (params: {
-    svg: string;
-    scale?: number;
-  }) => Promise<{ success?: boolean; message?: string }>;
-  /** Writes already-rasterised PNG bytes to the native clipboard. */
-  copyPngToClipboard?: (params: {
-    buffer: ArrayBuffer | Uint8Array;
-  }) => Promise<{ success?: boolean; message?: string }>;
-  openInNewWindow?: (absolutePath: string) => Promise<boolean>;
-  printToPdf?: (params?: {
-    title?: string;
-    landscape?: boolean;
-    pageSize?: string;
-  }) => Promise<{ success?: boolean; canceled?: boolean; filePath?: string; message?: string }>;
-  printDocument?: () => Promise<{ success?: boolean; message?: string }>;
+  /** Bridge contract version; kept in sync with package.json "version". */
+  apiVersion: string;
 
-  // Version Snapshots & Time Travel
-  listSnapshots?: (params: { filePath: string; rootPath?: string }) => Promise<SnapshotItem[]>;
-  readSnapshot?: (params: {
-    filePath: string;
-    rootPath?: string;
-    snapshotId: string;
-  }) => Promise<SnapshotDetail | null>;
-  revertSnapshot?: (params: {
-    filePath: string;
-    rootPath?: string;
-    snapshotId: string;
-  }) => Promise<SaveMarkdownResult>;
-  createManualSnapshot?: (params: {
-    filePath: string;
-    rootPath?: string;
-    content: string;
-  }) => Promise<{ success: boolean; snapshotId?: string; error?: string }>;
+  /** Document and vault IO — channels registered in electron/files.cjs. */
+  files: {
+    openDirectory: () => Promise<DirectoryOpenResult>;
+    refreshDirectory: (rootPath: string) => Promise<BookManifest & { rootPath: string }>;
+    readMarkdownFile: (absolutePath: string) => Promise<ChapterSource>;
+    readMarkdownBatch?: (paths: string[]) => Promise<ChapterSource[]>;
+    /**
+     * Applies the reader's directory-scan preferences.
+     *
+     * A setting rather than an argument on each listing call: a directory is
+     * listed from many places in the app, and a preference threaded through all of
+     * them would eventually be missed on one — showing up as hidden files coming
+     * back on whichever path was forgotten.
+     */
+    setScanOptions?: (options: { includeHidden?: boolean }) => Promise<{ ok: boolean }>;
+    /**
+     * A folder to revise from, picked without opening it as the workspace.
+     *
+     * Answers with the paths rather than the contents: reading every file is the
+     * review's own decision to make on demand, and the picker is a dialog that has
+     * already made the reader wait once.
+     */
+    pickReviewFolder?: () => Promise<{
+      canceled: boolean;
+      rootPath?: string;
+      name?: string;
+      paths?: string[];
+      message?: string;
+      scanTruncated?: ManifestScanTruncation;
+      scanUnreadable?: ManifestScanUnreadable;
+    }>;
+    /** The Markdown files in a folder chosen earlier, listed again with no side effects. */
+    listReviewFolder?: (rootPath: string) => Promise<{
+      paths?: string[];
+      message?: string;
+      scanTruncated?: ManifestScanTruncation;
+      scanUnreadable?: ManifestScanUnreadable;
+    }>;
+    /**
+     * The mind map's companion file, which holds what the document cannot.
+     *
+     * A Markdown file stays the source of truth for the tree; notes, markers and
+     * anything else the tree cannot express live in `<document>.mindmap.json`
+     * beside it. `exists: false` is a normal answer rather than an error — a
+     * document that never carried a note is exactly that — and the map then
+     * degrades to a plain tree.
+     *
+     * The path is not passed in: the renderer names a document it has open, and
+     * the main process derives the companion's name from it.
+     */
+    readMindmapSidecar?: (params: {
+      documentPath: string;
+    }) => Promise<{ success?: boolean; exists?: boolean; content?: string; message?: string }>;
+    saveMindmapSidecar?: (params: {
+      documentPath: string;
+      content: string;
+    }) => Promise<{ success?: boolean; path?: string; message?: string }>;
+    getDirectoryForFile: (absolutePath: string) => Promise<{
+      directory: BookManifest & { rootPath: string };
+      activeChapterId: string | null;
+    }>;
+    saveMarkdownFile: (request: SaveMarkdownRequest) => Promise<SaveMarkdownResult>;
+    createMarkdownFile: (options?: CreateMarkdownOptions) => Promise<CreateMarkdownResult>;
+    renameMarkdownFile?: (params: { oldPath: string; newTitle: string }) => Promise<{
+      success: boolean;
+      newPath?: string;
+      newTitle?: string;
+      fileName?: string;
+      error?: string;
+    }>;
+    saveMarkdownFileAs: (request?: SaveMarkdownAsRequest) => Promise<SaveMarkdownAsResult>;
+    /**
+     * Asks the reader for an outline file to import, and reads it.
+     *
+     * The dialog and the read both happen in the main process: the renderer never
+     * names a path, and what comes back is the file's bytes rather than a handle it
+     * could write to. Bytes, because one of the formats is a ZIP — so which format
+     * this is gets decided by the content, in the renderer, which owns the parsers.
+     *
+     * `canceled` is a normal answer — the reader changed their mind — and a file that
+     * cannot be read comes back as a message instead.
+     */
+    pickOutlineFile?: () => Promise<{
+      canceled?: boolean;
+      success?: boolean;
+      contentBase64?: string;
+      fileName?: string;
+      message?: string;
+    }>;
+  };
 
-  openFlashCapsule?: () => Promise<boolean>;
-  hideFlashCapsule?: () => Promise<boolean>;
-  getFlashShortcut?: () => Promise<string>;
-  setFlashShortcut?: (
-    shortcut: string,
-  ) => Promise<{ success: boolean; shortcut?: string; error?: string }>;
-  getFlashTargetPath?: () => Promise<{
-    workspaceDir: string | null;
-    spaceDir?: string;
-    defaultDir?: string;
-    isCustom?: boolean;
-    targetFile: string;
-    minuteFileName?: string;
-    relativeDisplay: string;
-  }>;
-  saveFlashNote?: (payload: { content: string; tags?: string[]; isTodo?: boolean }) => Promise<{
-    success: boolean;
-    filePath?: string;
-    fileName?: string;
-    dateStr?: string;
-    spaceDir?: string;
-    error?: string;
-  }>;
-  getFlashPin?: () => Promise<{ pinned: boolean }>;
-  setFlashPin?: (pinned: boolean) => Promise<{ success: boolean; pinned: boolean }>;
-  getFlashSpaceConfig?: () => Promise<{
-    currentDir: string;
-    isCustom: boolean;
-    defaultDir: string;
-  }>;
-  selectFlashSpaceDir?: () => Promise<{
-    success: boolean;
-    canceled?: boolean;
-    newDir?: string;
-    error?: string;
-  }>;
-  resetFlashSpaceDir?: () => Promise<{ success: boolean; defaultDir: string }>;
-  getPersistentNote?: () => Promise<{ text: string }>;
-  savePersistentNote?: (text: string) => Promise<{ success: boolean }>;
-  setFlashSize?: (size: {
-    width: number;
-    height: number;
-  }) => Promise<{ success: boolean; width?: number; height?: number }>;
-  resetFlashSize?: () => Promise<{ success: boolean; width?: number; height?: number }>;
-  getFlashNotesSummary?: () => Promise<FlashNotesSummaryResult>;
-  toggleFlashTodo?: (params: {
-    filePath: string;
-    lineIndex: number;
-    completed: boolean;
-  }) => Promise<{ success: boolean; completed?: boolean; error?: string }>;
-  deleteFlashNote?: (params: { filePath: string }) => Promise<{ success: boolean; error?: string }>;
-  savePastedImage?: (params: {
-    currentFilePath?: string;
-    bufferBase64: string;
-    originalName?: string;
-    ext?: string;
-  }) => Promise<SavePastedImageResult>;
-  getAppSettings?: () => Promise<{
-    autoLaunch: boolean;
-    runInBackground: boolean;
-    flashShortcut: string;
-  }>;
-  setAppSettings?: (settings: { autoLaunch?: boolean; runInBackground?: boolean }) => Promise<{
-    success: boolean;
-    settings?: { autoLaunch: boolean; runInBackground: boolean; flashShortcut: string };
-  }>;
-  onOpenFilePath: (callback: (absolutePath: string) => void) => () => void;
-  onMenuCommand: (callback: (command: string) => void) => () => void;
-  onBeforeClose: (callback: (data: BeforeCloseData) => void) => () => void;
-  onFullScreenChanged?: (callback: (isFullscreen: boolean) => void) => () => void;
-  onFlashFocus?: (callback: () => void) => () => void;
-  onFlashShortcutUpdated?: (callback: (shortcut: string) => void) => () => void;
-  onFlashNoteSaved?: (
-    callback: (data: { filePath: string; dateStr: string; fileName?: string }) => void,
-  ) => () => void;
-  onAppSettingsUpdated?: (
-    callback: (data: {
+  /** Version snapshots & time travel — channels registered in electron/history.cjs. */
+  history: {
+    listSnapshots?: (params: { filePath: string; rootPath?: string }) => Promise<SnapshotItem[]>;
+    readSnapshot?: (params: {
+      filePath: string;
+      rootPath?: string;
+      snapshotId: string;
+    }) => Promise<SnapshotDetail | null>;
+    revertSnapshot?: (params: {
+      filePath: string;
+      rootPath?: string;
+      snapshotId: string;
+    }) => Promise<SaveMarkdownResult>;
+    createManualSnapshot?: (params: {
+      filePath: string;
+      rootPath?: string;
+      content: string;
+    }) => Promise<{ success: boolean; snapshotId?: string; error?: string }>;
+  };
+
+  /** PNG export, clipboard images and local-image reads — electron/media.cjs. */
+  media: {
+    exportSvgAsPng?: (params: {
+      svgHtml: string;
+      width?: number;
+      height?: number;
+      theme?: string;
+      filename?: string;
+    }) => Promise<{ success?: boolean; canceled?: boolean; filePath?: string; message?: string }>;
+    savePngData?: (params: {
+      dataUrl: string;
+      filename?: string;
+    }) => Promise<{ success?: boolean; canceled?: boolean; filePath?: string; message?: string }>;
+    /**
+     * Saves raw PNG bytes. Preferred over `savePngData` because it avoids
+     * base64-encoding a multi-megabyte image before sending it over IPC.
+     */
+    savePngBuffer?: (params: {
+      buffer: ArrayBuffer | Uint8Array;
+      filename?: string;
+    }) => Promise<{ success?: boolean; canceled?: boolean; filePath?: string; message?: string }>;
+    /**
+     * Reads a local image back as a data URL. Used when exporting the canvas:
+     * the rasteriser refuses to run on a canvas that referenced a file:// image,
+     * and fetch/XHR cannot reach those paths reliably.
+     */
+    readFileAsDataUrl?: (params: {
+      filePath: string;
+    }) => Promise<{ success?: boolean; dataUrl?: string; message?: string }>;
+    /**
+     * Rasterises the board SVG in an offscreen window in the main process.
+     * `capturePage()` composites inside Chromium, so it is not subject to the
+     * canvas tainting rules that can make `toBlob()` fail in the renderer.
+     */
+    exportCanvasAsPng?: (params: {
+      svg: string;
+      filename?: string;
+      scale?: number;
+    }) => Promise<{ success?: boolean; canceled?: boolean; filePath?: string; message?: string }>;
+    /** Same offscreen rendering path, but writes straight to the clipboard. */
+    copyCanvasAsImage?: (params: {
+      svg: string;
+      scale?: number;
+    }) => Promise<{ success?: boolean; message?: string }>;
+    /** Writes already-rasterised PNG bytes to the native clipboard. */
+    copyPngToClipboard?: (params: {
+      buffer: ArrayBuffer | Uint8Array;
+    }) => Promise<{ success?: boolean; message?: string }>;
+  };
+
+  /** Window lifecycle, shell, printing and settings — electron/system.cjs. */
+  system: {
+    getInitialSyncData?: () => { filePath: string; source: ChapterSource | null } | null;
+    getLaunchFilePath: () => Promise<string | null>;
+    setNativeTheme: (theme: string) => Promise<void>;
+    setDocumentState: (state: { activePath: string | null; isDirty: boolean }) => Promise<void>;
+    resolveBeforeClose: (result: {
+      requestId: number;
+      action: "proceed" | "cancel";
+    }) => Promise<void>;
+    openExternal?: (url: string) => Promise<boolean>;
+    toggleFullScreen?: () => Promise<boolean>;
+    isFullScreen?: () => Promise<boolean>;
+    openInNewWindow?: (absolutePath: string) => Promise<boolean>;
+    printToPdf?: (params?: {
+      title?: string;
+      landscape?: boolean;
+      pageSize?: string;
+    }) => Promise<{ success?: boolean; canceled?: boolean; filePath?: string; message?: string }>;
+    printDocument?: () => Promise<{ success?: boolean; message?: string }>;
+    /** App Settings (Background Running & Auto Launch) */
+    getAppSettings?: () => Promise<{
       autoLaunch: boolean;
       runInBackground: boolean;
       flashShortcut: string;
-    }) => void,
-  ) => () => void;
-  onThemeUpdated?: (callback: (theme: string) => void) => () => void;
+    }>;
+    setAppSettings?: (settings: { autoLaunch?: boolean; runInBackground?: boolean }) => Promise<{
+      success: boolean;
+      settings?: { autoLaunch: boolean; runInBackground: boolean; flashShortcut: string };
+    }>;
+    onOpenFilePath: (callback: (absolutePath: string) => void) => () => void;
+    onMenuCommand: (callback: (command: string) => void) => () => void;
+    onBeforeClose: (callback: (data: BeforeCloseData) => void) => () => void;
+    onFullScreenChanged?: (callback: (isFullscreen: boolean) => void) => () => void;
+    onThemeUpdated?: (callback: (theme: string) => void) => () => void;
+    onAppSettingsUpdated?: (
+      callback: (data: {
+        autoLaunch: boolean;
+        runInBackground: boolean;
+        flashShortcut: string;
+      }) => void,
+    ) => () => void;
+  };
+
+  /** Flash Capsule window and pasted images — electron/capture.cjs. */
+  capture: {
+    openFlashCapsule?: () => Promise<boolean>;
+    hideFlashCapsule?: () => Promise<boolean>;
+    getFlashShortcut?: () => Promise<string>;
+    setFlashShortcut?: (
+      shortcut: string,
+    ) => Promise<{ success: boolean; shortcut?: string; error?: string }>;
+    getFlashTargetPath?: () => Promise<{
+      workspaceDir: string | null;
+      spaceDir?: string;
+      defaultDir?: string;
+      isCustom?: boolean;
+      targetFile: string;
+      minuteFileName?: string;
+      relativeDisplay: string;
+    }>;
+    saveFlashNote?: (payload: { content: string; tags?: string[]; isTodo?: boolean }) => Promise<{
+      success: boolean;
+      filePath?: string;
+      fileName?: string;
+      dateStr?: string;
+      spaceDir?: string;
+      error?: string;
+    }>;
+    getFlashPin?: () => Promise<{ pinned: boolean }>;
+    setFlashPin?: (pinned: boolean) => Promise<{ success: boolean; pinned: boolean }>;
+    getFlashSpaceConfig?: () => Promise<{
+      currentDir: string;
+      isCustom: boolean;
+      defaultDir: string;
+    }>;
+    selectFlashSpaceDir?: () => Promise<{
+      success: boolean;
+      canceled?: boolean;
+      newDir?: string;
+      error?: string;
+    }>;
+    resetFlashSpaceDir?: () => Promise<{ success: boolean; defaultDir: string }>;
+    getPersistentNote?: () => Promise<{ text: string }>;
+    savePersistentNote?: (text: string) => Promise<{ success: boolean }>;
+    setFlashSize?: (size: {
+      width: number;
+      height: number;
+    }) => Promise<{ success: boolean; width?: number; height?: number }>;
+    resetFlashSize?: () => Promise<{ success: boolean; width?: number; height?: number }>;
+    getFlashNotesSummary?: () => Promise<FlashNotesSummaryResult>;
+    toggleFlashTodo?: (params: {
+      filePath: string;
+      lineIndex: number;
+      completed: boolean;
+    }) => Promise<{ success: boolean; completed?: boolean; error?: string }>;
+    deleteFlashNote?: (params: {
+      filePath: string;
+    }) => Promise<{ success: boolean; error?: string }>;
+    savePastedImage?: (params: {
+      currentFilePath?: string;
+      bufferBase64: string;
+      originalName?: string;
+      ext?: string;
+    }) => Promise<SavePastedImageResult>;
+    onFlashFocus?: (callback: () => void) => () => void;
+    onFlashShortcutUpdated?: (callback: (shortcut: string) => void) => () => void;
+    onFlashNoteSaved?: (
+      callback: (data: { filePath: string; dateStr: string; fileName?: string }) => void,
+    ) => () => void;
+  };
 };
 
 export type FlashNoteTodo = {

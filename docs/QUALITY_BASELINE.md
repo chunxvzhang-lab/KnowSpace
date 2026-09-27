@@ -17,7 +17,7 @@
 | `as-any` | 10 | 只减不增（`as any`） |
 | `files-over-1000-lines` | 12 | 只减不增（src 非测试代码，> 1000 行） |
 | `max-file-lines` | 1353 | 只减不增（最大单文件行数） |
-| `src-lines` | 64690 | 记录趋势，不设闸 |
+| `src-lines` | 64685 | 记录趋势，不设闸 |
 | `test-cases` | 见 `TEST_BASELINE.md` | 只增不减——由测试基线守护，本文件不重复设闸 |
 
 ---
@@ -28,16 +28,16 @@
 | :--- | ---: |
 | `src/components/MindmapView.tsx` | 1353 |
 | `src/components/DailyReviewPanel.tsx` | 1237 |
-| `src/components/FlashCapsule.tsx` | 1177 |
+| `src/components/FlashCapsule.tsx` | 1171 |
 | `src/App.tsx` | 1151 |
 | `src/services/canvasGraph.ts` | 1150 |
 | `src/services/markdown.ts` | 1147 |
 | `src/services/canvasExport.ts` | 1123 |
 | `src/components/EditorContextMenu.tsx` | 1095 |
 | `src/components/GraphViewPane.tsx` | 1075 |
-| `src/components/AboutDialog.tsx` | 1068 |
 | `src/services/fsrsService.ts` | 1062 |
 | `src/components/CanvasView.tsx` | 1054 |
+| `src/components/AboutDialog.tsx` | 1051 |
 
 ---
 

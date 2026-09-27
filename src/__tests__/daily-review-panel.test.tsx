@@ -58,7 +58,11 @@ describe("DailyReviewPanel - 每日复盘视图", () => {
     // that use `resetStores`.
     localStorage.clear();
     saveMarkdownFile = vi.fn().mockResolvedValue({ success: true, absolutePath: "x" });
-    (window as unknown as Record<string, unknown>).knowSpaceDesktop = { saveMarkdownFile };
+    (window as unknown as Record<string, unknown>).knowSpaceDesktop = {
+      files: {
+        saveMarkdownFile: saveMarkdownFile,
+      },
+    };
   });
 
   afterEach(() => {
@@ -403,8 +407,10 @@ describe("DailyReviewPanel - 撤销上一次评分", () => {
     // note as it started. Anything else would make the merge look better than it is.
     readMarkdownFile = vi.fn();
     (window as unknown as Record<string, unknown>).knowSpaceDesktop = {
-      saveMarkdownFile,
-      readMarkdownFile,
+      files: {
+        saveMarkdownFile: saveMarkdownFile,
+        readMarkdownFile: readMarkdownFile,
+      },
     };
   });
 
@@ -539,8 +545,10 @@ describe("DailyReviewPanel - 评分与保存的边角", () => {
     // ordinary case: nothing wrote to it between loading and rating.
     readMarkdownFile = vi.fn();
     (window as unknown as Record<string, unknown>).knowSpaceDesktop = {
-      saveMarkdownFile,
-      readMarkdownFile,
+      files: {
+        saveMarkdownFile: saveMarkdownFile,
+        readMarkdownFile: readMarkdownFile,
+      },
     };
   });
 

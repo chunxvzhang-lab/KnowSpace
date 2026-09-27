@@ -51,8 +51,10 @@ function sidecarWithTags(text: string, tags: string[]): string {
 
 function installBridge() {
   const api = {
-    readMindmapSidecar: vi.fn().mockResolvedValue({ success: true, exists: false }),
-    saveMindmapSidecar: vi.fn().mockResolvedValue({ success: true }),
+    files: {
+      readMindmapSidecar: vi.fn().mockResolvedValue({ success: true, exists: false }),
+      saveMindmapSidecar: vi.fn().mockResolvedValue({ success: true }),
+    },
   };
   (window as unknown as Record<string, unknown>).knowSpaceDesktop = api;
   return api;
@@ -96,7 +98,7 @@ function suggestion(tag: string): HTMLElement {
 }
 
 function lastWritten(api: ReturnType<typeof installBridge>) {
-  const call = api.saveMindmapSidecar.mock.calls.at(-1);
+  const call = api.files.saveMindmapSidecar.mock.calls.at(-1);
   return call ? parseSidecar(call[0].content as string) : null;
 }
 
@@ -117,7 +119,7 @@ describe("节点标签", () => {
 
   it("打开文档时读出标签，画在节点下方", async () => {
     const api = installBridge();
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: sidecarWithTags("父节点", ["api", "紧急"]),
@@ -134,7 +136,7 @@ describe("节点标签", () => {
     // A map is not a tag cloud: a node wearing twenty tags is a wall of text
     // with a node somewhere in it.
     const api = installBridge();
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: sidecarWithTags("父节点", ["a", "b", "c", "d", "e"]),
@@ -200,7 +202,7 @@ describe("节点标签", () => {
     expect(tagField().value).toBe("");
     // ...and nothing was stored for either of them.
     await settle();
-    expect(api.saveMindmapSidecar).not.toHaveBeenCalled();
+    expect(api.files.saveMindmapSidecar).not.toHaveBeenCalled();
   });
 
   it("点一下建议就把标签加上，再点一下去掉", async () => {
@@ -209,7 +211,7 @@ describe("节点标签", () => {
     // updates from that load never flush, and the test would be asserting about
     // a panel that has not been told anything yet.
     const api = installBridge();
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       // 父节点 already wears one; 子节点甲 wears the other, which is what makes
@@ -255,17 +257,17 @@ describe("节点标签", () => {
 
   it("文件里的标签不像样：不画、不报错，也不擦", async () => {
     const api = installBridge();
-    api.readMindmapSidecar.mockResolvedValueOnce({
+    api.files.readMindmapSidecar.mockResolvedValueOnce({
       success: true,
       exists: true,
       content: JSON.stringify({ version: 1, tags: { [nodeIdOf("父节点")]: "不是列表" } }),
     });
 
     render(<MindmapView title="测试" source={SOURCE} documentKey={DOC} />);
-    await waitFor(() => expect(api.readMindmapSidecar).toHaveBeenCalled());
+    await waitFor(() => expect(api.files.readMindmapSidecar).toHaveBeenCalled());
 
     expect(screen.getByText("父节点")).toBeTruthy();
     expect(chipRows().length).toBe(0);
-    expect(api.saveMindmapSidecar).not.toHaveBeenCalled();
+    expect(api.files.saveMindmapSidecar).not.toHaveBeenCalled();
   });
 });
