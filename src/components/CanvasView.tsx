@@ -1,16 +1,12 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import type { ThemeMode } from "../core/types";
-import { expandLoopEdgeSelection, isPointInsideNodeHull } from "../services/canvasService";
+import { isPointInsideNodeHull } from "../services/canvasService";
 import { getCanvasThemeColors } from "../services/canvasTheme";
 import type { LightboxMedia } from "./MediaLightbox";
-// Extracted during the R2 split (batch B2).
-import { CanvasCardSuggestMenu } from "./canvas/CanvasCardSuggestMenu";
-import { MarqueeSelectionBox } from "./canvas/MarqueeSelectionBox";
-import { CanvasMinimap } from "./canvas/CanvasMinimap";
-import { CanvasEdgeBatchToolbar } from "./canvas/CanvasEdgeBatchToolbar";
-import { CanvasEdgeLabelLayer } from "./canvas/CanvasEdgeLabelLayer";
-import { CanvasEdgeLayer } from "./canvas/CanvasEdgeLayer";
+// The render tree below the root container — the hidden media inputs, the
+// transformed board world, the minimap, the marquee box, the batch edge
+// toolbar and the card-suggestion portal — extracted in wave 7.
+import { CanvasWorld } from "./canvas/CanvasWorld";
 // Document (data/history/save) and camera (viewport/wheel) state domains,
 // extracted during the wave-1 CanvasView decomposition.
 import { useCanvasDocument } from "./canvas/useCanvasDocument";
@@ -33,9 +29,9 @@ import { useCanvasCardSuggest } from "./canvas/useCanvasCardSuggest";
 import { useCanvasContextMenu } from "./canvas/useCanvasContextMenu";
 import { useCanvasExportExtract } from "./canvas/useCanvasExportExtract";
 import { useCanvasDerived } from "./canvas/useCanvasDerived";
-// The node layer (the group hulls and the card chrome), extracted during the
-// wave-3 CanvasView decomposition.
-import { CanvasNodeLayer } from "./canvas/CanvasNodeLayer";
+// The keyboard domain (the global shortcut handler and the Escape priority
+// chain), extracted during the wave-7 CanvasView decomposition.
+import { useCanvasKeyboard } from "./canvas/useCanvasKeyboard";
 // The presentation domain hook and the toolbar / overlay / presentation-chrome
 // components, extracted during the wave-4 CanvasView decomposition.
 import { useCanvasPresentation } from "./canvas/useCanvasPresentation";
@@ -127,6 +123,14 @@ export const CanvasView = memo(function CanvasView({
   const editingTextRef = useRef<string>("");
   editingTextRef.current = editingText;
 
+  // Render-current mirrors of the selection sets. The document hook's colour
+  // preview helpers read these at call time: useCanvasDocument runs before
+  // useCanvasSelection produces the sets themselves (the selection hook needs
+  // data.edges from the document hook, so the two cannot be reordered), so the
+  // sets are mirrored into refs right after the selection hook returns.
+  const selectedNodeIdsRef = useRef<Set<string>>(new Set());
+  const selectedEdgeIdsRef = useRef<Set<string>>(new Set());
+
   // Right-click context menu state
   // `x`/`y` are viewport coordinates (pageX/pageY) used to render the menu via
   // a fixed-positioned portal. The menu is intentionally rendered at the
@@ -144,7 +148,8 @@ export const CanvasView = memo(function CanvasView({
   const contextMenuRef = useRef<HTMLDivElement | null>(null);
 
   // Document domain: board state, source sync, history, save paths and the
-  // colour-picker snapshot/commit trio (extracted hook).
+  // colour-picker snapshot/commit/preview machinery (extracted hook; the
+  // preview callbacks moved beside the commit machinery in wave 7).
   const {
     data,
     setData,
@@ -156,8 +161,11 @@ export const CanvasView = memo(function CanvasView({
     handleRedo,
     handleSaveNodeEdit,
     handleSave,
-    captureColorSnapshot,
     debounceCommitColorPick,
+    previewBatchNodeColor,
+    previewBatchEdgeColor,
+    previewEdgeColor,
+    previewNodeColor,
   } = useCanvasDocument({
     source,
     title,
@@ -167,6 +175,9 @@ export const CanvasView = memo(function CanvasView({
     editingTextRef,
     setEditingNodeId,
     setContextMenu,
+    editable,
+    selectedNodeIdsRef,
+    selectedEdgeIdsRef,
   });
 
   // Camera domain: viewport state and the zoom/wheel/minimap handlers
@@ -204,6 +215,11 @@ export const CanvasView = memo(function CanvasView({
     baseEdgeSelectionBeforeBoxRef,
     handleStartBoxSelection,
   } = useCanvasSelection({ containerRef, viewportRef, edges: data.edges });
+
+  // Keep the mirrors the document hook's colour previews read exactly in step
+  // with the committed selection (assigned during render, like editingTextRef).
+  selectedNodeIdsRef.current = selectedNodeIds;
+  selectedEdgeIdsRef.current = selectedEdgeIds;
 
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
 
@@ -348,95 +364,6 @@ export const CanvasView = memo(function CanvasView({
     editingEdgeLabel,
     setEditingEdgeId,
   });
-
-  // Escape-key priority chain. F5 and the in-presentation slide keys live in
-  // useCanvasPresentation's own listener; the Escape chain stays whole here
-  // because it is ONE ordered list that also covers non-presentation overlays
-  // (modals → context menu → fullscreen). Splitting it across two listeners
-  // would let a later branch fire where the original handler had `return`ed —
-  // e.g. Escape with both the slide drawer and presentation active must close
-  // only the drawer, never exit the presentation.
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      if (showSlideDrawer) {
-        e.preventDefault();
-        setShowSlideDrawer(false);
-        return;
-      }
-      if (showExtractModal) {
-        e.preventDefault();
-        setShowExtractModal(false);
-        return;
-      }
-      if (showExportModal) {
-        e.preventDefault();
-        setShowExportModal(false);
-        return;
-      }
-      if (showFilePicker) {
-        e.preventDefault();
-        setShowFilePicker(false);
-        return;
-      }
-      if (contextMenu) {
-        e.preventDefault();
-        setContextMenu(null);
-        return;
-      }
-      if (isPresentationMode) {
-        e.preventDefault();
-        handleTogglePresentation();
-        return;
-      }
-      if (isFullscreenActive) {
-        e.preventDefault();
-        handleToggleFullscreen();
-        return;
-      }
-
-      // ── Fallback: force-exit whatever fullscreen is actually active ────
-      // The React flag above can go stale (e.g. the window went fullscreen
-      // through a path that never updated it), and then ESC appeared to do
-      // nothing. These checks ask the real sources of truth instead.
-      if (typeof document !== "undefined" && document.fullscreenElement) {
-        e.preventDefault();
-        document.exitFullscreen?.().catch(() => {});
-        return;
-      }
-      const desktopFs = (
-        window as unknown as {
-          bookMDDesktop?: {
-            isFullScreen?: () => Promise<boolean>;
-            toggleFullScreen?: () => Promise<boolean>;
-          };
-        }
-      ).bookMDDesktop;
-      if (desktopFs?.isFullScreen && desktopFs?.toggleFullScreen) {
-        e.preventDefault();
-        desktopFs
-          .isFullScreen()
-          .then((full) => {
-            if (full) return desktopFs.toggleFullScreen?.();
-            return undefined;
-          })
-          .catch(() => {});
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [
-    showSlideDrawer,
-    showExtractModal,
-    showExportModal,
-    showFilePicker,
-    contextMenu,
-    isPresentationMode,
-    isFullscreenActive,
-    handleTogglePresentation,
-    handleToggleFullscreen,
-  ]);
 
   // Node gesture starts: what a mousedown on a card means — plain drag,
   // collaborative multi-drag, grid/ring re-flow, group scoop, resize — written
@@ -688,82 +615,52 @@ export const CanvasView = memo(function CanvasView({
     return () => ro.disconnect();
   }, []);
 
-  /**
-   * Applies a colour to the board WITHOUT writing history — the live preview
-   * while the native chooser is open. Exactly one entry is committed later by
-   * commitColorPick().
-   */
-  const previewBatchNodeColor = useCallback(
-    (color: string) => {
-      if (!editable || selectedNodeIds.size === 0) return;
-      captureColorSnapshot();
-      setData((prev) => {
-        const next = {
-          ...prev,
-          nodes: prev.nodes.map((n) =>
-            selectedNodeIds.has(n.id) ? { ...n, color: color || undefined } : n,
-          ),
-        };
-        latestDataRef.current = next;
-        return next;
-      });
-    },
-    [editable, selectedNodeIds, captureColorSnapshot],
-  );
-
-  const previewBatchEdgeColor = useCallback(
-    (color: string) => {
-      if (!editable || selectedEdgeIds.size === 0) return;
-      captureColorSnapshot();
-      setData((prev) => {
-        const affected = expandLoopEdgeSelection(prev.edges, selectedEdgeIds);
-        const next = {
-          ...prev,
-          edges: prev.edges.map((e) =>
-            affected.has(e.id) ? { ...e, color: color || undefined } : e,
-          ),
-        };
-        latestDataRef.current = next;
-        return next;
-      });
-    },
-    [editable, selectedEdgeIds, captureColorSnapshot],
-  );
-
-  const previewEdgeColor = useCallback(
-    (edgeId: string, color: string) => {
-      if (!editable) return;
-      captureColorSnapshot();
-      setData((prev) => {
-        const affected = expandLoopEdgeSelection(prev.edges, [edgeId]);
-        const next = {
-          ...prev,
-          edges: prev.edges.map((e) =>
-            affected.has(e.id) ? { ...e, color: color || undefined } : e,
-          ),
-        };
-        latestDataRef.current = next;
-        return next;
-      });
-    },
-    [editable, captureColorSnapshot],
-  );
-
-  const previewNodeColor = useCallback(
-    (nodeId: string, color: string) => {
-      if (!editable) return;
-      captureColorSnapshot();
-      setData((prev) => {
-        const next = {
-          ...prev,
-          nodes: prev.nodes.map((n) => (n.id === nodeId ? { ...n, color: color || undefined } : n)),
-        };
-        latestDataRef.current = next;
-        return next;
-      });
-    },
-    [editable, captureColorSnapshot],
-  );
+  // Keyboard domain: the global shortcut handler (Ctrl+S/A/D/Z/Y, Delete, R,
+  // Tab, Enter, Escape) and the Escape priority chain (extracted hook, wave
+  // 7). The hook registers the Escape chain first, then the shortcuts — the
+  // same listener order as before the extraction.
+  useCanvasKeyboard({
+    editable,
+    editingNodeId,
+    editingEdgeId,
+    selectedNodeId,
+    selectedNodeIds,
+    selectedEdgeId,
+    selectedEdgeIds,
+    nodes: data.nodes,
+    handleSave,
+    handleUndo,
+    handleRedo,
+    handleSelectAll,
+    handleDeleteSelected,
+    handleDuplicateSelected,
+    handleDeleteEdge,
+    handleBatchDeleteEdges,
+    handleReverseEdge,
+    handleBatchReverseEdges,
+    handleSpawnConnectedChild,
+    setEditingNodeId,
+    setEditingText,
+    setSelectedNodeIds,
+    setSelectedEdgeIds,
+    setContextMenu,
+    setIsBoxSelectMode,
+    selectionBoxRef,
+    setSelectionBox,
+    contextMenu,
+    showSlideDrawer,
+    setShowSlideDrawer,
+    showExtractModal,
+    setShowExtractModal,
+    showExportModal,
+    setShowExportModal,
+    showFilePicker,
+    setShowFilePicker,
+    isPresentationMode,
+    handleTogglePresentation,
+    isFullscreenActive,
+    handleToggleFullscreen,
+  });
 
   // Background drag to pan or start box selection
   const handleMouseDownBackground = (e: React.MouseEvent) => {
@@ -834,114 +731,6 @@ export const CanvasView = memo(function CanvasView({
     };
   };
 
-  // Keyboard Shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Global Save shortcut (Ctrl+S / Cmd+S)
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
-        e.preventDefault();
-        handleSave();
-        return;
-      }
-
-      // While a card's text is being edited, the keys belong to the text.
-      // Without this guard the Enter below is the trap: it closes the editor,
-      // React flushes, and this handler — whose closure still says "not
-      // editing" — opens it straight back, so Ctrl+Enter looked like it did
-      // nothing at all. The same guard is what stops Delete from deleting the
-      // card out from under the sentence being typed, and Tab from spawning a
-      // branch beside it.
-      const keyTarget = e.target as HTMLElement | null;
-      if (
-        keyTarget &&
-        (keyTarget.tagName === "TEXTAREA" ||
-          keyTarget.tagName === "INPUT" ||
-          keyTarget.isContentEditable)
-      ) {
-        return;
-      }
-
-      if (editingNodeId || editingEdgeId) return;
-
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a") {
-        e.preventDefault();
-        handleSelectAll();
-      } else if (e.key === "Delete" || e.key === "Backspace") {
-        if (selectedNodeIds.size > 0) {
-          handleDeleteSelected();
-        } else if (selectedEdgeIds.size > 0) {
-          handleBatchDeleteEdges();
-        }
-      } else if (
-        (e.key === "r" || e.key === "R") &&
-        selectedEdgeIds.size > 0 &&
-        !e.ctrlKey &&
-        !e.metaKey &&
-        !e.altKey
-      ) {
-        e.preventDefault();
-        handleBatchReverseEdges();
-      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "d") {
-        if (selectedNodeIds.size > 0) {
-          e.preventDefault();
-          handleDuplicateSelected();
-        }
-      } else if (e.key === "Tab" && selectedNodeId && !editingNodeId) {
-        e.preventDefault();
-        handleSpawnConnectedChild(selectedNodeId, "right");
-      } else if (e.key === "Enter" && selectedNodeId) {
-        const node = data.nodes.find((n) => n.id === selectedNodeId);
-        if (node && editable) {
-          e.preventDefault();
-          setEditingNodeId(node.id);
-          setEditingText(
-            node.type === "text" ? node.text : node.type === "group" ? node.label || "" : "",
-          );
-        }
-      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
-        if (e.shiftKey) {
-          handleRedo();
-        } else {
-          handleUndo();
-        }
-      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
-        handleRedo();
-      } else if (e.key === "Escape") {
-        setSelectedNodeIds(new Set());
-        setSelectedEdgeIds(new Set());
-        setContextMenu(null);
-        setIsBoxSelectMode(false);
-        if (selectionBoxRef.current) {
-          selectionBoxRef.current = null;
-          setSelectionBox(null);
-        }
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [
-    editingNodeId,
-    editingEdgeId,
-    selectedNodeId,
-    selectedNodeIds,
-    selectedEdgeId,
-    selectedEdgeIds,
-    data.nodes,
-    editable,
-    handleSave,
-    handleSelectAll,
-    handleDeleteSelected,
-    handleDuplicateSelected,
-    handleDeleteEdge,
-    handleBatchDeleteEdges,
-    handleReverseEdge,
-    handleBatchReverseEdges,
-    handleSpawnConnectedChild,
-    handleUndo,
-    handleRedo,
-  ]);
-
   return (
     <div
       ref={containerRef}
@@ -960,43 +749,6 @@ export const CanvasView = memo(function CanvasView({
       onDragOver={handleDragOver}
       onDrop={handleCanvasDrop}
     >
-      {/* Hidden file input for multimodal media insertion */}
-      <input
-        type="file"
-        ref={mediaFileInputRef}
-        accept="image/*,audio/*,video/*,application/pdf"
-        style={{ display: "none" }}
-        onChange={handleMediaFileInputChange}
-        multiple
-      />
-
-      {/* Per-modality inputs so the context menu can pre-filter the file
-          dialog to exactly the kind of media the user asked for. */}
-      <input
-        type="file"
-        ref={imageFileInputRef}
-        accept="image/*"
-        style={{ display: "none" }}
-        onChange={handleMediaFileInputChange}
-        multiple
-      />
-      <input
-        type="file"
-        ref={videoFileInputRef}
-        accept="video/*"
-        style={{ display: "none" }}
-        onChange={handleMediaFileInputChange}
-        multiple
-      />
-      <input
-        type="file"
-        ref={audioFileInputRef}
-        accept="audio/*"
-        style={{ display: "none" }}
-        onChange={handleMediaFileInputChange}
-        multiple
-      />
-
       {/* 1. TOP FLOATING GLASSMORPHIC TOOLBAR (extracted component, wave 4) */}
       <CanvasToolbar
         theme={theme}
@@ -1045,161 +797,6 @@ export const CanvasView = memo(function CanvasView({
         isFullscreenActive={isFullscreenActive}
         handleToggleFullscreen={handleToggleFullscreen}
         onClose={onClose}
-      />
-
-      {/* 2. INFINITE CANVAS 2D TRANSFORM VIEWPORT (Hardware accelerated) */}
-      <div
-        className="canvas-world"
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width: "100%",
-          height: "100%",
-          transform: `translate3d(${viewport.panX}px, ${viewport.panY}px, 0) scale(${viewport.zoom})`,
-          transformOrigin: "0 0",
-          transition: isPresentationMode
-            ? "transform 0.5s cubic-bezier(0.2, 0.9, 0.3, 1)"
-            : undefined,
-          backgroundImage: `radial-gradient(${colors.dotColor} 1.2px, transparent 1.2px)`,
-          backgroundSize: "28px 28px",
-          backfaceVisibility: "hidden",
-        }}
-      >
-        {/* SVG EDGES LAYER (Optimized backing store to release GPU/memory pressure)
-            zIndex stays BELOW the card layers: even when a connector's geometry
-            passes over a card, the card (and its text) paints on top, so lines
-            never cover labels or titles. */}
-        <CanvasEdgeLayer
-          edges={data.edges}
-          nodes={data.nodes}
-          nodeMap={nodeMap}
-          obstacles={canvasObstacles}
-          selectedEdgeIds={selectedEdgeIds}
-          hoveredNodeId={hoveredNodeId}
-          connecting={connectingState}
-          editable={editable}
-          isDark={isDark}
-          isEink={isEink}
-          colorMap={sourceDisplayColorMap}
-          colors={colors}
-          presentation={{
-            active: isPresentationMode,
-            sequence: presentationSequence,
-            index: currentSlideIndex,
-          }}
-          isInViewport={isEdgeInViewport}
-          onSelectEdge={setSelectedEdgeIds}
-          onClearNodeSelection={() => setSelectedNodeIds(new Set())}
-          onStartEditingLabel={(edgeId) => {
-            setEditingEdgeId(edgeId);
-            setEditingEdgeLabel(data.edges.find((e) => e.id === edgeId)?.label || "");
-          }}
-          onContextMenu={handleContextMenuEdge}
-          onCycleAnchor={handleCycleEdgeAnchor}
-          onStepBendMouseDown={handleStepBendMouseDown}
-          onResetStepOffset={handleResetEdgeStepOffset}
-        />
-
-        {/* 3. MULTIMODAL CARDS LAYER — the per-node JSX (group hull / card
-            chrome) lives in the extracted node-layer views (wave 3 of the
-            CanvasView decomposition); the layer itself owns the map and the
-            branch dispatch. */}
-        <CanvasNodeLayer
-          nodes={data.nodes}
-          editable={editable}
-          colors={colors}
-          isDark={isDark}
-          isEink={isEink}
-          selectedNodeIds={selectedNodeIds}
-          hoveredNodeId={hoveredNodeId}
-          setHoveredNodeId={setHoveredNodeId}
-          editingNodeId={editingNodeId}
-          editingText={editingText}
-          setEditingNodeId={setEditingNodeId}
-          setEditingText={setEditingText}
-          connectingState={connectingState}
-          isPresentationMode={isPresentationMode}
-          presentationSequence={presentationSequence}
-          currentSlideIndex={currentSlideIndex}
-          nodeMap={nodeMap}
-          nodeOutgoingMap={nodeOutgoingMap}
-          currentMultiRootNode={currentMultiRootNode}
-          sourceDisplayColorMap={sourceDisplayColorMap}
-          isNodeInViewport={isNodeInViewport}
-          hasDraggedRef={hasDraggedRef}
-          cardSuggest={cardSuggest}
-          setCardSuggest={setCardSuggest}
-          cardEditorRef={cardEditorRef}
-          currentFilePath={currentFilePath}
-          onOpenFile={onOpenFile}
-          setSelectedNodeId={setSelectedNodeId}
-          setSelectedEdgeId={setSelectedEdgeId}
-          handleNodeDragStart={handleNodeDragStart}
-          handleNodeResizeStart={handleNodeResizeStart}
-          handleAnchorMouseDown={handleAnchorMouseDown}
-          handleAnchorMouseUp={handleAnchorMouseUp}
-          handleCardMouseUpForConnect={handleCardMouseUpForConnect}
-          handleContextMenuNode={handleContextMenuNode}
-          handleJumpToSlide={handleJumpToSlide}
-          handleDeleteNode={handleDeleteNode}
-          handleDuplicateNode={handleDuplicateNode}
-          handleNodeColorChange={handleNodeColorChange}
-          handleSaveNodeEdit={handleSaveNodeEdit}
-          handleSave={handleSave}
-          handleCardEditorChange={handleCardEditorChange}
-          moveCardSuggest={moveCardSuggest}
-          pickCardSuggest={pickCardSuggest}
-          handleCardBodyActivate={handleCardBodyActivate}
-          openMediaPreview={openMediaPreview}
-        />
-
-        {/* 4. EDGE LABELS OVERLAY LAYER (z-index: 25 - never occluded by cards) */}
-        <CanvasEdgeLabelLayer
-          edges={data.edges}
-          nodes={data.nodes}
-          nodeMap={nodeMap}
-          obstacles={canvasObstacles}
-          selectedEdgeIds={selectedEdgeIds}
-          editingEdgeId={editingEdgeId}
-          editingLabel={editingEdgeLabel}
-          onEditingLabelChange={setEditingEdgeLabel}
-          onStartEditing={(edgeId) => {
-            setEditingEdgeId(edgeId);
-            setEditingEdgeLabel(data.edges.find((e) => e.id === edgeId)?.label || "");
-          }}
-          onStopEditing={() => setEditingEdgeId(null)}
-          onSelectionChange={setSelectedEdgeIds}
-          onClearNodeSelection={() => setSelectedNodeIds(new Set())}
-          onSaveLabel={handleSaveEdgeLabel}
-          onContextMenu={handleContextMenuEdge}
-          isInViewport={isEdgeInViewport}
-          colorMap={sourceDisplayColorMap}
-          colors={colors}
-          isDark={isDark}
-          presentation={{
-            active: isPresentationMode,
-            sequence: presentationSequence,
-            index: currentSlideIndex,
-          }}
-        />
-      </div>
-
-      {/* 5. BOTTOM-RIGHT INTERACTIVE MINIMAP */}
-      <CanvasMinimap
-        data={data}
-        viewport={viewport}
-        theme={theme}
-        isDark={isDark}
-        colors={colors}
-        nodeMap={nodeMap}
-        selectedNodeIds={selectedNodeIds}
-        bounds={minimapBBox}
-        scale={minimapScale}
-        offsetX={minimapOffsetX}
-        offsetY={minimapOffsetY}
-        containerEl={containerRef.current}
-        onNavigate={handleMinimapNavigate}
       />
 
       {/* 5-9. OVERLAY LAYER — the note-picker / extract / export / spawn
@@ -1318,54 +915,97 @@ export const CanvasView = memo(function CanvasView({
         lightboxMedia={lightboxMedia}
         setLightboxMedia={setLightboxMedia}
       />
-      {/* 7. MARQUEE SELECTION BOX */}
-      <MarqueeSelectionBox box={selectionBox} viewport={viewport} />
 
-      {/* 8.5 Floating Batch Toolbar for Multiple Selected Edges */}
-      {selectedEdgeIds.size > 1 && (
-        <CanvasEdgeBatchToolbar
-          count={selectedEdgeIds.size}
-          theme={theme}
-          isDark={isDark}
-          colors={colors}
-          onSetStyle={handleBatchSetEdgeStyle}
-          onCycleStrokePattern={handleBatchCycleStrokePattern}
-          onToggleArrow={handleBatchToggleArrow}
-          onReverse={handleBatchReverseEdges}
-          onSetColor={handleBatchSetEdgeColor}
-          onDelete={handleBatchDeleteEdges}
-          onClear={() => setSelectedEdgeIds(new Set())}
-        />
-      )}
-
-      {/* 8.6 Suggestion popup for the card editor (`[[` for a note, `/` for a
-          command). Through a portal, because the card lives inside the
-          transformed canvas world and a popup drawn there would be scaled and
-          clipped with it. */}
-      {cardSuggest &&
-        typeof document !== "undefined" &&
-        createPortal(
-          <CanvasCardSuggestMenu
-            header={
-              cardSuggest.kind === "note"
-                ? `引用笔记${cardSuggest.query ? `：${cardSuggest.query}` : ""}`
-                : undefined
-            }
-            items={cardSuggest.items}
-            selectedIndex={cardSuggest.selectedIndex}
-            emptyText={cardSuggest.kind === "note" ? "没有匹配的笔记" : "没有匹配的命令"}
-            x={cardSuggest.x}
-            y={cardSuggest.y}
-            colors={colors}
-            isDark={isDark}
-            isEink={isEink}
-            onPick={pickCardSuggest}
-            onHover={(index) =>
-              setCardSuggest((prev) => (prev ? { ...prev, selectedIndex: index } : prev))
-            }
-          />,
-          document.body,
-        )}
+      {/* 2-8.6. THE CANVAS WORLD — the hidden media inputs, the transformed
+          board (edges, cards, edge labels), the minimap, the marquee box, the
+          batch edge toolbar and the card-suggestion portal (extracted
+          component, wave 7). Mounted after the overlay on purpose: every child
+          of the world carries its own z-index (marquee 80, minimap 90, batch
+          toolbar 1000, suggest portal 10001) against the overlay's
+          200/1100/99999 stack, so paint order stays z-index-determined and the
+          sibling reorder is not observable. */}
+      <CanvasWorld
+        theme={theme}
+        colors={colors}
+        isDark={isDark}
+        isEink={isEink}
+        editable={editable}
+        data={data}
+        nodeMap={nodeMap}
+        viewport={viewport}
+        isPresentationMode={isPresentationMode}
+        presentationSequence={presentationSequence}
+        currentSlideIndex={currentSlideIndex}
+        hoveredNodeId={hoveredNodeId}
+        setHoveredNodeId={setHoveredNodeId}
+        selectedNodeIds={selectedNodeIds}
+        setSelectedNodeIds={setSelectedNodeIds}
+        selectedEdgeIds={selectedEdgeIds}
+        setSelectedEdgeIds={setSelectedEdgeIds}
+        editingNodeId={editingNodeId}
+        setEditingNodeId={setEditingNodeId}
+        editingText={editingText}
+        setEditingText={setEditingText}
+        editingEdgeId={editingEdgeId}
+        setEditingEdgeId={setEditingEdgeId}
+        editingEdgeLabel={editingEdgeLabel}
+        setEditingEdgeLabel={setEditingEdgeLabel}
+        connectingState={connectingState}
+        canvasObstacles={canvasObstacles}
+        sourceDisplayColorMap={sourceDisplayColorMap}
+        isEdgeInViewport={isEdgeInViewport}
+        isNodeInViewport={isNodeInViewport}
+        nodeOutgoingMap={nodeOutgoingMap}
+        currentMultiRootNode={currentMultiRootNode}
+        hasDraggedRef={hasDraggedRef}
+        selectionBox={selectionBox}
+        cardSuggest={cardSuggest}
+        setCardSuggest={setCardSuggest}
+        cardEditorRef={cardEditorRef}
+        currentFilePath={currentFilePath}
+        onOpenFile={onOpenFile}
+        setSelectedNodeId={setSelectedNodeId}
+        setSelectedEdgeId={setSelectedEdgeId}
+        handleNodeDragStart={handleNodeDragStart}
+        handleNodeResizeStart={handleNodeResizeStart}
+        handleAnchorMouseDown={handleAnchorMouseDown}
+        handleAnchorMouseUp={handleAnchorMouseUp}
+        handleCardMouseUpForConnect={handleCardMouseUpForConnect}
+        handleStepBendMouseDown={handleStepBendMouseDown}
+        handleResetEdgeStepOffset={handleResetEdgeStepOffset}
+        handleCardBodyActivate={handleCardBodyActivate}
+        handleContextMenuNode={handleContextMenuNode}
+        handleContextMenuEdge={handleContextMenuEdge}
+        handleSaveEdgeLabel={handleSaveEdgeLabel}
+        handleCycleEdgeAnchor={handleCycleEdgeAnchor}
+        handleJumpToSlide={handleJumpToSlide}
+        handleDeleteNode={handleDeleteNode}
+        handleDuplicateNode={handleDuplicateNode}
+        handleNodeColorChange={handleNodeColorChange}
+        handleSaveNodeEdit={handleSaveNodeEdit}
+        handleSave={handleSave}
+        handleCardEditorChange={handleCardEditorChange}
+        moveCardSuggest={moveCardSuggest}
+        pickCardSuggest={pickCardSuggest}
+        openMediaPreview={openMediaPreview}
+        handleBatchSetEdgeStyle={handleBatchSetEdgeStyle}
+        handleBatchCycleStrokePattern={handleBatchCycleStrokePattern}
+        handleBatchToggleArrow={handleBatchToggleArrow}
+        handleBatchReverseEdges={handleBatchReverseEdges}
+        handleBatchSetEdgeColor={handleBatchSetEdgeColor}
+        handleBatchDeleteEdges={handleBatchDeleteEdges}
+        minimapBBox={minimapBBox}
+        minimapScale={minimapScale}
+        minimapOffsetX={minimapOffsetX}
+        minimapOffsetY={minimapOffsetY}
+        containerRef={containerRef}
+        handleMinimapNavigate={handleMinimapNavigate}
+        mediaFileInputRef={mediaFileInputRef}
+        imageFileInputRef={imageFileInputRef}
+        videoFileInputRef={videoFileInputRef}
+        audioFileInputRef={audioFileInputRef}
+        handleMediaFileInputChange={handleMediaFileInputChange}
+      />
 
       {/* 10. Presentation Mode Floating Controls & Slide Drawer (extracted
           component, wave 4; the guard stays here so the chrome only mounts

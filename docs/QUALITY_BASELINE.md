@@ -1,7 +1,7 @@
 # KnowSpace · 质量棘轮基线
 
 > **文档性质**：代码质量债务的权威口径（与 `TEST_BASELINE.md` 同规格）
-> **生成时间**：2026-09-26
+> **生成时间**：2026-09-27
 > **应用版本**：`2.6.5`
 > **生成方式**：`node scripts/quality-ratchet.cjs`（自动生成，**禁止手工编辑**）
 > **判定规则**：CI 中 `--check` 比对，门控指标只许改善不许恶化；放宽基线必须走评审
@@ -17,7 +17,7 @@
 | `as-any` | 10 | 只减不增（`as any`） |
 | `files-over-1000-lines` | 15 | 只减不增（src 非测试代码，> 1000 行） |
 | `max-file-lines` | 3586 | 只减不增（最大单文件行数） |
-| `src-lines` | 62426 | 记录趋势，不设闸 |
+| `src-lines` | 62986 | 记录趋势，不设闸 |
 | `test-cases` | 见 `TEST_BASELINE.md` | 只增不减——由测试基线守护，本文件不重复设闸 |
 
 ---
@@ -27,7 +27,6 @@
 | 文件 | 行数 |
 | :--- | ---: |
 | `src/components/MindmapView.tsx` | 3586 |
-| `src/components/CanvasView.tsx` | 1414 |
 | `src/services/mindmapLayout.ts` | 1266 |
 | `src/components/DailyReviewPanel.tsx` | 1237 |
 | `src/services/mindmapSidecar.ts` | 1215 |
@@ -41,6 +40,7 @@
 | `src/components/GraphViewPane.tsx` | 1075 |
 | `src/components/AboutDialog.tsx` | 1068 |
 | `src/services/fsrsService.ts` | 1062 |
+| `src/components/CanvasView.tsx` | 1054 |
 
 ---
 

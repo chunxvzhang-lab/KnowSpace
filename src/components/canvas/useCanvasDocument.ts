@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type RefObject } from "react"
 import type { CanvasData } from "../../types/canvasTypes";
 import {
   createDefaultCanvas,
+  expandLoopEdgeSelection,
   parseCanvasData,
   serializeCanvasData,
 } from "../../services/canvasService";
@@ -9,10 +10,12 @@ import {
 /**
  * The document domain of the canvas: board state and its external-source sync,
  * the undo/redo history stack, the save paths, and the colour-picker
- * snapshot/commit trio that routes colour drags through that same history.
+ * snapshot/commit trio (plus the live-preview callbacks) that routes colour
+ * drags through that same history.
  *
  * Extracted from CanvasView (wave 1 of the CanvasView decomposition); the
- * camera/viewport domain lives in `useCanvasViewport`.
+ * camera/viewport domain lives in `useCanvasViewport`. The colour preview
+ * helpers moved here in wave 7, beside the commit machinery they feed.
  */
 type UseCanvasDocumentParams = {
   /** Externally owned canvas source; external changes are parsed back into state. */
@@ -32,6 +35,17 @@ type UseCanvasDocumentParams = {
   setEditingNodeId: (id: string | null) => void;
   /** Saving from the context menu also dismisses the menu. */
   setContextMenu: (menu: null) => void;
+  /** Colour previews and colour commits are gated on the canvas being editable. */
+  editable: boolean;
+  /**
+   * Render-current mirrors of the selection sets, read by the colour preview
+   * helpers below. They arrive as refs because this hook runs before
+   * `useCanvasSelection` produces the sets themselves (the selection hook
+   * needs `data.edges` from here, so the two cannot be reordered); mirroring
+   * in the parent keeps the previews reading exactly the committed selection.
+   */
+  selectedNodeIdsRef: RefObject<Set<string>>;
+  selectedEdgeIdsRef: RefObject<Set<string>>;
 };
 
 export function useCanvasDocument({
@@ -43,6 +57,9 @@ export function useCanvasDocument({
   editingTextRef,
   setEditingNodeId,
   setContextMenu,
+  editable,
+  selectedNodeIdsRef,
+  selectedEdgeIdsRef,
 }: UseCanvasDocumentParams) {
   // Initialize canvas data
   const [data, setData] = useState<CanvasData>(() => {
@@ -172,6 +189,85 @@ export function useCanvasDocument({
     }, 500);
   }, [commitColorPick]);
 
+  /**
+   * Applies a colour to the board WITHOUT writing history — the live preview
+   * while the native chooser is open. Exactly one entry is committed later by
+   * commitColorPick().
+   */
+  const previewBatchNodeColor = useCallback(
+    (color: string) => {
+      const selectedNodeIds = selectedNodeIdsRef.current;
+      if (!editable || selectedNodeIds.size === 0) return;
+      captureColorSnapshot();
+      setData((prev) => {
+        const next = {
+          ...prev,
+          nodes: prev.nodes.map((n) =>
+            selectedNodeIds.has(n.id) ? { ...n, color: color || undefined } : n,
+          ),
+        };
+        latestDataRef.current = next;
+        return next;
+      });
+    },
+    [editable, selectedNodeIdsRef, captureColorSnapshot],
+  );
+
+  const previewBatchEdgeColor = useCallback(
+    (color: string) => {
+      const selectedEdgeIds = selectedEdgeIdsRef.current;
+      if (!editable || selectedEdgeIds.size === 0) return;
+      captureColorSnapshot();
+      setData((prev) => {
+        const affected = expandLoopEdgeSelection(prev.edges, selectedEdgeIds);
+        const next = {
+          ...prev,
+          edges: prev.edges.map((e) =>
+            affected.has(e.id) ? { ...e, color: color || undefined } : e,
+          ),
+        };
+        latestDataRef.current = next;
+        return next;
+      });
+    },
+    [editable, selectedEdgeIdsRef, captureColorSnapshot],
+  );
+
+  const previewEdgeColor = useCallback(
+    (edgeId: string, color: string) => {
+      if (!editable) return;
+      captureColorSnapshot();
+      setData((prev) => {
+        const affected = expandLoopEdgeSelection(prev.edges, [edgeId]);
+        const next = {
+          ...prev,
+          edges: prev.edges.map((e) =>
+            affected.has(e.id) ? { ...e, color: color || undefined } : e,
+          ),
+        };
+        latestDataRef.current = next;
+        return next;
+      });
+    },
+    [editable, captureColorSnapshot],
+  );
+
+  const previewNodeColor = useCallback(
+    (nodeId: string, color: string) => {
+      if (!editable) return;
+      captureColorSnapshot();
+      setData((prev) => {
+        const next = {
+          ...prev,
+          nodes: prev.nodes.map((n) => (n.id === nodeId ? { ...n, color: color || undefined } : n)),
+        };
+        latestDataRef.current = next;
+        return next;
+      });
+    },
+    [editable, captureColorSnapshot],
+  );
+
   const handleUndo = useCallback(() => {
     if (history.past.length === 0) return;
     const previous = history.past[history.past.length - 1];
@@ -261,9 +357,14 @@ export function useCanvasDocument({
     handleRedo,
     handleSaveNodeEdit,
     handleSave,
-    /** Colour-picker baseline capture — the preview helpers live in CanvasView. */
+    /** Colour-picker baseline capture — fed by the preview helpers below. */
     captureColorSnapshot,
     /** Debounced, single-entry history commit for a whole colour-drag gesture. */
     debounceCommitColorPick,
+    /** Live no-history previews while the native colour chooser is open. */
+    previewBatchNodeColor,
+    previewBatchEdgeColor,
+    previewEdgeColor,
+    previewNodeColor,
   };
 }
