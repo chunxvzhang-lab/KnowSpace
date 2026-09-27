@@ -15,9 +15,9 @@
 | :--- | ---: | :--- |
 | `colon-any` | 30 | 只减不增（`: any`，含 `any[]`；不含 `Array<any>` 泛型） |
 | `as-any` | 10 | 只减不增（`as any`） |
-| `files-over-1000-lines` | 15 | 只减不增（src 非测试代码，> 1000 行） |
+| `files-over-1000-lines` | 12 | 只减不增（src 非测试代码，> 1000 行） |
 | `max-file-lines` | 3586 | 只减不增（最大单文件行数） |
-| `src-lines` | 62986 | 记录趋势，不设闸 |
+| `src-lines` | 63202 | 记录趋势，不设闸 |
 | `test-cases` | 见 `TEST_BASELINE.md` | 只增不减——由测试基线守护，本文件不重复设闸 |
 
 ---
@@ -27,10 +27,7 @@
 | 文件 | 行数 |
 | :--- | ---: |
 | `src/components/MindmapView.tsx` | 3586 |
-| `src/services/mindmapLayout.ts` | 1266 |
 | `src/components/DailyReviewPanel.tsx` | 1237 |
-| `src/services/mindmapSidecar.ts` | 1215 |
-| `src/services/mindmapService.ts` | 1194 |
 | `src/components/FlashCapsule.tsx` | 1177 |
 | `src/App.tsx` | 1151 |
 | `src/services/canvasGraph.ts` | 1150 |
@@ -79,7 +76,7 @@
 | `src/hooks/useDocumentCreation.ts:206` | `: any) {` |
 | `src/hooks/useDocumentCreation.ts:287` | `: any) {` |
 | `src/services/markdown.ts:1064` | `: any, silent: boolean) => {` |
-| `src/services/mindmapSidecar.ts:373` | `: any of them written as something other` |
+| `src/services/mindmapSidecarRead.ts:51` | `: any of them written as something other` |
 
 ### `as any`
 
