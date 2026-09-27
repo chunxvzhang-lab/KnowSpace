@@ -2,6 +2,7 @@ import {
   useCallback,
   useLayoutEffect,
   useEffect,
+  useState,
   type Dispatch,
   type RefObject,
   type SetStateAction,
@@ -20,8 +21,12 @@ import type { CanvasContextMenuState } from "./CanvasOverlayMenus";
  * consumes `setContextMenu`, and this hook's other dependencies (the viewport
  * ref, the selection and presentation state) only exist after the document
  * hook has run — owning the state here would make the initialisation order
- * circular. The align-menu flag also stays in CanvasView (two domains write
- * it); this hook only closes it on Escape via `setShowAlignMenu`.
+ * circular. The align dropdown (flag + its dismissal effects) is owned HERE
+ * since the final trim wave: this domain already closes it on Escape, the
+ * toolbar writes it through the returned setter, and the state is not read
+ * before this hook's call site — ownership needs a single reader-order
+ * constraint, which this satisfies. The `contextMenu` state still cannot come
+ * here for the document-hook reason above.
  */
 type UseCanvasContextMenuParams = {
   /** The open menu, if any — owned by CanvasView (see the header note). */
@@ -29,8 +34,6 @@ type UseCanvasContextMenuParams = {
   setContextMenu: Dispatch<SetStateAction<CanvasContextMenuState | null>>;
   /** The rendered menu element, measured by the clamp effect below. */
   contextMenuRef: RefObject<HTMLDivElement | null>;
-  /** The toolbar's align dropdown — closed alongside the menu on Escape. */
-  setShowAlignMenu: Dispatch<SetStateAction<boolean>>;
   /** The scrollable canvas container — the click coordinates are relative to it. */
   containerRef: RefObject<HTMLDivElement | null>;
   /** Render-current mirror of the viewport, for the canvas-space coordinates. */
@@ -53,7 +56,6 @@ export function useCanvasContextMenu({
   contextMenu,
   setContextMenu,
   contextMenuRef,
-  setShowAlignMenu,
   containerRef,
   viewportRef,
   isPresentationMode,
@@ -67,6 +69,25 @@ export function useCanvasContextMenu({
   editingEdgeLabel,
   setEditingEdgeId,
 }: UseCanvasContextMenuParams) {
+  // The toolbar's align dropdown: this domain closes it on Escape, the toolbar
+  // opens it, and the two effects below dismiss it on any outside mousedown or
+  // once fewer than two cards are selected (the dropdown only makes sense for
+  // a multi-selection).
+  const [showAlignMenu, setShowAlignMenu] = useState(false);
+
+  // Close the toolbar align dropdown on any outside click
+  useEffect(() => {
+    if (!showAlignMenu) return;
+    const handleOutside = () => setShowAlignMenu(false);
+    window.addEventListener("mousedown", handleOutside);
+    return () => window.removeEventListener("mousedown", handleOutside);
+  }, [showAlignMenu]);
+
+  // The align dropdown only makes sense while 2+ cards are selected
+  useEffect(() => {
+    if (selectedNodeIds.size < 2 && showAlignMenu) setShowAlignMenu(false);
+  }, [selectedNodeIds, showAlignMenu]);
+
   // Dynamically clamp context menu position against the actual viewport so
   // the menu never spills off-screen, even when the canvas is nested in a
   // narrow layout (e.g. dual-document workspace).
@@ -247,5 +268,7 @@ export function useCanvasContextMenu({
     handleContextMenuNode,
     handleContextMenuEdge,
     handleSaveEdgeLabel,
+    showAlignMenu,
+    setShowAlignMenu,
   };
 }

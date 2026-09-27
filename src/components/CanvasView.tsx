@@ -1,7 +1,5 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ThemeMode } from "../core/types";
-import { isPointInsideNodeHull } from "../services/canvasService";
-import { getCanvasThemeColors } from "../services/canvasTheme";
+import { memo, useCallback, useMemo, useRef, useState } from "react";
+import { useCanvasAppearance } from "./canvas/useCanvasAppearance";
 import type { LightboxMedia } from "./MediaLightbox";
 // The render tree below the root container — the hidden media inputs, the
 // transformed board world, the minimap, the marquee box, the batch edge
@@ -32,30 +30,14 @@ import { useCanvasDerived } from "./canvas/useCanvasDerived";
 // The keyboard domain (the global shortcut handler and the Escape priority
 // chain), extracted during the wave-7 CanvasView decomposition.
 import { useCanvasKeyboard } from "./canvas/useCanvasKeyboard";
-// The presentation domain hook and the toolbar / overlay / presentation-chrome
-// components, extracted during the wave-4 CanvasView decomposition.
+// The presentation domain hook (wave 4) and CanvasChrome — the mount point of
+// the toolbar / overlay / presentation-chrome satellites (final trim wave).
 import { useCanvasPresentation } from "./canvas/useCanvasPresentation";
-import { CanvasToolbar } from "./canvas/CanvasToolbar";
-import { CanvasOverlayMenus, type CanvasContextMenuState } from "./canvas/CanvasOverlayMenus";
-import { CanvasPresentationChrome } from "./canvas/CanvasPresentationChrome";
+import type { CanvasContextMenuState } from "./canvas/CanvasOverlayMenus";
+import { CanvasChrome } from "./canvas/CanvasChrome";
+import type { CanvasViewProps } from "./canvas/canvasViewProps";
 
-export type CanvasViewProps = {
-  title: string;
-  source?: string;
-  onSourceChange?: (newSource: string) => void;
-  editable?: boolean;
-  theme?: ThemeMode;
-  onClose?: () => void;
-  allChapters?: Array<{ id: string; title: string; src: string; absolutePath?: string }>;
-  onOpenFile?: (filePath: string) => void;
-  onExtractToNote?: (title: string, content: string) => void;
-  onSave?: () => void;
-  isDirty?: boolean;
-  isSaving?: boolean;
-  currentFilePath?: string;
-  isFullscreen?: boolean;
-  onToggleFullscreen?: () => void;
-};
+export type { CanvasViewProps };
 
 // getNodePalette now lives in ./canvas/canvasPalette so the minimap and the
 // node layer share one definition (imported at the top).
@@ -84,34 +66,11 @@ export const CanvasView = memo(function CanvasView({
   isFullscreen,
   onToggleFullscreen,
 }: CanvasViewProps) {
-  // Theme-aware design tokens
-  const colors = useMemo(() => getCanvasThemeColors(theme), [theme]);
-
-  const isDark = useMemo(() => {
-    return (
-      theme === "twitter" ||
-      (theme === "system" &&
-        typeof window !== "undefined" &&
-        Boolean(window.matchMedia?.("(prefers-color-scheme: dark)").matches))
-    );
-  }, [theme]);
-  const isEink = colors.isEink;
-
-  const [isNarrow, setIsNarrow] = useState(false);
-
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setIsNarrow(entry.contentRect.width < 860);
-      }
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-
   const containerRef = useRef<HTMLDivElement | null>(null);
+
+  // Theme-aware design tokens and the responsive flag (extracted hook; the
+  // final trim wave).
+  const { colors, isDark, isEink, isNarrow } = useCanvasAppearance({ theme, containerRef });
 
   // Card text editing — the draft lives here, mirrored into refs so the
   // document hook's save paths can commit it without re-subscribing on
@@ -136,14 +95,10 @@ export const CanvasView = memo(function CanvasView({
   // a fixed-positioned portal. The menu is intentionally rendered at the
   // document body level so it can never be clipped by the canvas container's
   // `overflow: hidden` or any ancestor that would otherwise occlude it.
-  // The align menu's open flag deliberately stays here rather than inside
-  // CanvasToolbar: the context-menu keydown handler below also closes it on
-  // Escape, so two domains write it and it cannot be toolbar-local.
-  // The menu domain itself (clamping, dismissal, openers) moved into
-  // useCanvasContextMenu (wave 6); only this state stays here because
-  // useCanvasDocument's save path consumes setContextMenu before that hook's
-  // other dependencies exist.
-  const [showAlignMenu, setShowAlignMenu] = useState(false);
+  // The menu domain itself (clamping, dismissal, openers — and the toolbar's
+  // align dropdown since the final trim wave) lives in useCanvasContextMenu;
+  // only this state stays here because useCanvasDocument's save path consumes
+  // setContextMenu before that hook's other dependencies exist.
   const [contextMenu, setContextMenu] = useState<CanvasContextMenuState | null>(null);
   const contextMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -243,19 +198,6 @@ export const CanvasView = memo(function CanvasView({
   /** Media preview opened by double-clicking an image / video / audio card. */
   const [lightboxMedia, setLightboxMedia] = useState<LightboxMedia | null>(null);
 
-  // Close the toolbar align dropdown on any outside click
-  useEffect(() => {
-    if (!showAlignMenu) return;
-    const handleOutside = () => setShowAlignMenu(false);
-    window.addEventListener("mousedown", handleOutside);
-    return () => window.removeEventListener("mousedown", handleOutside);
-  }, [showAlignMenu]);
-
-  // The align dropdown only makes sense while 2+ cards are selected
-  useEffect(() => {
-    if (selectedNodeIds.size < 2 && showAlignMenu) setShowAlignMenu(false);
-  }, [selectedNodeIds, showAlignMenu]);
-
   // Edge label editing state
   const [editingEdgeId, setEditingEdgeId] = useState<string | null>(null);
   const [editingEdgeLabel, setEditingEdgeLabel] = useState("");
@@ -346,11 +288,12 @@ export const CanvasView = memo(function CanvasView({
     handleContextMenuNode,
     handleContextMenuEdge,
     handleSaveEdgeLabel,
+    showAlignMenu,
+    setShowAlignMenu,
   } = useCanvasContextMenu({
     contextMenu,
     setContextMenu,
     contextMenuRef,
-    setShowAlignMenu,
     containerRef,
     viewportRef,
     isPresentationMode,
@@ -427,36 +370,47 @@ export const CanvasView = memo(function CanvasView({
 
   // Pointer system: the single global mousemove/mouseup pair that multiplexes
   // step-bend, group drag, marquee, pan, node drag, resize and connect, with
-  // the shared rAF-throttling refs (extracted hook).
-  const { isDraggingCanvasRef, canvasDragStartRef, groupDragRef, handleCardBodyActivate } =
-    useCanvasPointer({
-      containerRef,
-      latestDataRef,
-      setData,
-      pushHistory,
-      emitChange,
-      setViewport,
-      viewportRef,
-      rafWheelIdRef,
-      setSelectedNodeIds,
-      setSelectedEdgeIds,
-      hasDraggedRef,
-      selectionBoxRef,
-      setSelectionBox,
-      baseSelectionBeforeBoxRef,
-      baseEdgeSelectionBeforeBoxRef,
-      nodeDragRef,
-      resizeDragRef,
-      connectingStateRef,
-      setConnectingState,
-      rafConnectIdRef,
-      latestConnectPosRef,
-      stepBendDragRef,
-      allChapters,
-      onOpenFile,
-      isPresentationMode,
-      showToast,
-    });
+  // the shared rAF-throttling refs (extracted hook). The background-mousedown
+  // handler (pan / box-select / group grab / presentation tap) moved there too
+  // in the final trim wave — it arms exactly the drag refs that hook owns.
+  const { handleCardBodyActivate, handleMouseDownBackground } = useCanvasPointer({
+    containerRef,
+    latestDataRef,
+    setData,
+    pushHistory,
+    emitChange,
+    setViewport,
+    viewportRef,
+    rafWheelIdRef,
+    setSelectedNodeIds,
+    setSelectedEdgeIds,
+    hasDraggedRef,
+    selectionBoxRef,
+    setSelectionBox,
+    baseSelectionBeforeBoxRef,
+    baseEdgeSelectionBeforeBoxRef,
+    nodeDragRef,
+    resizeDragRef,
+    connectingStateRef,
+    setConnectingState,
+    rafConnectIdRef,
+    latestConnectPosRef,
+    stepBendDragRef,
+    allChapters,
+    onOpenFile,
+    isPresentationMode,
+    showToast,
+    // Background-mousedown inputs (final trim wave):
+    setContextMenu,
+    editingNodeIdRef,
+    handleSaveNodeEdit,
+    viewport,
+    isBoxSelectMode,
+    handleStartBoxSelection,
+    selectedNodeIds,
+    showSlideDrawer,
+    setShowSlideDrawer,
+  });
 
   // Node CRUD / arrangement domain: card, group and clipboard-text operations
   // (extracted hook, wave 5).
@@ -605,16 +559,6 @@ export const CanvasView = memo(function CanvasView({
     connectingState,
   });
 
-  // ResizeObserver for canvas container to ensure smooth updates
-  useEffect(() => {
-    if (!containerRef.current || typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(() => {
-      // Keep canvas reactive on resize
-    });
-    ro.observe(containerRef.current);
-    return () => ro.disconnect();
-  }, []);
-
   // Keyboard domain: the global shortcut handler (Ctrl+S/A/D/Z/Y, Delete, R,
   // Tab, Enter, Escape) and the Escape priority chain (extracted hook, wave
   // 7). The hook registers the Escape chain first, then the shortcuts — the
@@ -662,75 +606,6 @@ export const CanvasView = memo(function CanvasView({
     handleToggleFullscreen,
   });
 
-  // Background drag to pan or start box selection
-  const handleMouseDownBackground = (e: React.MouseEvent) => {
-    if (e.button !== 0 && e.button !== 1) return; // Left or Middle click
-    setContextMenu(null);
-
-    // If a card or group was being edited, commit edits
-    if (editingNodeIdRef.current) {
-      handleSaveNodeEdit();
-    }
-
-    if (isPresentationMode) {
-      if (showSlideDrawer) setShowSlideDrawer(false);
-      if (e.button === 0 || e.button === 1) {
-        isDraggingCanvasRef.current = true;
-        canvasDragStartRef.current = {
-          x: e.clientX,
-          y: e.clientY,
-          panX: viewport.panX,
-          panY: viewport.panY,
-          hasMoved: false,
-        };
-      }
-      return;
-    }
-
-    const isModifier = e.shiftKey || e.ctrlKey || e.metaKey;
-    // If in box select mode or holding Shift/Ctrl/Cmd, start marquee box selection
-    if (isBoxSelectMode || isModifier) {
-      handleStartBoxSelection(e, isModifier);
-      return;
-    }
-
-    // Clicking the hollow middle of a multi-selection — the empty centre of a
-    // ring or a grid — grabs the whole group and moves it. Without this the
-    // press would fall through to the pan below, dragging the canvas instead,
-    // which is never what the user means right after arranging and selecting
-    // those cards.
-    if (e.button === 0 && selectedNodeIds.size >= 3 && containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const zoom = viewportRef.current.zoom;
-      const canvasX = (e.clientX - rect.left - viewportRef.current.panX) / zoom;
-      const canvasY = (e.clientY - rect.top - viewportRef.current.panY) / zoom;
-      const selected = latestDataRef.current.nodes.filter(
-        (n) => selectedNodeIds.has(n.id) && n.type !== "group",
-      );
-
-      if (isPointInsideNodeHull({ x: canvasX, y: canvasY }, selected)) {
-        groupDragRef.current = {
-          startClientX: e.clientX,
-          startClientY: e.clientY,
-          startById: new Map(selected.map((n) => [n.id, { id: n.id, startX: n.x, startY: n.y }])),
-        };
-        hasDraggedRef.current = false;
-        e.preventDefault();
-        return;
-      }
-    }
-
-    // Normal pan: do not clear selection immediately; clear only on mouseup if canvas did not move
-    isDraggingCanvasRef.current = true;
-    canvasDragStartRef.current = {
-      x: e.clientX,
-      y: e.clientY,
-      panX: viewport.panX,
-      panY: viewport.panY,
-      hasMoved: false,
-    };
-  };
-
   return (
     <div
       ref={containerRef}
@@ -749,174 +624,193 @@ export const CanvasView = memo(function CanvasView({
       onDragOver={handleDragOver}
       onDrop={handleCanvasDrop}
     >
-      {/* 1. TOP FLOATING GLASSMORPHIC TOOLBAR (extracted component, wave 4) */}
-      <CanvasToolbar
-        theme={theme}
-        colors={colors}
-        isDark={isDark}
-        isEink={isEink}
-        isNarrow={isNarrow}
-        title={title}
-        onSave={onSave}
-        isDirty={isDirty}
-        isSaving={isSaving}
-        handleSave={handleSave}
-        editable={editable}
-        handleAddTextCard={handleAddTextCard}
-        handleTriggerInsertMedia={handleTriggerInsertMedia}
-        setShowFilePicker={setShowFilePicker}
-        handleAddGroup={handleAddGroup}
-        isBoxSelectMode={isBoxSelectMode}
-        setIsBoxSelectMode={setIsBoxSelectMode}
-        selectedNodeIds={selectedNodeIds}
-        currentMultiRootNode={currentMultiRootNode}
-        currentMultiRootTitle={currentMultiRootTitle}
-        handleConnectOneToMany={handleConnectOneToMany}
-        handleConnectSelectedNodes={handleConnectSelectedNodes}
-        handleConnectLoopNodes={handleConnectLoopNodes}
-        showAlignMenu={showAlignMenu}
-        setShowAlignMenu={setShowAlignMenu}
-        handleAlignSelected={handleAlignSelected}
-        nodes={data.nodes}
-        latestDataRef={latestDataRef}
-        setData={setData}
-        pushHistory={pushHistory}
-        handleSpawnConnectedChild={handleSpawnConnectedChild}
-        setSpawnModalState={setSpawnModalState}
-        history={history}
-        handleUndo={handleUndo}
-        handleRedo={handleRedo}
-        handleOpenExtractModal={handleOpenExtractModal}
-        setShowExportModal={setShowExportModal}
-        isPresentationMode={isPresentationMode}
-        handleTogglePresentation={handleTogglePresentation}
-        handleZoom={handleZoom}
-        viewport={viewport}
-        setViewport={setViewport}
-        handleZoomToFit={handleZoomToFit}
-        isFullscreenActive={isFullscreenActive}
-        handleToggleFullscreen={handleToggleFullscreen}
-        onClose={onClose}
-      />
-
-      {/* 5-9. OVERLAY LAYER — the note-picker / extract / export / spawn
-          modals, the portalled right-click context menu, the toast and the
-          media lightbox (extracted component, wave 4). The overlay state it
-          renders stays up in CanvasView because non-overlay code writes it:
-          the gesture hooks take setContextMenu, the keyboard chains close the
-          modals, the toolbar opens the export modal, showToast writes the
-          toast, openMediaPreview writes the lightbox. */}
-      <CanvasOverlayMenus
-        theme={theme}
-        colors={colors}
-        isDark={isDark}
-        editable={editable}
-        data={data}
-        nodeMap={nodeMap}
-        selectedNodeIds={selectedNodeIds}
-        selectedEdgeIds={selectedEdgeIds}
-        connectedInternalEdges={connectedInternalEdges}
-        batchCustomColor={batchCustomColor}
-        batchEdgeCustomColor={batchEdgeCustomColor}
-        contextMenu={contextMenu}
-        setContextMenu={setContextMenu}
-        contextMenuRef={contextMenuRef}
-        allChapters={allChapters}
-        showFilePicker={showFilePicker}
-        setShowFilePicker={setShowFilePicker}
-        handleAddFileCard={handleAddFileCard}
-        showExtractModal={showExtractModal}
-        setShowExtractModal={setShowExtractModal}
-        extractedMarkdown={extractedMarkdown}
-        copiedNotification={copiedNotification}
-        handleCopyExtracted={handleCopyExtracted}
-        handleSaveAsNote={handleSaveAsNote}
-        onExtractToNote={onExtractToNote}
-        showExportModal={showExportModal}
-        setShowExportModal={setShowExportModal}
-        exportFormat={exportFormat}
-        setExportFormat={setExportFormat}
-        exportBg={exportBg}
-        setExportBg={setExportBg}
-        isExporting={isExporting}
-        exportCopyFeedback={exportCopyFeedback}
-        handleCopyExport={handleCopyExport}
-        handleDownloadExport={handleDownloadExport}
-        spawnModalState={spawnModalState}
-        setSpawnModalState={setSpawnModalState}
-        handleConfirmBatchSpawn={handleConfirmBatchSpawn}
-        handleAddTextCard={handleAddTextCard}
-        handlePasteClipboardAsCard={handlePasteClipboardAsCard}
-        handleTriggerInsertImage={handleTriggerInsertImage}
-        handleTriggerInsertVideo={handleTriggerInsertVideo}
-        handleTriggerInsertAudio={handleTriggerInsertAudio}
-        handleAddGroup={handleAddGroup}
-        isBoxSelectMode={isBoxSelectMode}
-        setIsBoxSelectMode={setIsBoxSelectMode}
-        handleSelectAll={handleSelectAll}
-        handleSelectAllEdges={handleSelectAllEdges}
-        handleAlignToGrid={handleAlignToGrid}
-        handleZoomToFit={handleZoomToFit}
-        setViewport={setViewport}
-        history={history}
-        handleUndo={handleUndo}
-        handleRedo={handleRedo}
-        onSave={onSave}
-        handleSave={handleSave}
-        handleOpenExtractModal={handleOpenExtractModal}
-        handleToggleEdgeStyle={handleToggleEdgeStyle}
-        handleToggleEdgeArrow={handleToggleEdgeArrow}
-        handleToggleEdgeStrokePattern={handleToggleEdgeStrokePattern}
-        handleReverseEdge={handleReverseEdge}
-        handleEdgeColorChange={handleEdgeColorChange}
-        handleEdgeLabelChange={handleEdgeLabelChange}
-        handleEdgeLabelShapeChange={handleEdgeLabelShapeChange}
-        handleSetEdgeAnchorSide={handleSetEdgeAnchorSide}
-        handleDeleteEdge={handleDeleteEdge}
-        handleBatchSetEdgeStyle={handleBatchSetEdgeStyle}
-        handleBatchCycleStrokePattern={handleBatchCycleStrokePattern}
-        handleBatchToggleArrow={handleBatchToggleArrow}
-        handleBatchSetEdgeColor={handleBatchSetEdgeColor}
-        handleBatchDeleteEdges={handleBatchDeleteEdges}
-        handleBatchReverseEdges={handleBatchReverseEdges}
-        previewBatchEdgeColor={previewBatchEdgeColor}
-        previewEdgeColor={previewEdgeColor}
-        debounceCommitColorPick={debounceCommitColorPick}
-        handleAlignSelected={handleAlignSelected}
-        handleSpawnConnectedChild={handleSpawnConnectedChild}
-        handleDisconnectSelectedNodesEdges={handleDisconnectSelectedNodesEdges}
-        handleDisconnectNodeEdges={handleDisconnectNodeEdges}
-        handleCopyNodeText={handleCopyNodeText}
-        handleCopyNodeWikilink={handleCopyNodeWikilink}
-        handleExtractCardToNote={handleExtractCardToNote}
-        handleSelectGroupNodes={handleSelectGroupNodes}
-        handleFitGroupSize={handleFitGroupSize}
-        handleDissolveGroup={handleDissolveGroup}
-        handleDeleteGroupWithContents={handleDeleteGroupWithContents}
-        handleGroupSelectedNodes={handleGroupSelectedNodes}
-        handleResetNodeSize={handleResetNodeSize}
-        handleNodeColorChange={handleNodeColorChange}
-        handleBatchColorChange={handleBatchColorChange}
-        handleDeleteNode={handleDeleteNode}
-        handleDeleteSelected={handleDeleteSelected}
-        handleDuplicateNode={handleDuplicateNode}
-        handleDuplicateSelected={handleDuplicateSelected}
-        handleBringToFront={handleBringToFront}
-        handleSendToBack={handleSendToBack}
-        handleConnectSelectedNodes={handleConnectSelectedNodes}
-        handleConnectOneToMany={handleConnectOneToMany}
-        handleConnectLoopNodes={handleConnectLoopNodes}
-        previewNodeColor={previewNodeColor}
-        previewBatchNodeColor={previewBatchNodeColor}
-        setEditingNodeId={setEditingNodeId}
-        setEditingText={setEditingText}
-        onOpenFile={onOpenFile}
-        toastMessage={toastMessage}
-        lightboxMedia={lightboxMedia}
-        setLightboxMedia={setLightboxMedia}
-      />
-
-      {/* 2-8.6. THE CANVAS WORLD — the hidden media inputs, the transformed
+      {/* 1-10. THE CHROME — the floating toolbar, the overlay menus and the
+          presentation controls now mount inside ./canvas/CanvasChrome (final
+          trim wave); this call only composes their bundles from the hook
+          values above. The world below passes through as children, so every
+          sibling keeps its exact position: toolbar + overlay render before it
+          and the presentation chrome after it. */}
+      <CanvasChrome
+        showPresentation={isPresentationMode && presentationSequence.length > 0}
+        toolbar={{
+          theme,
+          colors,
+          isDark,
+          isEink,
+          isNarrow,
+          title,
+          onSave,
+          isDirty,
+          isSaving,
+          handleSave,
+          editable,
+          handleAddTextCard,
+          handleTriggerInsertMedia,
+          setShowFilePicker,
+          handleAddGroup,
+          isBoxSelectMode,
+          setIsBoxSelectMode,
+          selectedNodeIds,
+          currentMultiRootNode,
+          currentMultiRootTitle,
+          handleConnectOneToMany,
+          handleConnectSelectedNodes,
+          handleConnectLoopNodes,
+          showAlignMenu,
+          setShowAlignMenu,
+          handleAlignSelected,
+          nodes: data.nodes,
+          latestDataRef,
+          setData,
+          pushHistory,
+          handleSpawnConnectedChild,
+          setSpawnModalState,
+          history,
+          handleUndo,
+          handleRedo,
+          handleOpenExtractModal,
+          setShowExportModal,
+          isPresentationMode,
+          handleTogglePresentation,
+          handleZoom,
+          viewport,
+          setViewport,
+          handleZoomToFit,
+          isFullscreenActive,
+          handleToggleFullscreen,
+          onClose,
+        }}
+        overlay={{
+          theme,
+          colors,
+          isDark,
+          editable,
+          data,
+          nodeMap,
+          selectedNodeIds,
+          selectedEdgeIds,
+          connectedInternalEdges,
+          batchCustomColor,
+          batchEdgeCustomColor,
+          contextMenu,
+          setContextMenu,
+          contextMenuRef,
+          allChapters,
+          showFilePicker,
+          setShowFilePicker,
+          handleAddFileCard,
+          showExtractModal,
+          setShowExtractModal,
+          extractedMarkdown,
+          copiedNotification,
+          handleCopyExtracted,
+          handleSaveAsNote,
+          onExtractToNote,
+          showExportModal,
+          setShowExportModal,
+          exportFormat,
+          setExportFormat,
+          exportBg,
+          setExportBg,
+          isExporting,
+          exportCopyFeedback,
+          handleCopyExport,
+          handleDownloadExport,
+          spawnModalState,
+          setSpawnModalState,
+          handleConfirmBatchSpawn,
+          handleAddTextCard,
+          handlePasteClipboardAsCard,
+          handleTriggerInsertImage,
+          handleTriggerInsertVideo,
+          handleTriggerInsertAudio,
+          handleAddGroup,
+          isBoxSelectMode,
+          setIsBoxSelectMode,
+          handleSelectAll,
+          handleSelectAllEdges,
+          handleAlignToGrid,
+          handleZoomToFit,
+          setViewport,
+          history,
+          handleUndo,
+          handleRedo,
+          onSave,
+          handleSave,
+          handleOpenExtractModal,
+          handleToggleEdgeStyle,
+          handleToggleEdgeArrow,
+          handleToggleEdgeStrokePattern,
+          handleReverseEdge,
+          handleEdgeColorChange,
+          handleEdgeLabelChange,
+          handleEdgeLabelShapeChange,
+          handleSetEdgeAnchorSide,
+          handleDeleteEdge,
+          handleBatchSetEdgeStyle,
+          handleBatchCycleStrokePattern,
+          handleBatchToggleArrow,
+          handleBatchSetEdgeColor,
+          handleBatchDeleteEdges,
+          handleBatchReverseEdges,
+          previewBatchEdgeColor,
+          previewEdgeColor,
+          debounceCommitColorPick,
+          handleAlignSelected,
+          handleSpawnConnectedChild,
+          handleDisconnectSelectedNodesEdges,
+          handleDisconnectNodeEdges,
+          handleCopyNodeText,
+          handleCopyNodeWikilink,
+          handleExtractCardToNote,
+          handleSelectGroupNodes,
+          handleFitGroupSize,
+          handleDissolveGroup,
+          handleDeleteGroupWithContents,
+          handleGroupSelectedNodes,
+          handleResetNodeSize,
+          handleNodeColorChange,
+          handleBatchColorChange,
+          handleDeleteNode,
+          handleDeleteSelected,
+          handleDuplicateNode,
+          handleDuplicateSelected,
+          handleBringToFront,
+          handleSendToBack,
+          handleConnectSelectedNodes,
+          handleConnectOneToMany,
+          handleConnectLoopNodes,
+          previewNodeColor,
+          previewBatchNodeColor,
+          setEditingNodeId,
+          setEditingText,
+          onOpenFile,
+          toastMessage,
+          lightboxMedia,
+          setLightboxMedia,
+        }}
+        presentation={{
+          nodes: data.nodes,
+          nodeMap,
+          presentationSequence,
+          currentSlideIndex,
+          isAutoPlaying,
+          setIsAutoPlaying,
+          showSlideDrawer,
+          setShowSlideDrawer,
+          slideDrawerRef,
+          isFullscreenActive,
+          handleToggleFullscreen,
+          handleTogglePresentation,
+          handlePrevSlide,
+          handleNextSlide,
+          handleJumpToSlide,
+          colors,
+          isDark,
+          isEink,
+        }}
+      >
+        {/* 2-8.6. THE CANVAS WORLD — the hidden media inputs, the transformed
           board (edges, cards, edge labels), the minimap, the marquee box, the
           batch edge toolbar and the card-suggestion portal (extracted
           component, wave 7). Mounted after the overlay on purpose: every child
@@ -924,114 +818,89 @@ export const CanvasView = memo(function CanvasView({
           toolbar 1000, suggest portal 10001) against the overlay's
           200/1100/99999 stack, so paint order stays z-index-determined and the
           sibling reorder is not observable. */}
-      <CanvasWorld
-        theme={theme}
-        colors={colors}
-        isDark={isDark}
-        isEink={isEink}
-        editable={editable}
-        data={data}
-        nodeMap={nodeMap}
-        viewport={viewport}
-        isPresentationMode={isPresentationMode}
-        presentationSequence={presentationSequence}
-        currentSlideIndex={currentSlideIndex}
-        hoveredNodeId={hoveredNodeId}
-        setHoveredNodeId={setHoveredNodeId}
-        selectedNodeIds={selectedNodeIds}
-        setSelectedNodeIds={setSelectedNodeIds}
-        selectedEdgeIds={selectedEdgeIds}
-        setSelectedEdgeIds={setSelectedEdgeIds}
-        editingNodeId={editingNodeId}
-        setEditingNodeId={setEditingNodeId}
-        editingText={editingText}
-        setEditingText={setEditingText}
-        editingEdgeId={editingEdgeId}
-        setEditingEdgeId={setEditingEdgeId}
-        editingEdgeLabel={editingEdgeLabel}
-        setEditingEdgeLabel={setEditingEdgeLabel}
-        connectingState={connectingState}
-        canvasObstacles={canvasObstacles}
-        sourceDisplayColorMap={sourceDisplayColorMap}
-        isEdgeInViewport={isEdgeInViewport}
-        isNodeInViewport={isNodeInViewport}
-        nodeOutgoingMap={nodeOutgoingMap}
-        currentMultiRootNode={currentMultiRootNode}
-        hasDraggedRef={hasDraggedRef}
-        selectionBox={selectionBox}
-        cardSuggest={cardSuggest}
-        setCardSuggest={setCardSuggest}
-        cardEditorRef={cardEditorRef}
-        currentFilePath={currentFilePath}
-        onOpenFile={onOpenFile}
-        setSelectedNodeId={setSelectedNodeId}
-        setSelectedEdgeId={setSelectedEdgeId}
-        handleNodeDragStart={handleNodeDragStart}
-        handleNodeResizeStart={handleNodeResizeStart}
-        handleAnchorMouseDown={handleAnchorMouseDown}
-        handleAnchorMouseUp={handleAnchorMouseUp}
-        handleCardMouseUpForConnect={handleCardMouseUpForConnect}
-        handleStepBendMouseDown={handleStepBendMouseDown}
-        handleResetEdgeStepOffset={handleResetEdgeStepOffset}
-        handleCardBodyActivate={handleCardBodyActivate}
-        handleContextMenuNode={handleContextMenuNode}
-        handleContextMenuEdge={handleContextMenuEdge}
-        handleSaveEdgeLabel={handleSaveEdgeLabel}
-        handleCycleEdgeAnchor={handleCycleEdgeAnchor}
-        handleJumpToSlide={handleJumpToSlide}
-        handleDeleteNode={handleDeleteNode}
-        handleDuplicateNode={handleDuplicateNode}
-        handleNodeColorChange={handleNodeColorChange}
-        handleSaveNodeEdit={handleSaveNodeEdit}
-        handleSave={handleSave}
-        handleCardEditorChange={handleCardEditorChange}
-        moveCardSuggest={moveCardSuggest}
-        pickCardSuggest={pickCardSuggest}
-        openMediaPreview={openMediaPreview}
-        handleBatchSetEdgeStyle={handleBatchSetEdgeStyle}
-        handleBatchCycleStrokePattern={handleBatchCycleStrokePattern}
-        handleBatchToggleArrow={handleBatchToggleArrow}
-        handleBatchReverseEdges={handleBatchReverseEdges}
-        handleBatchSetEdgeColor={handleBatchSetEdgeColor}
-        handleBatchDeleteEdges={handleBatchDeleteEdges}
-        minimapBBox={minimapBBox}
-        minimapScale={minimapScale}
-        minimapOffsetX={minimapOffsetX}
-        minimapOffsetY={minimapOffsetY}
-        containerRef={containerRef}
-        handleMinimapNavigate={handleMinimapNavigate}
-        mediaFileInputRef={mediaFileInputRef}
-        imageFileInputRef={imageFileInputRef}
-        videoFileInputRef={videoFileInputRef}
-        audioFileInputRef={audioFileInputRef}
-        handleMediaFileInputChange={handleMediaFileInputChange}
-      />
-
-      {/* 10. Presentation Mode Floating Controls & Slide Drawer (extracted
-          component, wave 4; the guard stays here so the chrome only mounts
-          while a presentation with slides is actually running) */}
-      {isPresentationMode && presentationSequence.length > 0 && (
-        <CanvasPresentationChrome
-          nodes={data.nodes}
-          nodeMap={nodeMap}
-          presentationSequence={presentationSequence}
-          currentSlideIndex={currentSlideIndex}
-          isAutoPlaying={isAutoPlaying}
-          setIsAutoPlaying={setIsAutoPlaying}
-          showSlideDrawer={showSlideDrawer}
-          setShowSlideDrawer={setShowSlideDrawer}
-          slideDrawerRef={slideDrawerRef}
-          isFullscreenActive={isFullscreenActive}
-          handleToggleFullscreen={handleToggleFullscreen}
-          handleTogglePresentation={handleTogglePresentation}
-          handlePrevSlide={handlePrevSlide}
-          handleNextSlide={handleNextSlide}
-          handleJumpToSlide={handleJumpToSlide}
+        <CanvasWorld
+          theme={theme}
           colors={colors}
           isDark={isDark}
           isEink={isEink}
+          editable={editable}
+          data={data}
+          nodeMap={nodeMap}
+          viewport={viewport}
+          isPresentationMode={isPresentationMode}
+          presentationSequence={presentationSequence}
+          currentSlideIndex={currentSlideIndex}
+          hoveredNodeId={hoveredNodeId}
+          setHoveredNodeId={setHoveredNodeId}
+          selectedNodeIds={selectedNodeIds}
+          setSelectedNodeIds={setSelectedNodeIds}
+          selectedEdgeIds={selectedEdgeIds}
+          setSelectedEdgeIds={setSelectedEdgeIds}
+          editingNodeId={editingNodeId}
+          setEditingNodeId={setEditingNodeId}
+          editingText={editingText}
+          setEditingText={setEditingText}
+          editingEdgeId={editingEdgeId}
+          setEditingEdgeId={setEditingEdgeId}
+          editingEdgeLabel={editingEdgeLabel}
+          setEditingEdgeLabel={setEditingEdgeLabel}
+          connectingState={connectingState}
+          canvasObstacles={canvasObstacles}
+          sourceDisplayColorMap={sourceDisplayColorMap}
+          isEdgeInViewport={isEdgeInViewport}
+          isNodeInViewport={isNodeInViewport}
+          nodeOutgoingMap={nodeOutgoingMap}
+          currentMultiRootNode={currentMultiRootNode}
+          hasDraggedRef={hasDraggedRef}
+          selectionBox={selectionBox}
+          cardSuggest={cardSuggest}
+          setCardSuggest={setCardSuggest}
+          cardEditorRef={cardEditorRef}
+          currentFilePath={currentFilePath}
+          onOpenFile={onOpenFile}
+          setSelectedNodeId={setSelectedNodeId}
+          setSelectedEdgeId={setSelectedEdgeId}
+          handleNodeDragStart={handleNodeDragStart}
+          handleNodeResizeStart={handleNodeResizeStart}
+          handleAnchorMouseDown={handleAnchorMouseDown}
+          handleAnchorMouseUp={handleAnchorMouseUp}
+          handleCardMouseUpForConnect={handleCardMouseUpForConnect}
+          handleStepBendMouseDown={handleStepBendMouseDown}
+          handleResetEdgeStepOffset={handleResetEdgeStepOffset}
+          handleCardBodyActivate={handleCardBodyActivate}
+          handleContextMenuNode={handleContextMenuNode}
+          handleContextMenuEdge={handleContextMenuEdge}
+          handleSaveEdgeLabel={handleSaveEdgeLabel}
+          handleCycleEdgeAnchor={handleCycleEdgeAnchor}
+          handleJumpToSlide={handleJumpToSlide}
+          handleDeleteNode={handleDeleteNode}
+          handleDuplicateNode={handleDuplicateNode}
+          handleNodeColorChange={handleNodeColorChange}
+          handleSaveNodeEdit={handleSaveNodeEdit}
+          handleSave={handleSave}
+          handleCardEditorChange={handleCardEditorChange}
+          moveCardSuggest={moveCardSuggest}
+          pickCardSuggest={pickCardSuggest}
+          openMediaPreview={openMediaPreview}
+          handleBatchSetEdgeStyle={handleBatchSetEdgeStyle}
+          handleBatchCycleStrokePattern={handleBatchCycleStrokePattern}
+          handleBatchToggleArrow={handleBatchToggleArrow}
+          handleBatchReverseEdges={handleBatchReverseEdges}
+          handleBatchSetEdgeColor={handleBatchSetEdgeColor}
+          handleBatchDeleteEdges={handleBatchDeleteEdges}
+          minimapBBox={minimapBBox}
+          minimapScale={minimapScale}
+          minimapOffsetX={minimapOffsetX}
+          minimapOffsetY={minimapOffsetY}
+          containerRef={containerRef}
+          handleMinimapNavigate={handleMinimapNavigate}
+          mediaFileInputRef={mediaFileInputRef}
+          imageFileInputRef={imageFileInputRef}
+          videoFileInputRef={videoFileInputRef}
+          audioFileInputRef={audioFileInputRef}
+          handleMediaFileInputChange={handleMediaFileInputChange}
         />
-      )}
+      </CanvasChrome>
     </div>
   );
 });

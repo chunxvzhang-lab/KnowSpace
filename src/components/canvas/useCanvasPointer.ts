@@ -10,6 +10,7 @@ import type { CanvasData, CanvasNode, CanvasViewport } from "../../types/canvasT
 import {
   computeGridLayout,
   computeRingSpacingLayout,
+  isPointInsideNodeHull,
   resizeGridSpacing,
   resizeRingSpacing,
   syncLoopEdgeGeometry,
@@ -22,6 +23,7 @@ import {
 } from "./useCanvasSelection";
 import type { NodeDragState, ResizeDragState } from "./useCanvasNodeDrag";
 import type { ConnectingState, StepBendDragState } from "./useCanvasConnect";
+import type { CanvasContextMenuState } from "./CanvasOverlayMenus";
 
 /**
  * Shared empty Map so the drag hot path never allocates a throwaway one when
@@ -42,7 +44,9 @@ type AllChapters = Array<{ id: string; title: string; src: string; absolutePath?
  * pointer effect plus the drag-start cluster exceed the 999-line file cap
  * together); their state mirrors and rAF refs arrive here as params. The
  * marquee branch reads and writes the selection domain's refs and setters
- * from `useCanvasSelection`.
+ * from `useCanvasSelection`. The background-mousedown handler (pan /
+ * box-select / hollow-middle group grab / presentation tap) moved here too
+ * (final trim wave) — it arms exactly the drag refs this hook owns.
  */
 type UseCanvasPointerParams = {
   /** The scrollable canvas container — every coordinate space below is relative to it. */
@@ -77,10 +81,32 @@ type UseCanvasPointerParams = {
   // ── card body activation ──────────────────────────────────────────────────
   allChapters: AllChapters;
   onOpenFile?: (filePath: string) => void;
+  // ── background mousedown (the handler moved here from CanvasView, final
+  //    trim wave) ────────────────────────────────────────────────────────────
+  /** Render-current viewport — seeds the pan / slide-drag start coordinates. */
+  viewport: CanvasViewport;
+  /** The press closes the context menu before anything else. */
+  setContextMenu: Dispatch<SetStateAction<CanvasContextMenuState | null>>;
+  /** A background press commits an open card edit first. */
+  editingNodeIdRef: RefObject<string | null>;
+  handleSaveNodeEdit: () => void;
+  /** Presentation mode: the press also closes the slide drawer. */
+  showSlideDrawer: boolean;
+  setShowSlideDrawer: Dispatch<SetStateAction<boolean>>;
+  /** Box-select mode (or a Shift/Ctrl/Cmd modifier) starts a marquee, not a pan. */
+  isBoxSelectMode: boolean;
+  handleStartBoxSelection: (e: React.MouseEvent | MouseEvent, isModifier: boolean) => void;
+  /** The hollow-middle grab needs the live multi-selection. */
+  selectedNodeIds: Set<string>;
   // ── misc ──────────────────────────────────────────────────────────────────
   /**
-   * Only read once, to seed `isPresentationModeAtMountRef` below — never in
-   * the effect body, so its identity is irrelevant.
+   * The big effect's mouseup reads `isPresentationMode` only through
+   * `isPresentationModeAtMountRef` below, which is initialised once and never
+   * refreshed — replicating the original contract exactly (the effect's
+   * dependency list never re-subscribed, so its closure kept the first-render
+   * value forever; see that ref for why). The returned background-mousedown
+   * handler reads the live render value instead: it is a fresh per-render
+   * closure, exactly like the inline CanvasView handler it moved from.
    */
   isPresentationMode: boolean;
   showToast: (msg: string) => void;
@@ -109,6 +135,15 @@ export function useCanvasPointer({
   rafConnectIdRef,
   latestConnectPosRef,
   stepBendDragRef,
+  viewport,
+  setContextMenu,
+  editingNodeIdRef,
+  handleSaveNodeEdit,
+  showSlideDrawer,
+  setShowSlideDrawer,
+  isBoxSelectMode,
+  handleStartBoxSelection,
+  selectedNodeIds,
   allChapters,
   onOpenFile,
   isPresentationMode,
@@ -243,6 +278,78 @@ export function useCanvasPointer({
     },
     [allChapters, onOpenFile, pushHistory, showToast, latestDataRef],
   );
+
+  // Background drag to pan or start box selection — moved verbatim from
+  // CanvasView (final trim wave). A plain per-render function, exactly like
+  // the inline handler it was: the root div rebinds it on every render, so it
+  // always closes over the live viewport / selection / presentation values.
+  const handleMouseDownBackground = (e: React.MouseEvent) => {
+    if (e.button !== 0 && e.button !== 1) return; // Left or Middle click
+    setContextMenu(null);
+
+    // If a card or group was being edited, commit edits
+    if (editingNodeIdRef.current) {
+      handleSaveNodeEdit();
+    }
+
+    if (isPresentationMode) {
+      if (showSlideDrawer) setShowSlideDrawer(false);
+      if (e.button === 0 || e.button === 1) {
+        isDraggingCanvasRef.current = true;
+        canvasDragStartRef.current = {
+          x: e.clientX,
+          y: e.clientY,
+          panX: viewport.panX,
+          panY: viewport.panY,
+          hasMoved: false,
+        };
+      }
+      return;
+    }
+
+    const isModifier = e.shiftKey || e.ctrlKey || e.metaKey;
+    // If in box select mode or holding Shift/Ctrl/Cmd, start marquee box selection
+    if (isBoxSelectMode || isModifier) {
+      handleStartBoxSelection(e, isModifier);
+      return;
+    }
+
+    // Clicking the hollow middle of a multi-selection — the empty centre of a
+    // ring or a grid — grabs the whole group and moves it. Without this the
+    // press would fall through to the pan below, dragging the canvas instead,
+    // which is never what the user means right after arranging and selecting
+    // those cards.
+    if (e.button === 0 && selectedNodeIds.size >= 3 && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const zoom = viewportRef.current.zoom;
+      const canvasX = (e.clientX - rect.left - viewportRef.current.panX) / zoom;
+      const canvasY = (e.clientY - rect.top - viewportRef.current.panY) / zoom;
+      const selected = latestDataRef.current.nodes.filter(
+        (n) => selectedNodeIds.has(n.id) && n.type !== "group",
+      );
+
+      if (isPointInsideNodeHull({ x: canvasX, y: canvasY }, selected)) {
+        groupDragRef.current = {
+          startClientX: e.clientX,
+          startClientY: e.clientY,
+          startById: new Map(selected.map((n) => [n.id, { id: n.id, startX: n.x, startY: n.y }])),
+        };
+        hasDraggedRef.current = false;
+        e.preventDefault();
+        return;
+      }
+    }
+
+    // Normal pan: do not clear selection immediately; clear only on mouseup if canvas did not move
+    isDraggingCanvasRef.current = true;
+    canvasDragStartRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      panX: viewport.panX,
+      panY: viewport.panY,
+      hasMoved: false,
+    };
+  };
 
   // Global mouse move and up listeners
   useEffect(() => {
@@ -915,11 +1022,12 @@ export function useCanvasPointer({
   ]);
 
   return {
-    /** Armed by the background mousedown (CanvasView) for pan / slide drags. */
+    /** Armed by the background mousedown below for pan / slide drags. */
     isDraggingCanvasRef,
     canvasDragStartRef,
     /** Armed by the background mousedown for a hollow-middle group drag. */
     groupDragRef,
     handleCardBodyActivate,
+    handleMouseDownBackground,
   };
 }
