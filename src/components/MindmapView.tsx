@@ -38,49 +38,25 @@ import { branchColorFor, freezeAppearance } from "../core/mindmapThemes";
 import { layoutMindmap, type MindmapLayoutNode } from "../services/mindmapLayout";
 import {
   allTags,
-  emptySidecar,
   areRelated,
   iconFor,
   linkFor,
-  loadSidecar,
-  mergeSidecar,
-  type SidecarSection,
   markersFor,
   noteFor,
-  saveSidecar,
   setNodeIcon,
   setNodeLink,
   setNodeNote,
   setNodePriority,
   setNodeProgress,
   setNodeSide,
-  addBoundary,
-  addFloatingTopic,
-  addSummary,
-  boundariesIn,
-  floatingTopics,
-  removeBoundary,
-  removeSummary,
-  setBoundaryColor,
-  setBoundaryText,
-  relationBetween,
-  setRelationFields,
-  setSummaryText,
-  summariesIn,
-  moveFloatingTopic,
-  removeFloatingTopic,
-  setFloatingText,
   setNodeTags,
   tagsFor,
-  toggleRelation,
-  type MindmapSidecar,
+  floatingTopics,
 } from "../services/mindmapSidecar";
-import { relationGeometry } from "../core/mindmapRelations";
 import { boundsOfBoxes, unionBounds } from "../core/mindmapBounds";
-import { boundaryTitleAnchor, summaryLabelAnchor } from "../core/mindmapGroups";
 import { MindmapFloatingTopics, type FloatingBox } from "./MindmapFloatingTopics";
-import { MindmapSummaries, type SummaryBox } from "./MindmapSummaries";
-import { MindmapBoundaries, type BoundaryBox } from "./MindmapBoundaries";
+import { MindmapSummaries } from "./MindmapSummaries";
+import { MindmapBoundaries } from "./MindmapBoundaries";
 import { MindmapFloatingAnnotationMenu } from "./MindmapFloatingAnnotationMenu";
 import { parseMindmapLink } from "../core/mindmapLinks";
 import { NodeIcon, NodeLinkMark, NodeMarks, NodeNoteMark, NodeTags } from "./MindmapMarks";
@@ -89,15 +65,8 @@ import { useMindmapAppearance } from "./mindmap/useMindmapAppearance";
 import { useMindmapSearch } from "./mindmap/useMindmapSearch";
 import { useMindmapExport } from "./mindmap/useMindmapExport";
 import { useMindmapShortcuts } from "./mindmap/useMindmapShortcuts";
-
-/**
- * How long a note waits before it is written.
- *
- * Writing on every keystroke would mean a disk write per character. Long enough
- * to cover a burst of typing, short enough that a reader who types and then
- * moves on never notices the pause.
- */
-const NOTE_SAVE_DELAY = 600;
+import { useMindmapSidecar } from "./mindmap/useMindmapSidecar";
+import { useMindmapAnnotations, type MindmapContextMenu } from "./mindmap/useMindmapAnnotations";
 
 /**
  * A node's icon, drawn on its leading edge and outside its box.
@@ -197,145 +166,17 @@ export const MindmapView = memo(function MindmapView({
   documentKey,
   themeId,
 }: MindmapViewProps) {
-  /**
-   * The document's companion file: what the map knows that the document does not.
-   *
-   * Held as the reader's text rather than as what is on disk — the two differ by
-   * up to one pause in typing, since a write per keystroke would be a write per
-   * character. `null` means no companion was found, which is the ordinary state
-   * of a document nobody has annotated.
-   */
-  const [sidecar, setSidecar] = useState<MindmapSidecar | null>(null);
-  const [sidecarSaveFailed, setSidecarSaveFailed] = useState(false);
-
-  /**
-   * The free topic the reader has picked, if any.
-   *
-   * Kept apart from the tree's selection deliberately. Everything that acts on
-   * selected nodes — delete, style, relate, batch — assumes its ids are nodes,
-   * and one of them forgetting would act on the wrong thing; a second piece of
-   * state is cheaper than auditing all of them.
-   */
-  const [selectedFloatingId, setSelectedFloatingId] = useState<string | null>(null);
-  const [editingFloatingId, setEditingFloatingId] = useState<string | null>(null);
-
-  /** The summary the reader has picked, and the one whose label is being typed. */
-  const [selectedSummaryId, setSelectedSummaryId] = useState<string | null>(null);
-  const [editingSummaryId, setEditingSummaryId] = useState<string | null>(null);
-
-  /** The same pair for boundaries, which are picked and titled by their title. */
-  const [selectedBoundaryId, setSelectedBoundaryId] = useState<string | null>(null);
-  const [editingBoundaryId, setEditingBoundaryId] = useState<string | null>(null);
-
-  /**
-   * The line the reader has picked, and the one whose label is being typed.
-   *
-   * Held as the pair rather than as a key, because everything done to a line is
-   * addressed by the two topics it joins — the canonical order is a storage rule,
-   * and nothing outside the file has to know it.
-   */
-  const [selectedRelation, setSelectedRelation] = useState<{
-    fromId: string;
-    toId: string;
-  } | null>(null);
-  const [editingRelation, setEditingRelation] = useState<{
-    fromId: string;
-    toId: string;
-  } | null>(null);
-
-  /**
-   * The drag in progress, in a ref rather than in state.
-   *
-   * A ref because the window listeners below are attached once and must read the
-   * current drag without being re-attached on every frame of it, and because a
-   * drag updating state on each move would re-render for something that is
-   * already visible.
-   */
-  const [draggingFloatingId, setDraggingFloatingId] = useState<string | null>(null);
-  const draggingFloatingOffsetRef = useRef<{ x: number; y: number } | null>(null);
-
-  /**
-   * The sections the reader has edited since this document was opened.
-   *
-   * Kept so a load that lands late can be merged rather than applied outright:
-   * the reader's edits win for the sections they touched and the file wins for
-   * the rest. Without it, a slow read silently undoes whatever was clicked while
-   * it was in flight — and, worse, the save that follows writes that undo out.
-   */
-  const editedSectionsRef = useRef<Set<SidecarSection>>(new Set());
-
-  useEffect(() => {
-    let cancelled = false;
-    editedSectionsRef.current = new Set();
-    setSidecar(null);
-    setSidecarSaveFailed(false);
-    if (!documentKey) return;
-
-    void loadSidecar(documentKey).then((loaded) => {
-      if (cancelled) return;
-      // Nothing has been touched: the file is simply what is on screen.
-      if (editedSectionsRef.current.size === 0) {
-        setSidecar(loaded);
-        return;
-      }
-      setSidecar((current) => mergeSidecar(loaded, current, editedSectionsRef.current));
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [documentKey]);
-
-  const pendingSidecarSave = useRef<{ key: string; sidecar: MindmapSidecar } | null>(null);
-  const sidecarSaveTimer = useRef<number | null>(null);
-
-  /**
-   * Writes notes to the companion file, a pause after typing stops.
-   *
-   * The document key and the contents are captured when the pause starts rather
-   * than read when it ends: switching documents mid-pause would otherwise write
-   * the previous document's notes into the new document's file, which is the one
-   * way this could lose writing rather than merely delay it.
-   */
-  const scheduleSidecarSave = useCallback((key: string, next: MindmapSidecar) => {
-    pendingSidecarSave.current = { key, sidecar: next };
-    if (sidecarSaveTimer.current !== null) window.clearTimeout(sidecarSaveTimer.current);
-    sidecarSaveTimer.current = window.setTimeout(() => {
-      sidecarSaveTimer.current = null;
-      const pending = pendingSidecarSave.current;
-      pendingSidecarSave.current = null;
-      if (!pending) return;
-      void saveSidecar(pending.key, pending.sidecar).then((ok) => setSidecarSaveFailed(!ok));
-    }, NOTE_SAVE_DELAY);
-  }, []);
-
-  useEffect(
-    () => () => {
-      // A pause still running when the view goes away is written out now, so
-      // closing the map right after typing does not lose what was typed.
-      if (sidecarSaveTimer.current !== null) window.clearTimeout(sidecarSaveTimer.current);
-      const pending = pendingSidecarSave.current;
-      pendingSidecarSave.current = null;
-      if (pending) void saveSidecar(pending.key, pending.sidecar);
-    },
-    [],
-  );
-
-  /**
-   * An annotation edit: immediate in memory, written shortly afterwards.
-   *
-   * One path for every kind of annotation rather than one per kind, so there is
-   * a single pause to reason about and a single place where the document a write
-   * belongs to is decided.
-   */
-  const applySidecarEdit = useCallback(
-    (sections: SidecarSection[], edit: (current: MindmapSidecar) => MindmapSidecar) => {
-      editedSectionsRef.current = new Set([...editedSectionsRef.current, ...sections]);
-      const next = edit(sidecar ?? emptySidecar());
-      setSidecar(next);
-      if (documentKey) scheduleSidecarSave(documentKey, next);
-    },
-    [documentKey, scheduleSidecarSave, sidecar],
-  );
+  // The companion file and the one writer every annotation edit goes through:
+  // the sidecar state, the load-and-merge on document change, the debounced
+  // save and `applySidecarEdit`. Extracted to useMindmapSidecar (batch 3,
+  // wave 2b). Called here — ahead of useMindmapAppearance — so its load effect
+  // keeps running before the appearance hook's load effects, the order they
+  // have always run in. The annotation editors' state (the picked and edited
+  // relation, floating topic, summary and boundary, and the floating drag)
+  // lives in useMindmapAnnotations, called further down at the position its
+  // callbacks have always occupied, which keeps the floating drag's
+  // window listener the last effect this component registers.
+  const { sidecar, applySidecarEdit, sidecarSaveFailed } = useMindmapSidecar({ documentKey });
 
   /**
    * A note edit arrives on every keystroke, since the panel holds no state of its
@@ -547,21 +388,12 @@ export const MindmapView = memo(function MindmapView({
    * `nodeId` as a plain string in a dozen places. Making it nullable would have
    * forced a narrowing guard into every one of them to describe a state none of
    * them can be in.
+   *
+   * The shape itself lives with the annotation editors (`MindmapContextMenu` in
+   * useMindmapAnnotations), which open this same menu for a line and for a free
+   * topic and write the same fields.
    */
-  const [contextMenu, setContextMenu] = useState<{
-    x: number;
-    y: number;
-    /**
-     * The topic this menu is about — a topic in the outline, or, when `floating`
-     * is set, one the outline does not own. The field is named for the map's
-     * topics rather than for the tree's nodes, because both kinds are topics and
-     * a panel only ever needs the id to write by.
-     */
-    nodeId: string;
-    isCanvas?: boolean;
-    /** True when this menu is about a floating topic, which has its own panel. */
-    floating?: boolean;
-  } | null>(null);
+  const [contextMenu, setContextMenu] = useState<MindmapContextMenu | null>(null);
 
   /** Marquee selection, in canvas coordinates, while dragging on empty space. */
   const [marquee, setMarquee] = useState<{
@@ -1711,380 +1543,72 @@ export const MindmapView = memo(function MindmapView({
    * the reason, rather than hidden — a control that vanishes teaches nothing.
    */
   /**
-   * Connects the two selected topics, or disconnects them.
-   *
-   * The selection is the gesture: two topics chosen with Ctrl-click are exactly
-   * what a relation needs, so this reads as "do something with these two" rather
-   * than as a mode the reader has to enter and remember to leave. The pair is
-   * normalised on the way in, so the order they were selected in cannot matter.
+   * The annotation editors: relations, free topics, summaries and boundaries —
+   * their picked/edited state, their callbacks, the free topic's drag window
+   * listener and the box each inline editor draws over. Extracted to
+   * useMindmapAnnotations (batch 3, wave 2b); called here, at the position its
+   * callbacks have always occupied, so the drag listener stays the last effect
+   * this component registers. `setSelectedRelation` is read above this line by
+   * the marquee effect; that reference sits inside the effect's closure, which
+   * only ever runs after this call has returned.
    */
-  const handleToggleRelation = useCallback(() => {
-    const ids = [...selectedNodeIds];
-    if (ids.length !== 2) return;
-    applySidecarEdit(["relations"], (current) => toggleRelation(current, ids[0], ids[1]));
-  }, [applySidecarEdit, selectedNodeIds]);
-
-  /**
-   * Changes what the picked line says or how it is drawn.
-   *
-   * One handler for the label and the three ids, because they differ only in
-   * which field they touch — and because the line's other settings have to
-   * survive each one, which is the service's patch for.
-   */
-  const handleRelationChange = useCallback(
-    (field: "label" | "arrow" | "style" | "color", value: string) => {
-      if (!selectedRelation) return;
-      const { fromId, toId } = selectedRelation;
-      applySidecarEdit(["relations"], (current) =>
-        setRelationFields(current, fromId, toId, { [field]: value }),
-      );
-    },
-    [applySidecarEdit, selectedRelation],
-  );
-
-  /**
-   * A right click on a line: the canvas menu, with the line as its subject.
-   *
-   * The same shape as a right click on a floating topic — pick the thing, then
-   * open the menu about it at the cursor — and a line has no surface of its own
-   * to hang a panel off, so the rows it needs appear inside that menu.
-   */
-  const handleRelationContextMenu = useCallback(
-    (relation: { fromId: string; toId: string }, event: React.MouseEvent) => {
-      setSelectedRelation({ fromId: relation.fromId, toId: relation.toId });
-      const containerRect = containerRef.current?.getBoundingClientRect();
-      const x = containerRect ? event.clientX - containerRect.left : event.clientX;
-      const y = containerRect ? event.clientY - containerRect.top : event.clientY;
-      setContextMenu({ x, y, nodeId: tree.id, isCanvas: true });
-    },
-    [tree.id],
-  );
-
-  const handleRemoveSelectedRelation = useCallback(() => {
-    if (!selectedRelation) return;
-    const { fromId, toId } = selectedRelation;
-    setSelectedRelation(null);
-    setEditingRelation(null);
-    applySidecarEdit(["relations"], (current) => toggleRelation(current, fromId, toId));
-  }, [applySidecarEdit, selectedRelation]);
-
-  const handleStartRelationEdit = useCallback(
-    (relation: { fromId: string; toId: string; label?: string }) => {
-      setSelectedRelation({ fromId: relation.fromId, toId: relation.toId });
-      setEditingRelation({ fromId: relation.fromId, toId: relation.toId });
-      setEditingText(relation.label ?? "");
-    },
-    [],
-  );
-
-  const handleCancelRelationEdit = useCallback(() => setEditingRelation(null), []);
-
-  const handleCommitRelationEdit = useCallback(() => {
-    const relation = editingRelation;
-    setEditingRelation(null);
-    if (!relation) return;
-    applySidecarEdit(["relations"], (current) =>
-      setRelationFields(current, relation.fromId, relation.toId, { label: editingText }),
-    );
-  }, [applySidecarEdit, editingRelation, editingText]);
-
-  /**
-   * The box the label editor is drawing over: the line's own middle.
-   *
-   * Worked out from the same geometry the line is drawn with, so the editor lands
-   * on the curve rather than beside it — a label written two pixels off the line
-   * it belongs to is the kind of thing that reads as a bug.
-   */
-  const editingRelationBox = (() => {
-    if (!editingRelation) return null;
-    const from = relationBoxes.get(editingRelation.fromId);
-    const to = relationBoxes.get(editingRelation.toId);
-    if (!from || !to) return null;
-    const { apex } = relationGeometry(from, to);
-    return {
-      x: apex.x - 60,
-      y: apex.y - 11,
-      width: 120,
-      height: 22,
-    };
-  })();
-
-  /**
-   * The drag, listened for on the window.
-   *
-   * On the window rather than on the box, because once a drag has started the
-   * pointer leaves the box almost immediately and a gesture that stopped
-   * tracking at its edge would drop the topic wherever the reader's hand happened
-   * to leave the shape. Moves are written into the map's state and the file
-   * follows on its usual pause: the debounce collapses a whole drag into one
-   * write, which is the only way a drag should ever reach the disk.
-   */
-  useEffect(() => {
-    if (!draggingFloatingId) return;
-
-    const handleMove = (event: MouseEvent) => {
-      const containerRect = containerRef.current?.getBoundingClientRect();
-      const offset = draggingFloatingOffsetRef.current;
-      if (!containerRect || !offset) return;
-
-      const x = (event.clientX - containerRect.left - transform.x) / transform.scale - offset.x;
-      const y = (event.clientY - containerRect.top - transform.y) / transform.scale - offset.y;
-      applySidecarEdit(["floating"], (current) =>
-        moveFloatingTopic(current, draggingFloatingId, Math.round(x), Math.round(y)),
-      );
-    };
-
-    const handleUp = () => setDraggingFloatingId(null);
-
-    window.addEventListener("mousemove", handleMove);
-    window.addEventListener("mouseup", handleUp);
-    return () => {
-      window.removeEventListener("mousemove", handleMove);
-      window.removeEventListener("mouseup", handleUp);
-    };
-  }, [applySidecarEdit, draggingFloatingId, transform.scale, transform.x, transform.y]);
-
-  /**
-   * Starts a drag from wherever in the box the pointer went down.
-   *
-   * The offset is what stops a topic grabbed near its right edge from jumping so
-   * that its corner sits under the cursor.
-   */
-  const handleFloatingDragStart = useCallback(
-    (id: string, event: React.MouseEvent) => {
-      const box = floatingBoxes.find((topic) => topic.id === id);
-      const containerRect = containerRef.current?.getBoundingClientRect();
-      if (!box || !containerRect) return;
-
-      const pointerX = (event.clientX - containerRect.left - transform.x) / transform.scale;
-      const pointerY = (event.clientY - containerRect.top - transform.y) / transform.scale;
-      draggingFloatingOffsetRef.current = { x: pointerX - box.x, y: pointerY - box.y };
-      setDraggingFloatingId(id);
-    },
-    [floatingBoxes, transform.scale, transform.x, transform.y],
-  );
-
-  const handleStartFloatingEdit = useCallback(
-    (id: string) => {
-      const box = floatingBoxes.find((topic) => topic.id === id);
-      if (!box) return;
-      setEditingFloatingId(id);
-      setEditingText(box.text);
-    },
-    [floatingBoxes],
-  );
-
-  const handleCancelFloatingEdit = useCallback(() => setEditingFloatingId(null), []);
-
-  /**
-   * Commits a free topic's text. Emptying it takes the topic away, which is what
-   * the section's own reader takes an empty topic to mean — one reading, written
-   * once, so the screen and a later version cannot disagree about it.
-   */
-  const handleCommitFloatingEdit = useCallback(() => {
-    const id = editingFloatingId;
-    setEditingFloatingId(null);
-    if (!id) return;
-    applySidecarEdit(["floating"], (current) => setFloatingText(current, id, editingText));
-  }, [applySidecarEdit, editingFloatingId, editingText]);
-
-  const handleRemoveFloatingTopic = useCallback(() => {
-    if (!selectedFloatingId) return;
-    const id = selectedFloatingId;
-    setSelectedFloatingId(null);
-    applySidecarEdit(["floating"], (current) => removeFloatingTopic(current, id));
-  }, [applySidecarEdit, selectedFloatingId]);
-
-  /**
-   * A right click on a floating topic: its own panel, where the cursor is.
-   *
-   * The same shape as the node handler — select it if it is not selected, then
-   * open the panel at the cursor — because it is the same gesture about a
-   * different kind of topic, and a reader should not have to learn a second one.
-   */
-  const handleFloatingContextMenu = useCallback((id: string, event: React.MouseEvent) => {
-    setSelectedFloatingId(id);
-    const containerRect = containerRef.current?.getBoundingClientRect();
-    const x = containerRect ? event.clientX - containerRect.left : event.clientX;
-    const y = containerRect ? event.clientY - containerRect.top : event.clientY;
-    setContextMenu({ x, y, nodeId: id, floating: true });
-  }, []);
-
-  /** Deletes the floating topic a panel is about, by id rather than by selection. */
-  const handleDeleteFloatingTopic = useCallback(
-    (id: string) => {
-      setContextMenu(null);
-      setSelectedFloatingId(null);
-      applySidecarEdit(["floating"], (current) => removeFloatingTopic(current, id));
-    },
-    [applySidecarEdit],
-  );
-
-  /**
-   * Puts a free topic where the reader right-clicked.
-   *
-   * The menu's coordinates are the container's, and the canvas behind it may be
-   * panned and zoomed, so they go through the same conversion the marquee uses —
-   * otherwise the topic would land somewhere other than where it was asked for.
-   */
-  const handleNewFloatingTopic = useCallback(() => {
-    const x = (menuPos.left - transform.x) / transform.scale;
-    const y = (menuPos.top - transform.y) / transform.scale;
-    applySidecarEdit(
-      ["floating"],
-      (current) => addFloatingTopic(current, "新主题", Math.round(x), Math.round(y)).sidecar,
-    );
-  }, [applySidecarEdit, menuPos.left, menuPos.top, transform.scale, transform.x, transform.y]);
-
-  /** The box the floating editor is drawing over, if one is open. */
-  const editingFloatingBox = floatingBoxes.find((topic) => topic.id === editingFloatingId) ?? null;
-
-  /**
-   * Each summary with the bounds it spans.
-   *
-   * Worked out from the laid-out boxes rather than stored: a summary is about
-   * topics, not about a rectangle, so moving or renaming one of them moves the
-   * bracket with it and nothing has to be kept in step. A summary whose topics
-   * are not all on the canvas — folded away, or renamed since — is drawn over
-   * whatever part of the group is there, and over nothing at all when none of it
-   * is.
-   */
-  const summaryBoxes = useMemo<SummaryBox[]>(() => {
-    return summariesIn(sidecar).map(({ id, summary }) => {
-      const boxes = summary.nodeIds
-        .map((nodeId) => relationBoxes.get(nodeId))
-        .filter((box): box is { x: number; y: number; width: number; height: number } => !!box);
-      return { id, text: summary.text, bounds: boundsOfBoxes(boxes, 0) };
-    });
-  }, [sidecar, relationBoxes]);
-
-  /**
-   * Brackets the selected topics.
-   *
-   * Two or more, because a bracket over one topic says nothing a label on that
-   * topic could not — and the gesture is the same multi-selection relations use,
-   * so there is no new mode to learn.
-   */
-  const handleAddSummary = useCallback(() => {
-    const nodeIds = [...selectedNodeIds];
-    if (nodeIds.length < 2) return;
-    applySidecarEdit(["summaries"], (current) => addSummary(current, nodeIds).sidecar);
-  }, [applySidecarEdit, selectedNodeIds]);
-
-  const handleRemoveSummary = useCallback(() => {
-    if (!selectedSummaryId) return;
-    const id = selectedSummaryId;
-    setSelectedSummaryId(null);
-    applySidecarEdit(["summaries"], (current) => removeSummary(current, id));
-  }, [applySidecarEdit, selectedSummaryId]);
-
-  const handleStartSummaryEdit = useCallback(
-    (id: string) => {
-      const summary = summaryBoxes.find((entry) => entry.id === id);
-      if (!summary) return;
-      setEditingSummaryId(id);
-      setEditingText(summary.text);
-    },
-    [summaryBoxes],
-  );
-
-  const handleCancelSummaryEdit = useCallback(() => setEditingSummaryId(null), []);
-
-  /**
-   * Commits a summary's label. Emptying it leaves the bracket in place, unlike a
-   * free topic's text: what the reader asked for was the bracket, and a bracket
-   * with nothing written on it still says "these belong together".
-   */
-  const handleCommitSummaryEdit = useCallback(() => {
-    const id = editingSummaryId;
-    setEditingSummaryId(null);
-    if (!id) return;
-    applySidecarEdit(["summaries"], (current) => setSummaryText(current, id, editingText));
-  }, [applySidecarEdit, editingSummaryId, editingText]);
-
-  /** Each boundary with the bounds it encloses, the same way summaries are built. */
-  const boundaryBoxes = useMemo<BoundaryBox[]>(() => {
-    return boundariesIn(sidecar).map(({ id, boundary }) => {
-      const boxes = boundary.nodeIds
-        .map((nodeId) => relationBoxes.get(nodeId))
-        .filter((box): box is { x: number; y: number; width: number; height: number } => !!box);
-      return { id, text: boundary.text, colorId: boundary.color, bounds: boundsOfBoxes(boxes, 0) };
-    });
-  }, [sidecar, relationBoxes]);
-
-  /**
-   * Draws a box around the selection.
-   *
-   * One topic is enough, unlike a summary: a box around a single topic says "this
-   * one is its own thing", which a bracket could never say — a bracket over one
-   * topic is just a line beside it.
-   */
-  const handleAddBoundary = useCallback(() => {
-    const nodeIds = [...selectedNodeIds];
-    if (nodeIds.length === 0) return;
-    applySidecarEdit(["boundaries"], (current) => addBoundary(current, nodeIds).sidecar);
-  }, [applySidecarEdit, selectedNodeIds]);
-
-  const handleRemoveBoundary = useCallback(() => {
-    if (!selectedBoundaryId) return;
-    const id = selectedBoundaryId;
-    setSelectedBoundaryId(null);
-    applySidecarEdit(["boundaries"], (current) => removeBoundary(current, id));
-  }, [applySidecarEdit, selectedBoundaryId]);
-
-  const handleBoundaryColorChange = useCallback(
-    (colorId: string) => {
-      if (!selectedBoundaryId) return;
-      const id = selectedBoundaryId;
-      applySidecarEdit(["boundaries"], (current) => setBoundaryColor(current, id, colorId));
-    },
-    [applySidecarEdit, selectedBoundaryId],
-  );
-
-  const handleStartBoundaryEdit = useCallback(
-    (id: string) => {
-      const boundary = boundaryBoxes.find((entry) => entry.id === id);
-      if (!boundary) return;
-      setEditingBoundaryId(id);
-      setEditingText(boundary.text);
-    },
-    [boundaryBoxes],
-  );
-
-  const handleCancelBoundaryEdit = useCallback(() => setEditingBoundaryId(null), []);
-
-  const handleCommitBoundaryEdit = useCallback(() => {
-    const id = editingBoundaryId;
-    setEditingBoundaryId(null);
-    if (!id) return;
-    applySidecarEdit(["boundaries"], (current) => setBoundaryText(current, id, editingText));
-  }, [applySidecarEdit, editingBoundaryId, editingText]);
-
-  /** The box the title editor is drawing over, in the band above the group. */
-  const editingBoundaryBox = (() => {
-    const boundary = boundaryBoxes.find((entry) => entry.id === editingBoundaryId);
-    if (!boundary?.bounds) return null;
-    const anchor = boundaryTitleAnchor(boundary.bounds);
-    return {
-      x: anchor.x - 2,
-      y: anchor.y - 10,
-      width: Math.max(120, boundary.text.length * 8 + 40),
-      height: 20,
-    };
-  })();
-
-  /** The box the label editor is drawing over, sized to the label's own line. */
-  const editingSummaryBox = (() => {
-    const summary = summaryBoxes.find((entry) => entry.id === editingSummaryId);
-    if (!summary?.bounds) return null;
-    const anchor = summaryLabelAnchor(summary.bounds);
-    return {
-      x: anchor.x,
-      y: anchor.y - 11,
-      width: Math.max(120, summary.text.length * 8 + 40),
-      height: 22,
-    };
-  })();
+  const {
+    selectedRelation,
+    setSelectedRelation,
+    handleToggleRelation,
+    handleRelationChange,
+    handleRelationContextMenu,
+    handleRemoveSelectedRelation,
+    handleStartRelationEdit,
+    handleCancelRelationEdit,
+    handleCommitRelationEdit,
+    editingRelationBox,
+    selectedRelationInfo,
+    selectedFloatingId,
+    setSelectedFloatingId,
+    handleFloatingDragStart,
+    handleStartFloatingEdit,
+    handleCancelFloatingEdit,
+    handleCommitFloatingEdit,
+    handleRemoveFloatingTopic,
+    handleFloatingContextMenu,
+    handleDeleteFloatingTopic,
+    handleNewFloatingTopic,
+    editingFloatingBox,
+    selectedSummaryId,
+    setSelectedSummaryId,
+    handleAddSummary,
+    handleRemoveSummary,
+    handleStartSummaryEdit,
+    handleCancelSummaryEdit,
+    handleCommitSummaryEdit,
+    summaryBoxes,
+    editingSummaryBox,
+    selectedBoundaryId,
+    setSelectedBoundaryId,
+    handleAddBoundary,
+    handleRemoveBoundary,
+    handleBoundaryColorChange,
+    handleStartBoundaryEdit,
+    handleCancelBoundaryEdit,
+    handleCommitBoundaryEdit,
+    boundaryBoxes,
+    editingBoundaryBox,
+  } = useMindmapAnnotations({
+    applySidecarEdit,
+    selectedNodeIds,
+    containerRef,
+    transform,
+    menuPos,
+    editingText,
+    setEditingText,
+    setContextMenu,
+    treeId: tree.id,
+    sidecar,
+    layout,
+    relationBoxes,
+    floatingBoxes,
+  });
 
   /**
    * The one inline editor, and what it is editing.
@@ -2145,36 +1669,6 @@ export const MindmapView = memo(function MindmapView({
   /** The floating topic the menu is about, for a title and a delete. */
   const contextTargetFloating =
     floatingBoxes.find((topic) => topic.id === contextMenu?.nodeId) ?? null;
-
-  /** Every topic's text by id, for naming the two ends of a picked line. */
-  const topicTexts = useMemo(() => {
-    const texts = new Map<string, string>();
-    for (const node of layout.nodes) texts.set(node.id, node.text);
-    for (const topic of floatingBoxes) texts.set(topic.id, topic.text);
-    return texts;
-  }, [layout.nodes, floatingBoxes]);
-
-  /**
-   * The picked line as the menu needs it: what it says, and what it joins.
-   *
-   * Read from the file rather than remembered when the line was clicked, so the
-   * menu shows what is stored — a font of the label being typed, a colour going
-   * back to the theme, both arrive here as soon as they are written.
-   */
-  const selectedRelationInfo = useMemo(() => {
-    if (!selectedRelation) return null;
-    const relation = relationBetween(sidecar, selectedRelation.fromId, selectedRelation.toId);
-    if (!relation) return null;
-
-    return {
-      label: relation.label ?? "",
-      arrow: relation.arrow ?? "",
-      style: relation.style ?? "",
-      color: relation.color ?? "",
-      fromText: topicTexts.get(relation.fromId) ?? relation.fromId,
-      toText: topicTexts.get(relation.toId) ?? relation.toId,
-    };
-  }, [selectedRelation, sidecar, topicTexts]);
 
   return (
     <div
