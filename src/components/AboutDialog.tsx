@@ -145,6 +145,57 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
               <span className="about-changelog-version-badge">v{__APP_VERSION__}</span>
             </div>
             <div className="about-changelog-list">
+              {/* v2.7.0 */}
+              <div className="about-changelog-group">
+                <div className="about-changelog-group-label">
+                  <Sparkles size={12} className="text-cyan" />
+                  <span>v2.7.0 架构减负与质量地基：这一版没有新功能，但之后每一版都会更快</span>
+                </div>
+                <ul className="about-changelog-items">
+                  <li>
+                    🏗️ <strong>巨石组件解体</strong>：<code>App</code>（2,349 行）、
+                    <code>CanvasView</code>（7,179 行）、<code>MindmapView</code>（3,586
+                    行）与三个大对话框全部拆为职责单一的 hook 与视图组件；全仓库
+                    <strong>不再有超过一千行的源文件</strong>（此前 15 个），11 个巨型服务收敛到 800
+                    行内且对外导入面逐字节不变。
+                  </li>
+                  <li>
+                    ⌨️ <strong>命令总线</strong>
+                    ：命令面板、全局快捷键与系统菜单从此共享同一份命令注册表 ——
+                    新增一个动作只需注册一处，三个入口同时可用；此前同一动作最多被接线 5
+                    次，两份逐字复制的切换 updater 与一个双实现的打字机开关就此归一。
+                  </li>
+                  <li>
+                    🧱 <strong>IPC 网关命名空间化</strong>：渲染层 60+ 个扁平方法收敛为{" "}
+                    <code>files</code> / <code>history</code> / <code>media</code> /{" "}
+                    <code>system</code> / <code>capture</code>{" "}
+                    五个命名空间，附带渲染层与主进程的版本握手；主进程 handler
+                    按域拆为六个模块，通道契约由守卫测试逐条钉住。
+                  </li>
+                  <li>
+                    🛡️ <strong>质量门禁从约定变成机器</strong>
+                    ：ESLint（含分层依赖护栏）、Prettier、git hooks、CI 流水线与本地{" "}
+                    <code>preflight</code>
+                    同构六道闸；「测试基线滞后一个版本」这类靠人记得跑的失效不再可能无声发生 ——
+                    类型逃逸与文件体量受棘轮约束<strong>只减不增</strong>。
+                  </li>
+                  <li>
+                    ✂️ <strong>交互边界修正</strong>：思维导图「换到另一侧」弹层出现后按{" "}
+                    <code>Esc</code>{" "}
+                    现在正确关闭弹层而非清空选择；快捷键处理不再可能被合成事件击穿。
+                  </li>
+                  <li>
+                    📦 <strong>没有改变任何既有文件格式</strong>：<code>.md</code>、
+                    <code>.canvas</code>、<code>.mindmap.md</code>、伴生文件与 <code>.xmind</code>{" "}
+                    与 v2.6.5 完全一致，升级不需要迁移；用户可见行为与上一版逐一对齐。
+                  </li>
+                  <li>
+                    🧪 <strong>测试规模</strong>：<strong>113 个测试套件、1,414 项</strong>
+                    单元与集成测试零回归通过；每个重构波次都在全量绿之后才落提交。
+                  </li>
+                </ul>
+              </div>
+
               {/* v2.6.5 */}
               <div className="about-changelog-group">
                 <div className="about-changelog-group-label">

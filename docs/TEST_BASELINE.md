@@ -2,7 +2,7 @@
 
 > **文档性质**：重构安全网的权威口径（release plan R3 交付物）
 > **生成时间**：2026-09-27
-> **应用版本**：`2.6.5`
+> **应用版本**：`2.7.0`
 > **生成方式**：`node scripts/capture-test-baseline.cjs`（自动生成，请勿手工编辑）
 
 ---
@@ -149,7 +149,7 @@
 
 | 文件 | 当前行数 | 目标 |
 | :--- | ---: | :--- |
-| `src/components/CanvasView.tsx` | 795 | R2 待拆分: 目标各模块 < 2500 行 |
+| `src/components/CanvasView.tsx` | 932 | R2 待拆分: 目标各模块 < 2500 行 |
 | `src/App.tsx` | 776 | R1: < 500 行 |
 | `src/services/canvasGraph.ts` | 26 | R2 已拆分 ✅ |
 | `src/services/canvasExport.ts` | 598 | R2 已拆分 ✅ |
