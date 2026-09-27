@@ -15,9 +15,9 @@
 | :--- | ---: | :--- |
 | `colon-any` | 30 | 只减不增（`: any`，含 `any[]`；不含 `Array<any>` 泛型） |
 | `as-any` | 10 | 只减不增（`as any`） |
-| `files-over-1000-lines` | 12 | 只减不增（src 非测试代码，> 1000 行） |
-| `max-file-lines` | 1353 | 只减不增（最大单文件行数） |
-| `src-lines` | 64685 | 记录趋势，不设闸 |
+| `files-over-1000-lines` | 8 | 只减不增（src 非测试代码，> 1000 行） |
+| `max-file-lines` | 1350 | 只减不增（最大单文件行数） |
+| `src-lines` | 64954 | 记录趋势，不设闸 |
 | `test-cases` | 见 `TEST_BASELINE.md` | 只增不减——由测试基线守护，本文件不重复设闸 |
 
 ---
@@ -26,18 +26,14 @@
 
 | 文件 | 行数 |
 | :--- | ---: |
-| `src/components/MindmapView.tsx` | 1353 |
-| `src/components/DailyReviewPanel.tsx` | 1237 |
-| `src/components/FlashCapsule.tsx` | 1171 |
-| `src/App.tsx` | 1151 |
-| `src/services/canvasGraph.ts` | 1150 |
-| `src/services/markdown.ts` | 1147 |
-| `src/services/canvasExport.ts` | 1123 |
+| `src/components/MindmapView.tsx` | 1350 |
+| `src/components/DailyReviewPanel.tsx` | 1236 |
+| `src/components/FlashCapsule.tsx` | 1176 |
+| `src/App.tsx` | 1148 |
 | `src/components/EditorContextMenu.tsx` | 1095 |
 | `src/components/GraphViewPane.tsx` | 1075 |
-| `src/services/fsrsService.ts` | 1062 |
 | `src/components/CanvasView.tsx` | 1054 |
-| `src/components/AboutDialog.tsx` | 1051 |
+| `src/components/AboutDialog.tsx` | 1048 |
 
 ---
 
@@ -49,9 +45,9 @@
 | :--- | :--- |
 | `src/components/DocumentWorkspace.tsx:33` | `: any) => void;` |
 | `src/components/DualDocumentWorkspace.tsx:33` | `: any) => void;` |
-| `src/components/EditorPane.tsx:582` | `: any, from: number, to: number) => {` |
-| `src/components/EditorPane.tsx:611` | `: any, from: number, to: number) => {` |
-| `src/components/EditorPane.tsx:648` | `: any, from: number, to: number) => {` |
+| `src/components/EditorPane.tsx:581` | `: any, from: number, to: number) => {` |
+| `src/components/EditorPane.tsx:610` | `: any, from: number, to: number) => {` |
+| `src/components/EditorPane.tsx:647` | `: any, from: number, to: number) => {` |
 | `src/components/GlobalGraphDialog.tsx:245` | `: any) => {` |
 | `src/components/GlobalGraphDialog.tsx:249` | `: any) => {` |
 | `src/components/GlobalGraphDialog.tsx:253` | `: any) => {` |
@@ -75,7 +71,7 @@
 | `src/hooks/useBacklinkIndex.ts:374` | `: any) {` |
 | `src/hooks/useDocumentCreation.ts:206` | `: any) {` |
 | `src/hooks/useDocumentCreation.ts:287` | `: any) {` |
-| `src/services/markdown.ts:1064` | `: any, silent: boolean) => {` |
+| `src/services/markdownPlugins.ts:128` | `: any, silent: boolean) => {` |
 | `src/services/mindmapSidecarRead.ts:51` | `: any of them written as something other` |
 
 ### `as any`
@@ -91,4 +87,4 @@
 | `src/components/GraphViewPane.tsx:560` | `as any)` |
 | `src/components/LocalGraphView.tsx:138` | `as any,` |
 | `src/components/LocalGraphView.tsx:146` | `as any,` |
-| `src/services/markdown.ts:1024` | `as any)("block_anchor", "span", 0);` |
+| `src/services/markdownPlugins.ts:88` | `as any)("block_anchor", "span", 0);` |
