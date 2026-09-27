@@ -1,44 +1,20 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-// The icons the style panel draws with went with it, and the svg scaffolding and
-// the per-node node layer have since gone to ./mindmap too (batch 3, wave 3);
-// what is left here is the toolbar, the menus, the side chooser and the inline
-// editor, plus the three slots of canvas layers the view still owns.
+// The composition root of the mindmap: the hook calls in their load-bearing
+// order, the canvas layer slots, the inline editor, and the two mount points —
+// the toolbar and the menus/side-chooser — whose wiring lives beside them in
+// ./mindmap. The style panel's icons, the svg scaffolding and the per-node node
+// layer went to ./mindmap in earlier waves (batch 3); the pure derivations went
+// to useMindmapDerived and the menu/toolbar wiring to MindmapMenus and
+// MindmapToolbarMount in the final trim wave.
 import type { Heading, ThemeMode } from "../core/types";
-import {
-  buildMindmapTree,
-  parseMarkdownToMindmapTree,
-  addChildNode,
-  findNode,
-  calculateNodeDimensions,
-} from "../services/mindmapService";
+import { buildMindmapTree, parseMarkdownToMindmapTree } from "../services/mindmapService";
 import type { MindmapNode } from "../core/types";
-import { MindmapCanvasMenu } from "./MindmapCanvasMenu";
-import { MindmapNodeStyleMenu } from "./MindmapNodeStyleMenu";
 import { MindmapInlineEditor } from "./MindmapInlineEditor";
-import { MindmapToolbar } from "./MindmapToolbar";
-import { freezeAppearance } from "../core/mindmapThemes";
-import {
-  allTags,
-  areRelated,
-  iconFor,
-  linkFor,
-  markersFor,
-  noteFor,
-  setNodeIcon,
-  setNodeLink,
-  setNodeNote,
-  setNodePriority,
-  setNodeProgress,
-  setNodeTags,
-  tagsFor,
-  floatingTopics,
-} from "../services/mindmapSidecar";
-import { boundsOfBoxes, unionBounds } from "../core/mindmapBounds";
-import { MindmapFloatingTopics, type FloatingBox } from "./MindmapFloatingTopics";
+import { linkFor } from "../services/mindmapSidecar";
+import { parseMindmapLink } from "../core/mindmapLinks";
+import { MindmapFloatingTopics } from "./MindmapFloatingTopics";
 import { MindmapSummaries } from "./MindmapSummaries";
 import { MindmapBoundaries } from "./MindmapBoundaries";
-import { MindmapFloatingAnnotationMenu } from "./MindmapFloatingAnnotationMenu";
-import { parseMindmapLink } from "../core/mindmapLinks";
 import { MindmapRelationLines } from "./MindmapRelationLines";
 import { useMindmapAppearance } from "./mindmap/useMindmapAppearance";
 import { useMindmapSearch } from "./mindmap/useMindmapSearch";
@@ -48,8 +24,11 @@ import { useMindmapSidecar } from "./mindmap/useMindmapSidecar";
 import { useMindmapAnnotations, type MindmapContextMenu } from "./mindmap/useMindmapAnnotations";
 import { useMindmapTreeOps } from "./mindmap/useMindmapTreeOps";
 import { useMindmapViewport } from "./mindmap/useMindmapViewport";
+import { useMindmapDerived } from "./mindmap/useMindmapDerived";
 import { MindmapCanvasLayers } from "./mindmap/MindmapCanvasLayers";
 import { MindmapNodeLayer } from "./mindmap/MindmapNodeLayer";
+import { MindmapMenus } from "./mindmap/MindmapMenus";
+import { MindmapToolbarMount } from "./mindmap/MindmapToolbarMount";
 
 /**
  * A node's icon, drawn on its leading edge and outside its box.
@@ -129,39 +108,6 @@ export const MindmapView = memo(function MindmapView({
   const { sidecar, applySidecarEdit, sidecarSaveFailed } = useMindmapSidecar({ documentKey });
 
   /**
-   * A note edit arrives on every keystroke, since the panel holds no state of its
-   * own; only the disk write waits, which is why the text never lags the typing.
-   */
-  const handleNoteChange = useCallback(
-    (nodeId: string, text: string) =>
-      applySidecarEdit(["notes"], (current) => setNodeNote(current, nodeId, text)),
-    [applySidecarEdit],
-  );
-
-  /**
-   * An icon edit. One icon per node: picking the one a node already wears takes
-   * it off, which is the only way to say "none" without a menu of its own.
-   */
-  const handleIconChange = useCallback(
-    (nodeId: string, iconId: string) =>
-      applySidecarEdit(["icons"], (current) => setNodeIcon(current, nodeId, iconId)),
-    [applySidecarEdit],
-  );
-
-  /** A node's link, as typed. Stored verbatim; read when someone follows it. */
-  const handleLinkChange = useCallback(
-    (nodeId: string, text: string) =>
-      applySidecarEdit(["links"], (current) => setNodeLink(current, nodeId, text)),
-    [applySidecarEdit],
-  );
-
-  // The side-of-root writer (`handleSideChange`) and the two-sided layout's
-  // "which side does this new branch go on" question (`sideChooser`) live in
-  // useMindmapTreeOps (batch 3, wave 2c): their only readers are the tree
-  // handlers that write both the tree and the companion file, which moved there
-  // with them.
-
-  /**
    * Follows a link to a heading in this document.
    *
    * The document's headings become this map's nodes, so an anchor names a node
@@ -219,36 +165,11 @@ export const MindmapView = memo(function MindmapView({
     [followAnchor, onWikiLinkClick, sidecar],
   );
 
-  /** A node's tags, replaced wholesale — the list is what the panel edits. */
-  const handleTagsChange = useCallback(
-    (nodeId: string, tags: string[]) =>
-      applySidecarEdit(["tags"], (current) => setNodeTags(current, nodeId, tags)),
-    [applySidecarEdit],
-  );
-
-  /**
-   * Every tag the document uses, most used first.
-   *
-   * Derived from the sidecar rather than stored, so it cannot fall out of step
-   * with the tags it describes, and computed once per change rather than once
-   * per keystroke in the note field.
-   */
-  const documentTags = useMemo(() => allTags(sidecar), [sidecar]);
-
-  /**
-   * A priority or a progress edit. One handler for both, because they differ
-   * only in which setter they reach — a node carries one of each at the same
-   * time, so neither is a separate kind of thing to the panel.
-   */
-  const handleMarkChange = useCallback(
-    (nodeId: string, field: "priority" | "progress", value: number | null) =>
-      applySidecarEdit(["markers"], (current) =>
-        field === "priority"
-          ? setNodePriority(current, nodeId, value)
-          : setNodeProgress(current, nodeId, value),
-      ),
-    [applySidecarEdit],
-  );
+  // The side-of-root writer (`handleSideChange`) and the two-sided layout's
+  // "which side does this new branch go on" question (`sideChooser`) live in
+  // useMindmapTreeOps (batch 3, wave 2c): their only readers are the tree
+  // handlers that write both the tree and the companion file, which moved there
+  // with them.
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -286,21 +207,10 @@ export const MindmapView = memo(function MindmapView({
   // Per-document look & feel: the theme, layout and numbering the reader picks,
   // remembered under the document's key, plus the responsive breakpoints the
   // container class and the toolbar listen to. Extracted to useMindmapAppearance
-  // (batch 3, wave 2a); it reads `tree` only for the numbering it derives.
-  const {
-    handlePickTheme,
-    activeThemeId,
-    mindmapTheme,
-    handlePickLayout,
-    activeLayoutId,
-    showNumbering,
-    handleToggleNumbering,
-    numbering,
-    isSemiCompact,
-    isCompact,
-    isNarrow,
-    isUltraNarrow,
-  } = useMindmapAppearance({ documentKey, themeId, containerRef, tree });
+  // (batch 3, wave 2a); it reads `tree` only for the numbering it derives. The
+  // whole return object is kept as one value — the members thread into the tree
+  // ops hook below, the container class and the two mount points.
+  const appearance = useMindmapAppearance({ documentKey, themeId, containerRef, tree });
 
   // The source-sync effect (external document changes re-parse into the tree
   // unless this map has unsynced edits) and the fold persistence moved to
@@ -383,35 +293,7 @@ export const MindmapView = memo(function MindmapView({
   // returned here. `tree`/`hasUnsyncedChanges` stay above on purpose: the
   // appearance hook derives the outline numbering from the tree and has to run
   // before this call, so the state cannot live below it.
-  const {
-    layout,
-    collapsedIds,
-    handleToggleCollapse,
-    handleExpandAll,
-    handleCollapseToLevel2,
-    sideChooser,
-    setSideChooser,
-    handleAddChild,
-    handleAddSibling,
-    handleMoveToSide,
-    applyTreeChange,
-    handleUndo,
-    handleRedo,
-    handleSyncToDocument,
-    handleMoveSibling,
-    clipboardRef,
-    clipboardReady,
-    handleCopyNode,
-    handleCutNode,
-    handlePasteNode,
-    startEditing,
-    startEditingRef,
-    handleCommitEdit,
-    handleCancelEdit,
-    handleUpdateStyle,
-    handleNavigate,
-    handleDeleteNode,
-  } = useMindmapTreeOps({
+  const treeOps = useMindmapTreeOps({
     documentKey,
     source,
     title,
@@ -422,7 +304,7 @@ export const MindmapView = memo(function MindmapView({
     setTree,
     hasUnsyncedChanges,
     setHasUnsyncedChanges,
-    activeLayoutId,
+    activeLayoutId: appearance.activeLayoutId,
     statedSides,
     transform,
     containerRef,
@@ -443,90 +325,36 @@ export const MindmapView = memo(function MindmapView({
   // viewport, selection and container stay with the view and thread in here.
   // Called directly after the tree ops hook now, because it needs the layout
   // that hook returns; it registers no effects, so the move changes nothing.
-  const {
-    isSearchOpen,
-    setIsSearchOpen,
-    searchQuery,
-    searchMatchIds,
-    currentSearchIndex,
-    searchInputRef,
-    handleSearch,
-    handleNextSearch,
-    handlePrevSearch,
-    handleCloseSearch,
-    handleSelectAll,
-  } = useMindmapSearch({
+  const search = useMindmapSearch({
     tree,
     sidecar,
-    layout,
+    layout: treeOps.layout,
     containerRef,
     setTransform,
     setSelectedNodeIds,
   });
 
   /**
-   * The floating topics, measured the same way the layout measures nodes.
-   *
-   * Measured rather than stored: a topic's box follows its text, so renaming one
-   * resizes it and the file never has to hold a size its own text contradicts.
-   * The measurement is the service's, so a free topic looks like the branches
-   * beside it instead of like a second opinion about the theme.
+   * The pure derivations that belong to no one hook: the measured free topics,
+   * the frame bounds anything framing the canvas takes, the laid-out boxes the
+   * relation lines are drawn between, and the style panel's target and its
+   * link. Extracted to useMindmapDerived (final trim wave). The call sits here
+   * — after the layout exists, before the viewport reads `frameBounds` — and is
+   * a pure memo bundle: no state, no effects, so the position costs nothing and
+   * moves nothing. The menus and the rest of the view share the same bundle via
+   * `derived`; the members the view itself reads are pulled out below.
    */
-  const floatingBoxes = useMemo<FloatingBox[]>(() => {
-    return floatingTopics(sidecar).map(({ id, topic }) => {
-      const { width, height, lines } = calculateNodeDimensions({
-        id,
-        text: topic.text,
-        level: 1,
-        children: [],
-      });
-      return {
-        id,
-        text: topic.text,
-        lines,
-        x: topic.x,
-        y: topic.y,
-        width,
-        height,
-        // What it carries, read here rather than in the component: a floating
-        // topic's annotations live in the same sections as a node's, so the view
-        // reads them the same way and the component draws boxes.
-        iconId: iconFor(sidecar, id),
-        markers: markersFor(sidecar, id),
-        hasNote: Boolean(noteFor(sidecar, id)),
-        hasLink: Boolean(parseMindmapLink(linkFor(sidecar, id))),
-        tags: tagsFor(sidecar, id),
-      };
-    });
-  }, [sidecar]);
-
-  /**
-   * The bounds anything framing the canvas has to use.
-   *
-   * The layout's bounds cover the tree and nothing else — it has never heard of a
-   * free topic — so the export, the printed page and "fit to screen" all take the
-   * union. Without it, a topic dragged into open space would be cropped out of the
-   * very picture meant to show it.
-   */
-  const frameBounds = useMemo(() => {
-    const floating = boundsOfBoxes(floatingBoxes, 60);
-    return floating ? unionBounds(layout.bounds, floating) : layout.bounds;
-  }, [floatingBoxes, layout.bounds]);
-
-  /** Where each laid-out node is, for the relation lines to be drawn between. */
-  const relationBoxes = useMemo(
-    () =>
-      new Map(
-        layout.nodes.map((node) => [
-          node.id,
-          { x: node.x, y: node.y, width: node.width, height: node.height },
-        ]),
-      ),
-    [layout],
-  );
-
-  /** The stored relations, or nothing while the file is still being read. */
-  const relations = sidecar?.relations ?? [];
+  const derived = useMindmapDerived({
+    sidecar,
+    layout: treeOps.layout,
+    tree,
+    contextMenu,
+    selectedNodeIds,
+    editingNodeId,
+    onJumpToHeading,
+    onWikiLinkClick,
+  });
+  const { floatingBoxes, frameBounds, relationBoxes, relations, editingNode } = derived;
 
   // The camera and the container-level gestures — the pan & zoom handlers, the
   // wheel zoom, "fit to screen", the marquee press, the print view-box swap,
@@ -538,43 +366,25 @@ export const MindmapView = memo(function MindmapView({
   // gesture that drives them; the view reads them back for the ghost badge and
   // the drop indicators. The transform itself stays above, threaded into both
   // this hook and the tree ops hook (see the note on the state).
-  const {
-    isDragging,
-    handleMouseDown,
-    handleMouseMove,
-    handleMouseUp,
-    handleWheel,
-    handleZoomStep,
-    handleFitToScreen,
-    isBlankCanvasTarget,
-    handleCanvasMouseDown,
-    marquee,
-    setMarquee,
-    marqueeStartRef,
-    marqueeRectRef,
-    setResizingNode,
-    draggingNodeId,
-    dragGhostPos,
-    dropTargetId,
-    dropPosition,
-    nodeDragStartRef,
-  } = useMindmapViewport({
+  const viewport = useMindmapViewport({
     containerRef,
     svgRef,
     transform,
     setTransform,
-    layout,
+    layout: treeOps.layout,
     frameBounds,
     tree,
-    applyTreeChange,
-    handleUpdateStyle,
-    handleCommitEdit,
+    applyTreeChange: treeOps.applyTreeChange,
+    handleUpdateStyle: treeOps.handleUpdateStyle,
+    handleCommitEdit: treeOps.handleCommitEdit,
     editingNodeId,
     contextMenu,
     setContextMenu,
-    sideChooser,
-    setSideChooser,
+    sideChooser: treeOps.sideChooser,
+    setSideChooser: treeOps.setSideChooser,
     setSelectedNodeIds,
+    editable,
+    startEditingRef: treeOps.startEditingRef,
   });
 
   // Initial fit on mount. Still in the view on purpose: in a new file
@@ -583,54 +393,17 @@ export const MindmapView = memo(function MindmapView({
   // edit instead of once on mount, which is the behaviour this timing guards.
   useEffect(() => {
     const timer = setTimeout(() => {
-      handleFitToScreen();
+      viewport.handleFitToScreen();
     }, 60);
     return () => clearTimeout(timer);
   }, []);
 
   // applyTreeChange, handleMoveSibling, handleZoomStep, the clipboard and its
-  // copy/cut/paste, `isBlankCanvasTarget` and `startEditingRef` moved to
-  // useMindmapTreeOps and useMindmapViewport (batch 3, wave 2c); they arrive
-  // back from those calls above. `isBlankCanvasTarget` is a pure predicate, so
-  // the canvas-level gestures below keep asking it first, exactly as before.
-
-  /** Double-clicking empty canvas adds a branch under the root, ready to name. */
-  const handleCanvasDoubleClick = useCallback(
-    (e: React.MouseEvent) => {
-      if (!editable || !isBlankCanvasTarget(e.target)) return;
-      e.preventDefault();
-
-      const { nextTree, newNodeId } = addChildNode(tree, tree.id, "新建子主题");
-      applyTreeChange(nextTree);
-      setSelectedNodeIds(new Set([newNodeId]));
-      startEditingRef.current(newNodeId);
-    },
-    [applyTreeChange, editable, isBlankCanvasTarget, tree],
-  );
-
-  /**
-   * Right-clicking empty canvas opens the canvas menu.
-   *
-   * Reported with a null nodeId rather than the root's, because the canvas menu
-   * offers actions with no subject — paste, expand all, fit to screen — and
-   * quietly addressing the root would put "delete" one mis-click away from a
-   * gesture aimed at nothing.
-   */
-  const handleCanvasContextMenu = useCallback(
-    (e: React.MouseEvent) => {
-      if (!isBlankCanvasTarget(e.target)) return;
-      e.preventDefault();
-
-      const containerRect = containerRef.current?.getBoundingClientRect();
-      setContextMenu({
-        x: containerRect ? e.clientX - containerRect.left : e.clientX,
-        y: containerRect ? e.clientY - containerRect.top : e.clientY,
-        nodeId: tree.id,
-        isCanvas: true,
-      });
-    },
-    [isBlankCanvasTarget],
-  );
+  // copy/cut/paste, `isBlankCanvasTarget`, `startEditingRef` and the two
+  // canvas-level gestures (double-click-to-create, right-click canvas menu)
+  // moved to useMindmapTreeOps and useMindmapViewport (batch 3, wave 2c; the
+  // gestures joined the viewport in the final trim wave, beside the blank-
+  // canvas predicate they both ask first); they arrive back from those calls.
 
   // The marquee's state, refs and press handler moved to useMindmapViewport
   // (batch 3, wave 2c) and come back from that call. The release effect below
@@ -640,19 +413,19 @@ export const MindmapView = memo(function MindmapView({
   // called before that one cannot receive the setter without changing when
   // these window listeners attach relative to the floating-drag listener,
   // which must stay the last one registered.
-  const isMarqueeSelecting = marquee !== null;
+  const isMarqueeSelecting = viewport.marquee !== null;
 
   useEffect(() => {
     if (!isMarqueeSelecting) return;
 
     const handleMove = (e: MouseEvent) => {
-      const start = marqueeStartRef.current;
+      const start = viewport.marqueeStartRef.current;
       const containerRect = containerRef.current?.getBoundingClientRect();
       if (!start || !containerRect) return;
 
       // Pressing on bare canvas puts the picked line down, as it does the picked
       // group: there is one selection on this map, and the reader has moved on.
-      setSelectedRelation(null);
+      annotations.setSelectedRelation(null);
 
       const rect = {
         x1: start.x,
@@ -660,13 +433,13 @@ export const MindmapView = memo(function MindmapView({
         x2: (e.clientX - containerRect.left - transform.x) / transform.scale,
         y2: (e.clientY - containerRect.top - transform.y) / transform.scale,
       };
-      marqueeRectRef.current = rect;
-      setMarquee(rect);
+      viewport.marqueeRectRef.current = rect;
+      viewport.setMarquee(rect);
     };
 
     const handleUp = () => {
-      const rect = marqueeRectRef.current;
-      if (rect && layout) {
+      const rect = viewport.marqueeRectRef.current;
+      if (rect && treeOps.layout) {
         const left = Math.min(rect.x1, rect.x2);
         const right = Math.max(rect.x1, rect.x2);
         const top = Math.min(rect.y1, rect.y2);
@@ -675,16 +448,16 @@ export const MindmapView = memo(function MindmapView({
         // Intersection, not containment: requiring a node to be fully inside
         // means a box drawn across a row of branches selects nothing, which is
         // the opposite of what drawing it feels like.
-        const hit = layout.nodes
+        const hit = treeOps.layout.nodes
           .filter(
             (n) => n.x < right && n.x + n.width > left && n.y < bottom && n.y + n.height > top,
           )
           .map((n) => n.id);
         if (hit.length) setSelectedNodeIds(new Set(hit));
       }
-      marqueeStartRef.current = null;
-      marqueeRectRef.current = null;
-      setMarquee(null);
+      viewport.marqueeStartRef.current = null;
+      viewport.marqueeRectRef.current = null;
+      viewport.setMarquee(null);
     };
 
     window.addEventListener("mousemove", handleMove);
@@ -693,7 +466,7 @@ export const MindmapView = memo(function MindmapView({
       window.removeEventListener("mousemove", handleMove);
       window.removeEventListener("mouseup", handleUp);
     };
-  }, [isMarqueeSelecting, layout, transform.scale, transform.x, transform.y]);
+  }, [isMarqueeSelecting, treeOps.layout, transform.scale, transform.x, transform.y]);
 
   // handleUndo/handleRedo/handleSyncToDocument and the interactive topic
   // actions — add child (with the two-sided layout's side question), add
@@ -707,33 +480,33 @@ export const MindmapView = memo(function MindmapView({
   // everything it composes threads in from the view's own hooks and locals.
   useMindmapShortcuts({
     editingNodeId,
-    isSearchOpen,
-    sideChooser,
+    isSearchOpen: search.isSearchOpen,
+    sideChooser: treeOps.sideChooser,
     contextMenu,
     selectedNodeIds,
-    setIsSearchOpen,
-    searchInputRef,
-    handleCloseSearch,
-    setSideChooser,
+    setIsSearchOpen: search.setIsSearchOpen,
+    searchInputRef: search.searchInputRef,
+    handleCloseSearch: search.handleCloseSearch,
+    setSideChooser: treeOps.setSideChooser,
     setContextMenu,
     setSelectedNodeIds,
-    handleSelectAll,
-    handleCommitEdit,
-    handleCancelEdit,
-    handleCopyNode,
-    handleCutNode,
-    handlePasteNode,
-    handleUndo,
-    handleRedo,
-    handleSyncToDocument,
-    handleAddChild,
-    handleAddSibling,
-    handleDeleteNode,
-    startEditing,
-    handleZoomStep,
-    handleFitToScreen,
-    handleMoveSibling,
-    handleNavigate,
+    handleSelectAll: search.handleSelectAll,
+    handleCommitEdit: treeOps.handleCommitEdit,
+    handleCancelEdit: treeOps.handleCancelEdit,
+    handleCopyNode: treeOps.handleCopyNode,
+    handleCutNode: treeOps.handleCutNode,
+    handlePasteNode: treeOps.handlePasteNode,
+    handleUndo: treeOps.handleUndo,
+    handleRedo: treeOps.handleRedo,
+    handleSyncToDocument: treeOps.handleSyncToDocument,
+    handleAddChild: treeOps.handleAddChild,
+    handleAddSibling: treeOps.handleAddSibling,
+    handleDeleteNode: treeOps.handleDeleteNode,
+    startEditing: treeOps.startEditing,
+    handleZoomStep: viewport.handleZoomStep,
+    handleFitToScreen: viewport.handleFitToScreen,
+    handleMoveSibling: treeOps.handleMoveSibling,
+    handleNavigate: treeOps.handleNavigate,
     onClose,
   });
 
@@ -745,91 +518,19 @@ export const MindmapView = memo(function MindmapView({
 
   // The seven ways a map leaves the app — PNG, SVG, print/PDF, OPML, FreeMind,
   // XMind and the Markdown outline. Extracted to useMindmapExport (batch 3,
-  // wave 2a); isDarkUi went with it, as the image exports' only reader.
-  const {
-    handleExportPng,
-    handleExportSvg,
-    handlePrintPdf,
-    handleExportOpml,
-    handleExportFreeMind,
-    handleExportXmind,
-    handleExportMarkdownOutline,
-  } = useMindmapExport({ title, tree, theme, svgRef, layout, frameBounds, collapsedIds, sidecar });
+  // wave 2a); isDarkUi went with it, as the image exports' only reader. The
+  // whole return object goes to the toolbar mount, its only reader.
+  const exportHandlers = useMindmapExport({
+    title,
+    tree,
+    theme,
+    svgRef,
+    layout: treeOps.layout,
+    frameBounds,
+    collapsedIds: treeOps.collapsedIds,
+    sidecar,
+  });
 
-  const editingNode = useMemo(() => {
-    if (!editingNodeId) return null;
-    return layout.nodes.find((n) => n.id === editingNodeId) || null;
-  }, [editingNodeId, layout.nodes]);
-
-  const contextTargetNode = useMemo(() => {
-    if (!contextMenu) return null;
-    return findNode(tree, contextMenu.nodeId);
-  }, [contextMenu, tree]);
-
-  const isBatchMode = selectedNodeIds.size > 1;
-
-  /**
-   * Opens the style panel under whatever the toolbar pressed.
-   *
-   * The bar measures its own button and hands the rect over; converting it into
-   * canvas coordinates belongs here, because the canvas offset is this view's to
-   * know. The panel targets the primary selection, or the root when nothing is
-   * selected — the same target the node context menu uses.
-   */
-  /**
-   * Writes the current theme's appearance into the selected nodes.
-   *
-   * Confirmed first, because it is the one action here that changes what later
-   * theme switches do to these nodes: after it they stop following. It cannot
-   * lose anything a reader set by hand — `freezeAppearance` gives a node's own
-   * value priority, so writing the answer back is a no-op for every field the
-   * node had already chosen.
-   */
-  const handleFreezeTheme = useCallback(() => {
-    const targetIds =
-      selectedNodeIds.size > 1 ? Array.from(selectedNodeIds) : [primarySelectedId || tree.id];
-
-    const confirmed = window.confirm(
-      `将把当前主题的外观固化到 ${targetIds.length} 个节点的样式上。\n\n` +
-        "此后切换主题时，这些节点不再跟随；你手工设置过的颜色、形状与字号不会改变。\n\n是否继续？",
-    );
-    if (!confirmed) return;
-
-    applyTreeChange(freezeAppearance(tree, targetIds, mindmapTheme));
-  }, [tree, selectedNodeIds, primarySelectedId, mindmapTheme, applyTreeChange]);
-
-  const handleStylePanelRequest = useCallback(
-    (anchor: DOMRect) => {
-      const containerRect = containerRef.current?.getBoundingClientRect();
-      setContextMenu({
-        x: anchor.left - (containerRect?.left ?? 0),
-        y: anchor.bottom - (containerRect?.top ?? 0) + 6,
-        nodeId: primarySelectedId || tree.id,
-      });
-    },
-    [primarySelectedId, tree.id],
-  );
-
-  /**
-   * The node the style panel describes and every annotation control writes to:
-   * the node the menu was opened on, or the root when nothing is selected — the
-   * same target the node context menu uses. Declared here rather than with the
-   * other derived values because both of the things it is derived from are
-   * declared later than them.
-   */
-  const panelNodeId = contextMenu?.nodeId ?? tree.id;
-
-  const panelLink = linkFor(sidecar, panelNodeId);
-  const parsedPanelLink = parseMindmapLink(panelLink);
-
-  /**
-   * Whether this build can actually go where the panel's link points.
-   *
-   * Worked out here rather than in the panel, because it is a fact about what
-   * this app was handed: a wiki link needs a caller that can open documents, and
-   * an anchor needs a caller that can jump. The button is offered disabled with
-   * the reason, rather than hidden — a control that vanishes teaches nothing.
-   */
   /**
    * The annotation editors: relations, free topics, summaries and boundaries —
    * their picked/edited state, their callbacks, the free topic's drag window
@@ -840,49 +541,7 @@ export const MindmapView = memo(function MindmapView({
    * the marquee effect; that reference sits inside the effect's closure, which
    * only ever runs after this call has returned.
    */
-  const {
-    selectedRelation,
-    setSelectedRelation,
-    handleToggleRelation,
-    handleRelationChange,
-    handleRelationContextMenu,
-    handleRemoveSelectedRelation,
-    handleStartRelationEdit,
-    handleCancelRelationEdit,
-    handleCommitRelationEdit,
-    editingRelationBox,
-    selectedRelationInfo,
-    selectedFloatingId,
-    setSelectedFloatingId,
-    handleFloatingDragStart,
-    handleStartFloatingEdit,
-    handleCancelFloatingEdit,
-    handleCommitFloatingEdit,
-    handleRemoveFloatingTopic,
-    handleFloatingContextMenu,
-    handleDeleteFloatingTopic,
-    handleNewFloatingTopic,
-    editingFloatingBox,
-    selectedSummaryId,
-    setSelectedSummaryId,
-    handleAddSummary,
-    handleRemoveSummary,
-    handleStartSummaryEdit,
-    handleCancelSummaryEdit,
-    handleCommitSummaryEdit,
-    summaryBoxes,
-    editingSummaryBox,
-    selectedBoundaryId,
-    setSelectedBoundaryId,
-    handleAddBoundary,
-    handleRemoveBoundary,
-    handleBoundaryColorChange,
-    handleStartBoundaryEdit,
-    handleCancelBoundaryEdit,
-    handleCommitBoundaryEdit,
-    boundaryBoxes,
-    editingBoundaryBox,
-  } = useMindmapAnnotations({
+  const annotations = useMindmapAnnotations({
     applySidecarEdit,
     selectedNodeIds,
     containerRef,
@@ -893,7 +552,7 @@ export const MindmapView = memo(function MindmapView({
     setContextMenu,
     treeId: tree.id,
     sidecar,
-    layout,
+    layout: treeOps.layout,
     relationBoxes,
     floatingBoxes,
   });
@@ -905,125 +564,70 @@ export const MindmapView = memo(function MindmapView({
    * summary's label are all a box with text in it, and the editor never wanted
    * more than that — deciding here, in one place, is also what makes it
    * impossible for two editors to be open at once.
+   *
+   * This is the one derivation that stayed in the view on purpose: its inputs
+   * are the annotation editors' boxes and commit/cancel pairs, which do not
+   * exist until the hook above has returned — moving it into useMindmapDerived
+   * would be a cycle.
    */
   const inlineEdit = editingNode
-    ? { box: editingNode, onCommit: handleCommitEdit, onCancel: handleCancelEdit }
-    : editingFloatingBox
+    ? { box: editingNode, onCommit: treeOps.handleCommitEdit, onCancel: treeOps.handleCancelEdit }
+    : annotations.editingFloatingBox
       ? {
-          box: editingFloatingBox,
-          onCommit: handleCommitFloatingEdit,
-          onCancel: handleCancelFloatingEdit,
+          box: annotations.editingFloatingBox,
+          onCommit: annotations.handleCommitFloatingEdit,
+          onCancel: annotations.handleCancelFloatingEdit,
         }
-      : editingSummaryBox
+      : annotations.editingSummaryBox
         ? {
-            box: editingSummaryBox,
-            onCommit: handleCommitSummaryEdit,
-            onCancel: handleCancelSummaryEdit,
+            box: annotations.editingSummaryBox,
+            onCommit: annotations.handleCommitSummaryEdit,
+            onCancel: annotations.handleCancelSummaryEdit,
           }
-        : editingBoundaryBox
+        : annotations.editingBoundaryBox
           ? {
-              box: editingBoundaryBox,
-              onCommit: handleCommitBoundaryEdit,
-              onCancel: handleCancelBoundaryEdit,
+              box: annotations.editingBoundaryBox,
+              onCommit: annotations.handleCommitBoundaryEdit,
+              onCancel: annotations.handleCancelBoundaryEdit,
             }
-          : editingRelationBox
+          : annotations.editingRelationBox
             ? {
-                box: editingRelationBox,
-                onCommit: handleCommitRelationEdit,
-                onCancel: handleCancelRelationEdit,
+                box: annotations.editingRelationBox,
+                onCommit: annotations.handleCommitRelationEdit,
+                onCancel: annotations.handleCancelRelationEdit,
               }
             : null;
-
-  const selectedIds = [...selectedNodeIds];
-  const selectionRelated =
-    selectedIds.length === 2 ? areRelated(sidecar, selectedIds[0], selectedIds[1]) : false;
-
-  const canOpenPanelLink =
-    parsedPanelLink?.kind === "external" ||
-    (parsedPanelLink?.kind === "anchor" && !!onJumpToHeading) ||
-    (parsedPanelLink?.kind === "wiki" && !!onWikiLinkClick);
-
-  /**
-   * Where a floating topic's link can go.
-   *
-   * The same question minus the anchor: `#标题` is followed by looking the heading
-   * up in the outline, and a topic that is not in the outline has no heading to
-   * find. Saying so in the panel is better than offering the button and then
-   * doing nothing.
-   */
-  const canOpenFloatingLink =
-    parsedPanelLink?.kind === "external" || (parsedPanelLink?.kind === "wiki" && !!onWikiLinkClick);
-
-  /** The floating topic the menu is about, for a title and a delete. */
-  const contextTargetFloating =
-    floatingBoxes.find((topic) => topic.id === contextMenu?.nodeId) ?? null;
 
   return (
     <div
       ref={containerRef}
-      className={`mindmap-view-container ${isDragging ? "is-dragging" : ""} ${
-        isSemiCompact ? "is-semi-compact" : ""
-      } ${isCompact ? "is-compact" : ""} ${isNarrow ? "is-narrow" : ""} ${
-        isUltraNarrow ? "is-ultra-narrow" : ""
+      className={`mindmap-view-container ${viewport.isDragging ? "is-dragging" : ""} ${
+        appearance.isSemiCompact ? "is-semi-compact" : ""
+      } ${appearance.isCompact ? "is-compact" : ""} ${appearance.isNarrow ? "is-narrow" : ""} ${
+        appearance.isUltraNarrow ? "is-ultra-narrow" : ""
       }`}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
-      onWheel={handleWheel}
+      onMouseDown={viewport.handleMouseDown}
+      onMouseMove={viewport.handleMouseMove}
+      onMouseUp={viewport.handleMouseUp}
+      onMouseLeave={viewport.handleMouseUp}
+      onWheel={viewport.handleWheel}
     >
-      {/* Top Floating Clean & Spacious Control Bar */}
-      <MindmapToolbar
-        title={tree.text || title}
-        nodeCount={layout.nodes.length}
-        selectedCount={selectedNodeIds.size}
+      <MindmapToolbarMount
+        title={title}
+        tree={tree}
+        selectedNodeIds={selectedNodeIds}
         editable={editable}
-        canSyncToDocument={editable && !!onSourceChange}
+        onSourceChange={onSourceChange}
         hasUnsyncedChanges={hasUnsyncedChanges}
-        isUltraNarrow={isUltraNarrow}
-        scale={transform.scale}
-        themeId={activeThemeId}
-        layoutId={activeLayoutId}
-        search={{
-          isOpen: isSearchOpen,
-          query: searchQuery,
-          matchIds: searchMatchIds,
-          currentIndex: currentSearchIndex,
-          inputRef: searchInputRef,
-          onToggle: () => {
-            setIsSearchOpen((prev) => {
-              const next = !prev;
-              // Focus after the field exists, hence the delay: it is rendered
-              // by the same state change that this returns.
-              if (next) setTimeout(() => searchInputRef.current?.focus(), 60);
-              return next;
-            });
-          },
-          onQueryChange: handleSearch,
-          onPrev: handlePrevSearch,
-          onNext: handleNextSearch,
-          onClose: handleCloseSearch,
-        }}
-        onSyncToDocument={handleSyncToDocument}
-        onAddSibling={() => handleAddSibling()}
-        onAddChild={() => handleAddChild()}
-        onStylePanelRequest={handleStylePanelRequest}
-        onSelectAll={handleSelectAll}
-        onCollapseToLevel2={handleCollapseToLevel2}
-        onExpandAll={handleExpandAll}
-        onPickTheme={handlePickTheme}
-        onPickLayout={handlePickLayout}
-        numbering={showNumbering}
-        onToggleNumbering={handleToggleNumbering}
-        onZoomStep={handleZoomStep}
-        onFitToScreen={handleFitToScreen}
-        onExportPng={handleExportPng}
-        onExportSvg={handleExportSvg}
-        onPrintPdf={handlePrintPdf}
-        onExportOpml={handleExportOpml}
-        onExportFreeMind={handleExportFreeMind}
-        onExportXmind={handleExportXmind}
-        onExportMarkdownOutline={handleExportMarkdownOutline}
+        transform={transform}
+        containerRef={containerRef}
+        primarySelectedId={primarySelectedId}
+        setContextMenu={setContextMenu}
+        appearance={appearance}
+        search={search}
+        treeOps={treeOps}
+        viewport={viewport}
+        exportHandlers={exportHandlers}
       />
 
       {/* Main SVG Infinite Mindmap Canvas. The svg scaffolding — the glow filter
@@ -1036,27 +640,27 @@ export const MindmapView = memo(function MindmapView({
       <MindmapCanvasLayers
         svgRef={svgRef}
         transform={transform}
-        marquee={marquee}
-        layout={layout}
-        mindmapTheme={mindmapTheme}
+        marquee={viewport.marquee}
+        layout={treeOps.layout}
+        mindmapTheme={appearance.mindmapTheme}
         hoveredNodeId={hoveredNodeId}
         selectedNodeIds={selectedNodeIds}
-        draggingNodeId={draggingNodeId}
-        dragGhostPos={dragGhostPos}
-        dropTargetId={dropTargetId}
-        handleCanvasMouseDown={handleCanvasMouseDown}
-        handleCanvasDoubleClick={handleCanvasDoubleClick}
-        handleCanvasContextMenu={handleCanvasContextMenu}
+        draggingNodeId={viewport.draggingNodeId}
+        dragGhostPos={viewport.dragGhostPos}
+        dropTargetId={viewport.dropTargetId}
+        handleCanvasMouseDown={viewport.handleCanvasMouseDown}
+        handleCanvasDoubleClick={viewport.handleCanvasDoubleClick}
+        handleCanvasContextMenu={viewport.handleCanvasContextMenu}
         backLayers={
           <>
             {/* Boundaries are the backmost layer, since a box is a background for
                 the group it encloses: the branches leaving those topics pass over
                 it, as they do on paper. */}
             <MindmapBoundaries
-              boundaries={boundaryBoxes}
-              selectedId={selectedBoundaryId}
-              onSelect={setSelectedBoundaryId}
-              onStartEdit={handleStartBoundaryEdit}
+              boundaries={annotations.boundaryBoxes}
+              selectedId={annotations.selectedBoundaryId}
+              onSelect={annotations.setSelectedBoundaryId}
+              onStartEdit={annotations.handleStartBoundaryEdit}
             />
 
             {/* Relations next, so they pass under the outline rather than across
@@ -1065,18 +669,20 @@ export const MindmapView = memo(function MindmapView({
               relations={relations}
               boxes={relationBoxes}
               selectedKey={
-                selectedRelation ? `${selectedRelation.fromId}\u0000${selectedRelation.toId}` : null
+                annotations.selectedRelation
+                  ? `${annotations.selectedRelation.fromId}\u0000${annotations.selectedRelation.toId}`
+                  : null
               }
-              onSelect={setSelectedRelation}
-              onStartLabelEdit={handleStartRelationEdit}
-              onOpenMenu={handleRelationContextMenu}
+              onSelect={annotations.setSelectedRelation}
+              onStartLabelEdit={annotations.handleStartRelationEdit}
+              onOpenMenu={annotations.handleRelationContextMenu}
             />
           </>
         }
         nodeLayer={
           <MindmapNodeLayer
-            nodes={layout.nodes}
-            mindmapTheme={mindmapTheme}
+            nodes={treeOps.layout.nodes}
+            mindmapTheme={appearance.mindmapTheme}
             sidecar={sidecar}
             editable={editable}
             hoveredNodeId={hoveredNodeId}
@@ -1085,19 +691,19 @@ export const MindmapView = memo(function MindmapView({
             setSelectedNodeIds={setSelectedNodeIds}
             containerRef={containerRef}
             setContextMenu={setContextMenu}
-            dropTargetId={dropTargetId}
-            dropPosition={dropPosition}
-            searchMatchIds={searchMatchIds}
-            currentSearchIndex={currentSearchIndex}
+            dropTargetId={viewport.dropTargetId}
+            dropPosition={viewport.dropPosition}
+            searchMatchIds={search.searchMatchIds}
+            currentSearchIndex={search.currentSearchIndex}
             tree={tree}
             onJumpToHeading={onJumpToHeading}
-            startEditing={startEditing}
+            startEditing={treeOps.startEditing}
             handleOpenLink={handleOpenLink}
-            numbering={numbering}
-            handleToggleCollapse={handleToggleCollapse}
-            setResizingNode={setResizingNode}
-            handleUpdateStyle={handleUpdateStyle}
-            nodeDragStartRef={nodeDragStartRef}
+            numbering={appearance.numbering}
+            handleToggleCollapse={treeOps.handleToggleCollapse}
+            setResizingNode={viewport.setResizingNode}
+            handleUpdateStyle={treeOps.handleUpdateStyle}
+            nodeDragStartRef={viewport.nodeDragStartRef}
           />
         }
         frontLayers={
@@ -1106,10 +712,10 @@ export const MindmapView = memo(function MindmapView({
                 additions and sit above the outline, and a free topic is the one a
                 reader drags over other things. */}
             <MindmapSummaries
-              summaries={summaryBoxes}
-              selectedId={selectedSummaryId}
-              onSelect={setSelectedSummaryId}
-              onStartEdit={handleStartSummaryEdit}
+              summaries={annotations.summaryBoxes}
+              selectedId={annotations.selectedSummaryId}
+              onSelect={annotations.setSelectedSummaryId}
+              onStartEdit={annotations.handleStartSummaryEdit}
             />
 
             {/* Free topics last, so they sit above the outline: they are the
@@ -1117,11 +723,11 @@ export const MindmapView = memo(function MindmapView({
                 visible rather than slide underneath it. */}
             <MindmapFloatingTopics
               topics={floatingBoxes}
-              selectedId={selectedFloatingId}
-              onSelect={setSelectedFloatingId}
-              onStartEdit={handleStartFloatingEdit}
-              onStartDrag={handleFloatingDragStart}
-              onOpenMenu={handleFloatingContextMenu}
+              selectedId={annotations.selectedFloatingId}
+              onSelect={annotations.setSelectedFloatingId}
+              onStartEdit={annotations.handleStartFloatingEdit}
+              onStartDrag={annotations.handleFloatingDragStart}
+              onOpenMenu={annotations.handleFloatingContextMenu}
               onOpenLink={(id) => handleOpenLink(tree, id)}
             />
           </>
@@ -1143,207 +749,24 @@ export const MindmapView = memo(function MindmapView({
         />
       )}
 
-      {/* Where a new first-level branch goes, asked before it is made. It wears the menus'
-          own class deliberately: it inherits their look, and their wheel handling — which is
-          what keeps the map still while a popover is up. */}
-      {sideChooser && (
-        <div
-          className="mindmap-context-menu mindmap-side-chooser"
-          style={{ left: sideChooser.x, top: sideChooser.y }}
-          onMouseDown={(event) => event.stopPropagation()}
-          role="group"
-          aria-label="这一支放哪边"
-        >
-          <div className="mindmap-ctx-header">
-            <span className="mindmap-ctx-title">这一支放哪边？</span>
-            <button
-              type="button"
-              className="mindmap-ctx-close"
-              onClick={() => setSideChooser(null)}
-              title="关闭 (Esc)"
-              aria-label="关闭"
-            >
-              ×
-            </button>
-          </div>
-          <div className="mindmap-ctx-actions">
-            <button
-              type="button"
-              className="mindmap-ctx-item"
-              onClick={() => handleAddChild(sideChooser.parentId, "left")}
-            >
-              放到左侧
-            </button>
-            <button
-              type="button"
-              className="mindmap-ctx-item"
-              onClick={() => handleAddChild(sideChooser.parentId, "right")}
-            >
-              放到右侧
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Canvas menu, for a right-click on empty space. */}
-      {contextMenu?.isCanvas && (
-        <MindmapCanvasMenu
-          left={menuPos.left}
-          top={menuPos.top}
-          menuRef={menuRef}
-          canPaste={Boolean(clipboardRef.current)}
-          onClose={() => setContextMenu(null)}
-          onNewTopic={() => {
-            setContextMenu(null);
-            handleAddChild(tree.id);
-          }}
-          onPaste={() => {
-            setContextMenu(null);
-            handlePasteNode();
-          }}
-          selectedCount={selectedIds.length}
-          selectionRelated={selectionRelated}
-          canBound={selectedIds.length >= 1}
-          onAddBoundary={() => {
-            setContextMenu(null);
-            handleAddBoundary();
-          }}
-          selectedBoundary={
-            boundaryBoxes.find((boundary) => boundary.id === selectedBoundaryId) ?? null
-          }
-          onBoundaryColorChange={(colorId) => {
-            setContextMenu(null);
-            handleBoundaryColorChange(colorId);
-          }}
-          onRemoveBoundary={() => {
-            setContextMenu(null);
-            handleRemoveBoundary();
-          }}
-          selectedRelation={selectedRelationInfo}
-          onEditRelationLabel={() => {
-            if (selectedRelation) handleStartRelationEdit(selectedRelation);
-          }}
-          onRelationChange={handleRelationChange}
-          onRemoveRelation={() => {
-            setContextMenu(null);
-            handleRemoveSelectedRelation();
-          }}
-          canSummarise={selectedIds.length >= 2}
-          onAddSummary={() => {
-            setContextMenu(null);
-            handleAddSummary();
-          }}
-          selectedSummaryText={
-            summaryBoxes.find((summary) => summary.id === selectedSummaryId)?.text || null
-          }
-          onRemoveSummary={() => {
-            setContextMenu(null);
-            handleRemoveSummary();
-          }}
-          selectedFloatingText={
-            floatingBoxes.find((topic) => topic.id === selectedFloatingId)?.text ?? null
-          }
-          onNewFloatingTopic={() => {
-            setContextMenu(null);
-            handleNewFloatingTopic();
-          }}
-          onRemoveFloatingTopic={() => {
-            setContextMenu(null);
-            handleRemoveFloatingTopic();
-          }}
-          onToggleRelation={() => {
-            setContextMenu(null);
-            handleToggleRelation();
-          }}
-          onExpandAll={() => {
-            setContextMenu(null);
-            handleExpandAll();
-          }}
-          onCollapseToLevel2={() => {
-            setContextMenu(null);
-            handleCollapseToLevel2();
-          }}
-          onFitToScreen={() => {
-            setContextMenu(null);
-            handleFitToScreen();
-          }}
-        />
-      )}
-
-      {/* Right Click Appearance & Typography Customization Context Menu */}
-      <MindmapNodeStyleMenu
-        open={!!contextMenu && !contextMenu.isCanvas && !contextMenu.floating}
-        position={menuPos}
+      <MindmapMenus
+        contextMenu={contextMenu}
+        setContextMenu={setContextMenu}
+        menuPos={menuPos}
         menuRef={menuRef}
-        nodeId={contextMenu?.nodeId ?? tree.id}
-        target={contextTargetNode}
-        isBatchMode={isBatchMode}
-        selectedCount={selectedNodeIds.size}
-        canPasteBranch={clipboardReady}
-        onCopyBranch={() => handleCopyNode(contextMenu?.nodeId)}
-        onCutBranch={() => handleCutNode(contextMenu?.nodeId)}
-        onPasteBranch={() => handlePasteNode(contextMenu?.nodeId)}
-        icon={iconFor(sidecar, panelNodeId)}
-        note={noteFor(sidecar, panelNodeId)}
-        link={panelLink}
-        parsedLink={parsedPanelLink}
-        canOpenLink={canOpenPanelLink}
-        tags={tagsFor(sidecar, panelNodeId)}
-        knownTags={documentTags}
-        markers={markersFor(sidecar, panelNodeId)}
-        saveFailed={sidecarSaveFailed}
-        onIconChange={handleIconChange}
-        onNoteChange={handleNoteChange}
-        onLinkChange={handleLinkChange}
-        onOpenLink={(nodeId) => handleOpenLink(tree, nodeId)}
-        onTagsChange={handleTagsChange}
-        onMarkChange={handleMarkChange}
-        onUpdateStyle={handleUpdateStyle}
-        onDelete={handleDeleteNode}
-        onAddChild={handleAddChild}
-        onAddSibling={handleAddSibling}
-        onStartRename={startEditing}
-        // Offered only where a side is a thing: the two-sided layout, for a first-level
-        // branch. A deeper topic follows its branch, so it has no other side of its own to
-        // be moved to.
-        onMoveToSide={
-          activeLayoutId === "bidirectional" &&
-          tree.children.some((child) => child.id === panelNodeId)
-            ? handleMoveToSide
-            : undefined
-        }
-        onFreezeTheme={handleFreezeTheme}
-        onClose={() => setContextMenu(null)}
-      />
-
-      {/* Right Click on a Floating Topic: its own panel. The annotations are the
-          same five as a node's, read from the same sections of the same file by
-          the same expressions above — only the header and the one action are this
-          panel's own. */}
-      <MindmapFloatingAnnotationMenu
-        open={!!contextMenu?.floating}
-        position={menuPos}
-        menuRef={menuRef}
-        topicText={contextTargetFloating?.text ?? ""}
-        nodeId={panelNodeId}
-        isBatchMode={false}
-        icon={iconFor(sidecar, panelNodeId)}
-        note={noteFor(sidecar, panelNodeId)}
-        link={panelLink}
-        parsedLink={parsedPanelLink}
-        canOpenLink={canOpenFloatingLink}
-        tags={tagsFor(sidecar, panelNodeId)}
-        knownTags={documentTags}
-        markers={markersFor(sidecar, panelNodeId)}
-        saveFailed={sidecarSaveFailed}
-        onIconChange={handleIconChange}
-        onNoteChange={handleNoteChange}
-        onLinkChange={handleLinkChange}
-        onOpenLink={(nodeId) => handleOpenLink(tree, nodeId)}
-        onTagsChange={handleTagsChange}
-        onMarkChange={handleMarkChange}
-        onDelete={() => handleDeleteFloatingTopic(panelNodeId)}
-        onClose={() => setContextMenu(null)}
+        tree={tree}
+        sidecar={sidecar}
+        applySidecarEdit={applySidecarEdit}
+        sidecarSaveFailed={sidecarSaveFailed}
+        selectedNodeIds={selectedNodeIds}
+        primarySelectedId={primarySelectedId}
+        handleOpenLink={handleOpenLink}
+        handleFitToScreen={viewport.handleFitToScreen}
+        activeLayoutId={appearance.activeLayoutId}
+        mindmapTheme={appearance.mindmapTheme}
+        derived={derived}
+        annotations={annotations}
+        treeOps={treeOps}
       />
     </div>
   );

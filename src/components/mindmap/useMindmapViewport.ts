@@ -10,7 +10,7 @@ import {
 import type { MindmapNode } from "../../core/types";
 import type { MindmapLayoutResult } from "../../services/mindmapLayout";
 import type { Bounds } from "../../core/mindmapBounds";
-import { planDrop, reparentNode } from "../../services/mindmapService";
+import { addChildNode, planDrop, reparentNode } from "../../services/mindmapService";
 import type { MindmapContextMenu } from "./useMindmapAnnotations";
 
 type UseMindmapViewportParams = {
@@ -53,6 +53,10 @@ type UseMindmapViewportParams = {
   setSideChooser: Dispatch<SetStateAction<{ parentId: string; x: number; y: number } | null>>;
   /** The node selection; blank-canvas mousedown clears it. */
   setSelectedNodeIds: Dispatch<SetStateAction<Set<string>>>;
+  /** Read-only mode gates the double-click-to-create gesture. */
+  editable: boolean;
+  /** Open text editor for a freshly created node, from `useMindmapTreeOps`. */
+  startEditingRef: { current: (nodeId: string) => void };
 };
 
 /**
@@ -102,6 +106,8 @@ export function useMindmapViewport({
   sideChooser,
   setSideChooser,
   setSelectedNodeIds,
+  editable,
+  startEditingRef,
 }: UseMindmapViewportParams) {
   const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef({ x: 0, y: 0, startTransformX: 0, startTransformY: 0 });
@@ -179,6 +185,44 @@ export function useMindmapViewport({
       setMarquee(marqueeRectRef.current);
     },
     [isBlankCanvasTarget, transform.scale, transform.x, transform.y, containerRef],
+  );
+
+  /** Double-clicking empty canvas adds a branch under the root, ready to name. */
+  const handleCanvasDoubleClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (!editable || !isBlankCanvasTarget(e.target)) return;
+      e.preventDefault();
+
+      const { nextTree, newNodeId } = addChildNode(tree, tree.id, "新建子主题");
+      applyTreeChange(nextTree);
+      setSelectedNodeIds(new Set([newNodeId]));
+      startEditingRef.current(newNodeId);
+    },
+    [applyTreeChange, editable, isBlankCanvasTarget, tree, setSelectedNodeIds, startEditingRef],
+  );
+
+  /**
+   * Right-clicking empty canvas opens the canvas menu.
+   *
+   * Reported with a null nodeId rather than the root's, because the canvas menu
+   * offers actions with no subject — paste, expand all, fit to screen — and
+   * quietly addressing the root would put "delete" one mis-click away from a
+   * gesture aimed at nothing.
+   */
+  const handleCanvasContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      if (!isBlankCanvasTarget(e.target)) return;
+      e.preventDefault();
+
+      const containerRect = containerRef.current?.getBoundingClientRect();
+      setContextMenu({
+        x: containerRect ? e.clientX - containerRect.left : e.clientX,
+        y: containerRect ? e.clientY - containerRect.top : e.clientY,
+        nodeId: tree.id,
+        isCanvas: true,
+      });
+    },
+    [isBlankCanvasTarget, containerRef, setContextMenu, tree],
   );
 
   // Fit to screen helper
@@ -504,6 +548,8 @@ export function useMindmapViewport({
     // window-listener release effect stays in the view (see header).
     isBlankCanvasTarget,
     handleCanvasMouseDown,
+    handleCanvasDoubleClick,
+    handleCanvasContextMenu,
     marquee,
     setMarquee,
     marqueeStartRef,
