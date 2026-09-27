@@ -1,41 +1,21 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 // The icons the style panel draws with went with it; what is left here is the
 // canvas, the toolbar and the inline editor.
-import type {
-  Heading,
-  ThemeMode,
-  MindmapNodeShape,
-  MindmapLineStyle,
-  MindmapTextAlign,
-} from "../core/types";
-import { oppositeSide, type MindmapSide } from "../core/mindmapSides";
+import type { Heading, ThemeMode } from "../core/types";
 import {
   buildMindmapTree,
   parseMarkdownToMindmapTree,
-  syncMindmapToDocument,
   addChildNode,
-  addSiblingNode,
-  deleteNode,
-  updateNodeText,
-  updateNodesStyle,
   findNode,
-  findParent,
-  findSibling,
-  reparentNode,
-  planDrop,
-  moveWithinSiblings,
-  copySubtree,
-  pasteSubtree,
   calculateNodeDimensions,
 } from "../services/mindmapService";
 import type { MindmapNode } from "../core/types";
-import { loadMindmapCollapsed, saveMindmapCollapsed } from "../services/storage";
 import { MindmapCanvasMenu } from "./MindmapCanvasMenu";
 import { MindmapNodeStyleMenu } from "./MindmapNodeStyleMenu";
 import { MindmapInlineEditor } from "./MindmapInlineEditor";
 import { MindmapToolbar } from "./MindmapToolbar";
 import { branchColorFor, freezeAppearance } from "../core/mindmapThemes";
-import { layoutMindmap, type MindmapLayoutNode } from "../services/mindmapLayout";
+import { type MindmapLayoutNode } from "../services/mindmapLayout";
 import {
   allTags,
   areRelated,
@@ -48,7 +28,6 @@ import {
   setNodeNote,
   setNodePriority,
   setNodeProgress,
-  setNodeSide,
   setNodeTags,
   tagsFor,
   floatingTopics,
@@ -67,6 +46,8 @@ import { useMindmapExport } from "./mindmap/useMindmapExport";
 import { useMindmapShortcuts } from "./mindmap/useMindmapShortcuts";
 import { useMindmapSidecar } from "./mindmap/useMindmapSidecar";
 import { useMindmapAnnotations, type MindmapContextMenu } from "./mindmap/useMindmapAnnotations";
+import { useMindmapTreeOps } from "./mindmap/useMindmapTreeOps";
+import { useMindmapViewport } from "./mindmap/useMindmapViewport";
 
 /**
  * A node's icon, drawn on its leading edge and outside its box.
@@ -205,28 +186,11 @@ export const MindmapView = memo(function MindmapView({
     [applySidecarEdit],
   );
 
-  /**
-   * Which side of the root a first-level branch hangs on, in the two-sided layout.
-   *
-   * Null hands it back to the layout's own rule — whichever side is shorter — which is what
-   * a branch nobody has placed does.
-   */
-  const handleSideChange = useCallback(
-    (nodeId: string, side: MindmapSide | null) =>
-      applySidecarEdit(["sides"], (current) => setNodeSide(current, nodeId, side)),
-    [applySidecarEdit],
-  );
-
-  /**
-   * The question asked when a branch is about to be created in the two-sided layout.
-   *
-   * Held in state rather than answered after the fact: the answer is what decides where the
-   * branch is drawn, and it is positioned where the branch's parent is on screen so that
-   * the question appears next to the thing it is about.
-   */
-  const [sideChooser, setSideChooser] = useState<{ parentId: string; x: number; y: number } | null>(
-    null,
-  );
+  // The side-of-root writer (`handleSideChange`) and the two-sided layout's
+  // "which side does this new branch go on" question (`sideChooser`) live in
+  // useMindmapTreeOps (batch 3, wave 2c): their only readers are the tree
+  // handlers that write both the tree and the companion file, which moved there
+  // with them.
 
   /**
    * Follows a link to a heading in this document.
@@ -324,7 +288,6 @@ export const MindmapView = memo(function MindmapView({
   const svgRef = useRef<SVGSVGElement | null>(null);
   const editInputRef = useRef<HTMLTextAreaElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
-  const lastEmittedSourceRef = useRef<string>("");
 
   // Initialize tree from source or headings
   const initialTree = useMemo(() => {
@@ -345,6 +308,15 @@ export const MindmapView = memo(function MindmapView({
   const [tree, setTree] = useState<MindmapNode>(initialTree);
   const [hasUnsyncedChanges, setHasUnsyncedChanges] = useState(false);
 
+  // Pan & Zoom transform state.
+  //
+  // Held by the view rather than by useMindmapViewport, deliberately: the tree
+  // ops hook runs before the viewport hook (the pan handlers need its callbacks
+  // and its layout) and its `handleAddChild` positions the two-sided layout's
+  // side question with the transform, so the state has to exist above both.
+  // Threading it in is the only acyclic order.
+  const [transform, setTransform] = useState({ x: 60, y: 80, scale: 1 });
+
   // Per-document look & feel: the theme, layout and numbering the reader picks,
   // remembered under the document's key, plus the responsive breakpoints the
   // container class and the toolbar listen to. Extracted to useMindmapAppearance
@@ -364,14 +336,10 @@ export const MindmapView = memo(function MindmapView({
     isUltraNarrow,
   } = useMindmapAppearance({ documentKey, themeId, containerRef, tree });
 
-  // Keep tree in sync if external document structure changes, while protecting active unsynced mindmap edits
-  useEffect(() => {
-    if (source && source.trim() && source !== lastEmittedSourceRef.current) {
-      if (!hasUnsyncedChanges) {
-        setTree(parseMarkdownToMindmapTree(source, title));
-      }
-    }
-  }, [source, title, hasUnsyncedChanges]);
+  // The source-sync effect (external document changes re-parse into the tree
+  // unless this map has unsynced edits) and the fold persistence moved to
+  // useMindmapTreeOps (batch 3, wave 2c), which owns that domain; they keep
+  // their relative order there.
 
   // Selected node(s), inline editing, and context menu states
   const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set([tree.id]));
@@ -395,13 +363,6 @@ export const MindmapView = memo(function MindmapView({
    */
   const [contextMenu, setContextMenu] = useState<MindmapContextMenu | null>(null);
 
-  /** Marquee selection, in canvas coordinates, while dragging on empty space. */
-  const [marquee, setMarquee] = useState<{
-    x1: number;
-    y1: number;
-    x2: number;
-    y2: number;
-  } | null>(null);
   const [menuPos, setMenuPos] = useState<{ left: number; top: number }>({ left: 0, top: 0 });
 
   // Safe boundary calculation for context menu to prevent bottom/right clipping
@@ -441,78 +402,101 @@ export const MindmapView = memo(function MindmapView({
     return arr[arr.length - 1];
   }, [selectedNodeIds]);
 
-  // Undo / Redo history stacks (retained for keyboard shortcuts Ctrl+Z / Ctrl+Y)
-  const undoStackRef = useRef<MindmapNode[]>([]);
-  const redoStackRef = useRef<MindmapNode[]>([]);
-
-  // Pan & Zoom transform state
-  const [transform, setTransform] = useState({ x: 60, y: 80, scale: 1 });
-  const [isDragging, setIsDragging] = useState(false);
-  const dragStartRef = useRef({ x: 0, y: 0, startTransformX: 0, startTransformY: 0 });
-
-  // Node collapse state
-  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
-
-  /**
-   * The document whose folds are currently in `collapsedIds`.
-   *
-   * Guards the save below. Without it, opening a second document would write
-   * the first document's folds under the second one's key: the save effect runs
-   * once with the previous set still in state, before the restore has landed.
-   */
-  const collapsedKeyRef = useRef<string | undefined>(undefined);
-
-  // Restore this document's folds when the document changes.
-  useEffect(() => {
-    if (!documentKey) {
-      collapsedKeyRef.current = undefined;
-      return;
-    }
-
-    // Ids for nodes that no longer exist are dropped. The document may have
-    // been edited since the folds were saved, and a stale id would otherwise
-    // sit in storage forever without ever being read back.
-    const present = new Set<string>();
-    const collect = (node: MindmapNode) => {
-      present.add(node.id);
-      for (const child of node.children ?? []) collect(child);
-    };
-    collect(tree);
-
-    const restored = loadMindmapCollapsed(documentKey).filter((id) => present.has(id));
-    collapsedKeyRef.current = documentKey;
-    setCollapsedIds(new Set(restored));
-    // Deliberately keyed on documentKey alone: re-running when the tree changes
-    // would re-apply the stored folds over ones the reader has just made.
-  }, [documentKey]);
-
-  // Save folds as they change. Folding is a discrete click rather than a
-  // per-frame drag, so unlike the pane widths there is nothing to gain by
-  // deferring the write.
-  useEffect(() => {
-    if (!documentKey || collapsedKeyRef.current !== documentKey) return;
-    saveMindmapCollapsed(documentKey, [...collapsedIds]);
-  }, [collapsedIds, documentKey]);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
 
-  // Node manual resizing state
-  const [resizingNode, setResizingNode] = useState<{
-    nodeId: string;
-    startX: number;
-    startY: number;
-    startWidth: number;
-    startHeight: number;
-  } | null>(null);
-
-  // Compute 2D layout coordinates
-  //
   // The sides are read from the companion file rather than from the tree: which side a
   // first-level branch hangs on is not something a document can say, and only the
   // two-sided layout has an opinion about it — the others ignore the map entirely.
   const statedSides = sidecar?.sides;
-  const layout = useMemo(() => {
-    return layoutMindmap(tree, collapsedIds, activeLayoutId, statedSides ?? {});
-  }, [tree, collapsedIds, activeLayoutId, statedSides]);
+
+  // The tree domain — Markdown synchronisation, undo/redo, the clipboard, the
+  // CRUD/navigation/style handlers, the collapse state and the derived layout —
+  // extracted to useMindmapTreeOps (batch 3, wave 2c). Called after
+  // useMindmapAppearance, whose `activeLayoutId` the layout needs, and before
+  // useMindmapViewport, whose pan handlers need the callbacks and the layout
+  // returned here. `tree`/`hasUnsyncedChanges` stay above on purpose: the
+  // appearance hook derives the outline numbering from the tree and has to run
+  // before this call, so the state cannot live below it.
+  const {
+    layout,
+    collapsedIds,
+    handleToggleCollapse,
+    handleExpandAll,
+    handleCollapseToLevel2,
+    sideChooser,
+    setSideChooser,
+    handleAddChild,
+    handleAddSibling,
+    handleMoveToSide,
+    applyTreeChange,
+    handleUndo,
+    handleRedo,
+    handleSyncToDocument,
+    handleMoveSibling,
+    clipboardRef,
+    clipboardReady,
+    handleCopyNode,
+    handleCutNode,
+    handlePasteNode,
+    startEditing,
+    startEditingRef,
+    handleCommitEdit,
+    handleCancelEdit,
+    handleUpdateStyle,
+    handleNavigate,
+    handleDeleteNode,
+  } = useMindmapTreeOps({
+    documentKey,
+    source,
+    title,
+    onSourceChange,
+    editable,
+    applySidecarEdit,
+    tree,
+    setTree,
+    hasUnsyncedChanges,
+    setHasUnsyncedChanges,
+    activeLayoutId,
+    statedSides,
+    transform,
+    containerRef,
+    selectedNodeIds,
+    setSelectedNodeIds,
+    primarySelectedId,
+    editingNodeId,
+    setEditingNodeId,
+    editingText,
+    setEditingText,
+    setContextMenu,
+    editInputRef,
+  });
+
+  // In-canvas search: the field's state, the match set, walking between the
+  // matches, and select-all — which shares the "point at topics the reader
+  // named" gesture. Extracted to useMindmapSearch (batch 3, wave 2a); the
+  // viewport, selection and container stay with the view and thread in here.
+  // Called directly after the tree ops hook now, because it needs the layout
+  // that hook returns; it registers no effects, so the move changes nothing.
+  const {
+    isSearchOpen,
+    setIsSearchOpen,
+    searchQuery,
+    searchMatchIds,
+    currentSearchIndex,
+    searchInputRef,
+    handleSearch,
+    handleNextSearch,
+    handlePrevSearch,
+    handleCloseSearch,
+    handleSelectAll,
+  } = useMindmapSearch({
+    tree,
+    sidecar,
+    layout,
+    containerRef,
+    setTransform,
+    setSelectedNodeIds,
+  });
 
   /**
    * The floating topics, measured the same way the layout measures nodes.
@@ -578,115 +562,59 @@ export const MindmapView = memo(function MindmapView({
   /** The stored relations, or nothing while the file is still being read. */
   const relations = sidecar?.relations ?? [];
 
-  /**
-   * Fits the whole map onto the printed page.
-   *
-   * On screen this is an infinite canvas, and what is visible is decided by the
-   * reader's pan and zoom; a printed page has no reader, so the map has to be
-   * fitted to the paper instead. The print stylesheet drops the pan and zoom
-   * transform, but it cannot supply a view box, because that depends on where
-   * the layout put everything — which is why this half is code and runs on the
-   * print event the browser (and Electron's printToPDF) fires around printing.
-   *
-   * Whatever was there before is put back afterwards, including nothing: the
-   * canvas normally has no view box at all, and leaving one behind would change
-   * how the map is drawn until the next reload.
-   */
-  useEffect(() => {
-    const svg = svgRef.current;
-    if (!svg) return;
-
-    let restore: string | null = null;
-
-    const handleBeforePrint = () => {
-      restore = svg.getAttribute("viewBox");
-      const { minX, minY, width, height } = frameBounds;
-      svg.setAttribute("viewBox", `${minX} ${minY} ${width} ${height}`);
-    };
-
-    const handleAfterPrint = () => {
-      if (restore === null) svg.removeAttribute("viewBox");
-      else svg.setAttribute("viewBox", restore);
-      restore = null;
-    };
-
-    window.addEventListener("beforeprint", handleBeforePrint);
-    window.addEventListener("afterprint", handleAfterPrint);
-    return () => {
-      window.removeEventListener("beforeprint", handleBeforePrint);
-      window.removeEventListener("afterprint", handleAfterPrint);
-      handleAfterPrint();
-    };
-  }, [frameBounds]);
-
-  // Drag-and-drop reparenting state
-  const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
-  const [dragGhostPos, setDragGhostPos] = useState<{ x: number; y: number } | null>(null);
-  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
-  /**
-   * Where the dragged node would land relative to the node under the pointer.
-   *
-   * "before" and "after" slot it between that node's siblings; "child" makes it
-   * a child, which is what dropping on the middle of a node has always meant.
-   *
-   * Before this, a drop could only ever append: reparentNode has taken a
-   * targetIndex since it was written, and nothing ever passed one.
-   */
-  const [dropPosition, setDropPosition] = useState<"before" | "after" | "child">("child");
-  const nodeDragStartRef = useRef<{
-    nodeId: string;
-    startX: number;
-    startY: number;
-    hasMoved: boolean;
-  } | null>(null);
-
-  // In-canvas search: the field's state, the match set, walking between the
-  // matches, and select-all — which shares the "point at topics the reader
-  // named" gesture. Extracted to useMindmapSearch (batch 3, wave 2a); the
-  // viewport, selection and container stay with the view and thread in here.
+  // The camera and the container-level gestures — the pan & zoom handlers, the
+  // wheel zoom, "fit to screen", the marquee press, the print view-box swap,
+  // and the container mouse trio (which multiplexes the node-resize stream and
+  // the node drag-and-drop hit-testing alongside the pan) — extracted to
+  // useMindmapViewport (batch 3, wave 2c). The trio cannot be split without
+  // composing handlers in the view and changing the order its branches run in,
+  // so the whole of it lives there and the drag/resize states moved with the
+  // gesture that drives them; the view reads them back for the ghost badge and
+  // the drop indicators. The transform itself stays above, threaded into both
+  // this hook and the tree ops hook (see the note on the state).
   const {
-    isSearchOpen,
-    setIsSearchOpen,
-    searchQuery,
-    searchMatchIds,
-    currentSearchIndex,
-    searchInputRef,
-    handleSearch,
-    handleNextSearch,
-    handlePrevSearch,
-    handleCloseSearch,
-    handleSelectAll,
-  } = useMindmapSearch({
-    tree,
-    sidecar,
-    layout,
+    isDragging,
+    handleMouseDown,
+    handleMouseMove,
+    handleMouseUp,
+    handleWheel,
+    handleZoomStep,
+    handleFitToScreen,
+    isBlankCanvasTarget,
+    handleCanvasMouseDown,
+    marquee,
+    setMarquee,
+    marqueeStartRef,
+    marqueeRectRef,
+    setResizingNode,
+    draggingNodeId,
+    dragGhostPos,
+    dropTargetId,
+    dropPosition,
+    nodeDragStartRef,
+  } = useMindmapViewport({
     containerRef,
+    svgRef,
+    transform,
     setTransform,
+    layout,
+    frameBounds,
+    tree,
+    applyTreeChange,
+    handleUpdateStyle,
+    handleCommitEdit,
+    editingNodeId,
+    contextMenu,
+    setContextMenu,
+    sideChooser,
+    setSideChooser,
     setSelectedNodeIds,
   });
 
-  // Fit to screen helper
-  const handleFitToScreen = useCallback(() => {
-    const container = containerRef.current;
-    if (!container || !layout) return;
-
-    const cWidth = container.clientWidth;
-    const cHeight = container.clientHeight;
-    const { width: lWidth, height: lHeight, minX, minY } = frameBounds;
-
-    if (lWidth === 0 || lHeight === 0) return;
-
-    const scaleX = (cWidth - 140) / lWidth;
-    const scaleY = (cHeight - 140) / lHeight;
-    const newScale = Math.max(0.4, Math.min(1.15, Math.min(scaleX, scaleY)));
-
-    const newX = (cWidth - lWidth * newScale) / 2 - minX * newScale;
-    const newY = (cHeight - lHeight * newScale) / 2 - minY * newScale;
-
-    setTransform({ x: Math.round(newX), y: Math.round(newY), scale: Number(newScale.toFixed(2)) });
-  }, [layout]);
-
-  // Initial fit on mount
+  // Initial fit on mount. Still in the view on purpose: in a new file
+  // exhaustive-deps is an error, and adding `handleFitToScreen` would re-run
+  // this effect on every layout change — re-fitting the canvas after each
+  // edit instead of once on mount, which is the behaviour this timing guards.
   useEffect(() => {
     const timer = setTimeout(() => {
       handleFitToScreen();
@@ -694,158 +622,11 @@ export const MindmapView = memo(function MindmapView({
     return () => clearTimeout(timer);
   }, []);
 
-  // Tree mutation & Non-destructive Markdown synchronization
-  const applyTreeChange = useCallback(
-    (nextTree: MindmapNode) => {
-      undoStackRef.current.push(tree);
-      redoStackRef.current = [];
-      setTree(nextTree);
-      setHasUnsyncedChanges(true);
-    },
-    [tree],
-  );
-
-  /**
-   * Reorders the selected node among its siblings; Alt+↑ and Alt+↓.
-   *
-   * Only the first selected node moves, and never the root — it has no siblings
-   * to move among. A move that would run off either end returns the same tree
-   * and is skipped, so it does not push an undo entry that undoes nothing.
-   */
-  const handleMoveSibling = useCallback(
-    (delta: number) => {
-      const nodeId = [...selectedNodeIds][0];
-      if (!nodeId || nodeId === tree.id) return;
-
-      const nextTree = moveWithinSiblings(tree, nodeId, delta);
-      if (nextTree === tree) return;
-      applyTreeChange(nextTree);
-    },
-    [applyTreeChange, selectedNodeIds, tree],
-  );
-
-  /**
-   * Steps the zoom, keeping the centre of the viewport fixed.
-   *
-   * The wheel handler anchors on the cursor; from a keyboard there is no cursor
-   * to anchor to, so the middle of the canvas is the equivalent choice.
-   */
-  const handleZoomStep = useCallback((factor: number) => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const rect = container.getBoundingClientRect();
-    const centreX = rect.width / 2;
-    const centreY = rect.height / 2;
-
-    setTransform((prev) => {
-      const nextScale = Math.max(0.25, Math.min(2.5, Number((prev.scale * factor).toFixed(3))));
-      const scaleRatio = nextScale / prev.scale;
-      return {
-        ...prev,
-        scale: nextScale,
-        x: centreX - (centreX - prev.x) * scaleRatio,
-        y: centreY - (centreY - prev.y) * scaleRatio,
-      };
-    });
-  }, []);
-
-  /**
-   * The copied branch.
-   *
-   * A ref rather than state, deliberately: nothing renders from it, and the
-   * paste shortcut reads it at the moment it runs — putting it in state would
-   * re-render the whole canvas on every copy for no visible change. It is not
-   * the system clipboard either; what is copied is a tree, not text.
-   */
-  const clipboardRef = useRef<MindmapNode | null>(null);
-
-  /**
-   * Whether anything has been copied, in a form React can render from.
-   *
-   * The tree itself stays in the ref — nothing draws it — but the node menu shows
-   * "粘贴为子主题" greyed out until there is something to paste, and a ref cannot tell it
-   * when that changes: copying from the menu left the row disabled until some unrelated
-   * interaction re-rendered the panel, which reads as the copy having failed.
-   */
-  const [clipboardReady, setClipboardReady] = useState(false);
-
-  const handleCopyNode = useCallback(
-    (explicitNodeId?: string) => {
-      const nodeId = explicitNodeId ?? [...selectedNodeIds][0];
-      if (!nodeId) return;
-      const copied = copySubtree(tree, nodeId);
-      if (copied) {
-        clipboardRef.current = copied;
-        setClipboardReady(true);
-      }
-    },
-    [selectedNodeIds, tree],
-  );
-
-  const handleCutNode = useCallback(
-    (explicitNodeId?: string) => {
-      const nodeId = explicitNodeId ?? [...selectedNodeIds][0];
-      // The root is refused: cutting it would leave no tree to paste into.
-      if (!nodeId || nodeId === tree.id) return;
-
-      const copied = copySubtree(tree, nodeId);
-      if (!copied) return;
-      clipboardRef.current = copied;
-      setClipboardReady(true);
-
-      // deleteNode returns the tree *and* what to select afterwards, so a cut
-      // leaves a sensible selection rather than nothing selected.
-      const { nextTree, fallbackSelectedId } = deleteNode(tree, nodeId);
-      applyTreeChange(nextTree);
-      setSelectedNodeIds(new Set([fallbackSelectedId]));
-    },
-    [applyTreeChange, selectedNodeIds, tree],
-  );
-
-  const handlePasteNode = useCallback(
-    (explicitParentId?: string) => {
-      const copied = clipboardRef.current;
-      if (!copied) return;
-
-      // Pasted under the selection, so a paste into empty space lands on the root
-      // rather than doing nothing. The node menu passes the topic it was opened on, so
-      // its row can name where the branch will land instead of leaving it to the selection.
-      const result = pasteSubtree(tree, explicitParentId ?? [...selectedNodeIds][0], copied);
-      if (!result) return;
-
-      applyTreeChange(result.nextTree);
-      setSelectedNodeIds(new Set([result.newNodeId]));
-    },
-    [applyTreeChange, selectedNodeIds, tree],
-  );
-
-  /**
-   * Whether an event landed on bare canvas.
-   *
-   * The svg receives everything, including events from the nodes inside it, so
-   * every canvas-level gesture has to ask this first. Without it a double-click
-   * on a node would both edit that node and create a new one.
-   */
-  const isBlankCanvasTarget = useCallback((target: EventTarget | null): boolean => {
-    const element = target as HTMLElement | SVGElement | null;
-    if (!element || typeof element.closest !== "function") return true;
-    return !(
-      element.closest(".mindmap-node-interactive") ||
-      element.closest(".mindmap-toolbar") ||
-      element.closest(".mindmap-inline-edit-input") ||
-      element.closest(".mindmap-context-menu")
-    );
-  }, []);
-
-  /**
-   * Reaches startEditing, which is declared further down.
-   *
-   * A ref rather than a direct call because the two are in the other order, and
-   * moving either would drag a sixty-line block with it. The same indirection
-   * App uses for selectChapter. Assigned in an effect once startEditing exists.
-   */
-  const startEditingRef = useRef<(nodeId?: string) => void>(() => {});
+  // applyTreeChange, handleMoveSibling, handleZoomStep, the clipboard and its
+  // copy/cut/paste, `isBlankCanvasTarget` and `startEditingRef` moved to
+  // useMindmapTreeOps and useMindmapViewport (batch 3, wave 2c); they arrive
+  // back from those calls above. `isBlankCanvasTarget` is a pure predicate, so
+  // the canvas-level gestures below keep asking it first, exactly as before.
 
   /** Double-clicking empty canvas adds a branch under the root, ready to name. */
   const handleCanvasDoubleClick = useCallback(
@@ -885,27 +666,15 @@ export const MindmapView = memo(function MindmapView({
     [isBlankCanvasTarget],
   );
 
-  /** Marquee selection: press on empty canvas, drag a box, release to select. */
-  const marqueeStartRef = useRef<{ x: number; y: number } | null>(null);
-  const marqueeRectRef = useRef<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+  // The marquee's state, refs and press handler moved to useMindmapViewport
+  // (batch 3, wave 2c) and come back from that call. The release effect below
+  // stays here on purpose: it puts the picked relation down via
+  // `setSelectedRelation`, which useMindmapAnnotations returns further down —
+  // the same late-bound closure the wave 2b extraction documented — and a hook
+  // called before that one cannot receive the setter without changing when
+  // these window listeners attach relative to the floating-drag listener,
+  // which must stay the last one registered.
   const isMarqueeSelecting = marquee !== null;
-
-  const handleCanvasMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      // Left button only, and only on bare canvas: the pan drag starts on the
-      // same surface, so anything looser would fight it.
-      if (e.button !== 0 || !isBlankCanvasTarget(e.target)) return;
-      const containerRect = containerRef.current?.getBoundingClientRect();
-      if (!containerRect) return;
-
-      const x = (e.clientX - containerRect.left - transform.x) / transform.scale;
-      const y = (e.clientY - containerRect.top - transform.y) / transform.scale;
-      marqueeStartRef.current = { x, y };
-      marqueeRectRef.current = { x1: x, y1: y, x2: x, y2: y };
-      setMarquee(marqueeRectRef.current);
-    },
-    [isBlankCanvasTarget, transform.scale, transform.x, transform.y],
-  );
 
   useEffect(() => {
     if (!isMarqueeSelecting) return;
@@ -960,228 +729,12 @@ export const MindmapView = memo(function MindmapView({
     };
   }, [isMarqueeSelecting, layout, transform.scale, transform.x, transform.y]);
 
-  const handleUndo = useCallback(() => {
-    if (undoStackRef.current.length === 0) return;
-    const prev = undoStackRef.current.pop()!;
-    redoStackRef.current.push(tree);
-    setTree(prev);
-    setHasUnsyncedChanges(true);
-  }, [tree]);
-
-  const handleRedo = useCallback(() => {
-    if (redoStackRef.current.length === 0) return;
-    const next = redoStackRef.current.pop()!;
-    undoStackRef.current.push(tree);
-    setTree(next);
-    setHasUnsyncedChanges(true);
-  }, [tree]);
-
-  const handleSyncToDocument = useCallback(() => {
-    if (!onSourceChange) return;
-    const currentDoc = source || "";
-    const syncedMarkdown = syncMindmapToDocument(currentDoc, tree);
-    lastEmittedSourceRef.current = syncedMarkdown;
-    onSourceChange(syncedMarkdown);
-    setHasUnsyncedChanges(false);
-  }, [source, tree, onSourceChange]);
-
-  // Interactive Topic Actions
-  /**
-   * Moves a first-level branch to the other side of the root.
-   *
-   * "The other side" is read off the layout rather than off the companion file, because a
-   * branch nobody has placed still has a side — the layout chose one — and the branch that
-   * moves has to be the one the reader is looking at. Only the two horizontal values are
-   * meaningful here; this row is offered by the two-sided layout alone.
-   */
-  const handleMoveToSide = useCallback(
-    (nodeId: string) => {
-      const node = layout.nodes.find((entry) => entry.id === nodeId);
-      if (!node) return;
-      handleSideChange(nodeId, oppositeSide(node.side === "left" ? "left" : "right"));
-    },
-    [layout, handleSideChange],
-  );
-
-  const handleAddChild = useCallback(
-    (parentId?: string, side?: MindmapSide) => {
-      if (!editable) return;
-      const targetId = parentId || primarySelectedId || tree.id;
-
-      // In the two-sided layout a child of the root becomes a first-level branch, and which
-      // side it hangs on is the reader's to say — the layout balances branches by height,
-      // and 「先做的一半放左边」 has nowhere to be said in that rule. Asking first is also the
-      // honest order: a branch that appears on one side and then jumps to the other is worse
-      // than one that waits a moment to be told.
-      if (side === undefined && activeLayoutId === "bidirectional" && targetId === tree.id) {
-        const root = layout.nodes.find((entry) => entry.id === targetId);
-        const rect = containerRef.current?.getBoundingClientRect();
-        // Just under the branch it is about, and kept inside the canvas: the question is
-        // answered by looking at the map, so it belongs next to the thing it asks about and
-        // must never land off the edge of the view.
-        const rawX = root ? transform.x + (root.x + root.width / 2) * transform.scale : 40;
-        const rawY = root ? transform.y + (root.y + root.height) * transform.scale + 8 : 40;
-        setSideChooser({
-          parentId: targetId,
-          x: Math.max(8, Math.min(rawX, (rect?.width ?? 360) - 190)),
-          y: Math.max(8, Math.min(rawY, (rect?.height ?? 260) - 110)),
-        });
-        return;
-      }
-
-      // Uncollapse if collapsed
-      if (collapsedIds.has(targetId)) {
-        setCollapsedIds((prev) => {
-          const next = new Set(prev);
-          next.delete(targetId);
-          return next;
-        });
-      }
-      const { nextTree, newNodeId } = addChildNode(tree, targetId, "新建子主题");
-      applyTreeChange(nextTree);
-      // Recorded before the render that draws it: the layout reads the sides out of the
-      // companion file, so a branch whose side arrived afterwards would be drawn on the
-      // balanced side and then move.
-      if (side) handleSideChange(newNodeId, side);
-      setSelectedNodeIds(new Set([newNodeId]));
-      setEditingNodeId(newNodeId);
-      setEditingText("新建子主题");
-      setContextMenu(null);
-      setSideChooser(null);
-    },
-    [
-      editable,
-      primarySelectedId,
-      tree,
-      collapsedIds,
-      applyTreeChange,
-      activeLayoutId,
-      layout,
-      transform,
-      handleSideChange,
-    ],
-  );
-
-  const handleAddSibling = useCallback(
-    (targetId?: string) => {
-      if (!editable) return;
-      const id = targetId || primarySelectedId || tree.id;
-      const { nextTree, newNodeId } = addSiblingNode(tree, id, "新建同级主题");
-      applyTreeChange(nextTree);
-      setSelectedNodeIds(new Set([newNodeId]));
-      setEditingNodeId(newNodeId);
-      setEditingText("新建同级主题");
-      setContextMenu(null);
-    },
-    [editable, primarySelectedId, tree, applyTreeChange],
-  );
-
-  const handleDeleteNode = useCallback(
-    (nodeId?: string) => {
-      if (!editable) return;
-      const targetIds = nodeId ? [nodeId] : Array.from(selectedNodeIds);
-      if (targetIds.length === 0) return;
-
-      let currTree = tree;
-      let lastFallback: string | null = tree.id;
-
-      for (const id of targetIds) {
-        if (id === tree.id || id === "root-mindmap-node") continue;
-        const { nextTree, fallbackSelectedId } = deleteNode(currTree, id);
-        currTree = nextTree;
-        lastFallback = fallbackSelectedId;
-      }
-
-      applyTreeChange(currTree);
-      setSelectedNodeIds(lastFallback ? new Set([lastFallback]) : new Set());
-      setEditingNodeId(null);
-      setContextMenu(null);
-    },
-    [editable, selectedNodeIds, tree, applyTreeChange],
-  );
-
-  const startEditing = useCallback(
-    (nodeId?: string) => {
-      if (!editable) return;
-      const id = nodeId || primarySelectedId || tree.id;
-      const node = findNode(tree, id);
-      if (node) {
-        setSelectedNodeIds(new Set([id]));
-        setEditingNodeId(id);
-        setEditingText(node.text);
-        setContextMenu(null);
-      }
-    },
-    [editable, primarySelectedId, tree],
-  );
-
-  // Keeps the indirection above pointing at the current startEditing. Assigning
-  // during render is safe here because nothing reads it until the next
-  // interaction, which is always after this line has run.
-  startEditingRef.current = startEditing;
-
-  const handleCommitEdit = useCallback(() => {
-    if (!editingNodeId) return;
-    if (editingText.trim()) {
-      const nextTree = updateNodeText(tree, editingNodeId, editingText.trim());
-      applyTreeChange(nextTree);
-    }
-    setEditingNodeId(null);
-  }, [editingNodeId, editingText, tree, applyTreeChange]);
-
-  const handleCancelEdit = useCallback(() => {
-    setEditingNodeId(null);
-  }, []);
-
-  // Update Appearance & Typography Styles (Batch-updates all selected nodes if multiple nodes are selected!)
-  const handleUpdateStyle = useCallback(
-    (
-      nodeId: string,
-      styles: {
-        color?: string;
-        shape?: MindmapNodeShape;
-        lineColor?: string;
-        lineStyle?: MindmapLineStyle;
-        fontSize?: number;
-        fontWeight?: "normal" | "bold";
-        textColor?: string;
-        borderColor?: string;
-        textAlign?: MindmapTextAlign;
-        customWidth?: number;
-        customHeight?: number;
-      },
-    ) => {
-      // If multiple nodes are selected, apply to ALL selected nodes at once!
-      const targetIds = selectedNodeIds.size > 1 ? Array.from(selectedNodeIds) : [nodeId];
-
-      const nextTree = updateNodesStyle(tree, targetIds, styles);
-      applyTreeChange(nextTree);
-    },
-    [tree, selectedNodeIds, applyTreeChange],
-  );
-
-  // Keyboard navigation
-  const handleNavigate = useCallback(
-    (direction: "up" | "down" | "left" | "right") => {
-      const currId = primarySelectedId || tree.id;
-      if (direction === "left") {
-        const parent = findParent(tree, currId);
-        if (parent) setSelectedNodeIds(new Set([parent.id]));
-      } else if (direction === "right") {
-        const curr = findNode(tree, currId);
-        if (curr?.children && curr.children.length > 0) {
-          setSelectedNodeIds(new Set([curr.children[0].id]));
-        }
-      } else if (direction === "up") {
-        const prev = findSibling(tree, currId, -1);
-        if (prev) setSelectedNodeIds(new Set([prev.id]));
-      } else if (direction === "down") {
-        const next = findSibling(tree, currId, 1);
-        if (next) setSelectedNodeIds(new Set([next.id]));
-      }
-    },
-    [primarySelectedId, tree],
-  );
+  // handleUndo/handleRedo/handleSyncToDocument and the interactive topic
+  // actions — add child (with the two-sided layout's side question), add
+  // sibling, delete, rename, style, keyboard navigation, and the move-to-other-
+  // side row — moved to useMindmapTreeOps (batch 3, wave 2c); they arrive back
+  // from that call above, and useMindmapShortcuts below composes them exactly
+  // as it always did.
 
   // Global Mindmap Keydown shortcuts. The handler body — guards, order,
   // preventDefaults — lives verbatim in useMindmapShortcuts (batch 3, wave 2a);
@@ -1218,242 +771,11 @@ export const MindmapView = memo(function MindmapView({
     onClose,
   });
 
-  // Focus and select input on entering edit mode
-  useEffect(() => {
-    if (editingNodeId && editInputRef.current) {
-      editInputRef.current.focus();
-      editInputRef.current.select();
-    }
-  }, [editingNodeId]);
-
-  // Pan interaction handlers & blank canvas click deselect
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      if (e.button !== 0) return;
-      const target = e.target as HTMLElement | SVGElement;
-      if (
-        target.closest(".mindmap-node-interactive") ||
-        target.closest(".mindmap-inline-edit-input") ||
-        target.closest(".mindmap-context-menu")
-      ) {
-        return;
-      }
-      // A click on the control bar: the menus close, and nothing else happens.
-      //
-      // The bar used to sit in the list above, which made a click on it not a click
-      // anywhere — a panel stayed open over a map the reader had started using again, and
-      // the only way to be rid of it was to click the canvas, which threw the selection
-      // away too. Dismissing on the way in is what every other surface here already does.
-      if (target.closest(".mindmap-toolbar")) {
-        if (contextMenu) setContextMenu(null);
-        if (sideChooser) setSideChooser(null);
-        return;
-      }
-      // Clicking blank canvas background commits edit, closes menu, and cancels selection!
-      if (editingNodeId) {
-        handleCommitEdit();
-      }
-      if (contextMenu) {
-        setContextMenu(null);
-      }
-      setSelectedNodeIds(new Set());
-
-      setIsDragging(true);
-      dragStartRef.current = {
-        x: e.clientX,
-        y: e.clientY,
-        startTransformX: transform.x,
-        startTransformY: transform.y,
-      };
-    },
-    [transform.x, transform.y, editingNodeId, contextMenu, sideChooser, handleCommitEdit],
-  );
-
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent) => {
-      if (resizingNode) {
-        const dx = (e.clientX - resizingNode.startX) / transform.scale;
-        const dy = (e.clientY - resizingNode.startY) / transform.scale;
-        const newWidth = Math.max(60, Math.round(resizingNode.startWidth + dx));
-        const newHeight = Math.max(30, Math.round(resizingNode.startHeight + dy));
-        handleUpdateStyle(resizingNode.nodeId, {
-          customWidth: newWidth,
-          customHeight: newHeight,
-        });
-        return;
-      }
-
-      if (nodeDragStartRef.current) {
-        const dx = e.clientX - nodeDragStartRef.current.startX;
-        const dy = e.clientY - nodeDragStartRef.current.startY;
-        if (!nodeDragStartRef.current.hasMoved && Math.hypot(dx, dy) > 8) {
-          nodeDragStartRef.current.hasMoved = true;
-          setDraggingNodeId(nodeDragStartRef.current.nodeId);
-        }
-        if (nodeDragStartRef.current.hasMoved) {
-          setDragGhostPos({ x: e.clientX, y: e.clientY });
-
-          const containerRect = containerRef.current?.getBoundingClientRect();
-          if (containerRect && layout) {
-            const canvasX = (e.clientX - containerRect.left - transform.x) / transform.scale;
-            const canvasY = (e.clientY - containerRect.top - transform.y) / transform.scale;
-
-            let targetFound: string | null = null;
-            let position: "before" | "after" | "child" = "child";
-            for (const node of layout.nodes) {
-              if (node.id === nodeDragStartRef.current.nodeId) continue;
-              if (
-                canvasX >= node.x - 25 &&
-                canvasX <= node.x + node.width + 25 &&
-                canvasY >= node.y - 25 &&
-                canvasY <= node.y + node.height + 25
-              ) {
-                targetFound = node.id;
-                // The upper and lower fifths reorder among siblings; the middle
-                // makes the node a child. The root is exempt from the bands —
-                // it has no siblings to slot between.
-                if (node.id !== tree.id) {
-                  const topBand = node.y + node.height * 0.2;
-                  const bottomBand = node.y + node.height * 0.8;
-                  if (canvasY < topBand) position = "before";
-                  else if (canvasY > bottomBand) position = "after";
-                }
-                break;
-              }
-            }
-            setDropTargetId(targetFound);
-            setDropPosition(position);
-          }
-          return;
-        }
-      }
-
-      if (!isDragging) return;
-      const dx = e.clientX - dragStartRef.current.x;
-      const dy = e.clientY - dragStartRef.current.y;
-      setTransform((prev) => ({
-        ...prev,
-        x: Math.round(dragStartRef.current.startTransformX + dx),
-        y: Math.round(dragStartRef.current.startTransformY + dy),
-      }));
-    },
-    // tree.id is here because the drop bands are skipped for the root node.
-    [
-      isDragging,
-      resizingNode,
-      transform.scale,
-      transform.x,
-      transform.y,
-      layout,
-      tree.id,
-      handleUpdateStyle,
-    ],
-  );
-
-  const handleMouseUp = useCallback(() => {
-    if (resizingNode) {
-      setResizingNode(null);
-    }
-    if (nodeDragStartRef.current) {
-      if (nodeDragStartRef.current.hasMoved && draggingNodeId && dropTargetId) {
-        // A before/after drop on the root or on one's own descendant is
-        // meaningless, so planDrop returns null and the move is dropped rather
-        // than silently becoming something else.
-        const plan = planDrop(tree, draggingNodeId, dropTargetId, dropPosition);
-        if (plan) {
-          const nextTree = reparentNode(tree, draggingNodeId, plan.parentId, plan.index);
-          if (nextTree !== tree) applyTreeChange(nextTree);
-        }
-      }
-      nodeDragStartRef.current = null;
-      setDraggingNodeId(null);
-      setDropTargetId(null);
-      setDropPosition("child");
-      setDragGhostPos(null);
-    }
-    setIsDragging(false);
-  }, [applyTreeChange, draggingNodeId, dropTargetId, dropPosition, resizingNode, tree]);
-
-  // Wheel zoom handler
-  const handleWheel = useCallback(
-    (e: React.WheelEvent) => {
-      // A wheel that lands on an open menu belongs to the menu. The menus are tall — that is
-      // why they scroll (`overflow-y: auto`, with `overscroll-behavior: contain` so they do
-      // not drag the page with them) — but a wheel event still bubbles up to this container,
-      // so scrolling a long menu also zoomed the map: the reader was trying to see the rest
-      // of the menu and the map grew and shrank underneath it.
-      //
-      // Nothing here moves the map while a menu is up. A wheel outside one dismisses it, the
-      // way a click outside does, and is spent doing that rather than zooming — one gesture,
-      // one effect.
-      const target = e.target as Element | null;
-      if (target?.closest?.(".mindmap-context-menu")) return;
-      // The control bar is chrome, not canvas: a wheel over it is someone trying to get
-      // through the bar, and it used to zoom the map underneath instead. Nothing happens
-      // now — which is also the second half of the fix that lets the bar wrap: the
-      // right-hand controls are on screen rather than somewhere a wheel cannot reach.
-      if (target?.closest?.(".mindmap-toolbar")) return;
-      if (contextMenu) {
-        setContextMenu(null);
-        return;
-      }
-
-      e.preventDefault();
-      const container = containerRef.current;
-      if (!container) return;
-
-      const rect = container.getBoundingClientRect();
-      const cursorX = e.clientX - rect.left;
-      const cursorY = e.clientY - rect.top;
-
-      const zoomFactor = e.deltaY < 0 ? 1.12 : 0.89;
-      setTransform((prev) => {
-        const nextScale = Math.max(
-          0.25,
-          Math.min(2.5, Number((prev.scale * zoomFactor).toFixed(3))),
-        );
-        const scaleRatio = nextScale / prev.scale;
-        const nextX = cursorX - (cursorX - prev.x) * scaleRatio;
-        const nextY = cursorY - (cursorY - prev.y) * scaleRatio;
-        return {
-          x: Math.round(nextX),
-          y: Math.round(nextY),
-          scale: nextScale,
-        };
-      });
-    },
-    [contextMenu],
-  );
-
-  // Toggle collapse for a specific node
-  const handleToggleCollapse = useCallback((nodeId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setCollapsedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(nodeId)) {
-        next.delete(nodeId);
-      } else {
-        next.add(nodeId);
-      }
-      return next;
-    });
-  }, []);
-
-  // Expand all nodes
-  const handleExpandAll = useCallback(() => {
-    setCollapsedIds(new Set());
-  }, []);
-
-  // Collapse to Level 2
-  const handleCollapseToLevel2 = useCallback(() => {
-    const toCollapse = new Set<string>();
-    for (const n of layout.nodes) {
-      if (n.level >= 2 && n.hasChildren) {
-        toCollapse.add(n.id);
-      }
-    }
-    setCollapsedIds(toCollapse);
-  }, [layout.nodes]);
+  // The edit-input focus effect moved to useMindmapTreeOps (batch 3, wave 2c),
+  // where it keeps its place in that hook's effect sequence after the sync and
+  // fold effects. The container mouse trio, the wheel zoom and the collapse
+  // handlers moved to useMindmapTreeOps and useMindmapViewport and arrive back
+  // from the calls above; the container's props below read them unchanged.
 
   // The seven ways a map leaves the app — PNG, SVG, print/PDF, OPML, FreeMind,
   // XMind and the Markdown outline. Extracted to useMindmapExport (batch 3,
