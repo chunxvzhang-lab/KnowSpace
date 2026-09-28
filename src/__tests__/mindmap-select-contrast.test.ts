@@ -4,19 +4,21 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 /**
- * 思维导图主题/布局下拉的弹出层配对性守卫。
+ * 思维导图主题/布局下拉的弹出层配对性守卫（第二版：成对同源，而非禁用 var）。
  *
- * 原生 `<select>` 的弹出列表是**操作系统画的**，不随应用主题重绘。因此弹层的
- * 底色与字色必须成对固定：一旦任何一端换成随主题的令牌，两者必然在某个主题下
- * 分手。这个 bug 真实发生过：`background: var(--surface-1, #1e293b)`（该令牌
- * 故意不桥接，恒定落回深藏青）配 `color: var(--text-primary)`（已桥接到
- * 随主题的 `--text`），浅色主题下深字压深底，实测对比 1.22:1 —— 菜单项几乎
- * 不可见。
+ * 原生 `<select>` 的弹出列表是**操作系统画的**，不随应用主题自动重绘——但
+ * option 的声明值是可以主题化的（Chromium 用同一 style engine 解析它）。
+ * 这个家族的失效有两种形状，都真实发生过：
  *
- * 守卫形状沿用仓库既有的 CSS 守卫五要素：单一来源（解析 styles.css 原文而非
- * 复制常量）、集合断言（两端都不许出现 var()）、负向对照（重新引入 var 必须被
- * 这条测试抓到，见 fixture）、解析器自检（找不到目标块直接报错，不许空转全绿）、
- * 对比度用算不用看（WCAG 2.1，正文 4.5:1）。
+ * 1. **混合形**：恒定底色 + 主题化字色。`background: var(--surface-1, #1e293b)`
+ *    （该令牌故意不桥接，恒定落回深藏青）配 `color: var(--text-primary)`（桥接
+ *    到随主题的 `--text`）——浅色主题下深字压深底，实测 1.22:1，菜单项几乎不可见。
+ * 2. **反向混合形**：主题化底色 + 恒定字色——深色主题下浅字落浅底，同族失效。
+ *
+ * 唯一稳固的形状是**两端同源**：`--surface` 与 `--text` 在每个主题块里成对定义
+ * （light #ffffff/#18181b、eink #fbf9f4/#1a1a1a、twitter #0f1419/#e7e9ea），
+ * 弹层跟随应用主题并继承令牌系统自己的对比度保证。守卫钉住这个配对：两端必须
+ * 恰好是这对令牌，并且逐主题用**实际值对**验算对比度。
  */
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -95,11 +97,11 @@ function contrast(a: string, b: string): number {
   return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
 }
 
-/** 声明值里第一个十六进制颜色字面量（纯字符串解析）。 */
-function hexValue(body: string, prop: string): string | null {
-  const at = body.indexOf(prop + ":");
+/** 声明块里某自定义属性的十六进制值（纯字符串解析，值形如 #rrggbb）。 */
+function readToken(block: string, name: string): string | null {
+  const at = block.indexOf(name + ":");
   if (at === -1) return null;
-  const after = body.slice(at + prop.length + 1, at + prop.length + 60);
+  const after = block.slice(at + name.length + 1, at + name.length + 12);
   const hash = after.indexOf("#");
   if (hash === -1) return null;
   const digits = after.slice(hash + 1, hash + 7);
@@ -111,7 +113,30 @@ function hexValue(body: string, prop: string): string | null {
   return "#" + digits.toLowerCase();
 }
 
-describe("思维导图下拉弹层的颜色配对（OS 弹出层不随主题重绘）", () => {
+/** 每个 { … } 声明块里成对出现的 --surface/--text 实际值。 */
+function themePairs(css: string): Map<string, [string, string]> {
+  const pairs = new Map<string, [string, string]>();
+  let depth = 0;
+  let blockStart = -1;
+  for (let i = 0; i < css.length; i += 1) {
+    if (css[i] === "{") {
+      if (depth === 0) blockStart = i;
+      depth += 1;
+    } else if (css[i] === "}") {
+      depth -= 1;
+      if (depth === 0 && blockStart !== -1) {
+        const block = css.slice(blockStart, i + 1);
+        const surface = readToken(block, "--surface");
+        const text = readToken(block, "--text");
+        if (surface && text) pairs.set(`${surface}/${text}`, [surface, text]);
+        blockStart = -1;
+      }
+    }
+  }
+  return pairs;
+}
+
+describe("思维导图下拉弹层的颜色配对（弹层跟随主题，两端必须同源）", () => {
   const clean = stripComments(cssText);
   const option = extractBlock(clean, ".mindmap-theme-select option,", "两个下拉共用的 option 规则");
   // 同一控件选择器对出现在多个规则里（max-width、外观、color-scheme 各一处），
@@ -122,48 +147,60 @@ describe("思维导图下拉弹层的颜色配对（OS 弹出层不随主题重�
     "两个 select 控件的共用规则",
   );
 
-  it("option 的底色与字色都不引用 var()——任何一端主题化都会与另一端分手", () => {
+  it("option 的底色与字色必须是成对同源的主题令牌（var(--surface) + var(--text)）", () => {
+    const bg = option.body.trim().startsWith("background: var(--surface)");
+    const fg = option.body.includes("color: var(--text)");
     expect(
-      option.body.includes("var("),
-      `OS 弹出的列表不随应用主题重绘，成对固定是硬约束（历史失效：--text-primary 落在恒定的 #1e293b 上，浅色主题 1.22:1）。当前块（styles.css:${option.line}）：${option.body.trim()}`,
-    ).toBe(false);
-  });
-
-  it("配对的十六进制字面量存在且对比度达 AA 正文标准", () => {
-    const bg = hexValue(option.body, "background");
-    const fg = hexValue(option.body, "color");
-    expect(bg, "option 缺 background 十六进制字面量").not.toBeNull();
-    expect(fg, "option 缺 color 十六进制字面量").not.toBeNull();
-    const ratio = contrast(fg!, bg!);
-    expect(ratio, `${fg} on ${bg} = ${ratio.toFixed(2)}:1，低于 4.5:1`).toBeGreaterThanOrEqual(4.5);
-  });
-
-  it("两个 select 控件声明 color-scheme: dark，浏览器自绘的选中高亮/滚动条才保持深色", () => {
-    const declared = controls.some((b) => b.body.includes("color-scheme: dark"));
-    expect(
-      declared,
-      `控件规则（共 ${controls.length} 处：${controls.map((b) => b.line).join("/")} 行）里没有任何一处声明 color-scheme: dark——OS 弹出层会退回系统浅色板。`,
+      bg && fg,
+      `OS 弹层不随主题自动重绘，唯一稳固的形状是两端同源：background: var(--surface) + color: var(--text)。历史两种失效形状（恒定底+主题字、主题底+恒定字）都在某个主题下掉到 1.22:1。当前块（styles.css:${option.line}）：${option.body.trim()}`,
     ).toBe(true);
+    // 混合形（一端 var、一端字面量）是两种历史失效的共同形状——显式排除。
+    expect(option.body.includes("background: var("), "底色端必须是 var(--surface)").toBe(true);
+    expect(option.body.includes("color: var("), "字色端必须是 var(--text)").toBe(true);
   });
 
-  it("负向对照：把字色换回主题化令牌，守卫必须抓到（证明提取与断言在工作）", () => {
+  it("逐主题用实际值对验算：每个主题块里的 --surface/--text 对比度都达 AA 正文", () => {
+    // 值对来自 styles.css 本体（同一来源的实际渲染对，规则 1：一个概念只有
+    // 一处定义），而不是这里抄一份调色板。
+    const pairs = themePairs(cssText);
+    expect(pairs.size, "一个主题对都没解析到——解析器坏了，别让它空转全绿").toBeGreaterThanOrEqual(
+      3,
+    );
+    for (const [key, [surface, text]] of pairs) {
+      const ratio = contrast(text, surface);
+      expect(
+        ratio,
+        `主题对 ${key}（--text on --surface）= ${ratio.toFixed(2)}:1，低于 4.5:1——下拉弹层跟随这对值，先修令牌再谈弹层`,
+      ).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("两个 select 控件不再声明 color-scheme: dark——弹层颜色已主题化，强制深色板会与浅色主题打架", () => {
+    const declared = controls.filter((b) => b.body.includes("color-scheme: dark"));
+    expect(
+      declared.map((b) => b.line),
+      "控件的 color-scheme: dark 与主题化的 option 颜色矛盾：浅色主题下系统深色板会顶掉弹层的浅色对。弹层的深浅由根部的 color-scheme 声明（每个主题块各自声明）。",
+    ).toEqual([]);
+  });
+
+  it("负向对照：历史混合形（恒定底 + 主题字）必须被成对检查抓到", () => {
     // 历史 bug 形状的原样 fixture——不是 styles.css 的内容。
     const broken = `.mindmap-theme-select option,
       .mindmap-layout-select option {
         background: var(--surface-1, #1e293b);
         color: var(--text-primary, #e2e8f0);
       }`;
-    const parsed = extractBlock(broken, ".mindmap-theme-select option,", "fixture 的 option 块");
-    expect(
-      parsed.body.includes("var("),
-      "提取逻辑连 fixture 的 var 都看不见，它在真实文件上同样会失明",
-    ).toBe(true);
-    // 历史失效的算数复现：浅色的 --text 落进固定深底。
-    expect(contrast("#18181b", "#1e293b")).toBeLessThan(1.5);
+    // 成对检查的判别：两端必须恰好是 var(--surface) / var(--text)。
+    const paired =
+      broken.includes("background: var(--surface)") && broken.includes("color: var(--text)");
+    expect(paired, "成对检查连 fixture 的混合形都放行了，它在真实文件上同样会失明").toBe(false);
+    // 反向混合形（主题底 + 恒定字）同样必须被抓。
+    const reverse = "background: var(--surface); color: #e2e8f0;".includes("color: var(--text)");
+    expect(reverse, "反向混合形（主题底+恒定字）必须同样被拒").toBe(false);
   });
 
-  it("回归锚点：当前配对就是修复后的值，被改回历史值即失败", () => {
-    expect(hexValue(option.body, "background")).toBe("#1e293b");
-    expect(hexValue(option.body, "color")).toBe("#e2e8f0");
+  it("回归锚点：当前配对就是修复后的令牌对，被改回任何历史形状即失败", () => {
+    expect(option.body).toContain("background: var(--surface)");
+    expect(option.body).toContain("color: var(--text)");
   });
 });

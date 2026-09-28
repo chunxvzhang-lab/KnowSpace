@@ -13516,30 +13516,28 @@ body:has(.flash-capsule-overlay) {
   outline-offset: 1px;
 }
 
-/* The dropdown list itself is drawn by the OS. Two separate traps here, both
+/* The dropdown list itself is drawn by the OS. Three separate traps here, all
    hit for real:
    1. The closed control is `background: transparent`, so on platforms where
       options inherit it the list is unreadable — hence an explicit background.
    2. Whatever background we set here, the list does NOT repaint with the app
-      theme: it is the OS popup, sized and painted by the OS. So the option
-      colors must be a PAIR, not each following their own source. The previous
-      rule had a fixed dark background (`--surface-1` is deliberately never
-      bridged, so the fallback #1e293b was constant) and a theme-following
-      text color (`--text-primary` is bridged to `--text`) — under the light
-      themes the dark text landed on the dark navy at 1.22:1, invisible.
-   Fixed pair #e2e8f0 on #1e293b computes to 11.87:1 on every theme; and
-   `color-scheme: dark` on the selects tells the browser the popup is a dark
-   surface, so the parts it paints itself — the selected-row highlight, the
-   scrollbar — stay dark instead of falling back to the OS light palette. */
-.mindmap-theme-select,
-.mindmap-layout-select {
-  color-scheme: dark;
-}
-
+      theme: it is the OS popup. The previous rule paired a CONSTANT dark
+      background (`--surface-1` is deliberately never bridged, so #1e293b was
+      what painted) with a THEME-FOLLOWING text color (`--text-primary` is
+      bridged to `--text`) — under the light themes the dark text landed on
+      the dark navy at 1.22:1, invisible.
+   3. The reverse pairing (theme-following background, constant text) fails
+      the same way on the dark themes. The only shape that holds is BOTH ends
+      from the same theme block: --surface and --text are defined together in
+      every theme (light #ffffff/#18181b, eink #fbf9f4/#1a1a1a, twitter
+      #0f1419/#e7e9ea), so the popup follows the app theme and keeps the
+      token system's own contrast guarantee. The companion guard
+      (mindmap-select-contrast.test.ts) pins the PAIR, so neither end can be
+      re-themed alone. */
 .mindmap-theme-select option,
 .mindmap-layout-select option {
-  background: #1e293b;
-  color: #e2e8f0;
+  background: var(--surface);
+  color: var(--text);
 }
 
 /* ── End mind map theme and layout pickers ── */
