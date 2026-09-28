@@ -24,6 +24,8 @@
     "quality:baseline": "node scripts/quality-ratchet.cjs",
     "test:baseline": "node scripts/capture-test-baseline.cjs",
     "test:baseline:check": "node scripts/capture-test-baseline.cjs --check --report test-baseline.json",
+    "perf:baseline": "node scripts/capture-perf-baseline.cjs",
+    "perf:baseline:check": "node scripts/capture-perf-baseline.cjs --check",
     "preflight": "node scripts/preflight.cjs"
   },
   "lint-staged": {
