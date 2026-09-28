@@ -1,7 +1,7 @@
 import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { GitFork } from "lucide-react";
 import type { RenderedChapter } from "../core/types";
-import { renderMermaid, type MermaidTheme } from "../services/mermaid";
+import { createMermaidRenderPool, type MermaidTheme } from "../services/mermaid";
 import type { LightboxMedia } from "./MediaLightbox";
 import type { WikiLinkTarget } from "./EditorPane";
 
@@ -48,6 +48,8 @@ export const ReaderPane = memo(function ReaderPane({
   onOpenBacklinks,
 }: ReaderPaneProps) {
   const articleRef = useRef<HTMLElement | null>(null);
+  // Identity of the Mermaid pool currently alive for this article, if any.
+  const mermaidPoolRef = useRef<{ token: string } | null>(null);
   const [hoverPopover, setHoverPopover] = useState<{
     target: string;
     label: string;
@@ -276,36 +278,60 @@ export const ReaderPane = memo(function ReaderPane({
     });
   }, [chapter?.html]);
 
-  // Mermaid rendering pipeline
+  // Mermaid rendering pipeline: a viewport-aware lazy pool (plan §6.3 2-5).
+  //
+  // The old pass rendered every diagram in the document the moment it mounted;
+  // a 30-chart page paid 161-368ms of Mermaid before the reader saw the first
+  // viewport settle. Now the pool renders only diagrams approaching the
+  // scroller's viewport (plus a preload margin), one per idle task, ordered by
+  // distance from the viewport. The end DOM is unchanged — scrolling to a
+  // diagram or printing flushes the rest — the work is just deferred.
+  //
+  // The token guard survives, now carried by a live-pool ref rather than only
+  // the article's dataset: a new checksum or theme cancels the old pool
+  // (queue dropped, in-flight renders vetoed from committing) before the new
+  // pool observes the document, so a stale async pass cannot paint a newer
+  // document. A ref-keyed guard also closes the dev-mode hole: React's
+  // StrictMode double-mount runs setup → cleanup → setup, and the dataset
+  // version said "a pass is scheduled" after the first pass had already been
+  // cancelled, silently skipping the second setup and losing every diagram.
   useLayoutEffect(() => {
     const node = articleRef.current;
     if (!node?.querySelector("pre.mermaid")) return undefined;
     const renderToken = `${chapter?.checksum ?? ""}:${mermaidTheme}`;
-    if (
-      node.dataset.mermaidRenderToken === renderToken &&
-      node.dataset.mermaidRenderStatus === "scheduled"
-    ) {
-      return undefined;
-    }
+    if (mermaidPoolRef.current?.token === renderToken) return undefined;
+    mermaidPoolRef.current = { token: renderToken };
     node.dataset.mermaidRenderToken = renderToken;
     node.dataset.mermaidRenderStatus = "scheduled";
-    const timerId = window.setTimeout(() => {
-      if (node.dataset.mermaidRenderToken !== renderToken) return;
-      node.dataset.mermaidRenderStatus = "running";
-      renderMermaid(node, { theme: mermaidTheme })
-        .then(() => {
-          if (node.dataset.mermaidRenderToken === renderToken)
-            node.dataset.mermaidRenderStatus = "done";
-        })
-        .catch(() => {
-          if (node.dataset.mermaidRenderToken === renderToken) {
-            node.dataset.mermaidRenderStatus = "error";
-            onMermaidError();
-          }
-        });
-    }, 0);
+    const pool = createMermaidRenderPool(node, {
+      theme: mermaidTheme,
+      // The scroller is this pane's own main.reader-pane; diagrams outside it
+      // are invisible even though they sit inside the browser window.
+      root: node.closest<HTMLElement>(".reader-pane"),
+      onComplete: () => {
+        node.dataset.mermaidRenderStatus = "done";
+      },
+      onError: () => {
+        node.dataset.mermaidRenderStatus = "error";
+        onMermaidError();
+      },
+    });
+    pool.start();
+    // Printing and PDF export capture the *live* DOM: a diagram the reader
+    // never scrolled to would otherwise print as raw source text. beforeprint
+    // flushes the whole pool; interactive printing leaves ample time for the
+    // sequential render, and the pool's no-op skip keeps already-rendered
+    // diagrams out of the cost.
+    const flushForPrint = () => {
+      void pool.flush().catch(() => {
+        // renderDiagram handles per-diagram failures internally; a throw here
+        // is unexpected, and there is nothing left to cancel the print for.
+      });
+    };
+    window.addEventListener("beforeprint", flushForPrint);
     return () => {
-      window.clearTimeout(timerId);
+      window.removeEventListener("beforeprint", flushForPrint);
+      pool.cancel();
     };
   }, [chapter?.checksum, mermaidTheme, onMermaidError]);
 
