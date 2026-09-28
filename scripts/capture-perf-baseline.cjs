@@ -133,6 +133,39 @@ const METRICS = [
     desc: "同窗口内 >50ms 的 longtask 条数。当前防抖后整篇重渲染，>0 即为计划 2-1（增量块解析）要消灭的对象。",
   },
   {
+    key: "typing_parse_max_ms",
+    scenario: "打字延迟 (2-1/2-2)",
+    name: "最长渲染 · markdown-it 解析段",
+    unit: "ms",
+    kind: "timing",
+    digits: 1,
+    budget: "—（口径项）",
+    pass: null,
+    desc: "打字落定窗口内最长一次 renderMarkdown 的 ks:md-render-parse 测量值（markdown.render 同步段）。permanent marks 见 src/services/markdown.ts：每次渲染先清同名旧条目，读到的即窗口内最后一次（=落定重渲染、长任务本体）的解剖。0 与「没有成本」的区分看 counts 行。jsdom bench 说解析占比极小，这里是 Chromium 的绝对值复核。",
+  },
+  {
+    key: "typing_sanitize_max_ms",
+    scenario: "打字延迟 (2-1/2-2)",
+    name: "最长渲染 · DOMPurify 净化段",
+    unit: "ms",
+    kind: "timing",
+    digits: 1,
+    budget: "—（口径项）",
+    pass: null,
+    desc: "同一次渲染的 ks:md-render-sanitize 段（RETURN_DOM_FRAGMENT 净化，主线程固有）。jsdom 口径下净化占 83%，但 jsdom 的 DOMPurify 是纯 JS——Chromium 原生 DOM 上这个比例是否成立，决定块级净化缓存这刀该不该下。",
+  },
+  {
+    key: "typing_dom_max_ms",
+    scenario: "打字延迟 (2-1/2-2)",
+    name: "最长渲染 · DOM 后处理段",
+    unit: "ms",
+    kind: "timing",
+    digits: 1,
+    budget: "—（口径项）",
+    pass: null,
+    desc: "同一次渲染的 ks:md-render-dom 段（addHeadingIds → template.innerHTML，含 URL 重写/图片优化/纯文本提取；sha256 的 await 在测量段外）。三段之和与 typing_max_longtask_ms 的差即 React 提交/样式/Layout 等管线外成本。",
+  },
+  {
     key: "scroll_p50_frame_ms",
     scenario: "滚动帧时 (2-4)",
     name: "长文滚动 · 帧间隔 p50",
@@ -862,9 +895,42 @@ async function scenarioTyping(browser, url, corpus) {
       await page.waitForTimeout(400);
     }
     const durations = await longtasksAfter(page, t0);
+    // Anatomy of the longest render in the window: the permanent marks in
+    // src/services/markdown.ts clear their own previous entries before each
+    // render, so getEntriesByName returns ≤1 measure per segment — and that
+    // one entry is the LATEST render, which after the 350ms debounce is
+    // exactly the full-document re-render that owns the long task. We still
+    // take the MAX over whatever entries exist (defensive: if the clearing
+    // strategy ever changes, the metric keeps meaning "longest segment").
+    const segments = await page.evaluate(() => {
+      const read = (name) => {
+        const entries = performance.getEntriesByName(name, "measure");
+        return {
+          maxMs: entries.length ? Math.max(...entries.map((e) => e.duration)) : 0,
+          // count distinguishes "no render happened" (count=0, value 0 is a
+          // hole in coverage) from "render costed ~0" (count≥1).
+          count: entries.length,
+        };
+      };
+      return {
+        parse: read("ks:md-render-parse"),
+        sanitize: read("ks:md-render-sanitize"),
+        dom: read("ks:md-render-dom"),
+      };
+    });
+    if (segments.parse.count === 0 || segments.sanitize.count === 0 || segments.dom.count === 0) {
+      console.warn(
+        `[perf] typing: renderMarkdown segments missing (parse=${segments.parse.count} ` +
+          `sanitize=${segments.sanitize.count} dom=${segments.dom.count}) — the 0 values mean ` +
+          `"no measured render", NOT "no cost" (cached render skips the marks).`,
+      );
+    }
     return {
       maxMs: durations.length ? Math.max(...durations) : 0,
       count: durations.length,
+      parseMaxMs: segments.parse.maxMs,
+      sanitizeMaxMs: segments.sanitize.maxMs,
+      domMaxMs: segments.dom.maxMs,
     };
   } finally {
     await context.close();
@@ -1105,6 +1171,9 @@ async function runAll(browser, url, corpus) {
   const typing = await sample(() => scenarioTyping(browser, url, corpus), "typing latency");
   values.typing_max_longtask_ms = pickMin(typing, (r) => r.maxMs);
   values.typing_longtask_count = pickMin(typing, (r) => r.count);
+  values.typing_parse_max_ms = pickMin(typing, (r) => r.parseMaxMs);
+  values.typing_sanitize_max_ms = pickMin(typing, (r) => r.sanitizeMaxMs);
+  values.typing_dom_max_ms = pickMin(typing, (r) => r.domMaxMs);
 
   const scroll = await sample(() => scenarioScroll(browser, url, corpus), "scroll frames");
   values.scroll_p50_frame_ms = pickMin(scroll, (r) => r.p50);

@@ -156,6 +156,45 @@ export function renderCardMarkdown(source: string): string {
   return result;
 }
 
+/*
+ * Permanent pipeline marks for the render long-task (plan §6.3 / phase-2 决策数据).
+ *
+ * These three measures are unconditional: performance.mark/measure costs ~µs,
+ * negligible next to the 100ms+ segments they bracket, and having the anatomy
+ * of every render in the real browser timeline is the point (the jsdom bench
+ * only gives direction, not Chromium magnitudes).
+ *
+ * Buffer discipline: before each new pair we clear the previous marks and the
+ * measure of the same name, so the timeline buffer holds exactly the LATEST
+ * render of each segment (user-timing entries would otherwise accumulate and
+ * the browser's buffer overflow would silently drop the oldest — we do not
+ * want the harness to read a stale render's number). Consequently
+ * getEntriesByName(name, "measure") yields at most one entry per segment:
+ * in the typing scenario the render that lands after the 350ms debounce IS
+ * the long-task's render, i.e. the one whose anatomy we want.
+ */
+function perfMarkable(): boolean {
+  return typeof performance !== "undefined" && typeof performance.mark === "function";
+}
+
+function perfMeasured<T>(name: string, fn: () => T): T {
+  if (!perfMarkable()) return fn();
+  const start = `${name}:start`;
+  const end = `${name}:end`;
+  performance.clearMarks(start);
+  performance.clearMarks(end);
+  performance.clearMeasures(name);
+  performance.mark(start);
+  try {
+    return fn();
+  } finally {
+    // finally: a throwing segment still gets an end mark + measure, so a
+    // broken render shows up as a real (failed) span instead of missing data.
+    performance.mark(end);
+    performance.measure(name, start, end);
+  }
+}
+
 export async function renderMarkdown(
   source: string,
   baseUrl = window.location.href,
@@ -168,47 +207,68 @@ export async function renderMarkdown(
 
   capturedFrontMatter = "";
   const checksumPromise = sha256(source);
-  const raw = markdown.render(source);
-  const fragment = DOMPurify.sanitize(raw, {
-    USE_PROFILES: { html: true, mathMl: true },
-    RETURN_DOM_FRAGMENT: true,
-    ADD_TAGS: ["annotation", "foreignObject", "semantics"],
-    ADD_ATTR: [
-      "aria-hidden",
-      "aria-label",
-      "class",
-      "data-language",
-      "data-mermaid-src",
-      "data-source-line",
-      "data-source-line-end",
-      "data-wikilink-target",
-      "data-wikilink-label",
-      "data-block-id",
-      "data-embed-target",
-      "decoding",
-      "encoding",
-      "fetchpriority",
-      "id",
-      "loading",
-      "referrerpolicy",
-      "rel",
-      "style",
-      "target",
-      "draggable",
-    ],
-    ALLOWED_URI_REGEXP:
-      /^(?:(?:(?:f|ht)tps?|mailto|tel|file|data):|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i,
-  }) as unknown as DocumentFragment;
-  const headings = addHeadingIds(fragment);
-  rewriteRelativeUrls(fragment, baseUrl);
-  optimizeImages(fragment);
-  const plainText = extractPlainText(fragment);
-  const hasMermaid = Boolean(fragment.querySelector("pre.mermaid"));
-  const frontMatter = parseFrontMatter(capturedFrontMatter);
-  const template = document.createElement("template");
-  template.content.append(fragment);
+  const raw = perfMeasured("ks:md-render-parse", () => markdown.render(source));
+  const fragment = perfMeasured(
+    "ks:md-render-sanitize",
+    () =>
+      DOMPurify.sanitize(raw, {
+        USE_PROFILES: { html: true, mathMl: true },
+        RETURN_DOM_FRAGMENT: true,
+        ADD_TAGS: ["annotation", "foreignObject", "semantics"],
+        ADD_ATTR: [
+          "aria-hidden",
+          "aria-label",
+          "class",
+          "data-language",
+          "data-mermaid-src",
+          "data-source-line",
+          "data-source-line-end",
+          "data-wikilink-target",
+          "data-wikilink-label",
+          "data-block-id",
+          "data-embed-target",
+          "decoding",
+          "encoding",
+          "fetchpriority",
+          "id",
+          "loading",
+          "referrerpolicy",
+          "rel",
+          "style",
+          "target",
+          "draggable",
+        ],
+        ALLOWED_URI_REGEXP:
+          /^(?:(?:(?:f|ht)tps?|mailto|tel|file|data):|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i,
+      }) as unknown as DocumentFragment,
+  );
+  // Bracketing choice: the measured dom span covers addHeadingIds → reading
+  // template.innerHTML — all of it synchronous main-thread DOM work. The
+  // checksumPromise (sha256, off-thread) is started before parse and awaited
+  // only when assembling `result`, i.e. OUTSIDE every measured span, so the
+  // crypto wait can never leak into ks:md-render-dom.
+  const { html, headings, plainText, hasMermaid, frontMatter } = perfMeasured(
+    "ks:md-render-dom",
+    () => {
+      const headings = addHeadingIds(fragment);
+      rewriteRelativeUrls(fragment, baseUrl);
+      optimizeImages(fragment);
+      const plainText = extractPlainText(fragment);
+      const hasMermaid = Boolean(fragment.querySelector("pre.mermaid"));
+      const frontMatter = parseFrontMatter(capturedFrontMatter);
+      const template = document.createElement("template");
+      template.content.append(fragment);
+      return {
+        html: template.innerHTML,
+        headings,
+        plainText,
+        hasMermaid,
+        frontMatter,
+      };
+    },
+  );
   const result: RenderedChapter = {
-    html: template.innerHTML,
+    html,
     headings,
     frontMatter,
     checksum: await checksumPromise,
