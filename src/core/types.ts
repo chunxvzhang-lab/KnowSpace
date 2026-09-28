@@ -107,6 +107,23 @@ export type Heading = {
   line?: number;
 };
 
+/**
+ * One top-level markdown block, sanitized and post-processed, as a document
+ * order slice of `RenderedChapter.html` (`html.slice` of the joined string —
+ * slices share the parent's storage, so this is not a second copy).
+ *
+ * Present when the block pipeline could segment the document losslessly; the
+ * reader inserts these block by block so a keystroke re-creates ONE block
+ * instead of re-rendering the whole article. `sourceStart`/`sourceEnd` are the
+ * 1-based source lines of the block's token group (-1 when the group carries
+ * no source map).
+ */
+export type RenderedBlock = {
+  html: string;
+  sourceStart: number;
+  sourceEnd: number;
+};
+
 export type RenderedChapter = {
   html: string;
   headings: Heading[];
@@ -114,6 +131,11 @@ export type RenderedChapter = {
   checksum: string;
   plainText: string;
   hasMermaid: boolean;
+  /**
+   * Block-granular view of `html` (see `RenderedBlock`); undefined when the
+   * document cannot be segmented safely — consumers then use `html` whole.
+   */
+  blocks?: RenderedBlock[];
 };
 
 export type Bookmark = {

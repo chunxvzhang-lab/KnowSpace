@@ -22,11 +22,20 @@ import {
 } from "./markdownDom";
 import { mathPlugin } from "./markdownMath";
 import { blockAnchorPlugin, sourceLineMappingPlugin, wikiLinkPlugin } from "./markdownPlugins";
+import {
+  buildBlockPlan,
+  PROD_FRAGMENT_CONFIG,
+  sanitizeBlockPlan,
+  serializeBlockUnits,
+  toRenderedBlocks,
+} from "./markdownBlocks";
+import type { BlockGroup } from "./markdownBlocks";
 
 /*
  * The markdown rendering pipeline: one MarkdownIt instance whose plugins and
  * post-processing live in ./markdownPlugins, ./markdownMath and ./markdownDom,
- * with chapter search in ./markdownSearch — all re-exported here so importers
+ * with chapter search in ./markdownSearch and the block-granular segmentation
+ * (phase 2, wave 2-1) in ./markdownBlocks — all re-exported here so importers
  * keep one entry point.
  */
 
@@ -207,47 +216,57 @@ export async function renderMarkdown(
 
   capturedFrontMatter = "";
   const checksumPromise = sha256(source);
-  const raw = perfMeasured("ks:md-render-parse", () => markdown.render(source));
-  const fragment = perfMeasured(
-    "ks:md-render-sanitize",
-    () =>
-      DOMPurify.sanitize(raw, {
-        USE_PROFILES: { html: true, mathMl: true },
-        RETURN_DOM_FRAGMENT: true,
-        ADD_TAGS: ["annotation", "foreignObject", "semantics"],
-        ADD_ATTR: [
-          "aria-hidden",
-          "aria-label",
-          "class",
-          "data-language",
-          "data-mermaid-src",
-          "data-source-line",
-          "data-source-line-end",
-          "data-wikilink-target",
-          "data-wikilink-label",
-          "data-block-id",
-          "data-embed-target",
-          "decoding",
-          "encoding",
-          "fetchpriority",
-          "id",
-          "loading",
-          "referrerpolicy",
-          "rel",
-          "style",
-          "target",
-          "draggable",
-        ],
-        ALLOWED_URI_REGEXP:
-          /^(?:(?:(?:f|ht)tps?|mailto|tel|file|data):|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i,
-      }) as unknown as DocumentFragment,
-  );
-  // Bracketing choice: the measured dom span covers addHeadingIds → reading
-  // template.innerHTML — all of it synchronous main-thread DOM work. The
-  // checksumPromise (sha256, off-thread) is started before parse and awaited
-  // only when assembling `result`, i.e. OUTSIDE every measured span, so the
-  // crypto wait can never leak into ks:md-render-dom.
-  const { html, headings, plainText, hasMermaid, frontMatter } = perfMeasured(
+  // Wave 2-1 (block-granular preview): the parse span still brackets the
+  // whole synchronous parse — markdown-it cannot segment cheaper than that,
+  // and the harness's typing_parse_max_ms keeps its meaning — but the parse
+  // now also cuts the token stream into per-block groups, so the sanitize
+  // span below can work block by block.
+  const plan = perfMeasured("ks:md-render-parse", () => buildBlockPlan(markdown, source));
+  const { fragment, groups } = perfMeasured("ks:md-render-sanitize", () => {
+    if (plan.mode === "whole") {
+      // Today's exact path, byte for byte (documents that cannot be
+      // segmented from the token stream at all: empty, or a level-0 hidden
+      // token — front matter). PROD_FRAGMENT_CONFIG is the same options
+      // object literal the whole-document call always passed.
+      return {
+        fragment: DOMPurify.sanitize(plan.raw, PROD_FRAGMENT_CONFIG) as unknown as DocumentFragment,
+        groups: null as BlockGroup[] | null,
+      };
+    }
+    // Adaptive per-block sanitize (./markdownBlocks): a settle render after
+    // typing re-sanitizes the ONE block whose raw HTML changed and replays
+    // the rest from the content-addressed cache; a cold document takes one
+    // whole-document pass (which is cheaper than N small ones) and back-fills
+    // that same cache; an unsafe block (raw HTML bleeding across blocks)
+    // degrades to today's whole-document path without blocks. The warm
+    // path's joined sanitized HTML — byte-equal to a whole-document sanitize
+    // by the two segmentation properties — is parsed once with plain
+    // innerHTML (native parse, no scrubbing pass).
+    const sanitized = sanitizeBlockPlan(plan.groups);
+    if (sanitized.mode === "cold") {
+      return { fragment: sanitized.fragment, groups: plan.groups as BlockGroup[] | null };
+    }
+    if (sanitized.mode === "unsafe") {
+      return {
+        fragment: DOMPurify.sanitize(
+          sanitized.raw,
+          PROD_FRAGMENT_CONFIG,
+        ) as unknown as DocumentFragment,
+        groups: null as BlockGroup[] | null,
+      };
+    }
+    const buildTemplate = document.createElement("template");
+    buildTemplate.innerHTML = sanitized.joined;
+    const blockFragment = document.createDocumentFragment();
+    blockFragment.append(buildTemplate.content);
+    return { fragment: blockFragment, groups: plan.groups as BlockGroup[] | null };
+  });
+  // Bracketing choice (unchanged): the measured dom span covers addHeadingIds
+  // → reading the final HTML — all of it synchronous main-thread DOM work.
+  // In block mode the final HTML is the concat of the block units cut from
+  // the same post-processed fragment, i.e. the same serializer over the same
+  // nodes; sha256 stays awaited OUTSIDE every measured span.
+  const { html, headings, plainText, hasMermaid, frontMatter, blocks } = perfMeasured(
     "ks:md-render-dom",
     () => {
       const headings = addHeadingIds(fragment);
@@ -258,12 +277,19 @@ export async function renderMarkdown(
       const frontMatter = parseFrontMatter(capturedFrontMatter);
       const template = document.createElement("template");
       template.content.append(fragment);
+      // Blocks are the post-processed fragment cut at its top-level element
+      // boundaries — one element per token group, heading ids/URL rewrites
+      // already applied. When the boundary check fails (embed splits, dropped
+      // comments) there are no blocks and `html` is read whole as before.
+      const units = groups ? serializeBlockUnits(template.content, groups) : null;
+      const segmented = units && groups ? toRenderedBlocks(units, groups) : null;
       return {
-        html: template.innerHTML,
+        html: segmented ? segmented.html : template.innerHTML,
         headings,
         plainText,
         hasMermaid,
         frontMatter,
+        blocks: segmented?.blocks,
       };
     },
   );
@@ -274,6 +300,7 @@ export async function renderMarkdown(
     checksum: await checksumPromise,
     plainText,
     hasMermaid,
+    ...(blocks ? { blocks } : {}),
   };
 
   if (renderedMarkdownCache.size >= MAX_RENDER_CACHE_SIZE) {
@@ -306,3 +333,11 @@ function isMermaidFence(language: string): boolean {
 
 export { extractExcerpt, findInChapter } from "./markdownSearch";
 export { extractHeadingsFromSource, findHeadingLineInSource } from "./markdownDom";
+export {
+  buildBlockPlan,
+  isSelfContainedHtml,
+  PROD_FRAGMENT_CONFIG,
+  sanitizeBlockGroups,
+  sanitizeBlockPlan,
+} from "./markdownBlocks";
+export type { BlockGroup, BlockPlan, BlockSanitize } from "./markdownBlocks";

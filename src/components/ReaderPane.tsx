@@ -1,6 +1,6 @@
-import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useLayoutEffect, useRef, useState } from "react";
 import { GitFork } from "lucide-react";
-import type { RenderedChapter } from "../core/types";
+import type { RenderedBlock, RenderedChapter } from "../core/types";
 import { createMermaidRenderPool, type MermaidTheme } from "../services/mermaid";
 import type { LightboxMedia } from "./MediaLightbox";
 import type { WikiLinkTarget } from "./EditorPane";
@@ -32,6 +32,122 @@ type ReaderPaneProps = {
   onOpenBacklinks?: () => void;
 };
 
+/*
+ * Block-granular article insertion (phase 2, wave 2-1).
+ *
+ * When the chapter carries `blocks` (see services/markdownBlocks), React does
+ * not own the article's children at all: the article renders empty and the
+ * effect below reconciles the DOM block by block. A block whose identity key
+ * and position are unchanged is NOT TOUCHED — no React reconciliation, search
+ * <mark>s, mermaid SVGs and code-header decorations survive inside it. Only
+ * new/changed blocks are parsed and spliced in, so typing one character in a
+ * 100k-character document re-inserts one block, not 2,282.
+ *
+ * React still owns the article ELEMENT: changing `documentKey` remounts the
+ * article (React drops the whole subtree, our appended DOM with it), and the
+ * effect repopulates the fresh node (verified: React removes DOM it never
+ * created when it removes the parent).
+ */
+
+const FNV_OFFSET = 0x811c9dc5;
+const FNV_PRIME = 0x01000193;
+
+function fnv1a(value: string): number {
+  let hash = FNV_OFFSET >>> 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, FNV_PRIME) >>> 0;
+  }
+  return hash >>> 0;
+}
+
+/** Identity of one block: where it came from plus what it now contains. */
+function blockKey(block: RenderedBlock): string {
+  return `${block.sourceStart}-${block.sourceEnd}:${fnv1a(block.html).toString(36)}`;
+}
+
+/** One inserted unit: the block's element plus the text nodes that follow it. */
+type ExistingUnit = { el: Element | null; nodes: Node[] };
+
+function readExistingUnits(node: HTMLElement): ExistingUnit[] {
+  const units: ExistingUnit[] = [];
+  const leading: Node[] = [];
+  for (const child of Array.from(node.childNodes)) {
+    if (child.nodeType === 1) {
+      const nodes: Node[] = leading.length > 0 ? [...leading.splice(0), child] : [child];
+      units.push({ el: child as Element, nodes });
+    } else if (units.length > 0) {
+      units[units.length - 1].nodes.push(child);
+    } else {
+      leading.push(child);
+    }
+  }
+  if (leading.length > 0) {
+    // Children with no element at all (e.g. leftover text) — one keyless
+    // synthetic unit so the replace loop wipes them against the first real
+    // block (`el: null` can never match a desired key).
+    units.unshift({ el: null, nodes: leading });
+  }
+  return units;
+}
+
+const BLOCK_KEY_ATTR = "data-block-key";
+
+/** Parse one block's HTML with its identity key stamped on the element. */
+function blockFragment(block: RenderedBlock, key: string): DocumentFragment {
+  const template = document.createElement("template");
+  template.innerHTML = block.html;
+  const el = template.content.firstElementChild;
+  if (el) el.setAttribute(BLOCK_KEY_ATTR, key);
+  return template.content;
+}
+
+/**
+ * Splice `article` to the desired block sequence. Unchanged blocks (same key
+ * at the same position) are not touched; changed/extra/new blocks are
+ * replaced/appended/removed one unit at a time, which preserves document
+ * order with minimal mutation. The final DOM is the same sequence a full
+ * `innerHTML = html` would parse, even when key pairing is imperfect —
+ * pairing only affects how much gets reused, never what ends up on screen.
+ */
+function reconcileBlocks(node: HTMLElement, blocks: RenderedBlock[]): void {
+  const keys = blocks.map(blockKey);
+  const units = readExistingUnits(node);
+  const shared = Math.min(units.length, keys.length);
+  let matches = 0;
+  for (let i = 0; i < shared; i += 1) {
+    if (units[i].el?.getAttribute(BLOCK_KEY_ATTR) === keys[i]) matches += 1;
+  }
+  // Mostly-mismatch (fresh mount after a documentKey remount, a document
+  // swap, the innerHTML fallback's DOM): one whole parse plus key stamping
+  // beats 2,282 tiny template parses and appends. The settle-render case —
+  // a warm article with a handful of changed blocks — stays on the splice
+  // path below, which is the point of the wave.
+  if (matches * 4 < Math.max(units.length, blocks.length)) {
+    for (const unit of units) {
+      for (const old of unit.nodes) node.removeChild(old);
+    }
+    node.innerHTML = blocks.map((block) => block.html).join("");
+    const elements = node.children;
+    for (let i = 0; i < keys.length && i < elements.length; i += 1) {
+      elements[i].setAttribute(BLOCK_KEY_ATTR, keys[i]);
+    }
+    return;
+  }
+  let i = 0;
+  for (; i < shared; i += 1) {
+    if (units[i].el?.getAttribute(BLOCK_KEY_ATTR) === keys[i]) continue;
+    node.insertBefore(blockFragment(blocks[i], keys[i]), units[i].nodes[0]);
+    for (const old of units[i].nodes) node.removeChild(old);
+  }
+  for (; i < blocks.length; i += 1) {
+    node.appendChild(blockFragment(blocks[i], keys[i]));
+  }
+  for (; i < units.length; i += 1) {
+    for (const old of units[i].nodes) node.removeChild(old);
+  }
+}
+
 export const ReaderPane = memo(function ReaderPane({
   chapter,
   documentKey,
@@ -60,9 +176,51 @@ export const ReaderPane = memo(function ReaderPane({
   } | null>(null);
   const hoverTimerRef = useRef<number | null>(null);
 
-  // Mermaid mutates the sanitized article HTML after React commits it. Keep
-  // this prop stable so unrelated renders do not restore the pre-render HTML.
-  const articleHtml = useMemo(() => ({ __html: chapter?.html ?? "" }), [chapter?.html]);
+  /**
+   * What this article node was last painted from. `null` chapter/node entries
+   * mean "nothing applied yet". The node is part of the identity because a
+   * `documentKey` change remounts a fresh empty article that must be
+   * repopulated even when React would otherwise consider the effect's inputs
+   * unchanged.
+   */
+  const appliedRenderRef = useRef<{
+    node: HTMLElement;
+    chapter: RenderedChapter | null;
+    html: string;
+    doc: string | null;
+  } | null>(null);
+
+  // Paint the article: block-spliced when the chapter carries blocks,
+  // whole-innerHTML exactly as before when it does not (secondary panes, web
+  // renders, gated documents). Runs before paint, after React has committed
+  // the (empty) article element itself.
+  useLayoutEffect(() => {
+    const node = articleRef.current;
+    if (!node) return;
+    const applied = appliedRenderRef.current;
+    if (
+      applied &&
+      applied.node === node &&
+      applied.chapter === chapter &&
+      applied.doc === (documentKey ?? null)
+    ) {
+      return;
+    }
+    const html = chapter?.html ?? "";
+    appliedRenderRef.current = { node, chapter: chapter ?? null, html, doc: documentKey ?? null };
+    const blocks = chapter?.blocks;
+    if (blocks) {
+      reconcileBlocks(node, blocks);
+      return;
+    }
+    // Mermaid mutates the sanitized article HTML after React commits it —
+    // the old contract that kept `dangerouslySetInnerHTML` keyed on the html
+    // string rather than the chapter object. Same guard here: an equal html
+    // string is not rewritten, so rendered SVGs survive.
+    if (applied && applied.node === node && applied.html === html) return;
+    node.innerHTML = html;
+  }, [chapter, documentKey]);
+
   const attachReader = useCallback(
     (node: HTMLElement | null) => {
       containerRef.current = node;
@@ -342,6 +500,10 @@ export const ReaderPane = memo(function ReaderPane({
       style={{ "--reader-scale": fontScale } as React.CSSProperties}
     >
       {chapter?.frontMatter ? <FrontMatterCard data={chapter.frontMatter} /> : null}
+      {/* No React children and no dangerouslySetInnerHTML: the article's
+          content is owned by the block-reconciliation effect above, so a
+          settle render mutates one block instead of handing the whole
+          article subtree to React. */}
       <article
         key={documentKey}
         className={`markdown-body ${showLineNumbers ? "show-line-numbers" : ""}`}
@@ -350,7 +512,6 @@ export const ReaderPane = memo(function ReaderPane({
         onMouseUp={handleMouseUp}
         onMouseOver={handleMouseOver}
         onMouseOut={handleMouseOut}
-        dangerouslySetInnerHTML={articleHtml}
       />
       {backlinksCount !== undefined && backlinksCount > 0 && onOpenBacklinks ? (
         <div
