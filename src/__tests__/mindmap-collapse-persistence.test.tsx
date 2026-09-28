@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MindmapView } from "../components/MindmapView";
+import { MINDMAP_LAYOUT_LIST } from "../services/mindmapLayout";
 import {
   loadMindmapCollapsed,
   saveMindmapCollapsed,
@@ -38,6 +39,24 @@ describe("折叠状态持久化", () => {
     cleanup();
     localStorage.clear();
   });
+
+  // 布局选择器已从原生 select 改为手写下拉（MindmapSelect）：触发钮的
+  // 文字就是当前值（label），选择 = 打开弹层后点选项。两个组件级 describe
+  // 都要用，所以 helper 提到这里共享。
+  const LAYOUT_LABEL: Record<string, string> = Object.fromEntries(
+    MINDMAP_LAYOUT_LIST.map((l) => [l.id, l.label]),
+  );
+  const picker = () => screen.getByLabelText("导图布局");
+  // 触发钮显示的是 label；旧断言的口径是布局 id——反查回 id，让历史断言
+  // （toBe("bidirectional") 等）原样成立。
+  const pickerValue = () => {
+    const shown = (picker().textContent ?? "").trim();
+    return MINDMAP_LAYOUT_LIST.find((l) => l.label === shown)?.id ?? shown;
+  };
+  const pickLayout = (id: string) => {
+    fireEvent.click(picker());
+    fireEvent.click(screen.getByRole("option", { name: LAYOUT_LABEL[id] }));
+  };
 
   describe("存储层", () => {
     it("按文档键存取折叠的节点 id", () => {
@@ -212,7 +231,6 @@ describe("折叠状态持久化", () => {
    * because "the layout changed" and "the nodes moved" are different claims.
    */
   describe("布局的按文档记忆（组件）", () => {
-    const picker = () => screen.getByLabelText("导图布局") as HTMLSelectElement;
     const nodePoints = () =>
       Array.from(document.querySelectorAll(".mindmap-node-interactive")).map((el) => nodePoint(el));
     const leftmostX = () => Math.min(...nodePoints().map((point) => point.x));
@@ -222,13 +240,13 @@ describe("折叠状态持久化", () => {
 
       render(<MindmapView title="测试" source={SOURCE} documentKey="/vault/a.md" />);
 
-      expect(picker().value).toBe("bidirectional");
+      expect(pickerValue()).toBe("bidirectional");
     });
 
     it("没有记录时停在默认布局", () => {
       render(<MindmapView title="测试" source={SOURCE} documentKey="/vault/b.md" />);
 
-      expect(picker().value).toBe("logic");
+      expect(pickerValue()).toBe("logic");
     });
 
     it("切换后写回这篇文档，并真的把分支排到另一侧", () => {
@@ -238,7 +256,7 @@ describe("折叠状态持久化", () => {
       // leftmost node on the canvas is the root itself.
       expect(leftmostX()).toBe(nodePoint(".mindmap-node-interactive.is-root").x);
 
-      fireEvent.change(picker(), { target: { value: "bidirectional" } });
+      pickLayout("bidirectional");
 
       // ...and the bidirectional layout puts at least one branch on the left.
       expect(leftmostX()).toBeLessThan(nodePoint(".mindmap-node-interactive.is-root").x);
@@ -248,7 +266,7 @@ describe("折叠状态持久化", () => {
     it("选时间轴后分支分居根的上下两侧", () => {
       render(<MindmapView title="测试" source={SOURCE} documentKey="/vault/e.md" />);
 
-      fireEvent.change(picker(), { target: { value: "timeline" } });
+      pickLayout("timeline");
 
       const root = nodePoint(".mindmap-node-interactive.is-root");
       const nodes = nodePoints();
@@ -261,7 +279,7 @@ describe("折叠状态持久化", () => {
     it("选径向后节点围到根的四周", () => {
       render(<MindmapView title="测试" source={SOURCE} documentKey="/vault/d.md" />);
 
-      fireEvent.change(picker(), { target: { value: "radial" } });
+      pickLayout("radial");
 
       const root = nodePoint(".mindmap-node-interactive.is-root");
       const nodes = nodePoints();
@@ -280,9 +298,9 @@ describe("折叠状态持久化", () => {
       // key would make every such preview share one.
       render(<MindmapView title="测试" source={SOURCE} />);
 
-      expect(picker().value).toBe("logic");
+      expect(pickerValue()).toBe("logic");
 
-      fireEvent.change(picker(), { target: { value: "bidirectional" } });
+      pickLayout("bidirectional");
 
       expect(localStorage.getItem("bookmd.mindmap.layout.v1")).toBeNull();
     });
@@ -298,8 +316,6 @@ describe("折叠状态持久化", () => {
    * one a reader actually sees.
    */
   describe("折叠按钮的落点（组件）", () => {
-    const picker = () => screen.getByLabelText("导图布局") as HTMLSelectElement;
-
     /** The toggle for a node, in that node's own coordinates, plus its box. */
     function toggleOf(label: string) {
       const group = screen.getByText(label).closest(".mindmap-node-interactive");
@@ -326,14 +342,14 @@ describe("折叠状态持久化", () => {
       expect(rooted.x).toBeCloseTo(rooted.width + 1);
       expect(rooted.y).toBeCloseTo(rooted.height / 2);
 
-      fireEvent.change(picker(), { target: { value: "timeline" } });
+      pickLayout("timeline");
 
       // The first branch hangs above the axis, so its toggle goes on top of it.
       const above = toggleOf("父节点");
       expect(above.y).toBeCloseTo(-1);
       expect(above.x).toBeCloseTo(above.width / 2);
 
-      fireEvent.change(picker(), { target: { value: "radial" } });
+      pickLayout("radial");
 
       // Radial children are spread around the node, so the toggle is placed by
       // offset on the outward edge rather than on a named one.

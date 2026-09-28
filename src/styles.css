@@ -9626,8 +9626,7 @@ body:has(.flash-capsule-overlay) {
 }
 
 /* 主题与布局两个下拉别把顶栏撑宽：它们是选了就走的控件，不是要读的内容。 */
-.mindmap-theme-select,
-.mindmap-layout-select {
+.mindmap-select-trigger {
   max-width: 132px;
 }
 
@@ -13474,16 +13473,21 @@ body:has(.flash-capsule-overlay) {
   padding: 0 8px;
 }
 
-.mindmap-theme-select,
-.mindmap-layout-select {
+/* 手写下拉的触发钮。为什么不再是原生 <select>：弹出的列表由操作系统绘制，
+   不随应用主题重绘，而 Windows 的 Chromium/Edge 对 option 的样式化是黑盒——
+   color/background/自定义属性是否生效无法依赖，深色主题下菜单项实测掉到
+   1.22:1。手写弹层（MindmapSelect，portal 到 body）让颜色回到普通 DOM，
+   全局主题令牌完全生效；键盘与 ARIA 契约由组件自带。 */
+.mindmap-select-trigger {
   appearance: none;
-  -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 4px 20px 4px 8px;
   border: 1px solid rgba(148, 163, 184, 0.28);
   border-radius: 6px;
   background-color: transparent;
-  /* The chevron is drawn rather than taken from the OS, since appearance: none
-     removes it. Kept inline so the rule needs no asset. */
+  /* chevron 画出来而不是取自系统——手写控件本来就没有系统箭头。 */
   background-image:
     linear-gradient(45deg, transparent 50%, currentColor 50%),
     linear-gradient(135deg, currentColor 50%, transparent 50%);
@@ -13494,50 +13498,65 @@ body:has(.flash-capsule-overlay) {
     4px 4px,
     4px 4px;
   background-repeat: no-repeat;
-  /* 正文色，与旁边的按钮一致 —— 这套下拉此前用 --text-primary，在没有定义它的主题里
-     会落回一个偏暗的值，在深色底上看着像被禁用。 */
   color: var(--text);
   font-size: 12px;
   font-weight: 500;
+  font-family: inherit;
   cursor: pointer;
   transition:
     border-color 0.15s ease,
     background-color 0.15s ease;
 }
 
-.mindmap-theme-select:hover,
-.mindmap-layout-select:hover {
+.mindmap-select-trigger:hover {
   border-color: rgba(var(--accent-info-rgb), 0.55);
 }
 
-.mindmap-theme-select:focus-visible,
-.mindmap-layout-select:focus-visible {
+.mindmap-select-trigger:focus-visible {
   outline: 2px solid var(--accent-info);
   outline-offset: 1px;
 }
 
-/* The dropdown list itself is drawn by the OS. Three separate traps here, all
-   hit for real:
-   1. The closed control is `background: transparent`, so on platforms where
-      options inherit it the list is unreadable — hence an explicit background.
-   2. Whatever background we set here, the list does NOT repaint with the app
-      theme: it is the OS popup. The previous rule paired a CONSTANT dark
-      background (`--surface-1` is deliberately never bridged, so #1e293b was
-      what painted) with a THEME-FOLLOWING text color (`--text-primary` is
-      bridged to `--text`) — under the light themes the dark text landed on
-      the dark navy at 1.22:1, invisible.
-   3. The reverse pairing (theme-following background, constant text) fails
-      the same way on the dark themes. The only shape that holds is BOTH ends
-      from the same theme block: --surface and --text are defined together in
-      every theme (light #ffffff/#18181b, eink #fbf9f4/#1a1a1a, twitter
-      #0f1419/#e7e9ea), so the popup follows the app theme and keeps the
-      token system's own contrast guarantee. The companion guard
-      (mindmap-select-contrast.test.ts) pins the PAIR, so neither end can be
-      re-themed alone. */
-.mindmap-theme-select option,
-.mindmap-layout-select option {
+/* 弹层：普通 DOM（portal 到 body），全部颜色随主题令牌走。
+   底/字成对同源（--surface/--text 在每个主题块成对定义），对比度由
+   mindmap-select-contrast.test.ts 逐主题验算钉住。 */
+.mindmap-select-pop {
+  position: fixed;
+  z-index: 2200;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 6px;
   background: var(--surface);
   color: var(--text);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.mindmap-select-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  user-select: none;
+}
+
+.mindmap-select-option.is-active {
+  background: var(--surface-2);
+}
+
+.mindmap-select-option.is-current {
+  color: var(--accent-info);
+}
+
+.mindmap-select-check {
+  flex: none;
 }
 
 /* ── End mind map theme and layout pickers ── */

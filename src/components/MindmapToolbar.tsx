@@ -13,6 +13,7 @@ import {
   UnfoldVertical,
 } from "lucide-react";
 import { MindmapExportMenu } from "./MindmapExportMenu";
+import { MindmapSelect } from "./mindmap/MindmapSelect";
 import { MindmapSearchGroup, type MindmapSearchGroupProps } from "./MindmapSearchGroup";
 import { MindmapZoomGroup } from "./MindmapZoomGroup";
 import { MINDMAP_THEME_LIST } from "../core/mindmapThemes";
@@ -270,6 +271,11 @@ export function MindmapToolbar({
   const signatureRef = useRef("");
   /** Bumped once the webfonts land, because they change every width. */
   const [fontEpoch, setFontEpoch] = useState(0);
+
+  // 下拉触发钮上显示的文字。id 不在列表里时（历史文件读回的旧 id）显示
+  // 原始 id，而不是悄悄顶替成第一项——错了要说出来。
+  const themeLabel = MINDMAP_THEME_LIST.find((t) => t.id === themeId)?.label ?? themeId;
+  const layoutLabel = MINDMAP_LAYOUT_LIST.find((l) => l.id === layoutId)?.label ?? layoutId;
 
   /**
    * Choose the arrangement, by measuring what the bar currently holds.
@@ -584,44 +590,35 @@ export function MindmapToolbar({
         {/* In-Canvas Search Toolbar Group */}
         <MindmapSearchGroup {...search} />
 
-        {/* Theme and layout pickers. Native selects rather than hand-rolled
-            dropdowns: there are a handful of options, none of them needs a
-            preview, and a select arrives with the keyboard handling and
-            accessibility a custom menu would have to reimplement. Both
-            repaint or reposition only what nobody has pinned by hand or
-            reordered, so neither needs a confirmation. */}
+        {/* 主题与布局两项在 id 不在列表里时（历史文件读回的旧 id）显示原始
+            id，而不是悄悄顶替成第一项——错了要说出来。 */}
+
+        {/* Theme and layout pickers. They were native <select>s for the free
+            keyboard handling, but the popup list is drawn by the OS and does
+            not repaint with the app theme — on Windows the option colors are
+            an unfixable black box, and the menu items measured 1.22:1 under
+            the light themes. MindmapSelect reimplements the keyboard and
+            listbox contract with plain DOM, where the theme tokens work. */}
         <div className="mindmap-toolbar-btn-group mindmap-theme-group">
           <Palette size={14} className="text-cyan" />
-          <select
-            className="mindmap-theme-select"
+          <MindmapSelect
             value={themeId}
-            onChange={(e) => onPickTheme(e.target.value)}
-            title="切换主题（不会改变手工设置过样式的节点）"
-            aria-label="导图主题"
-          >
-            {MINDMAP_THEME_LIST.map((option) => (
-              <option key={option.id} value={option.id} title={option.description}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+            options={MINDMAP_THEME_LIST}
+            onChange={onPickTheme}
+            ariaLabel="导图主题"
+            displayLabel={themeLabel}
+          />
         </div>
 
         <div className="mindmap-toolbar-btn-group mindmap-layout-group">
           <Network size={14} className="text-cyan" />
-          <select
-            className="mindmap-layout-select"
+          <MindmapSelect
             value={layoutId}
-            onChange={(e) => onPickLayout(e.target.value)}
-            title="切换布局（只改变节点位置，不改动文档与节点样式）"
-            aria-label="导图布局"
-          >
-            {MINDMAP_LAYOUT_LIST.map((option) => (
-              <option key={option.id} value={option.id} title={option.description}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+            options={MINDMAP_LAYOUT_LIST}
+            onChange={onPickLayout}
+            ariaLabel="导图布局"
+            displayLabel={layoutLabel}
+          />
         </div>
 
         {/* Outline numbering: a toggle rather than a picker, because the useful

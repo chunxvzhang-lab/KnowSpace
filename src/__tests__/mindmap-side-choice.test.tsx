@@ -11,9 +11,11 @@ import { MindmapView } from "../components/MindmapView";
  */
 const SOURCE = ["- 父节点", "  - 子节点甲", "  - 子节点乙", "- 第二个分支"].join("\n");
 
-/** 工具栏上的布局选择器，按它的无障碍名字找。 */
+/** 工具栏上的布局选择器，按它的无障碍名字找。选择器是手写下拉
+ * （MindmapSelect）：打开弹层后点目标选项。 */
 function switchToBidirectional() {
-  fireEvent.change(screen.getByLabelText("导图布局"), { target: { value: "bidirectional" } });
+  fireEvent.click(screen.getByLabelText("导图布局"));
+  fireEvent.click(screen.getByRole("option", { name: "双向" }));
 }
 
 describe("双向布局里新建分支先问放哪边", () => {
