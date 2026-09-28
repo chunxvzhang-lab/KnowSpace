@@ -53,52 +53,64 @@ const highlightCache = new Map<string, string>();
 const MAX_RENDER_CACHE_SIZE = 30;
 const renderedMarkdownCache = new Map<string, RenderedChapter>();
 
-const markdown: MarkdownIt = new MarkdownIt({
-  html: true,
-  linkify: true,
-  typographer: true,
-  highlight: (source: string, language: string): string => {
-    const languageName = normalizeFenceLanguage(language);
-    if (isMermaidFence(languageName)) {
-      // Store the raw source as base64 so the renderer reads it back without
-      // any HTML-entity distortion (e.g. --> would become --&gt; if escaped).
-      const b64 = btoa(unescape(encodeURIComponent(source)));
-      return `<pre class="mermaid" data-mermaid-src="${b64}">${markdown.utils.escapeHtml(source)}</pre>`;
-    }
-    const displayLang = languageName || "";
-    if (
-      source.length <= maxHighlightedCodeLength &&
-      languageName &&
-      hljs.getLanguage(languageName)
-    ) {
-      const hlKey = `${languageName}:${source}`;
-      const cached = highlightCache.get(hlKey);
-      if (cached !== undefined) return cached;
-      try {
-        const highlighted = `<pre class="hljs" data-language="${displayLang}"><code class="language-${displayLang}">${hljs.highlight(source, { language: languageName }).value}</code></pre>`;
-        if (highlightCache.size >= MAX_HIGHLIGHT_CACHE_SIZE) {
-          const firstKey = highlightCache.keys().next().value;
-          if (firstKey !== undefined) highlightCache.delete(firstKey);
-        }
-        highlightCache.set(hlKey, highlighted);
-        return highlighted;
-      } catch {
-        // Fall back to escaping below.
+/**
+ * 构建渲染管线的一个实例。
+ *
+ * 生产用下面的模块单例；成本分解 bench（bench-render-breakdown）也走这里
+ * 拿同一条管线——复制一份管线配置的基准测的是另一条管线，数字再漂亮也不
+ * 代表生产（规则 1）。frontMatter 回调是实例间唯一的差异点，提成参数。
+ */
+export function buildMarkdownIt(onFrontMatter: (frontMatter: string) => void): MarkdownIt {
+  const md: MarkdownIt = new MarkdownIt({
+    html: true,
+    linkify: true,
+    typographer: true,
+    highlight: (source: string, language: string): string => {
+      const languageName = normalizeFenceLanguage(language);
+      if (isMermaidFence(languageName)) {
+        // Store the raw source as base64 so the renderer reads it back without
+        // any HTML-entity distortion (e.g. --> would become --&gt; if escaped).
+        const b64 = btoa(unescape(encodeURIComponent(source)));
+        return `<pre class="mermaid" data-mermaid-src="${b64}">${md.utils.escapeHtml(source)}</pre>`;
       }
-    }
-    return `<pre class="hljs" data-language="${displayLang}"><code class="language-${displayLang}">${markdown.utils.escapeHtml(source)}</code></pre>`;
-  },
-})
-  .use(sourceLineMappingPlugin)
-  .use(mathPlugin)
-  .use(blockAnchorPlugin)
-  .use(wikiLinkPlugin)
-  .use(taskLists, { enabled: true, label: true })
-  .use(frontMatterPlugin, (frontMatter: string) => {
-    capturedFrontMatter = frontMatter;
-  });
+      const displayLang = languageName || "";
+      if (
+        source.length <= maxHighlightedCodeLength &&
+        languageName &&
+        hljs.getLanguage(languageName)
+      ) {
+        const hlKey = `${languageName}:${source}`;
+        const cached = highlightCache.get(hlKey);
+        if (cached !== undefined) return cached;
+        try {
+          const highlighted = `<pre class="hljs" data-language="${displayLang}"><code class="language-${displayLang}">${hljs.highlight(source, { language: languageName }).value}</code></pre>`;
+          if (highlightCache.size >= MAX_HIGHLIGHT_CACHE_SIZE) {
+            const firstKey = highlightCache.keys().next().value;
+            if (firstKey !== undefined) highlightCache.delete(firstKey);
+          }
+          highlightCache.set(hlKey, highlighted);
+          return highlighted;
+        } catch {
+          // Fall back to escaping below.
+        }
+      }
+      return `<pre class="hljs" data-language="${displayLang}"><code class="language-${displayLang}">${md.utils.escapeHtml(source)}</code></pre>`;
+    },
+  })
+    .use(sourceLineMappingPlugin)
+    .use(mathPlugin)
+    .use(blockAnchorPlugin)
+    .use(wikiLinkPlugin)
+    .use(taskLists, { enabled: true, label: true })
+    .use(frontMatterPlugin, onFrontMatter);
 
-markdown.disable("lheading");
+  md.disable("lheading");
+  return md;
+}
+
+const markdown: MarkdownIt = buildMarkdownIt((frontMatter) => {
+  capturedFrontMatter = frontMatter;
+});
 
 const cardMarkdownCache = new Map<string, string>();
 const MAX_CARD_CACHE_SIZE = 250;
