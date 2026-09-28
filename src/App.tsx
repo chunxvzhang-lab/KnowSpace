@@ -19,6 +19,7 @@ import { useChapterLoading } from "./hooks/useChapterLoading";
 import { useChapterRename } from "./hooks/useChapterRename";
 import { useColumnResize } from "./hooks/useColumnResize";
 import { useDesktopBridgeSync } from "./hooks/useDesktopBridgeSync";
+import { useDisposableListener } from "./hooks/useDisposableListener";
 import { useDocumentAuthoring } from "./hooks/useDocumentAuthoring";
 import { useDocumentCreation } from "./hooks/useDocumentCreation";
 import { useVaultOpening } from "./hooks/useVaultOpening";
@@ -442,7 +443,11 @@ export function App() {
     navLockUntilRef,
   });
 
-  // Sync fullscreen state
+  // Sync fullscreen state. The document-side listener goes through the
+  // lifecycle guard (2-10): paired removal is structural, not manual.
+  useDisposableListener(document, "fullscreenchange", () => {
+    setIsFullscreen(Boolean(document.fullscreenElement));
+  });
   useEffect(() => {
     if (window.bookMDDesktop?.system.isFullScreen) {
       window.bookMDDesktop.system.isFullScreen().then((full) => {
@@ -452,13 +457,8 @@ export function App() {
     const unsubDesktop = window.bookMDDesktop?.system.onFullScreenChanged?.((full) => {
       setIsFullscreen(Boolean(full));
     });
-    const handleDocFullscreenChange = () => {
-      setIsFullscreen(Boolean(document.fullscreenElement));
-    };
-    document.addEventListener("fullscreenchange", handleDocFullscreenChange);
     return () => {
       unsubDesktop?.();
-      document.removeEventListener("fullscreenchange", handleDocFullscreenChange);
     };
   }, []);
 
