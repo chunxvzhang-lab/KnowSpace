@@ -1,7 +1,17 @@
-import { memo, useCallback, useLayoutEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { GitFork } from "lucide-react";
 import type { RenderedBlock, RenderedChapter } from "../core/types";
-import { createMermaidRenderPool, type MermaidTheme } from "../services/mermaid";
+import {
+  createMermaidRenderPool,
+  type MermaidTheme,
+  type MermaidRenderPool,
+} from "../services/mermaid";
+import { blockKeyOf, VIRTUAL_MIN_BLOCKS } from "../services/readerVirtual";
+import {
+  registerVirtualController,
+  unregisterVirtualController,
+  VirtualReaderController,
+} from "./reader/ReaderVirtualDom";
 import type { LightboxMedia } from "./MediaLightbox";
 import type { WikiLinkTarget } from "./EditorPane";
 
@@ -49,21 +59,9 @@ type ReaderPaneProps = {
  * created when it removes the parent).
  */
 
-const FNV_OFFSET = 0x811c9dc5;
-const FNV_PRIME = 0x01000193;
-
-function fnv1a(value: string): number {
-  let hash = FNV_OFFSET >>> 0;
-  for (let i = 0; i < value.length; i += 1) {
-    hash ^= value.charCodeAt(i);
-    hash = Math.imul(hash, FNV_PRIME) >>> 0;
-  }
-  return hash >>> 0;
-}
-
 /** Identity of one block: where it came from plus what it now contains. */
 function blockKey(block: RenderedBlock): string {
-  return `${block.sourceStart}-${block.sourceEnd}:${fnv1a(block.html).toString(36)}`;
+  return blockKeyOf(block);
 }
 
 /** One inserted unit: the block's element plus the text nodes that follow it. */
@@ -92,6 +90,40 @@ function readExistingUnits(node: HTMLElement): ExistingUnit[] {
 }
 
 const BLOCK_KEY_ATTR = "data-block-key";
+
+/**
+ * Give every undecorated code block under `root` its language badge + copy
+ * button. Idempotent (the already-decorated guard), so it runs both over the
+ * whole article after a settle render and over each block the virtualizer
+ * materializes on scroll — a block scrolled into view late is decorated the
+ * moment it exists.
+ */
+function decorateCodeHeaders(root: HTMLElement): void {
+  const preElements = root.querySelectorAll<HTMLPreElement>("pre.hljs, pre:not(.mermaid)");
+  preElements.forEach((pre) => {
+    if (pre.querySelector(".code-header-bar")) return; // Already decorated
+
+    const rawLang = pre.getAttribute("data-language") || "";
+    const trimmedLang = rawLang.trim();
+    const displayLang =
+      trimmedLang &&
+      trimmedLang.toLowerCase() !== "text" &&
+      trimmedLang.toLowerCase() !== "plaintext" &&
+      trimmedLang.toLowerCase() !== "code"
+        ? trimmedLang.toUpperCase()
+        : "";
+
+    const headerBar = document.createElement("div");
+    headerBar.className = "code-header-bar";
+    headerBar.innerHTML = `
+      ${displayLang ? `<span class="code-lang-label">${displayLang}</span>` : ""}
+      <button type="button" class="code-copy-btn" title="复制代码到剪贴板">📋 复制</button>
+    `;
+
+    pre.style.position = "relative";
+    pre.insertBefore(headerBar, pre.firstChild);
+  });
+}
 
 /** Parse one block's HTML with its identity key stamped on the element. */
 function blockFragment(block: RenderedBlock, key: string): DocumentFragment {
@@ -164,8 +196,11 @@ export const ReaderPane = memo(function ReaderPane({
   onOpenBacklinks,
 }: ReaderPaneProps) {
   const articleRef = useRef<HTMLElement | null>(null);
-  // Identity of the Mermaid pool currently alive for this article, if any.
-  const mermaidPoolRef = useRef<{ token: string } | null>(null);
+  // Identity of the Mermaid pool currently alive for this article, plus the
+  // pool object so newly materialized blocks can hand it their diagrams.
+  const mermaidPoolRef = useRef<{ token: string; pool: MermaidRenderPool | null } | null>(null);
+  // The window controller while the article is virtualized; null otherwise.
+  const controllerRef = useRef<VirtualReaderController | null>(null);
   const [hoverPopover, setHoverPopover] = useState<{
     target: string;
     label: string;
@@ -190,6 +225,95 @@ export const ReaderPane = memo(function ReaderPane({
     doc: string | null;
   } | null>(null);
 
+  // Which scroller the live controller is registered against (so a swap of
+  // document / mount can unregister cleanly before registering anew).
+  const registeredContainerRef = useRef<HTMLElement | null>(null);
+
+  // Whether the current chapter takes the virtualized path at all. Short
+  // documents, gated documents and block-less chapters keep today's DOM.
+  const virtualActive = Boolean(chapter?.blocks && chapter.blocks.length >= VIRTUAL_MIN_BLOCKS);
+
+  /**
+   * One materialized block appeared (or a scrolled-in window was built):
+   * decorate its code and hand any fresh `pre.mermaid` to the live pool. The
+   * pool exists for the whole document (see the Mermaid effect), so a diagram
+   * outside the last window is still rendered lazily once its block is.
+   */
+  const handleMaterialize = useCallback((elements: HTMLElement[]) => {
+    for (const el of elements) decorateCodeHeaders(el);
+    const pool = mermaidPoolRef.current?.pool;
+    if (pool) pool.observe(elements);
+  }, []);
+
+  const disposeController = useCallback((container: HTMLElement | null) => {
+    const controller = controllerRef.current;
+    if (!controller) return;
+    const key = container ?? registeredContainerRef.current;
+    if (key) unregisterVirtualController(key);
+    controller.dispose();
+    controllerRef.current = null;
+    registeredContainerRef.current = null;
+  }, []);
+
+  const applyVirtual = useCallback(
+    (container: HTMLElement, node: HTMLElement, blocks: readonly RenderedBlock[]) => {
+      const context = { theme: mermaidTheme, fontScale };
+      const existing = controllerRef.current;
+      if (existing && registeredContainerRef.current === container) {
+        existing.sync(node, blocks, context);
+        return;
+      }
+      if (existing) {
+        if (registeredContainerRef.current) {
+          unregisterVirtualController(registeredContainerRef.current);
+        }
+        existing.dispose();
+      }
+      const controller = new VirtualReaderController(container, node, blocks, context, {
+        onMaterialize: handleMaterialize,
+      });
+      controllerRef.current = controller;
+      registeredContainerRef.current = container;
+      registerVirtualController(container, controller);
+    },
+    [fontScale, handleMaterialize, mermaidTheme],
+  );
+
+  // The virtualized lifecycle: the scroll/resize listeners that move the
+  // window, and the print handlers that expand it to the whole document first
+  // (beforeprint) and give it back after (afterprint). This effect is inert
+  // for every short document - no listeners, no ResizeObserver, no printing
+  // hook - which is why 2-2 leaves the vast majority of notes byte-for-byte
+  // unchanged. The controller itself is created in the paint effect above;
+  // these callbacks read it through the ref so a settle render never detaches
+  // a listener mid-scroll.
+  useEffect(() => {
+    if (!virtualActive) return undefined;
+    const container = containerRef.current;
+    if (!container) return undefined;
+
+    const handleScroll = () => controllerRef.current?.onScroll();
+    container.addEventListener("scroll", handleScroll, { passive: true });
+
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined") {
+      resizeObserver = new ResizeObserver(() => controllerRef.current?.onResize());
+      resizeObserver.observe(container);
+    }
+
+    const handleBeforePrint = () => controllerRef.current?.materializeAll();
+    const handleAfterPrint = () => controllerRef.current?.resumeWindowing();
+    window.addEventListener("beforeprint", handleBeforePrint);
+    window.addEventListener("afterprint", handleAfterPrint);
+
+    return () => {
+      container.removeEventListener("scroll", handleScroll);
+      resizeObserver?.disconnect();
+      window.removeEventListener("beforeprint", handleBeforePrint);
+      window.removeEventListener("afterprint", handleAfterPrint);
+    };
+  }, [containerRef, virtualActive]);
+
   // Paint the article: block-spliced when the chapter carries blocks,
   // whole-innerHTML exactly as before when it does not (secondary panes, web
   // renders, gated documents). Runs before paint, after React has committed
@@ -210,16 +334,30 @@ export const ReaderPane = memo(function ReaderPane({
     appliedRenderRef.current = { node, chapter: chapter ?? null, html, doc: documentKey ?? null };
     const blocks = chapter?.blocks;
     if (blocks) {
+      // Virtualized (2-2): a window around the viewport, plus source-line
+      // anchors, instead of every block. The controller owns the article's
+      // children; scroll / resize / print drive it from the effects below.
+      if (blocks.length >= VIRTUAL_MIN_BLOCKS) {
+        const container = containerRef.current;
+        if (container) {
+          applyVirtual(container, node, blocks);
+          return;
+        }
+        // No scroller yet (defensive): fall through to the full splice, which
+        // the scroll effect will re-run through the controller once mounted.
+      }
+      disposeController(containerRef.current);
       reconcileBlocks(node, blocks);
       return;
     }
+    disposeController(containerRef.current);
     // Mermaid mutates the sanitized article HTML after React commits it —
     // the old contract that kept `dangerouslySetInnerHTML` keyed on the html
     // string rather than the chapter object. Same guard here: an equal html
     // string is not rewritten, so rendered SVGs survive.
     if (applied && applied.node === node && applied.html === html) return;
     node.innerHTML = html;
-  }, [chapter, documentKey]);
+  }, [applyVirtual, chapter, containerRef, disposeController, documentKey]);
 
   const attachReader = useCallback(
     (node: HTMLElement | null) => {
@@ -405,35 +543,14 @@ export const ReaderPane = memo(function ReaderPane({
     [onElementClick],
   );
 
-  // Decorate code blocks with language badge and copy button
+  // Decorate code blocks with language badge and copy button. Over the whole
+  // article (which, virtualized, is just the current window) on every render;
+  // newly materialized blocks are also decorated from the controller's
+  // onMaterialize, so this covers settle renders and the fallback path.
   useLayoutEffect(() => {
     const node = articleRef.current;
     if (!node) return;
-
-    const preElements = node.querySelectorAll<HTMLPreElement>("pre.hljs, pre:not(.mermaid)");
-    preElements.forEach((pre) => {
-      if (pre.querySelector(".code-header-bar")) return; // Already decorated
-
-      const rawLang = pre.getAttribute("data-language") || "";
-      const trimmedLang = rawLang.trim();
-      const displayLang =
-        trimmedLang &&
-        trimmedLang.toLowerCase() !== "text" &&
-        trimmedLang.toLowerCase() !== "plaintext" &&
-        trimmedLang.toLowerCase() !== "code"
-          ? trimmedLang.toUpperCase()
-          : "";
-
-      const headerBar = document.createElement("div");
-      headerBar.className = "code-header-bar";
-      headerBar.innerHTML = `
-        ${displayLang ? `<span class="code-lang-label">${displayLang}</span>` : ""}
-        <button type="button" class="code-copy-btn" title="复制代码到剪贴板">📋 复制</button>
-      `;
-
-      pre.style.position = "relative";
-      pre.insertBefore(headerBar, pre.firstChild);
-    });
+    decorateCodeHeaders(node);
   }, [chapter?.html]);
 
   // Mermaid rendering pipeline: a viewport-aware lazy pool (plan §6.3 2-5).
@@ -455,10 +572,16 @@ export const ReaderPane = memo(function ReaderPane({
   // cancelled, silently skipping the second setup and losing every diagram.
   useLayoutEffect(() => {
     const node = articleRef.current;
-    if (!node?.querySelector("pre.mermaid")) return undefined;
+    if (!node) return undefined;
+    // The pool must exist for the WHOLE document when any diagram exists, not
+    // just when one happens to be in the current virtual window: a diagram
+    // scrolled into view later is handed to `pool.observe` by the controller.
+    // For non-virtual chapters the querySelector check is the cheap guard it
+    // always was.
+    if (!chapter?.hasMermaid && !node.querySelector("pre.mermaid")) return undefined;
     const renderToken = `${chapter?.checksum ?? ""}:${mermaidTheme}`;
     if (mermaidPoolRef.current?.token === renderToken) return undefined;
-    mermaidPoolRef.current = { token: renderToken };
+    mermaidPoolRef.current?.pool?.cancel();
     node.dataset.mermaidRenderToken = renderToken;
     node.dataset.mermaidRenderStatus = "scheduled";
     const pool = createMermaidRenderPool(node, {
@@ -474,12 +597,20 @@ export const ReaderPane = memo(function ReaderPane({
         onMermaidError();
       },
     });
+    mermaidPoolRef.current = { token: renderToken, pool };
     pool.start();
     // Printing and PDF export capture the *live* DOM: a diagram the reader
     // never scrolled to would otherwise print as raw source text. beforeprint
     // flushes the whole pool; interactive printing leaves ample time for the
     // sequential render, and the pool's no-op skip keeps already-rendered
     // diagrams out of the cost.
+    //
+    // ORDERING (2-2): the virtualizer's beforeprint listener (registered in
+    // the effect above, i.e. earlier, so it fires first) materializes the
+    // whole window first; THIS listener runs after it, so `liveDiagrams()`
+    // sees every diagram the now-fully-materialized article contains. A
+    // beforeprint flush that ran before virtualize-flush would render only
+    // the diagrams in the last window and print the rest as raw source.
     const flushForPrint = () => {
       void pool.flush().catch(() => {
         // renderDiagram handles per-diagram failures internally; a throw here
@@ -490,8 +621,11 @@ export const ReaderPane = memo(function ReaderPane({
     return () => {
       window.removeEventListener("beforeprint", flushForPrint);
       pool.cancel();
+      if (mermaidPoolRef.current?.pool === pool) {
+        mermaidPoolRef.current = null;
+      }
     };
-  }, [chapter?.checksum, mermaidTheme, onMermaidError]);
+  }, [chapter?.checksum, chapter?.hasMermaid, mermaidTheme, onMermaidError, documentKey]);
 
   return (
     <main

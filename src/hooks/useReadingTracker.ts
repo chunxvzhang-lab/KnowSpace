@@ -94,6 +94,13 @@ function updateActiveHeading(
 
   const containerTop = container.getBoundingClientRect().top;
   let selectedId = headings[0].id;
+  // Under block virtualization (wave 2-2) a heading outside the materialized
+  // window is not in the DOM, so `element` is null and it is skipped: the
+  // active-heading read lags to the last heading that IS materialized. This is
+  // accepted for this wave — reading position is saved by scrollRatio (which
+  // the source-line anchors keep accurate), and the TOC highlight refreshes
+  // once that heading's own window materializes. It never mis-points to a
+  // heading that is not a prefix of the current one.
   for (const heading of headings) {
     const element =
       container.querySelector<HTMLElement>(`[data-heading-id="${CSS.escape(heading.id)}"]`) ||

@@ -6,11 +6,27 @@ import {
   findInChapter,
 } from "../services/markdown";
 import { searchVault } from "../services/searchIndexService";
+import { ensureBlockVisible } from "../components/reader/ReaderVirtualDom";
 import { useTabStore } from "../store/useTabStore";
 import { useUiStore } from "../store/useUiStore";
 import { useVaultStore } from "../store/useVaultStore";
 import type { RenderedChapter, SearchResult } from "../core/types";
 import type { DocumentSessionState } from "./useDocumentSession";
+
+/**
+ * The 1-based source line of a block-reference anchor (`^abc`), for jumping to
+ * a block that may be outside the virtualized window. The block-id markup lives
+ * in the source; locating it gives the reader the source line to materialize.
+ * Undefined when the marker is not found (a plain heading/anchor id has none).
+ */
+function blockRefLineInSource(source: string | undefined, blockId: string): number | undefined {
+  if (!source || !blockId) return undefined;
+  const at = source.indexOf(`^${blockId}`);
+  if (at < 0) return undefined;
+  let line = 1;
+  for (let i = 0; i < at; i += 1) if (source.charCodeAt(i) === 10) line += 1;
+  return line;
+}
 
 /**
  * A jump waiting for its document to finish loading.
@@ -106,7 +122,7 @@ export function useSearch({
   ]);
 
   const jumpToHeading = useCallback(
-    (headingId: string, behavior: ScrollBehavior = "smooth", highlight: boolean = false) => {
+    async (headingId: string, behavior: ScrollBehavior = "smooth", highlight = false) => {
       setActiveHeadingId(headingId);
 
       // Lock sync-scroll and reading tracker during navigation animation to eliminate jitter and feedback loops
@@ -121,11 +137,22 @@ export function useSearch({
       const heading = allHeadings.find(
         (h) => h.id === headingId || h.text.trim().toLowerCase() === headingId.trim().toLowerCase(),
       );
+      const cleanBlockId = headingId.replace(/^[#^]+/, "");
 
       // 1. If Reader pane is present (read or split mode), scroll preview accurately and scoped
       const container = readerRef.current;
       if (container) {
-        const cleanBlockId = headingId.replace(/^[#^]+/, "");
+        // Virtualized reader (2-2): the target block may be outside the current
+        // window, so materialize it before reaching for its element. A no-op
+        // when the scroller is not virtualized (short docs keep today's path).
+        // The nav lock above already covers the await's timing window — this
+        // does not re-lock.
+        await ensureBlockVisible(
+          container,
+          heading?.line ?? blockRefLineInSource(session?.source, cleanBlockId),
+          "start",
+        );
+
         const isBlockJump =
           headingId.startsWith("^") || headingId.includes("^") || cleanBlockId.length > 0;
         let target =
@@ -347,7 +374,7 @@ export function useSearch({
   }, []);
 
   const handleSearchJump = useCallback(
-    (result: SearchResult) => {
+    async (result: SearchResult) => {
       setActiveSearchMatchId(result.id ?? `match-${result.index}`);
 
       if (result.chapterId && result.chapterId !== chapterId) {
@@ -378,6 +405,12 @@ export function useSearch({
 
       const container = readerRef.current;
       if (!container) return;
+
+      // Virtualized reader (2-2): bring the result's block into the window
+      // before reaching for its element or marking its text. Out-of-window
+      // results simply have no marks until this materializes them; the results
+      // panel is unaffected (it lists from the search index, not the DOM).
+      await ensureBlockVisible(container, result.lineNumber, "start");
 
       // 1. Immediately wipe all previous highlights and marks across the whole DOM
       clearSearchHighlights();

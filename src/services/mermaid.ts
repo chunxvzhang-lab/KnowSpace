@@ -177,6 +177,15 @@ export type MermaidRenderPoolOptions = {
 
 export type MermaidRenderPool = {
   start: () => void;
+  /**
+   * Bring elements that entered the DOM after start() into the pool (the
+   * virtualized reader materializes a window at a time; a diagram scrolled
+   * into view is a new `pre.mermaid` the initial scan never saw). Each node
+   * is checked for being or containing an unrendered diagram and observed.
+   * A no-op when the environment has no IntersectionObserver - there the
+   * pool already flushed eagerly.
+   */
+  observe: (nodes: readonly HTMLElement[]) => void;
   /** Render every remaining diagram eagerly (print / capture correctness). */
   flush: () => Promise<void>;
   /** Abort: disconnect the observer, drop the queue, veto in-flight commits. */
@@ -295,6 +304,34 @@ export function createMermaidRenderPool(
     scheduleDrain();
   };
 
+  /** The IntersectionObserver, created once on first need; null without IO. */
+  const ensureObserver = (): IntersectionObserver | null => {
+    if (cancelled) return null;
+    if (observer) return observer;
+    if (typeof IntersectionObserver !== "function") return null;
+    observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          // First arrival is the only one that matters: the element leaves
+          // the pool's observation set and its render is idempotent per
+          // theme, so scrolling back never needs another enqueue.
+          observer?.unobserve(entry.target);
+          enqueue(entry.target as HTMLElement);
+        }
+      },
+      { root: options.root ?? null, rootMargin: `${MERMAID_POOL_ROOT_MARGIN_PX}px` },
+    );
+    return observer;
+  };
+
+  const unrenderedDiagramsIn = (el: HTMLElement): HTMLElement[] => {
+    if (el.classList.contains("mermaid") && !el.classList.contains("mermaid-rendered")) {
+      return [el];
+    }
+    return Array.from(el.querySelectorAll<HTMLElement>("pre.mermaid:not(.mermaid-rendered)"));
+  };
+
   const pool: MermaidRenderPool = {
     start: () => {
       if (cancelled || observer) return;
@@ -306,20 +343,23 @@ export function createMermaidRenderPool(
         void pool.flush().catch((error: unknown) => options.onError?.(error));
         return;
       }
-      observer = new IntersectionObserver(
-        (entries) => {
-          for (const entry of entries) {
-            if (!entry.isIntersecting) continue;
-            // First arrival is the only one that matters: the element leaves
-            // the pool's observation set and its render is idempotent per
-            // theme, so scrolling back never needs another enqueue.
-            observer?.unobserve(entry.target);
-            enqueue(entry.target as HTMLElement);
-          }
-        },
-        { root: options.root ?? null, rootMargin: `${MERMAID_POOL_ROOT_MARGIN_PX}px` },
-      );
-      for (const diagram of diagrams) observer.observe(diagram);
+      const created = ensureObserver();
+      if (!created) return;
+      for (const diagram of diagrams) created.observe(diagram);
+    },
+
+    observe: (nodes) => {
+      if (cancelled || nodes.length === 0) return;
+      // No IO in this engine: the pool already took the eager pass on start,
+      // so there is nothing lazy left to hand it - the diagrams are rendered
+      // or will be by a later materialize that the whole-document path covers.
+      if (typeof IntersectionObserver !== "function") return;
+      const created = ensureObserver();
+      if (!created) return;
+      for (const node of nodes)
+        for (const diagram of unrenderedDiagramsIn(node)) {
+          created.observe(diagram);
+        }
     },
 
     flush: async () => {

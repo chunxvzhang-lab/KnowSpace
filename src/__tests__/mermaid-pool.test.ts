@@ -230,6 +230,30 @@ describe("createMermaidRenderPool", () => {
     expect(near.querySelector("svg")).not.toBeNull();
   });
 
+  it("observe() renders a diagram that entered the DOM after start()", async () => {
+    // The virtualized reader materializes a window at a time; a diagram
+    // outside the first window never existed when start() scanned the DOM, so
+    // the controller hands its element to pool.observe() when it appears.
+    const container = document.createElement("article");
+    document.body.appendChild(container);
+    const pool = createMermaidRenderPool(container, { theme: "default" });
+    pool.start(); // no diagrams yet: start() creates nothing eagerly
+    expect(FakeIntersectionObserver.instances).toHaveLength(0);
+
+    const late = preWithRect(818, "graph TD\nNEAR-->X");
+    container.appendChild(late);
+    pool.observe([late]);
+    expect(FakeIntersectionObserver.instances).toHaveLength(1);
+    expect(FakeIntersectionObserver.instances[0].observed).toContain(late);
+
+    FakeIntersectionObserver.instances[0].trigger([{ target: late, isIntersecting: true }]);
+    await settle();
+    h.pending[0]();
+    await settle();
+    expect(late.querySelector("svg")).not.toBeNull();
+    pool.cancel();
+  });
+
   it("cached diagram SVGs replay without touching Mermaid", async () => {
     // Document 1 renders the NEAR source through the pool.
     const { container, near } = makeContainer();
