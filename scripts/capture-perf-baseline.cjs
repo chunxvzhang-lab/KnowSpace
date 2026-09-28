@@ -78,6 +78,10 @@ const LONGTASK_MS = 50; // guide 4.5 / plan §6.3 long-task threshold
 const SCROLL_FRAMES = 120;
 const TYPING_CHARS = 60;
 const TYPING_SETTLE_MS = 2500; // > the 350ms preview debounce + full re-render
+// 与 Mermaid 惰性池的 rootMargin 同源（src/services/mermaid.ts 的池常量）。
+// 首屏完成线 = 视口 ± 这个边距内的图全部画完；改了池的边距就要改这里，
+// 两边不一致时这个测量口径会悄悄说谎——这是它写成常量的原因。
+const MERMAID_VIEWPORT_MARGIN_PX = 300;
 
 /* ------------------------------------------------------------------ *
  * Metric registry — one source of truth for printing, the doc, and
@@ -137,7 +141,7 @@ const METRICS = [
     digits: 1,
     budget: "≤ 16.7（恒定 60FPS）",
     pass: (v) => v <= 16.7,
-    desc: "阅读模式下 rAF 循环逐帧 scrollBy(420px) 共 120 帧，rAF 时间戳差的分位数（in-page performance.now，非 CDP 往返）。",
+    desc: "分屏模式下 rAF 循环逐帧 scrollBy(420px) 共 120 帧，rAF 时间戳差的分位数（in-page performance.now，非 CDP 往返）。分屏是同步滚动工作唯一存在的模式——阅读模式下 useSyncScroll 本就惰性，量它等于没量。",
   },
   {
     key: "scroll_p95_frame_ms",
@@ -164,13 +168,24 @@ const METRICS = [
   {
     key: "mermaid_firstpaint_ms",
     scenario: "图表批量 (2-5)",
-    name: "30 张 Mermaid 图 · 首屏渲染总时长",
+    name: "视口内 Mermaid 图 · 首屏完成时长",
     unit: "ms",
     kind: "timing",
     digits: 1,
     budget: "< 80（§6.3 图表/公式批量；验收线 <50）",
     pass: (v) => v < 80,
-    desc: "语料 B：从第一个 pre.mermaid 进入 DOM 到第 30 张图渲染出 <svg> 的 in-page 计时（16ms 定时器轮询；空闲 headless 页的 rAF 会停摆，不能用于等待）。当前为急切全量串行渲染。",
+    desc: "语料 B（30 图）：article 带着 pre.mermaid 进入 DOM → 视口 ±300px 内全部图渲染出 <svg>。两端时间戳由注入页面的 MutationObserver 记录（轮询锚点出生即晚，量出来是 harness 不是应用）。惰性池语义下的首屏感知口径；急切全量版的「第 30 张完成」口径见 v2.7.0 基线历史。",
+  },
+  {
+    key: "mermaid_flush_ms",
+    scenario: "图表批量 (2-5)",
+    name: "beforeprint flush · 全部 30 图完成",
+    unit: "ms",
+    kind: "timing",
+    digits: 1,
+    budget: "—（口径项：打印/导出的完整性成本，允许慢于首屏，必须完整）",
+    pass: null,
+    desc: "dispatch beforeprint 后 30/30 张 svg 全部出现的时长。它同时是「懒加载不会吞掉任何一张图」的机器证明。",
   },
   {
     key: "mermaid_longtask_sum_ms",
@@ -692,7 +707,7 @@ function startPreview(preferredPort) {
   };
 }
 
-async function newSeededPage(browser, url, corpus) {
+async function newSeededPage(browser, url, corpus, opts = {}) {
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
     deviceScaleFactor: 1,
@@ -704,7 +719,56 @@ async function newSeededPage(browser, url, corpus) {
     mermaidDoc: corpus.mermaidDoc,
     vault: corpus.vault,
   });
+  // In-page event timestamps for the mermaid scenario. Needed because a
+  // polling/evaluate measurement anchor is born LATE — by the time CDP
+  // round-trips land in the page, the first viewportful of diagrams has
+  // already rendered and the window collapses to ~0ms (a false PASS that
+  // measures the harness, not the app). A MutationObserver installed before
+  // any app script records the real interval. Scoped to the mermaid scenario:
+  // a subtree observer over the whole document costs milliseconds on the
+  // long-doc scenario it does not serve.
+  if (opts.instrumentMermaid) {
+    await context.addInitScript(() => {
+      const marks = { firstPreAt: 0, svgAt: [] };
+      window.__perfMermaid = marks;
+      const obs = new MutationObserver((records) => {
+        for (const r of records) {
+          for (const n of r.addedNodes) {
+            if (!(n instanceof Element)) continue;
+            // "Diagram-bearing content entered the DOM" under whichever DOM
+            // shape React used: a subtree insert containing the pre, the
+            // article itself, or (the real path) dangerouslySetInnerHTML
+            // filling an empty article — where each block, pre.mermaid
+            // included, arrives as a DIRECT added node. One selector covers
+            // ancestor-and-self: matches() for self, querySelector for under.
+            if (!marks.firstPreAt) {
+              const hit =
+                (n.matches && n.matches("pre.mermaid")) ||
+                (n.querySelector && n.querySelector("pre.mermaid"));
+              if (hit) marks.firstPreAt = performance.now();
+            }
+            if (
+              n.tagName === "svg" &&
+              n.parentElement &&
+              n.parentElement.matches &&
+              n.parentElement.matches("pre.mermaid")
+            ) {
+              marks.svgAt.push(performance.now());
+            }
+          }
+        }
+      });
+      obs.observe(document, { childList: true, subtree: true });
+    });
+  }
   const page = await context.newPage();
+  // Disable the HTTP cache for this page — headless Edge shares one profile
+  // across contexts, so without this the warm-up run loads the async mermaid
+  // vendor chunk into the disk cache and every measured sample gets a ~0ms
+  // "first paint". A cold cache per sample is the honest comparison; a
+  // cache-warm number is a false PASS (caught in the first phase-2 capture).
+  const cdp = await context.newCDPSession(page);
+  await cdp.send("Network.setCacheDisabled", { cacheDisabled: true });
   page.setDefaultTimeout(90000);
   await page.goto(url, { waitUntil: "domcontentloaded" });
   return { context, page };
@@ -811,7 +875,9 @@ async function scenarioScroll(browser, url, corpus) {
   const { context, page } = await newSeededPage(browser, url, corpus);
   try {
     await openFileAndWait(page, corpus.longDoc.path, "长文基准 分节 001");
-    await clickIfPresent(page, ".view-mode-btn[title='阅读模式']");
+    // 分屏，不是阅读：同步滚动的逐帧工作只在 split 下存在，阅读模式下
+    // useSyncScroll 本就惰性——用错了模式，2-4 的收益会被口径整体吞掉。
+    await clickIfPresent(page, ".view-mode-btn[title='分屏模式（边写边看）']");
     return await page.evaluate(
       async ([frames, step]) => {
         const el = document.querySelector(".reader-pane");
@@ -853,46 +919,76 @@ async function scenarioScroll(browser, url, corpus) {
 
 async function scenarioMermaid(browser, url, corpus) {
   trace("mermaid: newSeededPage");
-  const { context, page } = await newSeededPage(browser, url, corpus);
+  const { context, page } = await newSeededPage(browser, url, corpus, {
+    instrumentMermaid: true,
+  });
   try {
     trace("mermaid: openFileAndWait");
     await openFileAndWait(page, corpus.mermaidDoc.path, "图 01 小节");
     trace("mermaid: measuring");
     return await withDeadline(
       () =>
-        page.evaluate(async (expected) => {
-          // setTimeout polling, NOT rAF: an idle headless page stops
-          // producing BeginFrames, so an rAF-only wait can starve forever.
-          const wait = async (pred, timeoutMs, label) => {
-            const start = performance.now();
-            while (!pred()) {
-              if (performance.now() - start > timeoutMs) throw new Error("timeout: " + label);
-              await new Promise((r) => setTimeout(r, 16));
-            }
-          };
-          await wait(
-            () => document.querySelectorAll("article pre.mermaid").length > 0,
-            30000,
-            "first pre.mermaid",
-          );
-          const t0 = performance.now();
-          await wait(
-            () => document.querySelectorAll("article pre.mermaid svg").length >= expected,
-            60000,
-            "all mermaid svgs",
-          );
-          const t1 = performance.now();
-          await new Promise((r) => setTimeout(r, 1500)); // let trailing longtasks land
-          const lts = window.__perf.longtasks.filter(
-            (e) => e.duration > 50 && e.startTime >= t0 - 5 && e.startTime <= t1,
-          );
-          return {
-            paintMs: t1 - t0,
-            longtaskCount: lts.length,
-            longtaskSumMs: lts.reduce((s, e) => s + e.duration, 0),
-          };
-        }, 30),
-      150000,
+        page.evaluate(
+          async ([total, margin]) => {
+            const wait = async (pred, timeoutMs, label) => {
+              const start = performance.now();
+              while (!pred()) {
+                if (performance.now() - start > timeoutMs) throw new Error("timeout: " + label);
+                await new Promise((r) => setTimeout(r, 16));
+              }
+            };
+            // Timing comes from the injected MutationObserver's event
+            // timestamps, not from this evaluate's clock: a polling anchor is
+            // born late — by the time CDP lands, the first viewportful has
+            // often already rendered, and the window collapses to ~0ms.
+            await wait(
+              () => window.__perfMermaid && window.__perfMermaid.firstPreAt > 0,
+              30000,
+              "injected marks",
+            );
+            // 视口（±rootMargin，与池的边距同源）内几张图，首屏完成线就是
+            // 第 N 张 svg 的时间戳。
+            // 第 N 张 svg 的时间戳。
+            const viewportCount = Array.from(
+              document.querySelectorAll("article pre.mermaid"),
+            ).filter((el) => {
+              const r = el.getBoundingClientRect();
+              return r.top < window.innerHeight + margin && r.bottom > -margin;
+            }).length;
+            await wait(
+              () => window.__perfMermaid.svgAt.length >= viewportCount,
+              30000,
+              "viewport mermaid svgs",
+            );
+            const marks = window.__perfMermaid;
+            const paintMs = marks.svgAt[viewportCount - 1] - marks.firstPreAt;
+            // 打印完整性：beforeprint 把离屏图全部同步画完的代价——用户
+            // 按下打印那刻的真实成本，也是「懒不漏图」的机器证明。
+            const flushStart = performance.now();
+            window.dispatchEvent(new Event("beforeprint"));
+            await wait(
+              () => document.querySelectorAll("article pre.mermaid svg").length >= total,
+              90000,
+              "all mermaid svgs after print flush",
+            );
+            const flushMs = performance.now() - flushStart;
+            await new Promise((r) => setTimeout(r, 1500)); // let trailing longtasks land
+            const t0 = marks.firstPreAt;
+            const t1 = marks.svgAt[Math.max(0, viewportCount - 1)];
+            const lts = window.__perf.longtasks.filter(
+              (e) => e.duration > 50 && e.startTime >= t0 - 5 && e.startTime <= t1,
+            );
+            return {
+              paintMs,
+              flushMs,
+              viewportCount,
+              longtaskCount: lts.length,
+              longtaskSumMs: lts.reduce((s, e) => s + e.duration, 0),
+            };
+          },
+          [30, MERMAID_VIEWPORT_MARGIN_PX],
+        ),
+      180000,
       "mermaid measure",
     );
   } finally {
@@ -1017,6 +1113,7 @@ async function runAll(browser, url, corpus) {
 
   const mermaid = await sample(() => scenarioMermaid(browser, url, corpus), "mermaid first paint");
   values.mermaid_firstpaint_ms = pickMin(mermaid, (r) => r.paintMs);
+  values.mermaid_flush_ms = pickMin(mermaid, (r) => r.flushMs);
   values.mermaid_longtask_sum_ms = pickMin(mermaid, (r) => r.longtaskSumMs);
 
   const tabs = await sample(() => scenarioTabs(browser, url, corpus), "20-tab switch");
