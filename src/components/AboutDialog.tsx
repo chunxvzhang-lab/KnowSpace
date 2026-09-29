@@ -145,6 +145,38 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
               <span className="about-changelog-version-badge">v{__APP_VERSION__}</span>
             </div>
             <div className="about-changelog-list">
+              {/* v2.7.3 */}
+              <div className="about-changelog-group">
+                <div className="about-changelog-group-label">
+                  <Sparkles size={12} className="text-cyan" />
+                  <span>v2.7.3 上下标与行内高亮渲染 · 右键工具栏扩展</span>
+                </div>
+                <ul className="about-changelog-items">
+                  <li>
+                    ✏️ <strong>右键格式工具栏新增上标 / 下标</strong>（x² / x₂ 图标，
+                    开关式再点即取消）：<code>^文本^</code> 渲染为上标（E = mc^2^ → mc²）、
+                    <code>~文本~</code> 渲染为下标（H~2~O → H₂O），Pandoc / Obsidian 同款记号。
+                  </li>
+                  <li>
+                    🖍{" "}
+                    <strong>
+                      补齐 <code>==高亮==</code> 渲染
+                    </strong>
+                    ：格式工具栏的 「文本高亮」按钮自始就插入这个记号，但管线一直没有渲染规则——
+                    预览里是字面文本（与脚注当时同样的情况）。现在真正高亮显示。
+                  </li>
+                  <li>
+                    🛡 <strong>冲突防护由负向测试钉住</strong>：<code>~~删除线~~</code>{" "}
+                    不受影响、未解析脚注 <code>[^1^]</code> 保持原样、段落尾部块锚{" "}
+                    <code>^block-id</code> 照常工作、带空格或未闭合输入保持字面。
+                  </li>
+                  <li>
+                    📦 <strong>没有改变任何既有文件格式</strong>：与 v2.7.2
+                    完全一致，升级不需要迁移。
+                  </li>
+                </ul>
+              </div>
+
               {/* v2.7.2 */}
               <div className="about-changelog-group">
                 <div className="about-changelog-group-label">
