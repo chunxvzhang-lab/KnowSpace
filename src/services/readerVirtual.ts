@@ -121,11 +121,30 @@ export function blockKeyOf(block: RenderedBlock): string {
  * two metrics that change it), not of a mounted component: re-opening a
  * document, or remounting the pane, must not re-measure a document the
  * reader already scrolled through. Keyed by theme + fontScale + blockKey.
+ *
+ * Bounded (2-11): a reader who keeps the app open for days scrolls through
+ * many documents, and every long-document block under every metric context
+ * adds an entry. At 48-byte keys that is unbounded memory with no way back.
+ * The budget below is ~20 full 100k-corpus documents (2,282 blocks) across
+ * 4 metric contexts; over it, the oldest half of the insertion order - the
+ * coldest documents by arrival - is dropped, and those documents simply
+ * re-measure on their next scroll (a one-off 60-rect pass, never visible
+ * during scrolling).
  */
+export const MAX_MEASURED_HEIGHTS = 40_000;
+const MEASURED_EVICTION_CHUNK = 20_000;
 const measuredHeights = new Map<string, number>();
 const recentMeasurements: number[] = [];
 let medianDirty = true;
 let medianCache = DEFAULT_BLOCK_HEIGHT;
+
+function evictOldestHeights(): void {
+  let remaining = MEASURED_EVICTION_CHUNK;
+  for (const key of measuredHeights.keys()) {
+    measuredHeights.delete(key);
+    if (--remaining <= 0) break;
+  }
+}
 
 /** The metric context heights are a function of. */
 export type HeightContext = { theme: string; fontScale: number };
@@ -175,7 +194,14 @@ export function setMeasuredHeight(key: string, height: number): boolean {
   const rounded = Math.round(height);
   const previous = measuredHeights.get(key);
   if (previous === rounded) return false;
+  if (previous !== undefined) {
+    // A re-measure is a touch: move the entry to the back of the insertion
+    // order so a document the reader keeps returning to is never the one
+    // evicted as "oldest".
+    measuredHeights.delete(key);
+  }
   measuredHeights.set(key, rounded);
+  if (measuredHeights.size > MAX_MEASURED_HEIGHTS) evictOldestHeights();
   recentMeasurements.push(rounded);
   if (recentMeasurements.length > MEASURED_SAMPLE_WINDOW) recentMeasurements.shift();
   medianDirty = true;

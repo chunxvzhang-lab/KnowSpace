@@ -15,8 +15,10 @@ import {
   computeWindow,
   estimatedHeight,
   findBlockForSourceLine,
+  getMeasuredHeight,
   heightContextKey,
   HEIGHT_UPDATE_EPSILON_PX,
+  MAX_MEASURED_HEIGHTS,
   MAX_MATERIALIZED_BLOCKS,
   resolveHeights,
   scrollTopForBlock,
@@ -217,6 +219,40 @@ describe("readerVirtual — heights table (content-addressed, per context)", () 
     const addr = heightContextKey(ctx, blockKeyOf(block));
     expect(setMeasuredHeight(addr, 60)).toBe(true);
     expect(setMeasuredHeight(addr, 60)).toBe(false);
+  });
+
+  it("caps the height table, evicting the oldest arrivals (2-11)", () => {
+    const first = `light|1|first-block`;
+    const last = `light|1|last-block`;
+    setMeasuredHeight(first, 10);
+    for (let i = 0; i < MAX_MEASURED_HEIGHTS; i += 1) {
+      setMeasuredHeight(`light|1|k${i}`, 20 + (i % 50));
+    }
+    setMeasuredHeight(last, 90);
+    // The oldest chunk (including the very first entry) is dropped so the
+    // table cannot grow across a week-long session of long documents...
+    expect(getMeasuredHeight(first)).toBeUndefined();
+    // ...while the newest arrivals keep their measured geometry.
+    expect(getMeasuredHeight(last)).toBe(90);
+    expect(getMeasuredHeight(`light|1|k${MAX_MEASURED_HEIGHTS - 1}`)).toBeDefined();
+  });
+
+  it("re-measuring with a changed height touches the entry to the newest", () => {
+    const elder = "light|1|elder";
+    const younger = "light|1|younger";
+    setMeasuredHeight(elder, 10);
+    setMeasuredHeight(younger, 12);
+    for (let i = 0; i < MAX_MEASURED_HEIGHTS - 3; i += 1) {
+      setMeasuredHeight(`light|1|k${i}`, 20 + (i % 50));
+    }
+    // A real re-measure of the OLDEST entry moves it to the newest slot.
+    setMeasuredHeight(elder, 11);
+    // Two more sets cross the cap; the sweep drops the oldest chunk - which
+    // now starts at `younger` and no longer includes the touched `elder`.
+    setMeasuredHeight("light|1|cross-a", 70);
+    setMeasuredHeight("light|1|cross-b", 80);
+    expect(getMeasuredHeight(younger)).toBeUndefined();
+    expect(getMeasuredHeight(elder)).toBe(11);
   });
 
   it("findBlockForSourceLine maps a line to the block covering it", () => {
