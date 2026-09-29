@@ -687,7 +687,7 @@ graph LR
 | 2-8 | 目录树懒扫描 + 浅层监听 | P2 |
 | 2-9 | Chromium/V8 启动参数调优 | P2 |
 | 2-10 | 生命周期守卫（`useDisposableListener`）+ 泄漏防御 | P1 |
-| 2-11 | 弱引用资源回收（灯箱 `revokeObjectURL`） | P2 |
+| 2-11 | ~~灯箱 `revokeObjectURL`~~（审计：灯箱走协议 URL 从不建 blob；全仓 6 处 create 均已配对 revoke）→ 真正的无上限增长在虚拟化高度表：✅ 2026-09-28 加 40k 上限 + 逐出最旧半区 + 重测触新（be99e9d，成对测试钉住逐出与触新两条路径） | P2 ✅ |
 
 ### 能力建设目标
 本阶段是**性能测试的练兵场**：要求每个性能改动都配一条**可重复的基准测试**（沿用 `ENGINEERING_GUIDE.md` 4.5 的「预热 + 取 N 次最快」范式），并写入 `docs/PERF_BASELINE.md`——与测试基线、质量棘轮同一套心智模型。
