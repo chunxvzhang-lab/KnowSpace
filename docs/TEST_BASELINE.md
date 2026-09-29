@@ -12,8 +12,8 @@
 | 项目 | 数值 |
 | :--- | ---: |
 | 测试文件 | **122** |
-| 用例总数 | **1502** |
-| 通过 | 1500 |
+| 用例总数 | **1504** |
+| 通过 | 1502 |
 | 失败 | 0 |
 | 跳过 | 2 |
 | 通过率 | 99.9% |
@@ -43,9 +43,9 @@
 | `src/__tests__/flash-capsule-theme-contrast.test.ts` | 26 | ✅ |
 | `src/__tests__/mindmap-collapse-persistence.test.tsx` | 24 | ✅ |
 | `src/__tests__/mindmap.test.ts` | 23 | ✅ |
+| `src/__tests__/reader-virtual.test.ts` | 21 | ✅ |
 | `src/__tests__/search-index-service.test.ts` | 20 | ✅ |
 | `src/__tests__/column-resize.test.tsx` | 19 | ✅ |
-| `src/__tests__/reader-virtual.test.ts` | 19 | ✅ |
 | `src/__tests__/vault-store.test.ts` | 19 | ✅ |
 | `src/__tests__/markdown-blocks.test.ts` | 17 | ✅ |
 | `src/__tests__/ipc-channel-contract.test.ts` | 16 | ✅ |
@@ -174,7 +174,7 @@
 
 任何重构都必须满足：
 
-1. 用例总数 **不低于 1502**（删除测试需在 PR 说明中论证）
+1. 用例总数 **不低于 1504**（删除测试需在 PR 说明中论证）
 2. 通过率 **100%**
 3. 单文件用例数**不得下降**（防止测试被静默删除）
 
