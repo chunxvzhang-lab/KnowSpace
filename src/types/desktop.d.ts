@@ -287,15 +287,25 @@ export type KnowSpaceDesktopAPI = {
       pageSize?: string;
     }) => Promise<{ success?: boolean; canceled?: boolean; filePath?: string; message?: string }>;
     printDocument?: () => Promise<{ success?: boolean; message?: string }>;
-    /** App Settings (Background Running & Auto Launch) */
+    /** App Settings (Background Running, Auto Launch, Auto Save) */
     getAppSettings?: () => Promise<{
       autoLaunch: boolean;
       runInBackground: boolean;
+      autoSaveEnabled: boolean;
       flashShortcut: string;
     }>;
-    setAppSettings?: (settings: { autoLaunch?: boolean; runInBackground?: boolean }) => Promise<{
+    setAppSettings?: (settings: {
+      autoLaunch?: boolean;
+      runInBackground?: boolean;
+      autoSaveEnabled?: boolean;
+    }) => Promise<{
       success: boolean;
-      settings?: { autoLaunch: boolean; runInBackground: boolean; flashShortcut: string };
+      settings?: {
+        autoLaunch: boolean;
+        runInBackground: boolean;
+        autoSaveEnabled: boolean;
+        flashShortcut: string;
+      };
     }>;
     onOpenFilePath: (callback: (absolutePath: string) => void) => () => void;
     onMenuCommand: (callback: (command: string) => void) => () => void;
@@ -306,6 +316,7 @@ export type KnowSpaceDesktopAPI = {
       callback: (data: {
         autoLaunch: boolean;
         runInBackground: boolean;
+        autoSaveEnabled: boolean;
         flashShortcut: string;
       }) => void,
     ) => () => void;

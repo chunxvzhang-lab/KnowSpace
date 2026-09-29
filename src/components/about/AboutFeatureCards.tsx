@@ -29,8 +29,10 @@ import {
 type AboutFeatureCardsProps = {
   autoLaunch: boolean;
   runInBackground: boolean;
+  autoSaveEnabled: boolean;
   handleToggleAutoLaunch: (val: boolean) => void | Promise<void>;
   handleToggleRunInBackground: (val: boolean) => void | Promise<void>;
+  handleToggleAutoSave: (val: boolean) => void | Promise<void>;
   repoUrl: string;
   authorUrl: string;
   handleOpenExternal: (url: string) => void;
@@ -39,8 +41,10 @@ type AboutFeatureCardsProps = {
 export function AboutFeatureCards({
   autoLaunch,
   runInBackground,
+  autoSaveEnabled,
   handleToggleAutoLaunch,
   handleToggleRunInBackground,
+  handleToggleAutoSave,
   repoUrl,
   authorUrl,
   handleOpenExternal,
@@ -135,6 +139,37 @@ export function AboutFeatureCards({
                 }}
               >
                 点击窗口右上角 ✕ 时隐藏至右下角系统托盘，双击托盘图标或在托盘右键即可恢复打开工作台
+              </div>
+            </div>
+          </label>
+
+          <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={autoSaveEnabled}
+              onChange={(e) => handleToggleAutoSave(e.target.checked)}
+              style={{
+                accentColor: "#f59e0b",
+                width: 16,
+                height: 16,
+                marginTop: 2,
+                cursor: "pointer",
+              }}
+            />
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>
+                自动保存 (停止输入约 1.5 秒后写盘)
+              </div>
+              <div
+                style={{
+                  fontSize: 11,
+                  color: "var(--text-muted)",
+                  marginTop: 2,
+                  lineHeight: 1.4,
+                }}
+              >
+                持续键入时不写盘，停顿后把改动写入原文件（保留行尾符与
+                BOM，检测到磁盘上的他人修改会停下来询问而不是覆盖）。关闭后回到纯手动 Ctrl+S。
               </div>
             </div>
           </label>

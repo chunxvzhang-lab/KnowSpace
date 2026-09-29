@@ -254,6 +254,7 @@ function registerSystemHandlers(context) {
     return {
       autoLaunch: getAutoLaunch(),
       runInBackground: config.runInBackground !== false,
+      autoSaveEnabled: config.autoSaveEnabled !== false,
       flashShortcut: config.flashShortcut || "Alt+Space",
     };
   });
@@ -268,6 +269,9 @@ function registerSystemHandlers(context) {
     if (typeof settings.runInBackground === "boolean") {
       saveAppConfig({ runInBackground: settings.runInBackground });
     }
+    if (typeof settings.autoSaveEnabled === "boolean") {
+      saveAppConfig({ autoSaveEnabled: settings.autoSaveEnabled });
+    }
     context.updateTrayMenu();
     context.broadcastSettings();
     return {
@@ -275,6 +279,7 @@ function registerSystemHandlers(context) {
       settings: {
         autoLaunch: getAutoLaunch(),
         runInBackground: getAppConfig().runInBackground !== false,
+        autoSaveEnabled: getAppConfig().autoSaveEnabled !== false,
         flashShortcut: getAppConfig().flashShortcut || "Alt+Space",
       },
     };

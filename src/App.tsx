@@ -17,6 +17,7 @@ import { useAppActions } from "./hooks/useAppActions";
 import { useAppCommands } from "./hooks/useAppCommands";
 import { useChapterLoading } from "./hooks/useChapterLoading";
 import { useChapterRename } from "./hooks/useChapterRename";
+import { useAutoSave } from "./hooks/useAutoSave";
 import { useColumnResize } from "./hooks/useColumnResize";
 import { useDesktopBridgeSync } from "./hooks/useDesktopBridgeSync";
 import { useDisposableListener } from "./hooks/useDisposableListener";
@@ -165,6 +166,34 @@ export function App() {
   } = useDocumentSession();
   const sessionRef = useRef(session);
   sessionRef.current = session;
+
+  // Auto-save (2-7): the same saveSession a Ctrl+S runs, AUTOSAVE_DEBOUNCE_MS
+  // after the last keystroke. The switch lives in app settings (default ON)
+  // and follows the settings broadcast, so the About dialog toggle applies
+  // without a restart.
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
+  useEffect(() => {
+    const desktop = window.bookMDDesktop;
+    desktop?.system
+      .getAppSettings?.()
+      .then((settings) => {
+        if (settings) setAutoSaveEnabled(settings.autoSaveEnabled);
+      })
+      .catch(() => {});
+    const unsubscribe = desktop?.system.onAppSettingsUpdated?.((settings) => {
+      setAutoSaveEnabled(settings.autoSaveEnabled);
+    });
+    return () => unsubscribe?.();
+  }, []);
+  useAutoSave({
+    enabled: autoSaveEnabled,
+    isDirty,
+    isSaving,
+    conflictActive: conflict !== null,
+    sourceRevision: session?.sourceRevision ?? 0,
+    absolutePath: session?.absolutePath ?? null,
+    save: () => saveSession(),
+  });
 
   const activeTab = useMemo(() => tabs.find((item) => item.id === chapterId), [tabs, chapterId]);
   // Applying the dirty flag here rather than storing it means typing in a saved

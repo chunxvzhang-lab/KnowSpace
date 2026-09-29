@@ -12,6 +12,7 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
   const [copied, setCopied] = useState(false);
   const [autoLaunch, setAutoLaunch] = useState(false);
   const [runInBackground, setRunInBackground] = useState(true);
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
 
   const repoUrl = "https://github.com/chunxvzhang-lab/KnowSpace";
   const authorUrl = "https://github.com/chunxvzhang";
@@ -23,12 +24,14 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
       if (settings) {
         setAutoLaunch(settings.autoLaunch);
         setRunInBackground(settings.runInBackground);
+        setAutoSaveEnabled(settings.autoSaveEnabled);
       }
     });
 
     const unsubscribe = desktop?.system.onAppSettingsUpdated?.((settings) => {
       setAutoLaunch(settings.autoLaunch);
       setRunInBackground(settings.runInBackground);
+      setAutoSaveEnabled(settings.autoSaveEnabled);
     });
 
     return () => unsubscribe?.();
@@ -41,6 +44,7 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
     if (res?.settings) {
       setAutoLaunch(res.settings.autoLaunch);
       setRunInBackground(res.settings.runInBackground);
+      setAutoSaveEnabled(res.settings.autoSaveEnabled);
     }
   };
 
@@ -51,6 +55,18 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
     if (res?.settings) {
       setAutoLaunch(res.settings.autoLaunch);
       setRunInBackground(res.settings.runInBackground);
+      setAutoSaveEnabled(res.settings.autoSaveEnabled);
+    }
+  };
+
+  const handleToggleAutoSave = async (val: boolean) => {
+    setAutoSaveEnabled(val);
+    const desktop = typeof window !== "undefined" ? window.knowSpaceDesktop : undefined;
+    const res = await desktop?.system.setAppSettings?.({ autoSaveEnabled: val });
+    if (res?.settings) {
+      setAutoLaunch(res.settings.autoLaunch);
+      setRunInBackground(res.settings.runInBackground);
+      setAutoSaveEnabled(res.settings.autoSaveEnabled);
     }
   };
 
@@ -847,8 +863,10 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
           <AboutFeatureCards
             autoLaunch={autoLaunch}
             runInBackground={runInBackground}
+            autoSaveEnabled={autoSaveEnabled}
             handleToggleAutoLaunch={handleToggleAutoLaunch}
             handleToggleRunInBackground={handleToggleRunInBackground}
+            handleToggleAutoSave={handleToggleAutoSave}
             repoUrl={repoUrl}
             authorUrl={authorUrl}
             handleOpenExternal={handleOpenExternal}
