@@ -189,15 +189,27 @@ export function __resetHeightTables(): void {
   medianDirty = true;
 }
 
-/** Resolve one block's advance: measured for this context, else estimate. */
-export function resolveHeights(blocks: readonly RenderedBlock[], context: HeightContext): number[] {
+/**
+ * Resolve one block's advance from its identity alone: measured for this
+ * context, else the estimate. Takes precomputed keys because deriving them
+ * is the expensive half (FNV over the block's whole html) - the controller
+ * already keys every block once per content change and must not rehash the
+ * entire document on every measurement-correction pass (the 2-4 profile:
+ * 165ms of re-hashing 2,282 blocks per scroll burst).
+ */
+export function resolveHeightsFromKeys(keys: readonly string[], context: HeightContext): number[] {
   const fallback = estimatedHeight();
-  const heights = new Array<number>(blocks.length);
-  for (let i = 0; i < blocks.length; i += 1) {
-    const hit = measuredHeights.get(heightContextKey(context, blockKeyOf(blocks[i])));
+  const heights = new Array<number>(keys.length);
+  for (let i = 0; i < keys.length; i += 1) {
+    const hit = measuredHeights.get(heightContextKey(context, keys[i]));
     heights[i] = hit ?? fallback;
   }
   return heights;
+}
+
+/** Resolve one block's advance: measured for this context, else estimate. */
+export function resolveHeights(blocks: readonly RenderedBlock[], context: HeightContext): number[] {
+  return resolveHeightsFromKeys(blocks.map(blockKeyOf), context);
 }
 
 /* ── Cumulative geometry ──────────────────────────────────────────────── */

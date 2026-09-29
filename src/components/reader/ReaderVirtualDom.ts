@@ -7,12 +7,13 @@ import {
   findBlockForSourceLine,
   HEIGHT_UPDATE_EPSILON_PX,
   heightContextKey,
-  resolveHeights,
+  resolveHeightsFromKeys,
   scrollTopForBlock,
   setMeasuredHeight,
   type HeightContext,
   type VirtualSegment,
   type VirtualWindow,
+  type WindowInput,
 } from "../../services/readerVirtual";
 
 /*
@@ -63,6 +64,20 @@ export class VirtualReaderController {
   private measureFrame = 0;
   private pinnedAll = false;
   private disposed = false;
+  /**
+   * Cached scroller geometry (px top of the article inside the scroller, and
+   * the viewport height). Both are constants of the *layout*, not of the
+   * scroll position - yet reading them via getBoundingClientRect/clientHeight
+   * on every rAF-coalesced recompute forced a style/layout pass mid-burst
+   * (the 2-4 profile: 369ms of rect self time + the layout it forced). The
+   * cache is invalidated by everything that can move or resize the article:
+   * a remount (setArticle/sync), a context change (fonts reflow), and a
+   * container resize (the observer ReaderPane wires to onResize). Within a
+   * scroll burst, none of those happen, and recompute reads no DOM geometry
+   * at all beyond the (cheap, non-forcing) scrollTop.
+   */
+  private cachedContentTop: number | null = null;
+  private cachedViewport = 0;
 
   constructor(
     private readonly container: HTMLElement,
@@ -74,7 +89,7 @@ export class VirtualReaderController {
     this.context = context;
     this.blocks = blocks;
     this.keys = blocks.map(blockKeyOf);
-    this.heights = resolveHeights(blocks, context);
+    this.heights = resolveHeightsFromKeys(this.keys, context);
     this.cumulative = buildCumulative(this.heights);
     this.recompute(true);
   }
@@ -95,6 +110,7 @@ export class VirtualReaderController {
     this.blocks = blocks;
     this.keys = blocks.map(blockKeyOf);
     this.lastPlanSignature = "";
+    this.cachedContentTop = null;
     if (contextChanged) this.refreshTable();
     if (this.pinnedAll) this.materializeAll();
     else this.recompute(true);
@@ -114,6 +130,7 @@ export class VirtualReaderController {
   setArticle(article: HTMLElement): void {
     this.article = article;
     this.lastPlanSignature = "";
+    this.cachedContentTop = null;
     if (this.pinnedAll) this.materializeAll();
     else this.recompute(true);
   }
@@ -123,64 +140,90 @@ export class VirtualReaderController {
       return;
     }
     this.context = context;
+    this.cachedContentTop = null;
     this.refreshTable();
     if (this.pinnedAll) this.materializeAll();
     else this.recompute(true);
   }
 
-  /** Scroll listener entry point - passive, rAF-coalesced. */
+  /**
+   * Scroll listener entry point - passive, rAF-coalesced. The scrollTop is
+   * SNAPSHOT in the event phase, not re-read in the rAF: by the time rAF
+   * callbacks run, earlier DOM writes (our own previous window move, the
+   * editor pane's follow scroll) have dirtied the layout, and even a plain
+   * `scrollTop` read then forces a full style+layout flush (the second 2-4
+   * profile: 415ms attributed to a single property read per frame). During
+   * the scroll event itself the position is the one the browser just
+   * committed - free to read.
+   */
   onScroll(): void {
     if (this.disposed || this.pinnedAll || this.scrollQueued) return;
+    const position = this.container.scrollTop;
     this.scrollQueued = true;
     window.requestAnimationFrame(() => {
       this.scrollQueued = false;
       if (this.disposed || this.pinnedAll) return;
-      this.recompute(false);
+      this.recompute(false, position);
     });
   }
 
   onResize(): void {
     if (this.disposed || this.pinnedAll) return;
+    this.cachedContentTop = null;
     this.recompute(false);
   }
 
   /* ── window + surface ───────────────────────────────────────────────── */
 
-  private geometry() {
-    const contentTop =
-      this.article.getBoundingClientRect().top -
-      this.container.getBoundingClientRect().top +
-      this.container.scrollTop;
+  /**
+   * @param scrollTopOverride the event-phase snapshot from onScroll; when
+   * absent (jumps, settle renders, resize) the live position is read, which
+   * is correct there - those callers need the current value, not the last
+   * event's.
+   */
+  private geometry(scrollTopOverride?: number): WindowInput {
+    if (this.cachedContentTop === null) {
+      this.cachedContentTop =
+        this.article.getBoundingClientRect().top -
+        this.container.getBoundingClientRect().top +
+        this.container.scrollTop;
+      this.cachedViewport = this.container.clientHeight;
+    }
     return {
-      scrollTop: this.container.scrollTop,
-      viewport: this.container.clientHeight,
-      contentTop,
+      scrollTop: scrollTopOverride ?? this.container.scrollTop,
+      viewport: this.cachedViewport,
+      contentTop: this.cachedContentTop,
       count: this.blocks.length,
     };
   }
 
   private refreshTable(): void {
-    this.heights = resolveHeights(this.blocks, this.context);
+    this.heights = resolveHeightsFromKeys(this.keys, this.context);
     this.cumulative = buildCumulative(this.heights);
   }
 
-  private recompute(force: boolean): void {
+  private recompute(force: boolean, scrollTopOverride?: number): void {
     if (this.blocks.length === 0) {
       this.applySurface({ start: 0, end: 0 }, []);
       return;
     }
-    const plan = buildSurfacePlan(this.cumulative, (i) => this.sourceLineAt(i), this.windowFor());
+    const plan = buildSurfacePlan(
+      this.cumulative,
+      (i) => this.sourceLineAt(i),
+      this.windowFor(scrollTopOverride),
+    );
     const signature = this.signature(plan.window, plan.segments);
     if (!force && signature === this.lastPlanSignature) {
-      // The hot path: scrolled inside the window. Zero DOM work.
+      // The hot path: scrolled inside the window. Zero DOM work - no reads
+      // either: the caller passed its position snapshot.
       return;
     }
     this.lastPlanSignature = signature;
     this.applySurface(plan.window, plan.segments);
   }
 
-  private windowFor(): VirtualWindow {
-    return computeWindow(this.cumulative, this.geometry());
+  private windowFor(scrollTopOverride?: number): VirtualWindow {
+    return computeWindow(this.cumulative, this.geometry(scrollTopOverride));
   }
 
   private sourceLineAt(index: number): number {

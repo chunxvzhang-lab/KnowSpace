@@ -202,6 +202,101 @@ describe("VirtualReaderController — window surface", () => {
     // 8px measured blocks collapse the anchor run far below the estimate.
     expect(measuredHeight).toBeLessThan(estimateHeight);
   });
+
+  it("windows from the event-phase snapshot, not a stale rAF-time read", async () => {
+    // contentTop is a pure function of scrollTop under the scroller stub, so
+    // the geometry cache cannot be pinned here. What CAN is the read itself:
+    // the controller snapshots scrollTop in the scroll event and must window
+    // from that value. The stub below returns a LAGGED position from
+    // container.scrollTop (what a real scroller would answer mid-burst if a
+    // rAF-time read raced the scroll) - windowing from it puts the wrong
+    // slice on screen, and the assertion catches that.
+    const blocks = syntheticBlocks(2500); // block i -> line 2i+1, 48px estimate
+    const container = document.createElement("main");
+    document.body.appendChild(container);
+    Object.defineProperty(container, "clientHeight", { value: 800, configurable: true });
+    container.getBoundingClientRect = () => ({ top: 0 }) as DOMRect;
+    const article = document.createElement("article");
+    container.appendChild(article);
+    article.getBoundingClientRect = () => ({ top: -container.scrollTop }) as DOMRect;
+    const truth = { scrollTop: 0, lag: false };
+    Object.defineProperty(container, "scrollTop", {
+      configurable: true,
+      get: () => (truth.lag ? 2000 : truth.scrollTop),
+      set: (v: number) => {
+        truth.scrollTop = v;
+      },
+    });
+    const controller = new VirtualReaderController(
+      container,
+      article,
+      blocks,
+      { theme: "light", fontScale: 1 },
+      { onMaterialize: () => {} },
+    );
+    live.push({ container, controller });
+
+    truth.scrollTop = 10_000; // the scroll event carries this position
+    controller.onScroll(); // snapshots 10000 HERE, in the event phase
+    truth.lag = true; // by the time rAF runs, a live read would answer 2000
+    await flushFrame();
+    const lines = Array.from(article.querySelectorAll("[data-block-key][data-source-line]"))
+      .map((el) => parseInt(el.getAttribute("data-source-line") || "0", 10))
+      .filter((n) => n > 0);
+    // Snapshot 10000 (contentTop 0): window straddles block ~208 (line ~417).
+    // A rAF-time read would see the lagged 2000 and window at line ~85.
+    expect(Math.min(...lines)).toBeGreaterThan(200);
+    controller.dispose();
+  });
+
+  it("drops the cached contentTop when the article is replaced (remount)", async () => {
+    // The scroller stub makes contentTop constant (0), so cache invalidation
+    // cannot show through it. Here the article sits under a toolbar of a
+    // MUTABLE height: sync() swapping the article must re-read geometry,
+    // because a remount can move the chrome (stale cache = wrong slice).
+    const blocks = syntheticBlocks(2500);
+    const container = document.createElement("main");
+    document.body.appendChild(container);
+    Object.defineProperty(container, "clientHeight", { value: 800, configurable: true });
+    container.getBoundingClientRect = () => ({ top: 0 }) as DOMRect;
+    let toolbarHeight = 5000;
+    const articleA = document.createElement("article");
+    container.appendChild(articleA);
+    articleA.getBoundingClientRect = () =>
+      ({ top: toolbarHeight - container.scrollTop }) as DOMRect;
+    const controller = new VirtualReaderController(
+      container,
+      articleA,
+      blocks,
+      { theme: "light", fontScale: 1 },
+      { onMaterialize: () => {} },
+    );
+    live.push({ container, controller });
+
+    container.scrollTop = 10_000;
+    controller.onScroll();
+    await flushFrame();
+    // contentTop 5000: content position 5000px; the 48-block cap centers the
+    // window on the viewport's first block (~102, line ~205).
+    const linesA = Array.from(articleA.querySelectorAll("[data-block-key][data-source-line]"))
+      .map((el) => parseInt(el.getAttribute("data-source-line") || "0", 10))
+      .filter((n) => n > 0);
+    expect(Math.min(...linesA)).toBeLessThan(300);
+
+    // Remount: a new article node whose toolbar collapsed to 100px.
+    const articleB = document.createElement("article");
+    articleB.getBoundingClientRect = () =>
+      ({ top: toolbarHeight - container.scrollTop }) as DOMRect;
+    toolbarHeight = 100;
+    controller.sync(articleB, blocks, { theme: "light", fontScale: 1 });
+    // Fresh contentTop 100: content position 9900px -> block ~206 (line ~413).
+    // A stale cache would leave the window at line ~209.
+    const linesB = Array.from(articleB.querySelectorAll("[data-block-key][data-source-line]"))
+      .map((el) => parseInt(el.getAttribute("data-source-line") || "0", 10))
+      .filter((n) => n > 0);
+    expect(Math.min(...linesB)).toBeGreaterThan(300);
+    controller.dispose();
+  });
 });
 
 describe("VirtualReaderController — jump and print contracts", () => {
