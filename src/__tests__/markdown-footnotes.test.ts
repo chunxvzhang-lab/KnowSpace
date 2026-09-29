@@ -71,6 +71,15 @@ describe("footnote rendering", () => {
     expect(html).not.toContain("[^my note]");
   });
 
+  it("accepts a definition inside a list item (pasted-web shape)", async () => {
+    // Pasted web text often carries footnote definitions as list items; the
+    // block rule's default alt chain covers list context, so this works
+    // without special handling - pinned so it stays that way.
+    const html = await htmlOf("- [^215]: 列表里的定义\n\n创造了纪录[^215^]。\n");
+    expect(html).toContain("列表里的定义");
+    expect(html).not.toContain("[^215^]");
+  });
+
   it("the block pipeline groups the footnotes section (no whole-document fallback)", async () => {
     const chapter = await renderMarkdown("短句[^1]。\n\n[^1]: 注\n");
     expect(chapter.blocks).toBeTruthy();

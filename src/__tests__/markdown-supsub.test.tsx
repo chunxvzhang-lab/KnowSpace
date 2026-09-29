@@ -11,7 +11,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
-import { renderMarkdown } from "../services/markdown";
+import { renderMarkdown, renderCardMarkdown } from "../services/markdown";
 import { EditorContextMenu } from "../components/EditorContextMenu";
 import type { EditorView } from "@codemirror/view";
 
@@ -57,6 +57,16 @@ describe("superscript and subscript rendering", () => {
     const html = await htmlOf("化合物 H~2~O 与 E=mc^2^。\n");
     expect(html).toContain("<sub>2</sub>");
     expect(html).toContain("<sup>2</sup>");
+  });
+
+  it("also renders inside infinite-canvas text cards (shared pipeline)", () => {
+    // Canvas cards reuse the module-wide MarkdownIt instance, so every inline
+    // notation the main reader gained is automatically available there - the
+    // card sanitize config allows mark/sup/sub through the html profile.
+    const html = renderCardMarkdown("==高亮== 与 mc^2^ 和 H~2~O");
+    expect(html).toContain("<mark>高亮</mark>");
+    expect(html).toContain("<sup>2</sup>");
+    expect(html).toContain("<sub>2</sub>");
   });
 
   it("renders ==highlight== that the ribbon button always inserted", async () => {

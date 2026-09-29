@@ -41,6 +41,7 @@ import {
   detectSlashTrigger,
 } from "../services/slashCommands";
 import { EditorContextMenu } from "./EditorContextMenu";
+import { listContinueKeymap } from "./editorListContinue";
 
 export type WikiLinkTarget = {
   id?: string;
@@ -540,6 +541,14 @@ export const EditorPane = memo(function EditorPane({
         key: "Mod-i",
         run: (view) => toggleInlineFormat(view, "*"),
       },
+      {
+        key: "Mod-Shift-=",
+        run: (view) => toggleInlineFormat(view, "^"),
+      },
+      {
+        key: "Mod-=",
+        run: (view) => toggleInlineFormat(view, "~"),
+      },
     ]);
 
     lastInternalValueRef.current = value;
@@ -679,6 +688,7 @@ export const EditorPane = memo(function EditorPane({
         indentOnInput(),
         bracketMatching(),
         closeBrackets(),
+        listContinueKeymap,
         autocompletion({
           override: [wikiLinkCompletionSource, slashCommandCompletionSource],
         }),
