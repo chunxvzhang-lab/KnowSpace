@@ -2,7 +2,7 @@
 
 > **文档性质**：重构安全网的权威口径（release plan R3 交付物）
 > **生成时间**：2026-09-29
-> **应用版本**：`2.7.1`
+> **应用版本**：`2.7.3`
 > **生成方式**：`node scripts/capture-test-baseline.cjs`（自动生成，请勿手工编辑）
 
 ---
@@ -11,9 +11,9 @@
 
 | 项目 | 数值 |
 | :--- | ---: |
-| 测试文件 | **124** |
-| 用例总数 | **1521** |
-| 通过 | 1519 |
+| 测试文件 | **126** |
+| 用例总数 | **1537** |
+| 通过 | 1535 |
 | 失败 | 0 |
 | 跳过 | 2 |
 | 通过率 | 99.9% |
@@ -71,6 +71,7 @@
 | `src/__tests__/graph.test.ts` | 9 | ✅ |
 | `src/__tests__/inflate.test.ts` | 9 | ✅ |
 | `src/__tests__/markdown-footnotes.test.ts` | 9 | ✅ |
+| `src/__tests__/markdown-supsub.test.tsx` | 9 | ✅ |
 | `src/__tests__/zip.test.ts` | 9 | ✅ |
 | `src/__tests__/editor-line-prefix-transform.test.tsx` | 8 | ✅ |
 | `src/__tests__/fsrs-verification.test.ts` | 8 | ✅ |
@@ -112,6 +113,7 @@
 | `src/__tests__/space-timeline.test.ts` | 6 | ✅ |
 | `src/__tests__/status-bar.test.tsx` | 6 | ✅ |
 | `src/__tests__/sync-selection.test.ts` | 6 | ✅ |
+| `src/__tests__/use-auto-save.test.tsx` | 6 | ✅ |
 | `src/__tests__/blocklink.test.ts` | 5 | ✅ |
 | `src/__tests__/book-source.test.ts` | 5 | ✅ |
 | `src/__tests__/media-lightbox.test.tsx` | 5 | ✅ |
@@ -133,6 +135,7 @@
 | `src/__tests__/reader-pane-blocks.test.tsx` | 4 | ✅ |
 | `src/__tests__/reader-pane-mermaid.test.tsx` | 4 | ✅ |
 | `src/__tests__/reading-tracker-extent-cache.test.tsx` | 4 | ✅ |
+| `src/__tests__/snapshots-node.test.ts` | 4 | ✅ |
 | `src/__tests__/storage.test.ts` | 4 | ✅ |
 | `src/__tests__/toc-and-bookmarks.test.tsx` | 4 | ✅ |
 | `src/__tests__/web-snapshot-service.test.ts` | 4 | ✅ |
@@ -143,7 +146,6 @@
 | `src/__tests__/mindmap-shortcut-scope.test.tsx` | 3 | ✅ |
 | `src/__tests__/paths.test.ts` | 3 | ✅ |
 | `src/__tests__/search-panel.test.tsx` | 3 | ✅ |
-| `src/__tests__/snapshots-node.test.ts` | 3 | ✅ |
 | `src/__tests__/tab-bar-split.test.tsx` | 3 | ✅ |
 | `src/__tests__/theme-eink.test.ts` | 3 | ✅ |
 | `src/__tests__/mindmap-layout-performance.test.ts` | 2 | ✅ |
@@ -161,7 +163,7 @@
 | 文件 | 当前行数 | 目标 |
 | :--- | ---: | :--- |
 | `src/components/CanvasView.tsx` | 932 | R2 待拆分: 目标各模块 < 2500 行 |
-| `src/App.tsx` | 776 | R1: < 500 行 |
+| `src/App.tsx` | 805 | R1: < 500 行 |
 | `src/services/canvasGraph.ts` | 26 | R2 已拆分 ✅ |
 | `src/services/canvasExport.ts` | 598 | R2 已拆分 ✅ |
 | `src/services/canvasGeometry.ts` | 126 | R2 已拆分 ✅ |
@@ -176,7 +178,7 @@
 
 任何重构都必须满足：
 
-1. 用例总数 **不低于 1521**（删除测试需在 PR 说明中论证）
+1. 用例总数 **不低于 1537**（删除测试需在 PR 说明中论证）
 2. 通过率 **100%**
 3. 单文件用例数**不得下降**（防止测试被静默删除）
 
