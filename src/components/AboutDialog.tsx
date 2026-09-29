@@ -145,6 +145,41 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
               <span className="about-changelog-version-badge">v{__APP_VERSION__}</span>
             </div>
             <div className="about-changelog-list">
+              {/* v2.7.1 */}
+              <div className="about-changelog-group">
+                <div className="about-changelog-group-label">
+                  <Sparkles size={12} className="text-cyan" />
+                  <span>v2.7.1 下拉菜单修复 · 长文档不再卡顿 · 标签切换约 10 倍</span>
+                </div>
+                <ul className="about-changelog-items">
+                  <li>
+                    🎨 <strong>修复思维导图下拉菜单在浅色主题下不可读</strong>
+                    （主题/布局选择器）：v2.7.0 把选择器换成了原生控件，但弹出列表由操作系统绘制、
+                    不随应用主题重绘，实测菜单项对比只剩 1.22:1。现在改为跟随应用主题的手写弹层，
+                    配色由守卫逐主题验算对比度。
+                  </li>
+                  <li>
+                    ⚡ <strong>长文档打字不再卡顿</strong>：一次击键只重新处理被改动的那一个内容块
+                    （此前每次停顿都整篇重来），10 万字文档实测打字后最长主线程任务
+                    <strong>169ms → 0</strong>；文章 DOM 节点 <strong>6,842 → 191</strong>
+                    （只渲染视口附近的内容，窗外以保留行号锚点的占位段聚合，滚动同步的行号映射原样成立）。
+                  </li>
+                  <li>
+                    ⚡ <strong>标签切换约 10 倍</strong>：切换最长主线程任务 572ms → 58ms——
+                    打开一篇长文档只物化视口附近的内容。
+                  </li>
+                  <li>
+                    🧪 <strong>测试规模</strong>：<strong>113 个测试套件、1,495 项</strong>
+                    单元与集成测试（1,493 通过、2 项基准默认跳过）；每个性能改动都配了可重复的
+                    浏览器基准（docs/PERF_BASELINE.md，脚本生成）。
+                  </li>
+                  <li>
+                    📦 <strong>没有改变任何既有文件格式</strong>：与 v2.7.0
+                    完全一致，升级不需要迁移。
+                  </li>
+                </ul>
+              </div>
+
               {/* v2.7.0 */}
               <div className="about-changelog-group">
                 <div className="about-changelog-group-label">
