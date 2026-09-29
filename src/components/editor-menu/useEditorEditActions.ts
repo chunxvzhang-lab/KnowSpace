@@ -137,27 +137,47 @@ export function useEditorEditActions({
     [hasSelection, onClose, selectedText, selection.from, selection.to, view],
   );
 
-  // Helper: Transform line prefix (Heading, list, todo, quote)
+  // Helper: Transform line prefix (Heading, list, todo, quote, plain text).
+  //
+  // The replacement is handed to String.replace so a "$1" in it means what
+  // every caller has always intended: the line's leading whitespace, which
+  // keeps indentation (Word-style nesting) across a transform. The previous
+  // implementation stripped the prefix with `replace(pattern, "")` and then
+  // CONCATENATED the replacement - so "$1- " entered the document as literal
+  // `$1- ` text, which is exactly the reported bug: right-click list/heading/
+  // quote commands produced unrenderable garbage instead of a list.
+  // `newPrefix` may also be a function (indent, ordinal) => whole replacement,
+  // used by 转为有序列表 to number items 1. 2. 3. as it converts.
+  // Whitespace-only lines are skipped: a marker on an empty line is a stray
+  // dangling bullet in the preview and splits the list apart.
   const transformLinePrefix = useCallback(
-    (prefixPattern: RegExp, newPrefix: string) => {
+    (prefixPattern: RegExp, newPrefix: string | ((indent: string, ordinal: number) => string)) => {
       const doc = view.state.doc;
       const startLine = doc.lineAt(selection.from);
       const endLine = doc.lineAt(selection.to);
       const changes: { from: number; to: number; insert: string }[] = [];
 
+      let ordinal = 0;
       for (let l = startLine.number; l <= endLine.number; l++) {
         const line = doc.line(l);
         const lineContent = line.text;
-        const cleaned = lineContent.replace(prefixPattern, "");
-        changes.push({
-          from: line.from,
-          to: line.to,
-          insert: `${newPrefix}${cleaned}`,
-        });
+        if (lineContent.trim() === "") continue;
+        ordinal += 1;
+        const insert =
+          typeof newPrefix === "string"
+            ? lineContent.replace(prefixPattern, newPrefix)
+            : lineContent.replace(prefixPattern, (_match: string, ...args: unknown[]) =>
+                newPrefix(typeof args[0] === "string" ? args[0] : "", ordinal),
+              );
+        if (insert !== lineContent) {
+          changes.push({ from: line.from, to: line.to, insert });
+        }
       }
 
-      view.dispatch({ changes });
-      view.focus();
+      if (changes.length > 0) {
+        view.dispatch({ changes });
+        view.focus();
+      }
       onClose();
     },
     [onClose, selection.from, selection.to, view],

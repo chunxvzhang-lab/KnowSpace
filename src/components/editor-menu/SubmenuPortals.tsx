@@ -8,6 +8,7 @@ import {
   List,
   ListOrdered,
   Quote,
+  Eraser,
   Code,
   Sigma,
   GitFork,
@@ -22,7 +23,10 @@ type SubmenuPortalsProps = {
   tablePickerRef: RefObject<HTMLDivElement | null>;
   handleCancelClose: () => void;
   handleScheduleClose: () => void;
-  transformLinePrefix: (prefixPattern: RegExp, newPrefix: string) => void;
+  transformLinePrefix: (
+    prefixPattern: RegExp,
+    newPrefix: string | ((indent: string, ordinal: number) => string),
+  ) => void;
   insertAtCursor: (text: string, cursorRelativeOffset?: number) => void;
   handleInsertTableDimensions: (r: number, c: number) => void;
 };
@@ -131,7 +135,12 @@ export function SubmenuPortals({
             <button
               type="button"
               className="context-menu-item"
-              onClick={() => transformLinePrefix(/^(\s*)([-*+]|\d+\.)?\s*(\[[ xX]\]\s*)?/, "$11. ")}
+              onClick={() =>
+                transformLinePrefix(
+                  /^(\s*)([-*+]|\d+\.)?\s*(\[[ xX]\]\s*)?/,
+                  (indent, n) => `${indent}${n}. `,
+                )
+              }
             >
               <ListOrdered size={14} className="menu-icon" />
               <span className="menu-label">转为有序列表</span>
@@ -145,6 +154,22 @@ export function SubmenuPortals({
               <Quote size={14} className="menu-icon" />
               <span className="menu-label">转为引用块</span>
               <span className="menu-shortcut">&gt;</span>
+            </button>
+            {/* The cancel the family never had: strip every marker this
+                submenu (and 转为标题) can put on a line. */}
+            <button
+              type="button"
+              className="context-menu-item"
+              onClick={() =>
+                transformLinePrefix(
+                  /^(\s*)(?:#{1,6}\s+|>\s+)?(?:[-*+]|\d+[.)])?\s*(?:\[[ xX]\]\s*)?/,
+                  "$1",
+                )
+              }
+            >
+              <Eraser size={14} className="menu-icon" />
+              <span className="menu-label">转为普通文本</span>
+              <span className="menu-shortcut">取消格式</span>
             </button>
           </div>,
           document.body,
