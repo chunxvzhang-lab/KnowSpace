@@ -11,9 +11,9 @@
 
 | 项目 | 数值 |
 | :--- | ---: |
-| 测试文件 | **123** |
-| 用例总数 | **1512** |
-| 通过 | 1510 |
+| 测试文件 | **124** |
+| 用例总数 | **1521** |
+| 通过 | 1519 |
 | 失败 | 0 |
 | 跳过 | 2 |
 | 通过率 | 99.9% |
@@ -70,6 +70,7 @@
 | `src/__tests__/flash-capsule.test.ts` | 9 | ✅ |
 | `src/__tests__/graph.test.ts` | 9 | ✅ |
 | `src/__tests__/inflate.test.ts` | 9 | ✅ |
+| `src/__tests__/markdown-footnotes.test.ts` | 9 | ✅ |
 | `src/__tests__/zip.test.ts` | 9 | ✅ |
 | `src/__tests__/editor-line-prefix-transform.test.tsx` | 8 | ✅ |
 | `src/__tests__/fsrs-verification.test.ts` | 8 | ✅ |
@@ -175,7 +176,7 @@
 
 任何重构都必须满足：
 
-1. 用例总数 **不低于 1512**（删除测试需在 PR 说明中论证）
+1. 用例总数 **不低于 1521**（删除测试需在 PR 说明中论证）
 2. 通过率 **100%**
 3. 单文件用例数**不得下降**（防止测试被静默删除）
 
