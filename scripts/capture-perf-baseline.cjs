@@ -948,20 +948,35 @@ async function scrollPageLoop([frames, step]) {
   const internal = Boolean(el) && el.scrollHeight > el.clientHeight + 200;
   const target = internal ? el : document.scrollingElement || document.documentElement;
   const isWin = !internal;
+  /*
+   * The scrollable extent is a LAYOUT-dependent read (scrollHeight/clientHeight
+   * force a style+layout flush when the frame dirtied anything - split mode
+   * does, every frame). A real user scrolling with the wheel never reads it
+   * back, so reading it inside the per-frame loop measured the harness's own
+   * flushes, not the app's (same class of distortion as the polling-anchor
+   * fix). Read it once, refresh only at wrap; loop-position detection uses
+   * scrollTop, which the scroller already stores (no layout needed).
+   */
+  const readMax = () =>
+    isWin
+      ? document.documentElement.scrollHeight - window.innerHeight
+      : target.scrollHeight - target.clientHeight;
+  let max = readMax();
   const deltas = [];
   let last = performance.now();
+  let lastPos = -1;
   for (let i = 0; i < frames; i += 1) {
     await new Promise((r) => requestAnimationFrame(() => r()));
     const now = performance.now();
     deltas.push(now - last);
     last = now;
-    const max = isWin
-      ? document.documentElement.scrollHeight - window.innerHeight
-      : target.scrollHeight - target.clientHeight;
-    if (target.scrollTop + target.clientHeight >= max - 4) {
+    const pos = isWin ? window.scrollY : target.scrollTop;
+    if (pos >= max - 4 || pos === lastPos) {
       if (isWin) window.scrollTo(0, 0);
       else target.scrollTop = 0;
+      max = readMax();
     }
+    lastPos = pos;
     if (isWin) window.scrollBy(0, step);
     else target.scrollBy(0, step);
   }
@@ -1002,18 +1017,45 @@ async function profileScroll(browser, url, corpus) {
     // Warm-up: JIT-compile the hot path so the profiled pass shows steady
     // state, not first-run compile noise.
     await page.evaluate(scrollPageLoop, [SCROLL_FRAMES, 420]);
-    await page.evaluate(() => {
-      const el = document.querySelector(".reader-pane");
-      if (el) el.scrollTop = 0;
-      window.scrollTo(0, 0);
-    });
-    await page.waitForTimeout(300);
-    const cdp = await context.newCDPSession(page);
-    await cdp.send("Profiler.enable");
-    await cdp.send("Profiler.setSamplingInterval", { interval: 100 });
-    await cdp.send("Profiler.start");
-    const stats = await page.evaluate(scrollPageLoop, [SCROLL_FRAMES, 420]);
-    const { profile } = await cdp.send("Profiler.stop");
+    const rewind = async () => {
+      await page.evaluate(() => {
+        const el = document.querySelector(".reader-pane");
+        if (el) el.scrollTop = 0;
+        window.scrollTo(0, 0);
+      });
+      await page.waitForTimeout(300);
+    };
+    // Start the measured passes from the top of the document (the warm-up pass
+    // left the scroller at the end). N=3 with min() per measurement discipline
+    // (ENGINEERING_GUIDE 4.5): this machine's numbers swing ~50% with thermal
+    // state, so a single pass cannot support an A/B. The CPU profile is taken
+    // around the LAST pass; the stats are the min of all three.
+    let stats = null;
+    let profile = null;
+    const merge = (s) => {
+      stats = stats
+        ? {
+            p50: Math.min(stats.p50, s.p50),
+            p95: Math.min(stats.p95, s.p95),
+            drops: Math.min(stats.drops, s.drops),
+            frames: s.frames,
+          }
+        : s;
+    };
+    for (let pass = 1; pass <= 3; pass += 1) {
+      await rewind();
+      if (pass === 3) {
+        const cdp = await context.newCDPSession(page);
+        await cdp.send("Profiler.enable");
+        await cdp.send("Profiler.setSamplingInterval", { interval: 100 });
+        await cdp.send("Profiler.start");
+        const s = await page.evaluate(scrollPageLoop, [SCROLL_FRAMES, 420]);
+        profile = (await cdp.send("Profiler.stop")).profile;
+        merge(s);
+      } else {
+        merge(await page.evaluate(scrollPageLoop, [SCROLL_FRAMES, 420]));
+      }
+    }
     return { stats, profile };
   } finally {
     await context.close();
@@ -1526,6 +1568,14 @@ async function main() {
     await waitForServer(url, 60000);
     console.log(`[perf] preview server up at ${url}`);
     browser = await chromium.launch({ channel: "msedge", headless: true });
+    if (process.argv.includes("--profile-scroll")) {
+      const { stats, profile } = await profileScroll(browser, url, corpus);
+      console.log(
+        `[profile] scroll loop (min of 3): p50=${stats.p50.toFixed(1)}ms p95=${stats.p95.toFixed(1)}ms drops=${stats.drops}/${stats.frames}`,
+      );
+      printProfile(profile, os.tmpdir());
+      return;
+    }
     const values = await runAll(browser, url, corpus);
 
     for (const m of METRICS) {
