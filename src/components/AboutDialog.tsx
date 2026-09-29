@@ -145,6 +145,42 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
               <span className="about-changelog-version-badge">v{__APP_VERSION__}</span>
             </div>
             <div className="about-changelog-list">
+              {/* v2.7.2 */}
+              <div className="about-changelog-group">
+                <div className="about-changelog-group-label">
+                  <Sparkles size={12} className="text-cyan" />
+                  <span>v2.7.2 右键列表修复 · 脚注渲染 · 分屏滚动更顺滑</span>
+                </div>
+                <ul className="about-changelog-items">
+                  <li>
+                    🐛 <strong>修复右键「转为列表/标题/引用」写入垃圾文本</strong>
+                    （自该功能上线起即坏）：转换后文档里出现的是字面 <code>$1-</code> 而不是
+                    真正的列表标记，预览渲染不出列表。现在生成真标记并保留行首缩进，
+                    「转为有序列表」按 1. 2. 3. 自动续号，选区里的空行不再变成断开列表的
+                    悬空项；并新增<strong>「转为普通文本」</strong>一键取消这些格式。
+                  </li>
+                  <li>
+                    📌 <strong>脚注渲染</strong>：<code>[^1]</code> 与 Obsidian 形式的
+                    <code>[^1^]</code> 现在渲染为编号上标角标，定义收集到文末脚注列表
+                    （首次引用顺序编号、带 ↩ 回链）；长文档里角标与列表不在同一屏也能点击互跳。
+                    没有定义的引用按原样显示，不伪装成有效链接。
+                  </li>
+                  <li>
+                    ⚡ <strong>分屏滚动更顺滑</strong>：消除滚动路径上的强制布局 （几何缓存 +
+                    事件期快照 + 高度表键复用 + 状态栏重渲染跳过）， 10 万字文档实测滚动尾部帧时间{" "}
+                    <strong>30.9ms → 18.4ms</strong>、 掉帧 <strong>13 → 2</strong>（同机对照）。
+                  </li>
+                  <li>
+                    🧹 <strong>长会话内存护栏</strong>：滚动位置高度表加上限并按新旧逐出，
+                    长时间使用不再无限增长。
+                  </li>
+                  <li>
+                    📦 <strong>没有改变任何既有文件格式</strong>：与 v2.7.1
+                    完全一致，升级不需要迁移。
+                  </li>
+                </ul>
+              </div>
+
               {/* v2.7.1 */}
               <div className="about-changelog-group">
                 <div className="about-changelog-group-label">
