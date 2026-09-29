@@ -14,6 +14,7 @@ import frontMatterPlugin from "markdown-it-front-matter";
 import taskLists from "markdown-it-task-lists";
 import { sha256 } from "../core/ids";
 import { footnotePlugin } from "./markdownFootnotes";
+import { supSubPlugin } from "./markdownSupSub";
 import type { RenderedChapter } from "../core/types";
 import {
   addHeadingIds,
@@ -112,6 +113,7 @@ export function buildMarkdownIt(onFrontMatter: (frontMatter: string) => void): M
     .use(blockAnchorPlugin)
     .use(wikiLinkPlugin)
     .use(footnotePlugin)
+    .use(supSubPlugin)
     .use(taskLists, { enabled: true, label: true })
     .use(frontMatterPlugin, onFrontMatter);
 

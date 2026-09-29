@@ -8,6 +8,8 @@ import {
   Bold,
   Italic,
   Strikethrough,
+  Superscript,
+  Subscript,
   Code,
   Highlighter,
   Link,
@@ -225,6 +227,22 @@ export function ContextMenuPortal({
             title="文本高亮 (==)"
           >
             <Highlighter size={13} />
+          </button>
+          <button
+            type="button"
+            className="format-ribbon-btn"
+            onClick={() => wrapSelection("^")}
+            title="上标 (^)"
+          >
+            <Superscript size={13} />
+          </button>
+          <button
+            type="button"
+            className="format-ribbon-btn"
+            onClick={() => wrapSelection("~")}
+            title="下标 (~)"
+          >
+            <Subscript size={13} />
           </button>
           <button
             type="button"
