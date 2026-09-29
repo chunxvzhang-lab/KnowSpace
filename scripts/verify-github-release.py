@@ -19,17 +19,34 @@ Usage: python scripts/verify-github-release.py <tag> [--repo OWNER/REPO]
 
 import argparse
 import json
+import os
 import pathlib
 import subprocess
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 
 DEFAULT_REPO = "chunxvzhang-lab/KnowSpace"
 
+# Every URL in this script is a hardcoded api.github.com literal; the allowlist
+# makes that an enforced invariant (and keeps the dynamic-URL request pattern
+# inside a validated boundary: https + this host, nothing else).
+ALLOWED_API_HOSTS = frozenset({"api.github.com"})
+
 
 def api(url: str) -> dict:
-    request = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json"})
+    parsed = urllib.parse.urlsplit(url)
+    if parsed.scheme != "https" or parsed.hostname not in ALLOWED_API_HOSTS:
+        raise ValueError(f"refusing non-GitHub-API url: {parsed.scheme}://{parsed.hostname}")
+    headers = {"Accept": "application/vnd.github+json"}
+    # GITHUB_TOKEN (e.g. `gh auth token`) upgrades the meter from per-egress-IP
+    # 60/hr to per-account 5000/hr - on a shared proxy the IP quota is burned
+    # by other tenants and a verification stays unverifiable without it.
+    token = os.environ.get("GITHUB_TOKEN", "").strip()
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    request = urllib.request.Request(url, headers=headers)
     with urllib.request.urlopen(request, timeout=60) as response:
         return json.loads(response.read().decode("utf-8"))
 
