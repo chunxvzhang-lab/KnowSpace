@@ -58,6 +58,18 @@ describe("superscript and subscript rendering", () => {
     expect(html).toContain("<sub>2</sub>");
     expect(html).toContain("<sup>2</sup>");
   });
+
+  it("renders ==highlight== that the ribbon button always inserted", async () => {
+    const html = await htmlOf("这段==重点内容==要高亮。\n");
+    expect(html).toContain("<mark>重点内容</mark>");
+    expect(html).not.toContain("==重点内容==");
+  });
+
+  it("keeps spacing runs and setext-like input literal (highlight negative)", async () => {
+    const html = await htmlOf("等于号 a == b 与三连 a === b 原样。\n");
+    expect(html).not.toContain("<mark>");
+    expect(html).toContain("a == b");
+  });
 });
 
 function createView(text: string, selFrom: number, selTo: number) {
