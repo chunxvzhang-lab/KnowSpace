@@ -26,18 +26,55 @@ export function useReadingTracker(input: {
     let frame = 0;
     let idleTimer = 0;
 
+    /*
+     * The scroller's extent (scrollHeight/clientHeight) is read once per rAF
+     * tick here, and reading those properties forces a style+layout flush if
+     * anything in the frame dirtied layout — in split mode the editor-follow
+     * scroll does exactly that every frame. The 2-4 profile caught this read
+     * alone costing more than a frame budget of attributed time (up to 5ms/frame
+     * on the 100k corpus). Extent changes only when content above the fold is
+     * added or the pane resizes — neither happens mid-burst — so it is cached
+     * and refreshed on the signals that do mean it: a resize, the idle settle
+     * (same 900ms beat that saves the reading position), or scrollTop
+     * contradicting the cached range (content grew past the estimate).
+     */
+    let extent: { scrollHeight: number; clientHeight: number } | null = null;
+    const readExtent = () => {
+      if (!extent) {
+        extent = { scrollHeight: container.scrollHeight, clientHeight: container.clientHeight };
+      }
+      return extent;
+    };
+    const refreshExtent = () => {
+      extent = { scrollHeight: container.scrollHeight, clientHeight: container.clientHeight };
+      return extent;
+    };
+    const handleWindowResize = () => {
+      extent = null;
+    };
+    window.addEventListener("resize", handleWindowResize);
+
     const handleScroll = () => {
       if (frame) return;
       frame = window.requestAnimationFrame(() => {
         frame = 0;
-        const max = container.scrollHeight - container.clientHeight;
-        scrollRatioRef.current = max > 0 ? container.scrollTop / max : 0;
+        const scrollTop = container.scrollTop;
+        let box = readExtent();
+        if (scrollTop > box.scrollHeight - box.clientHeight) {
+          // Scrolled past the cached range: content grew since the last read.
+          box = refreshExtent();
+        }
+        const max = box.scrollHeight - box.clientHeight;
+        scrollRatioRef.current = max > 0 ? Math.min(1, scrollTop / max) : 0;
         if (!navLockUntilRef?.current || Date.now() >= navLockUntilRef.current) {
-          updateActiveHeading(container, headings, activeHeadingRef, onActiveHeadingChange);
+          updateActiveHeading(container, headings, activeHeadingRef, onActiveHeadingChange, box);
         }
         if (onScrollIdle) {
           window.clearTimeout(idleTimer);
-          idleTimer = window.setTimeout(onScrollIdle, 900);
+          idleTimer = window.setTimeout(() => {
+            extent = null; // the settle re-reads fresh extent on next use
+            onScrollIdle();
+          }, 900);
         }
       });
     };
@@ -46,6 +83,7 @@ export function useReadingTracker(input: {
     return () => {
       if (frame) window.cancelAnimationFrame(frame);
       window.clearTimeout(idleTimer);
+      window.removeEventListener("resize", handleWindowResize);
       container.removeEventListener("scroll", handleScroll);
     };
   }, [
@@ -62,7 +100,12 @@ export function useReadingTracker(input: {
     const container = containerRef.current;
     if (!container) return;
     if (!navLockUntilRef?.current || Date.now() >= navLockUntilRef.current) {
-      updateActiveHeading(container, headings, activeHeadingRef, onActiveHeadingChange);
+      // Content-driven refresh (headings changed): read the extent live here -
+      // this runs on document/headings change, not on the per-frame path.
+      updateActiveHeading(container, headings, activeHeadingRef, onActiveHeadingChange, {
+        scrollHeight: container.scrollHeight,
+        clientHeight: container.clientHeight,
+      });
     }
   }, [activeHeadingRef, containerRef, headings, navLockUntilRef, onActiveHeadingChange]);
 }
@@ -72,6 +115,7 @@ function updateActiveHeading(
   headings: Heading[],
   activeHeadingRef: React.MutableRefObject<string | undefined>,
   onActiveHeadingChange: (headingId: string | undefined) => void,
+  extent: { scrollHeight: number; clientHeight: number },
 ): void {
   if (headings.length === 0) {
     if (activeHeadingRef.current !== undefined) {
@@ -82,7 +126,7 @@ function updateActiveHeading(
   }
 
   // If scrolled to the bottom of the container, highlight the final heading
-  const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight <= 20;
+  const isAtBottom = extent.scrollHeight - container.scrollTop - extent.clientHeight <= 20;
   if (isAtBottom && headings.length > 0) {
     const lastId = headings[headings.length - 1].id;
     if (activeHeadingRef.current !== lastId) {
