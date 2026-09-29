@@ -937,6 +937,44 @@ async function scenarioTyping(browser, url, corpus) {
   }
 }
 
+/**
+ * The measured scroll loop, shared verbatim by the baseline scenario and the
+ * --profile-scroll diagnostic lane (identical bytes so a profile describes
+ * exactly what the baseline times). Module-level so Playwright serializes it
+ * once; see scenarioScroll for the mode/split rationale.
+ */
+async function scrollPageLoop([frames, step]) {
+  const el = document.querySelector(".reader-pane");
+  const internal = Boolean(el) && el.scrollHeight > el.clientHeight + 200;
+  const target = internal ? el : document.scrollingElement || document.documentElement;
+  const isWin = !internal;
+  const deltas = [];
+  let last = performance.now();
+  for (let i = 0; i < frames; i += 1) {
+    await new Promise((r) => requestAnimationFrame(() => r()));
+    const now = performance.now();
+    deltas.push(now - last);
+    last = now;
+    const max = isWin
+      ? document.documentElement.scrollHeight - window.innerHeight
+      : target.scrollHeight - target.clientHeight;
+    if (target.scrollTop + target.clientHeight >= max - 4) {
+      if (isWin) window.scrollTo(0, 0);
+      else target.scrollTop = 0;
+    }
+    if (isWin) window.scrollBy(0, step);
+    else target.scrollBy(0, step);
+  }
+  const sorted = deltas.slice(1).sort((a, b) => a - b);
+  const pct = (p) => sorted[Math.min(sorted.length - 1, Math.round(p * (sorted.length - 1)))];
+  return {
+    p50: pct(0.5),
+    p95: pct(0.95),
+    drops: deltas.filter((d) => d > 20).length,
+    frames: deltas.length,
+  };
+}
+
 async function scenarioScroll(browser, url, corpus) {
   const { context, page } = await newSeededPage(browser, url, corpus);
   try {
@@ -944,42 +982,141 @@ async function scenarioScroll(browser, url, corpus) {
     // 分屏，不是阅读：同步滚动的逐帧工作只在 split 下存在，阅读模式下
     // useSyncScroll 本就惰性——用错了模式，2-4 的收益会被口径整体吞掉。
     await clickIfPresent(page, ".view-mode-btn[title='分屏模式（边写边看）']");
-    return await page.evaluate(
-      async ([frames, step]) => {
-        const el = document.querySelector(".reader-pane");
-        const internal = Boolean(el) && el.scrollHeight > el.clientHeight + 200;
-        const target = internal ? el : document.scrollingElement || document.documentElement;
-        const isWin = !internal;
-        const deltas = [];
-        let last = performance.now();
-        for (let i = 0; i < frames; i += 1) {
-          await new Promise((r) => requestAnimationFrame(() => r()));
-          const now = performance.now();
-          deltas.push(now - last);
-          last = now;
-          const max = isWin
-            ? document.documentElement.scrollHeight - window.innerHeight
-            : target.scrollHeight - target.clientHeight;
-          if (target.scrollTop + target.clientHeight >= max - 4) {
-            if (isWin) window.scrollTo(0, 0);
-            else target.scrollTop = 0;
-          }
-          if (isWin) window.scrollBy(0, step);
-          else target.scrollBy(0, step);
-        }
-        const sorted = deltas.slice(1).sort((a, b) => a - b);
-        const pct = (p) => sorted[Math.min(sorted.length - 1, Math.round(p * (sorted.length - 1)))];
-        return {
-          p50: pct(0.5),
-          p95: pct(0.95),
-          drops: deltas.filter((d) => d > 20).length,
-          frames: deltas.length,
-        };
-      },
-      [SCROLL_FRAMES, 420],
-    );
+    return await page.evaluate(scrollPageLoop, [SCROLL_FRAMES, 420]);
   } finally {
     await context.close();
+  }
+}
+
+/**
+ * --profile-scroll: one warm-up pass, then a CDP-sampled CPU profile of the
+ * same loop. Diagnostic lane only (never writes the baseline): answers
+ * "where do the dropped frames go" before any optimization is attempted —
+ * Guide rule 4: change a hot path only with a measured address.
+ */
+async function profileScroll(browser, url, corpus) {
+  const { context, page } = await newSeededPage(browser, url, corpus);
+  try {
+    await openFileAndWait(page, corpus.longDoc.path, "长文基准 分节 001");
+    await clickIfPresent(page, ".view-mode-btn[title='分屏模式（边写边看）']");
+    // Warm-up: JIT-compile the hot path so the profiled pass shows steady
+    // state, not first-run compile noise.
+    await page.evaluate(scrollPageLoop, [SCROLL_FRAMES, 420]);
+    await page.evaluate(() => {
+      const el = document.querySelector(".reader-pane");
+      if (el) el.scrollTop = 0;
+      window.scrollTo(0, 0);
+    });
+    await page.waitForTimeout(300);
+    const cdp = await context.newCDPSession(page);
+    await cdp.send("Profiler.enable");
+    await cdp.send("Profiler.setSamplingInterval", { interval: 100 });
+    await cdp.send("Profiler.start");
+    const stats = await page.evaluate(scrollPageLoop, [SCROLL_FRAMES, 420]);
+    const { profile } = await cdp.send("Profiler.stop");
+    return { stats, profile };
+  } finally {
+    await context.close();
+  }
+}
+
+/** Self time per frame, µs, attributed to the sample that was on-CPU. */
+function profileSelfTime(profile) {
+  const selfUs = new Map();
+  const { samples, timeDeltas } = profile;
+  if (!samples || !timeDeltas) return selfUs;
+  for (let i = 1; i < samples.length; i += 1) {
+    const dt = timeDeltas[i] || 0;
+    if (dt <= 0) continue;
+    const id = samples[i - 1];
+    selfUs.set(id, (selfUs.get(id) || 0) + dt);
+  }
+  return selfUs;
+}
+
+/** Inclusive (ancestor-walk) time per node, µs, over the whole profile. */
+function profileTotalTime(profile) {
+  const parentOf = new Map();
+  for (const n of profile.nodes) {
+    for (const c of n.children || []) parentOf.set(c, n.id);
+  }
+  const totalUs = new Map();
+  const { samples, timeDeltas } = profile;
+  if (!samples || !timeDeltas) return totalUs;
+  for (let i = 1; i < samples.length; i += 1) {
+    const dt = timeDeltas[i] || 0;
+    if (dt <= 0) continue;
+    let id = samples[i - 1];
+    const seen = new Set();
+    while (id !== undefined && !seen.has(id)) {
+      seen.add(id);
+      totalUs.set(id, (totalUs.get(id) || 0) + dt);
+      id = parentOf.get(id);
+    }
+  }
+  return totalUs;
+}
+
+function fmtFrame(cf) {
+  const name = cf.functionName || "(native/anonymous)";
+  const url = (cf.url || "").replace(/^.*\/(dist\/assets|src|node_modules)\//, "$1/");
+  return `${name} @ ${url}:${cf.lineNumber ?? "?"}`;
+}
+
+/**
+ * Print the profile: bucket totals (idle/GC/native vs app vs vendor), top
+ * self-time frames, and inclusive time for the reader's own controller
+ * functions (those are what an optimization changes).
+ */
+function printProfile(profile, outDir) {
+  const byId = new Map(profile.nodes.map((n) => [n.id, n.callFrame || {}]));
+  const selfUs = profileSelfTime(profile);
+  const totalUs = profileTotalTime(profile);
+  const grandUs = [...selfUs.values()].reduce((a, b) => a + b, 0);
+
+  const bucketOf = (cf) => {
+    const name = cf.functionName || "";
+    if (name === "(idle)" || name === "(root)") return "idle";
+    if (name === "(garbage collector)") return "gc";
+    if (!cf.url) return "native/anonymous";
+    if (/dist\/assets/.test(cf.url)) return "app bundle";
+    if (/node_modules/.test(cf.url)) {
+      return /codemirror|@lezer/.test(cf.url) ? "codemirror" : "vendor";
+    }
+    return "other";
+  };
+  const buckets = new Map();
+  for (const [id, us] of selfUs) {
+    const b = bucketOf(byId.get(id) || {});
+    buckets.set(b, (buckets.get(b) || 0) + us);
+  }
+  console.log(`\n[profile] total ${(grandUs / 1000).toFixed(1)} ms sampled`);
+  for (const [b, us] of [...buckets.entries()].sort((a, b2) => b2[1] - a[1])) {
+    console.log(
+      `  ${b.padEnd(18)} ${(us / 1000).toFixed(1).padStart(8)} ms  ${((100 * us) / grandUs).toFixed(1)}%`,
+    );
+  }
+
+  const rank = (map, filter) =>
+    [...map.entries()]
+      .filter(([id]) => !filter || filter(byId.get(id) || {}))
+      .map(([id, us]) => ({ us, label: fmtFrame(byId.get(id) || {}) }))
+      .sort((a, b) => b.us - a.us)
+      .slice(0, 24)
+      .filter((r) => r.us > 1000);
+
+  console.log("\n[profile] top self time:");
+  for (const r of rank(selfUs))
+    console.log(`  ${(r.us / 1000).toFixed(1).padStart(8)} ms  ${r.label}`);
+  console.log("\n[profile] top inclusive time (app bundle only):");
+  for (const r of rank(totalUs, (cf) => /dist\/assets/.test(cf.url || ""))) {
+    console.log(`  ${(r.us / 1000).toFixed(1).padStart(8)} ms  ${r.label}`);
+  }
+
+  if (outDir) {
+    const file = path.join(outDir, "scroll-profile.cpuprofile");
+    fs.writeFileSync(file, JSON.stringify(profile));
+    console.log(`\n[profile] raw profile written to ${file} (open in DevTools > Performance)`);
   }
 }
 
