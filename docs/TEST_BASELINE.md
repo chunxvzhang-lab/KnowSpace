@@ -1,8 +1,8 @@
 # KnowSpace · 测试基线快照
 
 > **文档性质**：重构安全网的权威口径（release plan R3 交付物）
-> **生成时间**：2026-09-27
-> **应用版本**：`2.7.0`
+> **生成时间**：2026-09-29
+> **应用版本**：`2.7.1`
 > **生成方式**：`node scripts/capture-test-baseline.cjs`（自动生成，请勿手工编辑）
 
 ---
@@ -11,11 +11,11 @@
 
 | 项目 | 数值 |
 | :--- | ---: |
-| 测试文件 | **113** |
-| 用例总数 | **1414** |
-| 通过 | 1413 |
+| 测试文件 | **122** |
+| 用例总数 | **1502** |
+| 通过 | 1500 |
 | 失败 | 0 |
-| 跳过 | 1 |
+| 跳过 | 2 |
 | 通过率 | 99.9% |
 
 > ✅ **口径确认**：`vitest.config.ts` **未配置任何 `exclude`**，因此上述数字是全量真实口径。
@@ -45,8 +45,11 @@
 | `src/__tests__/mindmap.test.ts` | 23 | ✅ |
 | `src/__tests__/search-index-service.test.ts` | 20 | ✅ |
 | `src/__tests__/column-resize.test.tsx` | 19 | ✅ |
+| `src/__tests__/reader-virtual.test.ts` | 19 | ✅ |
 | `src/__tests__/vault-store.test.ts` | 19 | ✅ |
+| `src/__tests__/markdown-blocks.test.ts` | 17 | ✅ |
 | `src/__tests__/ipc-channel-contract.test.ts` | 16 | ✅ |
+| `src/__tests__/reader-pane-virtual.test.tsx` | 16 | ✅ |
 | `src/__tests__/canvas-card-interactions.test.tsx` | 15 | ✅ |
 | `src/__tests__/mindmap-svg-export.test.tsx` | 15 | ✅ |
 | `src/__tests__/perf-regressions.test.ts` | 14 | ✅ |
@@ -74,10 +77,12 @@
 | `src/__tests__/mindmap-marker-table.test.ts` | 8 | ✅ |
 | `src/__tests__/mindmap-node-style-menu.test.tsx` | 8 | ✅ |
 | `src/__tests__/mindmap-relation-settings-ui.test.tsx` | 8 | ✅ |
+| `src/__tests__/sync-scroll.test.ts` | 8 | ✅ |
 | `src/__tests__/backlink.test.ts` | 7 | ✅ |
 | `src/__tests__/dialogs-conflict-about.test.tsx` | 7 | ✅ |
 | `src/__tests__/graph-and-directory.test.ts` | 7 | ✅ |
 | `src/__tests__/graph-depth-clustering.test.ts` | 7 | ✅ |
+| `src/__tests__/mermaid-pool.test.ts` | 7 | ✅ |
 | `src/__tests__/mindmap-boundaries-ui.test.tsx` | 7 | ✅ |
 | `src/__tests__/mindmap-floating-annotations-ui.test.tsx` | 7 | ✅ |
 | `src/__tests__/mindmap-floating-ui.test.tsx` | 7 | ✅ |
@@ -97,11 +102,13 @@
 | `src/__tests__/mindmap-marks-ui.test.tsx` | 6 | ✅ |
 | `src/__tests__/mindmap-numbering-ui.test.tsx` | 6 | ✅ |
 | `src/__tests__/mindmap-relations-ui.test.tsx` | 6 | ✅ |
+| `src/__tests__/mindmap-select.test.tsx` | 6 | ✅ |
 | `src/__tests__/mindmap-side-choice.test.tsx` | 6 | ✅ |
 | `src/__tests__/mindmap-summaries-ui.test.tsx` | 6 | ✅ |
 | `src/__tests__/rename-refactor.test.ts` | 6 | ✅ |
 | `src/__tests__/search-hook.test.ts` | 6 | ✅ |
 | `src/__tests__/space-timeline.test.ts` | 6 | ✅ |
+| `src/__tests__/status-bar.test.tsx` | 6 | ✅ |
 | `src/__tests__/sync-selection.test.ts` | 6 | ✅ |
 | `src/__tests__/blocklink.test.ts` | 5 | ✅ |
 | `src/__tests__/book-source.test.ts` | 5 | ✅ |
@@ -109,8 +116,8 @@
 | `src/__tests__/mindmap-alignment.test.tsx` | 5 | ✅ |
 | `src/__tests__/mindmap-link-badge.test.tsx` | 5 | ✅ |
 | `src/__tests__/mindmap-numbering.test.ts` | 5 | ✅ |
+| `src/__tests__/mindmap-select-contrast.test.ts` | 5 | ✅ |
 | `src/__tests__/slash-commands.test.ts` | 5 | ✅ |
-| `src/__tests__/status-bar.test.tsx` | 5 | ✅ |
 | `src/__tests__/svg-export.test.ts` | 5 | ✅ |
 | `src/__tests__/vault-opening.test.ts` | 5 | ✅ |
 | `src/__tests__/command-palette.test.ts` | 4 | ✅ |
@@ -121,6 +128,9 @@
 | `src/__tests__/mindmap-palette.test.ts` | 4 | ✅ |
 | `src/__tests__/mindmap-wheel-menu.test.tsx` | 4 | ✅ |
 | `src/__tests__/print-pdf.test.ts` | 4 | ✅ |
+| `src/__tests__/reader-pane-blocks.test.tsx` | 4 | ✅ |
+| `src/__tests__/reader-pane-mermaid.test.tsx` | 4 | ✅ |
+| `src/__tests__/reading-tracker-extent-cache.test.tsx` | 4 | ✅ |
 | `src/__tests__/storage.test.ts` | 4 | ✅ |
 | `src/__tests__/toc-and-bookmarks.test.tsx` | 4 | ✅ |
 | `src/__tests__/web-snapshot-service.test.ts` | 4 | ✅ |
@@ -132,14 +142,13 @@
 | `src/__tests__/paths.test.ts` | 3 | ✅ |
 | `src/__tests__/search-panel.test.tsx` | 3 | ✅ |
 | `src/__tests__/snapshots-node.test.ts` | 3 | ✅ |
-| `src/__tests__/sync-scroll.test.ts` | 3 | ✅ |
 | `src/__tests__/tab-bar-split.test.tsx` | 3 | ✅ |
 | `src/__tests__/theme-eink.test.ts` | 3 | ✅ |
 | `src/__tests__/mindmap-layout-performance.test.ts` | 2 | ✅ |
 | `src/__tests__/version-history-dialog.test.tsx` | 2 | ✅ |
+| `src/__tests__/bench-render-breakdown.test.ts` | 1 | ✅ |
 | `src/__tests__/bench-vault-parse.test.ts` | 1 | ✅ |
 | `src/__tests__/document-session.test.ts` | 1 | ✅ |
-| `src/__tests__/reader-pane-mermaid.test.tsx` | 1 | ✅ |
 
 ---
 
@@ -165,7 +174,7 @@
 
 任何重构都必须满足：
 
-1. 用例总数 **不低于 1414**（删除测试需在 PR 说明中论证）
+1. 用例总数 **不低于 1502**（删除测试需在 PR 说明中论证）
 2. 通过率 **100%**
 3. 单文件用例数**不得下降**（防止测试被静默删除）
 
