@@ -64,6 +64,8 @@ const PROD_SANITIZE_BASE: Config = {
     "data-wikilink-label",
     "data-block-id",
     "data-embed-target",
+    "data-fn-def-line",
+    "data-fn-ref-line",
     "decoding",
     "encoding",
     "fetchpriority",

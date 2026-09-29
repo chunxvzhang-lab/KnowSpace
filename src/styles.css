@@ -2161,6 +2161,58 @@ body.is-resizing-col * {
   word-break: normal;
 }
 
+/* Footnotes (services/markdownFootnotes): superscript references in the
+   body and the collected definition list at the document end. */
+.markdown-body .footnote-ref {
+  line-height: 1;
+  font-size: 0.75em;
+  vertical-align: super;
+  white-space: nowrap;
+}
+
+.markdown-body .footnote-ref a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.markdown-body .footnote-ref a:hover {
+  text-decoration: underline;
+}
+
+.markdown-body .footnotes {
+  margin-top: 28px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: 0.9em;
+  color: var(--text-muted);
+}
+
+.markdown-body .footnotes ol {
+  padding-left: 1.6em;
+  margin: 0;
+}
+
+.markdown-body .footnotes li {
+  margin: 6px 0;
+  color: var(--text-muted);
+}
+
+.markdown-body .footnotes li p {
+  margin: 2px 0;
+}
+
+.markdown-body .footnote-backref {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+  margin-left: 4px;
+}
+
+.markdown-body .footnote-backref:hover {
+  text-decoration: underline;
+}
+
 .markdown-body a {
   color: var(--accent);
   text-decoration: none;

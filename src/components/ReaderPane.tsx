@@ -8,6 +8,7 @@ import {
 } from "../services/mermaid";
 import { blockKeyOf, VIRTUAL_MIN_BLOCKS } from "../services/readerVirtual";
 import {
+  ensureBlockVisible,
   registerVirtualController,
   unregisterVirtualController,
   VirtualReaderController,
@@ -463,6 +464,37 @@ export const ReaderPane = memo(function ReaderPane({
         return;
       }
 
+      // 0.6. Footnote reference / back-reference jump. The footnote list
+      // sits at the document end and a reference can be anywhere, so under
+      // block virtualization the target is frequently OUT of the materialized
+      // window; a plain anchor click would silently do nothing. Route through
+      // the same ensureBlockVisible contract every other jump path uses, then
+      // scroll the now-present element into view.
+      const footnoteLink = target.closest<HTMLAnchorElement>('a[href^="#fn-"], a[href^="#fnref-"]');
+      if (footnoteLink) {
+        e.preventDefault();
+        e.stopPropagation();
+        const scroller = containerRef.current;
+        const href = footnoteLink.getAttribute("href") ?? "";
+        const id = href.slice(1);
+        const jumpLine = Number(
+          footnoteLink.getAttribute("data-fn-def-line") ??
+            footnoteLink.getAttribute("data-fn-ref-line") ??
+            "0",
+        );
+        if (scroller && id) {
+          void (async () => {
+            let el = scroller.querySelector<HTMLElement>(`[id="${id.replace(/"/g, '\\"')}"]`);
+            if (!el && jumpLine > 0) {
+              await ensureBlockVisible(scroller, jumpLine);
+              el = scroller.querySelector<HTMLElement>(`[id="${id.replace(/"/g, '\\"')}"]`);
+            }
+            el?.scrollIntoView({ behavior: "smooth", block: "center" });
+          })();
+        }
+        return;
+      }
+
       // 1. Check if clicking code copy button
       const copyBtn = target.closest<HTMLButtonElement>(".code-copy-btn");
       if (copyBtn) {
@@ -520,7 +552,7 @@ export const ReaderPane = memo(function ReaderPane({
         }
       }
     },
-    [onOpenLightbox, onWikiLinkClick],
+    [containerRef, onOpenLightbox, onWikiLinkClick],
   );
 
   const handleMouseUp = useCallback(
