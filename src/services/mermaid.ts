@@ -21,6 +21,54 @@ function ensureInitialized(theme: MermaidTheme): void {
   });
 }
 
+/* ── Idle warm-up (profile finding, 2026-09-29) ──────────────────────────
+ *
+ * The FIRST mermaid.render costs ~400ms (one-off API lazy init: theme
+ * compile, layout setup, renderer construction) while every diagram after
+ * it is ~50ms — measured with --profile-mermaid (pre→svg0 = 421ms,
+ * marginal 50ms on the 30-diagram corpus). The module is statically
+ * imported and resident either way, so running one throwaway diagram
+ * during the startup idle window moves that cost off the reader's first
+ * screen without holding anything new in memory.
+ *
+ * The result is discarded and failures are free (the first real render
+ * just walks the cold path). ensureWarm serializes pool renders behind
+ * the warm-up so a document opened before the idle slot ever fires pays
+ * exactly what it would have paid anyway — never worse.
+ */
+
+const WARMUP_SOURCE = "flowchart TD\n    A[开始] --> B[结束]";
+
+let warmUpPromise: Promise<void> | null = null;
+
+function renderWarmUp(): Promise<void> {
+  return mermaid.render("bookmd-mermaid-warmup", WARMUP_SOURCE).then(
+    () => undefined,
+    // A failed warm-up is a cold path for the first real render — free.
+    () => undefined,
+  );
+}
+
+/** Schedules the throwaway warm-up render for the idle window. */
+export function scheduleMermaidWarmUp(): void {
+  if (warmUpPromise || import.meta.env?.MODE === "test") return;
+  const start = () => {
+    if (!warmUpPromise) warmUpPromise = renderWarmUp();
+  };
+  if (typeof requestIdleCallback === "function") {
+    requestIdleCallback(start, { timeout: 800 });
+  } else {
+    window.setTimeout(start, 300);
+  }
+}
+
+/** Resolves once the one-off API init has run (no-op under vitest). */
+async function ensureWarm(): Promise<void> {
+  if (import.meta.env?.MODE === "test") return;
+  if (!warmUpPromise) warmUpPromise = renderWarmUp();
+  await warmUpPromise;
+}
+
 /**
  * Read the raw Mermaid source from a <pre class="mermaid"> element.
  *
@@ -108,6 +156,7 @@ async function renderDiagram(
 
   const id = `bookmd-mermaid-${Date.now()}-${(renderId += 1)}`;
   try {
+    await ensureWarm();
     const { svg } = await mermaid.render(id, source);
     cleanupStrayNodes(id);
     if (options.shouldCommit && !options.shouldCommit()) return;

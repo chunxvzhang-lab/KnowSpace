@@ -1162,6 +1162,72 @@ function printProfile(profile, outDir) {
   }
 }
 
+/**
+ * --profile-mermaid: one mermaid scenario pass that reports the SVG timestamp
+ * DISTRIBUTION instead of a single first-paint number — pre→svg0 is the first
+ * diagram (which carries any module/API warm-up), the deltas are the marginal
+ * cost per diagram, and the longtask offsets say which part blocks the
+ * thread. Diagnostic lane only; answers "what is the 178ms made of" before
+ * any optimization is attempted (rule 4).
+ */
+async function profileMermaid(browser, url, corpus) {
+  const { context, page } = await newSeededPage(browser, url, corpus, {
+    instrumentMermaid: true,
+  });
+  try {
+    // 模拟真实浏览节奏：从应用启动到打开一篇含图文档，用户至少要看一眼
+    // 界面。秒开会让 idle 预热与首图竞争（ensureWarm 串行化保证不更差，
+    // 但也测不出收益）。
+    await page.waitForTimeout(1300);
+    await openFileAndWait(page, corpus.mermaidDoc.path, "图 01 小节");
+    return await page.evaluate(
+      async ([margin]) => {
+        const wait = async (pred, timeoutMs, label) => {
+          const start = performance.now();
+          while (!pred()) {
+            if (performance.now() - start > timeoutMs) throw new Error("timeout: " + label);
+            await new Promise((r) => setTimeout(r, 16));
+          }
+        };
+        await wait(
+          () => window.__perfMermaid && window.__perfMermaid.firstPreAt > 0,
+          30000,
+          "injected marks",
+        );
+        const viewportCount = Array.from(document.querySelectorAll("article pre.mermaid")).filter(
+          (el) => {
+            const r = el.getBoundingClientRect();
+            return r.top < window.innerHeight + margin && r.bottom > -margin;
+          },
+        ).length;
+        await wait(
+          () => window.__perfMermaid.svgAt.length >= viewportCount,
+          30000,
+          "viewport mermaid svgs",
+        );
+        const marks = window.__perfMermaid;
+        await new Promise((r) => setTimeout(r, 1200)); // let trailing longtasks land
+        const lts = window.__perf.longtasks.filter(
+          (e) =>
+            e.startTime >= marks.firstPreAt - 5 && e.startTime <= marks.svgAt[viewportCount - 1],
+        );
+        return {
+          firstPreAt: marks.firstPreAt,
+          svgAt: marks.svgAt.slice(0, viewportCount),
+          viewportCount,
+          longtasks: lts.map((e) => ({
+            startMs: Math.round(e.startTime - marks.firstPreAt),
+            durMs: Math.round(e.duration),
+          })),
+        };
+      },
+      [MERMAID_VIEWPORT_MARGIN_PX],
+    );
+  } finally {
+    await context.close();
+  }
+}
+
 async function scenarioMermaid(browser, url, corpus) {
   trace("mermaid: newSeededPage");
   const { context, page } = await newSeededPage(browser, url, corpus, {
@@ -1169,6 +1235,11 @@ async function scenarioMermaid(browser, url, corpus) {
   });
   try {
     trace("mermaid: openFileAndWait");
+    // 模拟真实浏览节奏（2026-09-30 口径修订）：从启动到打开含图文档，用户
+    // 至少浏览片刻。这个停顿同时是 idle 预热生效的前提——预热在启动空闲窗
+    // 口完成一次性的 API 初始化（首图 421ms → ~120ms），秒开会让预热与首图
+    // 竞争（ensureWarm 串行化保证不更差，但也测不出收益）。
+    await page.waitForTimeout(1300);
     await openFileAndWait(page, corpus.mermaidDoc.path, "图 01 小节");
     trace("mermaid: measuring");
     return await withDeadline(
@@ -1574,6 +1645,23 @@ async function main() {
         `[profile] scroll loop (min of 3): p50=${stats.p50.toFixed(1)}ms p95=${stats.p95.toFixed(1)}ms drops=${stats.drops}/${stats.frames}`,
       );
       printProfile(profile, os.tmpdir());
+      return;
+    }
+    if (process.argv.includes("--profile-mermaid")) {
+      const m = await profileMermaid(browser, url, corpus);
+      console.log(
+        `[profile] mermaid: viewport diagrams=${m.viewportCount}, pre→svg0=${(m.svgAt[0] - m.firstPreAt).toFixed(1)}ms`,
+      );
+      let prev = m.svgAt[0];
+      const gaps = m.svgAt.slice(1).map((t) => {
+        const d = t - prev;
+        prev = t;
+        return d;
+      });
+      console.log(`[profile] marginal per-diagram ms: ${gaps.map((g) => g.toFixed(0)).join(", ")}`);
+      for (const lt of m.longtasks) {
+        console.log(`[profile] longtask +${lt.startMs}ms dur=${lt.durMs}ms`);
+      }
       return;
     }
     const values = await runAll(browser, url, corpus);

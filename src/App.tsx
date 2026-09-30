@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { scheduleMermaidWarmUp } from "./services/mermaid";
 
 import { AppOverlays } from "./components/AppOverlays";
 import { AppShellChrome } from "./components/AppShellChrome";
@@ -194,6 +195,13 @@ export function App() {
     absolutePath: session?.absolutePath ?? null,
     save: () => saveSession(),
   });
+
+  // Mermaid idle warm-up (profile finding: first render ~400ms of one-off
+  // API init vs ~50ms marginal): schedule once at mount so a diagram opened
+  // in the normal browsing rhythm never pays the cold path.
+  useEffect(() => {
+    scheduleMermaidWarmUp();
+  }, []);
 
   const activeTab = useMemo(() => tabs.find((item) => item.id === chapterId), [tabs, chapterId]);
   // Applying the dirty flag here rather than storing it means typing in a saved
