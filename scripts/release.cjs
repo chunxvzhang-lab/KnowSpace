@@ -42,6 +42,11 @@ const die = (msg) => {
   console.error(`\n[release] FAILED: ${msg}`);
   process.exit(1);
 };
+// On Windows npm/npx are .cmd shims; spawning the bare name ENOENTs without
+// a shell. Resolve the real executable once, use it everywhere (v2.7.5's
+// first live run hit exactly this at the pack step).
+const NPM = process.platform === "win32" ? "npm.cmd" : "npm";
+const NPX = process.platform === "win32" ? "npx.cmd" : "npx";
 const run = (cmd, args, opts = {}) =>
   execFileSync(cmd, args, { cwd: root, stdio: "inherit", ...opts });
 
@@ -155,7 +160,7 @@ function commitVersionFiles() {
 /* ── 4. pack ──────────────────────────────────────────────────────────── */
 function pack() {
   step("4/8 desktop:pack (~13 min, electron-builder)");
-  run("npm", ["run", "desktop:pack"]);
+  run(NPM, ["run", "desktop:pack"]);
 }
 
 /* ── 5. artifact verification ─────────────────────────────────────────── */
@@ -195,7 +200,7 @@ print(json.dumps({"entry": a, "equal": h == d}))
 
   const extract = path.join(require("node:os").tmpdir(), `ks-release-verify-${version}`);
   fs.rmSync(extract, { recursive: true, force: true });
-  execFileSync("npx", ["asar", "extract", dirAsar, extract], { cwd: root, stdio: "pipe" });
+  execFileSync(NPX, ["asar", "extract", dirAsar, extract], { cwd: root, stdio: "pipe" });
   const bundles = fs
     .readdirSync(path.join(extract, "dist", "assets"))
     .filter((f) => /^App-.*\.js$/.test(f));
