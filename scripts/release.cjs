@@ -92,9 +92,18 @@ function consistencyGate() {
     die(`docs/USER_MANUAL.md has no v${version} changelog row`);
   }
 
-  const about = fs.readFileSync(path.join(root, "src", "components", "AboutDialog.tsx"), "utf8");
+  // The active-era changelog groups live in the AboutChangelogRecent satellite
+  // (the ratchet-driven split); fall back to the dialog itself so the gate
+  // does not hard-code where the groups live (v2.7.5's first live run found
+  // exactly this: the gate pointed at the pre-split location).
+  const about =
+    fs.readFileSync(path.join(root, "src", "components", "AboutDialog.tsx"), "utf8") +
+    fs.readFileSync(
+      path.join(root, "src", "components", "about", "AboutChangelogRecent.tsx"),
+      "utf8",
+    );
   if (!about.includes(`v${version} `)) {
-    die(`AboutDialog.tsx has no v${version} changelog group`);
+    die(`no v${version} changelog group in AboutDialog/AboutChangelogRecent`);
   }
   console.log("  package.json / preload / release notes / manual / AboutDialog all agree.");
 }
