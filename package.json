@@ -12,6 +12,7 @@
     "preview": "vite preview --host 127.0.0.1",
     "desktop": "electron .",
     "desktop:pack": "npm run build && node scripts/package-desktop.cjs",
+    "release": "node scripts/release.cjs",
     "desktop:pack:builder": "npm run build && electron-builder --win portable",
     "desktop:msi": "npm run build && electron-builder --win msi",
     "test": "vitest run",
