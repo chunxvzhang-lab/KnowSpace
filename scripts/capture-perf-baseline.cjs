@@ -987,6 +987,7 @@ async function scrollPageLoop([frames, step]) {
     p95: pct(0.95),
     drops: deltas.filter((d) => d > 20).length,
     frames: deltas.length,
+    deltas,
   };
 }
 
@@ -1032,6 +1033,7 @@ async function profileScroll(browser, url, corpus) {
     // around the LAST pass; the stats are the min of all three.
     let stats = null;
     let profile = null;
+    let coldDeltas = null;
     const merge = (s) => {
       stats = stats
         ? {
@@ -1053,10 +1055,12 @@ async function profileScroll(browser, url, corpus) {
         profile = (await cdp.send("Profiler.stop")).profile;
         merge(s);
       } else {
-        merge(await page.evaluate(scrollPageLoop, [SCROLL_FRAMES, 420]));
+        const s = await page.evaluate(scrollPageLoop, [SCROLL_FRAMES, 420]);
+        if (pass === 1) coldDeltas = s.deltas; // the COLD pass: height table empty
+        merge(s);
       }
     }
-    return { stats, profile };
+    return { stats, profile, coldDeltas };
   } finally {
     await context.close();
   }
@@ -1640,11 +1644,31 @@ async function main() {
     console.log(`[perf] preview server up at ${url}`);
     browser = await chromium.launch({ channel: "msedge", headless: true });
     if (process.argv.includes("--profile-scroll")) {
-      const { stats, profile } = await profileScroll(browser, url, corpus);
+      const result = await profileScroll(browser, url, corpus);
       console.log(
-        `[profile] scroll loop (min of 3): p50=${stats.p50.toFixed(1)}ms p95=${stats.p95.toFixed(1)}ms drops=${stats.drops}/${stats.frames}`,
+        `[profile] scroll loop (min of 3): p50=${result.stats.p50.toFixed(1)}ms p95=${result.stats.p95.toFixed(1)}ms drops=${result.stats.drops}/${result.stats.frames}`,
       );
-      printProfile(profile, os.tmpdir());
+      // 冷启动慢帧分布：高度表为空的首轮（pass 1）里，>20ms 的帧号与间隔——
+      // 若慢帧集中在开头（修正期），高度表持久化才有收益可言。
+      if (result.coldDeltas) {
+        const slow = result.coldDeltas.map((d, i) => ({ i: i + 1, d })).filter((f) => f.d > 20);
+        console.log(
+          `[profile] cold pass: frames>20ms = ${slow.length}/${result.coldDeltas.length}`,
+        );
+        console.log(
+          `[profile] cold slow frames (index:ms): ${slow
+            .slice(0, 40)
+            .map((f) => `${f.i}:${f.d.toFixed(0)}`)
+            .join(", ")}`,
+        );
+        const head = result.coldDeltas.slice(0, 30);
+        const tail = result.coldDeltas.slice(30);
+        const avg = (arr) => (arr.length ? arr.reduce((s, d) => s + d, 0) / arr.length : 0);
+        console.log(
+          `[profile] cold head(1-30) avg ${avg(head).toFixed(1)}ms vs tail(31+) avg ${avg(tail).toFixed(1)}ms`,
+        );
+      }
+      printProfile(result.profile, os.tmpdir());
       return;
     }
     if (process.argv.includes("--profile-mermaid")) {
