@@ -42,13 +42,16 @@ const die = (msg) => {
   console.error(`\n[release] FAILED: ${msg}`);
   process.exit(1);
 };
-// On Windows npm/npx are .cmd shims; spawning the bare name ENOENTs without
-// a shell. Resolve the real executable once, use it everywhere (v2.7.5's
-// first live run hit exactly this at the pack step).
-const NPM = process.platform === "win32" ? "npm.cmd" : "npm";
-const NPX = process.platform === "win32" ? "npx.cmd" : "npx";
+// On Windows npm/npx are .cmd shims: the bare name ENOENTs without a shell,
+// and spawning `.cmd` directly is EINVAL since Node's CVE-2023-32559 fix -
+// so they must run through the shell (their args here are all fixed strings,
+// never user text; v2.7.5's first live run found both halves of this at the
+// pack step).
+const NPM_SHELL = process.platform === "win32";
 const run = (cmd, args, opts = {}) =>
   execFileSync(cmd, args, { cwd: root, stdio: "inherit", ...opts });
+const runNpm = (args, opts = {}) =>
+  execFileSync("npm", args, { cwd: root, stdio: "inherit", shell: NPM_SHELL, ...opts });
 
 /** GitHub credential from the Windows credential manager (what git itself uses). */
 function githubToken() {
@@ -160,7 +163,7 @@ function commitVersionFiles() {
 /* ── 4. pack ──────────────────────────────────────────────────────────── */
 function pack() {
   step("4/8 desktop:pack (~13 min, electron-builder)");
-  run(NPM, ["run", "desktop:pack"]);
+  runNpm(["run", "desktop:pack"]);
 }
 
 /* ── 5. artifact verification ─────────────────────────────────────────── */
@@ -200,7 +203,11 @@ print(json.dumps({"entry": a, "equal": h == d}))
 
   const extract = path.join(require("node:os").tmpdir(), `ks-release-verify-${version}`);
   fs.rmSync(extract, { recursive: true, force: true });
-  execFileSync(NPX, ["asar", "extract", dirAsar, extract], { cwd: root, stdio: "pipe" });
+  execFileSync("npx", ["asar", "extract", dirAsar, extract], {
+    cwd: root,
+    stdio: "pipe",
+    shell: NPM_SHELL,
+  });
   const bundles = fs
     .readdirSync(path.join(extract, "dist", "assets"))
     .filter((f) => /^App-.*\.js$/.test(f));
