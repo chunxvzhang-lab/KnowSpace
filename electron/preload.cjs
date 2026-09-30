@@ -3,7 +3,7 @@ const { contextBridge, ipcRenderer } = require("electron");
 // Keep in sync with package.json "version": the startup handshake below (and
 // the bookmd:api-version handler in system.cjs) warns when the two drift
 // apart, so a one-sided bump is visible at first launch.
-const API_VERSION = "2.7.3";
+const API_VERSION = "2.7.4";
 
 let initialSyncData = null;
 try {

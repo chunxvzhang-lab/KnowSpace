@@ -161,6 +161,41 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
               <span className="about-changelog-version-badge">v{__APP_VERSION__}</span>
             </div>
             <div className="about-changelog-list">
+              {/* v2.7.4 */}
+              <div className="about-changelog-group">
+                <div className="about-changelog-group-label">
+                  <Sparkles size={12} className="text-cyan" />
+                  <span>v2.7.4 自动保存 · 列表续行 · 上下标快捷键</span>
+                </div>
+                <ul className="about-changelog-items">
+                  <li>
+                    💾 <strong>新增自动保存</strong>（系统偏好中可关，默认开）：最后一次击键 约{" "}
+                    <strong>1.5 秒</strong>后自动写盘，持续键入时不写盘、聚合为一次。
+                    此前保存的唯一触发是 Ctrl+S 与关闭确认框——崩溃或断电会丢掉
+                    上次手动保存以来的全部输入。自动保存走的就是 Ctrl+S 那条路径：
+                    检测到文件被其他程序修改会停下询问而非覆盖；冲突弹窗出现时自动保存
+                    完全挂起；写盘失败不会重试风暴。
+                  </li>
+                  <li>
+                    📝 <strong>列表续行</strong>：列表行尾按 Enter 自动续行——有序列表
+                    自动递增编号、任务清单续行为未勾选项、嵌套缩进保留，
+                    <strong>空项回车即退出列表</strong>（不再堆积空标记）。
+                  </li>
+                  <li>
+                    ⌨️ <strong>上/下标快捷键</strong>：<code>Ctrl+Shift+=</code> 上标、
+                    <code>Ctrl+=</code> 下标（开关式）。
+                  </li>
+                  <li>
+                    🛡 <code>==高亮==</code>、上标、下标、脚注在<strong>白板卡片</strong>与
+                    列表项脚注定义（网页粘贴形态）中的渲染由行为测试固化。
+                  </li>
+                  <li>
+                    📦 <strong>没有改变任何既有文件格式</strong>：与 v2.7.3
+                    完全一致，升级不需要迁移。
+                  </li>
+                </ul>
+              </div>
+
               {/* v2.7.3 */}
               <div className="about-changelog-group">
                 <div className="about-changelog-group-label">
