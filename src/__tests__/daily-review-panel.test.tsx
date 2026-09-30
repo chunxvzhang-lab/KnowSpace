@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { DailyReviewPanel } from "../components/DailyReviewPanel";
 import { computeCardId } from "../services/fsrsService";
+import { __setParseTimeSlice } from "../components/review/useReviewParsing";
 import type { FlashNoteSummaryItem } from "../types/desktop";
 
 /**
@@ -49,6 +50,16 @@ describe("DailyReviewPanel - 每日复盘视图", () => {
   let saveMarkdownFile: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
+    // The chunked parse yields to the render thread every 8ms, and under a
+    // loaded full suite that handoff happens even for three notes — the first
+    // screen then still says "正在载入 Space 闪念库..." and whichever test
+    // queried a card before waiting got the intermittent failure this file
+    // kept hitting one test at a time (the per-test `await findByText` patches
+    // below fixed one test each, never the class). Zeroing the slice makes the
+    // parse finish inside render's synchronous act, so every first screen in
+    // this file is deterministic — including the negative assertions, which a
+    // loading state would otherwise satisfy vacuously.
+    __setParseTimeSlice(0);
     // The panel remembers the review source in `localStorage`, and nothing here
     // cleared it, so the source one test picked was still in place for the next.
     // It only surfaced under a loaded full-suite run: the panel persists on a
@@ -401,6 +412,7 @@ describe("DailyReviewPanel - 撤销上一次评分", () => {
   const savedContent = () => onDisk();
 
   beforeEach(() => {
+    __setParseTimeSlice(0);
     localStorage.clear();
     saveMarkdownFile = vi.fn().mockResolvedValue({ success: true });
     // A real file, modelled honestly: reading gives back what was last written, or the
@@ -539,6 +551,7 @@ describe("DailyReviewPanel - 评分与保存的边角", () => {
   const savedContent = () => String(saveMarkdownFile.mock.calls.at(-1)?.[0]?.content ?? "");
 
   beforeEach(() => {
+    __setParseTimeSlice(0);
     localStorage.clear();
     saveMarkdownFile = vi.fn().mockResolvedValue({ success: true, absolutePath: "x" });
     // By default the file on disk is whatever the panel was given, which is the

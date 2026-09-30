@@ -11,6 +11,20 @@ import {
 import type { ReviewSourceDocument } from "../../services/reviewSources";
 
 /**
+ * The parse time slice in ms. 8 is about half a frame on the render thread
+ * (see the step loop below). Test seam: `__setParseTimeSlice(0)` finishes the
+ * whole parse inside one synchronous step, so a test's first screen is
+ * deterministic instead of racing the handoff — under a loaded full suite the
+ * slice hands off even for three notes, and the panel's suite kept hitting
+ * that intermittent one test at a time. Same pattern as readerVirtual's
+ * `__resetHeightTables`.
+ */
+let parseTimeSliceMs = 8;
+export function __setParseTimeSlice(ms: number): void {
+  parseTimeSliceMs = ms;
+}
+
+/**
  * The parsed notes that belong to the active source, in the order the source lists
  * them.
  *
@@ -75,7 +89,6 @@ export function useReviewParsing({ activeNotes, active }: UseReviewParsingParams
    * the longer one by far.
    */
   const [parseProgress, setParseProgress] = useState<{ done: number; total: number } | null>(null);
-
   /**
    * The parsed source, built a few notes at a time.
    *
@@ -150,7 +163,12 @@ export function useReviewParsing({ activeNotes, active }: UseReviewParsingParams
       const startedAt = performance.now();
       // Eight milliseconds is about half a frame: long enough that the parsing is not
       // dominated by the handovers, short enough that the window keeps answering.
-      while (index < stale.length && performance.now() - startedAt < 8) {
+      // A slice of 0 or less means "no limit": the whole parse finishes in
+      // this one synchronous step (the test seam above).
+      while (
+        index < stale.length &&
+        (parseTimeSliceMs <= 0 || performance.now() - startedAt < parseTimeSliceMs)
+      ) {
         const note = stale[index];
         const wanted = writtenContent.current.get(note.filePath) ?? note.content;
         cache.set(note.filePath, {
