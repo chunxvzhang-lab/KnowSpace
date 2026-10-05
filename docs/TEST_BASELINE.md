@@ -12,8 +12,8 @@
 | 项目 | 数值 |
 | :--- | ---: |
 | 测试文件 | **128** |
-| 用例总数 | **1550** |
-| 通过 | 1548 |
+| 用例总数 | **1551** |
+| 通过 | 1549 |
 | 失败 | 0 |
 | 跳过 | 2 |
 | 通过率 | 99.9% |
@@ -81,6 +81,7 @@
 | `src/__tests__/mindmap-node-style-menu.test.tsx` | 8 | ✅ |
 | `src/__tests__/mindmap-relation-settings-ui.test.tsx` | 8 | ✅ |
 | `src/__tests__/sync-scroll.test.ts` | 8 | ✅ |
+| `src/__tests__/theme-mode.test.ts` | 8 | ✅ |
 | `src/__tests__/backlink.test.ts` | 7 | ✅ |
 | `src/__tests__/dialogs-conflict-about.test.tsx` | 7 | ✅ |
 | `src/__tests__/graph-and-directory.test.ts` | 7 | ✅ |
@@ -97,7 +98,6 @@
 | `src/__tests__/mindmap-tags-ui.test.tsx` | 7 | ✅ |
 | `src/__tests__/review-focus.test.tsx` | 7 | ✅ |
 | `src/__tests__/review-source-reader.test.ts` | 7 | ✅ |
-| `src/__tests__/theme-mode.test.ts` | 7 | ✅ |
 | `src/__tests__/css-accent-info.test.ts` | 6 | ✅ |
 | `src/__tests__/css-custom-properties.test.ts` | 6 | ✅ |
 | `src/__tests__/diff-service.test.ts` | 6 | ✅ |
@@ -180,7 +180,7 @@
 
 任何重构都必须满足：
 
-1. 用例总数 **不低于 1550**（删除测试需在 PR 说明中论证）
+1. 用例总数 **不低于 1551**（删除测试需在 PR 说明中论证）
 2. 通过率 **100%**
 3. 单文件用例数**不得下降**（防止测试被静默删除）
 
