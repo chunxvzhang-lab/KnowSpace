@@ -225,17 +225,35 @@ function measure() {
   // being folded back in by hand, which silently reorders the cascade.
   const stylesPath = path.join(srcDir, "styles.css");
   const stylesCssLines = fs.existsSync(stylesPath) ? countLines(stylesPath) : 0;
-  const cssSlices = [];
+  // Slices are listed in LOAD order, not alphabetically: for phase B the order
+  // IS the cascade, and a table sorted by name would read as a claim about
+  // order that nothing verifies. A file on disk that the entry never imports is
+  // called out instead of silently missing from the board.
   const stylesDir = path.join(srcDir, "styles");
-  if (fs.existsSync(stylesDir)) {
-    for (const name of fs.readdirSync(stylesDir).sort()) {
-      if (!name.endsWith(".css")) continue;
-      cssSlices.push({
-        file: `src/styles/${name}`,
-        lines: countLines(path.join(stylesDir, name)),
-      });
-    }
-  }
+  const onDisk = fs.existsSync(stylesDir)
+    ? fs
+        .readdirSync(stylesDir)
+        .filter((n) => n.endsWith(".css"))
+        .map((n) => `./styles/${n}`)
+    : [];
+  const entryPath = path.join(srcDir, "main.tsx");
+  const imported = fs.existsSync(entryPath)
+    ? importSpecifiers(fs.readFileSync(entryPath, "utf8"))
+        .map((s) => s.spec)
+        .filter((s) => s.startsWith("./styles/") && s.endsWith(".css"))
+    : [];
+  const sliceRow = (spec) => ({
+    file: `src/${spec.slice(2)}`,
+    lines: countLines(path.resolve(root, "src", spec.slice(2))),
+  });
+  const cssSlices = imported
+    .filter((spec, i) => imported.indexOf(spec) === i)
+    .map(sliceRow)
+    .concat(
+      onDisk
+        .filter((spec) => !imported.includes(spec))
+        .map((spec) => ({ ...sliceRow(spec), unloaded: true })),
+    );
 
   const pkg = require(path.join(root, "package.json"));
   const undeclared = findUndeclaredImports(sources, pkg);
@@ -329,7 +347,10 @@ function generate(metrics) {
     "",
     "| 文件 | 行数 |",
     "| :--- | ---: |",
-    ...d.cssSlices.map((f) => `| \`${f.file}\`（切片） | ${f.lines} |`),
+    ...d.cssSlices.map(
+      (f) =>
+        `| \`${f.file}\`（切片${f.unloaded ? " **未被装载——样式不存在**" : ""}） | ${f.lines} |`,
+    ),
     `| \`src/styles.css\`（剩余） | ${metrics["styles-css-lines"]} |`,
     "",
     "---",

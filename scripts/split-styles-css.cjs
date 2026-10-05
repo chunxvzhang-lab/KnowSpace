@@ -1,4 +1,8 @@
-// B2: split src/styles.css into domain files with a brace-balanced slicer.
+// Phase B splitter: moves domain blocks out of src/styles.css with a
+// brace-balanced slicer. The DOMAINS list below is the CURRENT batch's
+// parameter - B2 shipped tokens/shell/sidebar, B3 ships workspace/reader/code/
+// statusbar (see git log for the executed batches; the ranges are not
+// recoverable from the shrunk file).
 //
 // Why a script instead of hand-editing 13k lines: slice points are top-level
 // block boundaries; a human moving blocks would clip rules. The script
@@ -117,9 +121,10 @@ const blocks = scanBlocks(lines);
 // overrides work in this file. Mid-file domains need a segmented split, to be
 // done in a later batch with a cascade-order proof.
 const DOMAINS = [
-  { file: "tokens.css", label: "主题令牌与全局基础", from: 1, to: 245 },
-  { file: "shell.css", label: "应用外壳：dock、顶栏、滚动条、动画关键帧", from: 246, to: 1017 },
-  { file: "sidebar.css", label: "侧边栏：目录树、书签、搜索面板", from: 1018, to: 1797 },
+  { file: "workspace.css", label: "文档工作区：分屏、全视图与窗格布局", from: 1, to: 176 },
+  { file: "reader.css", label: "阅读区：Markdown 卡片排版", from: 177, to: 763 },
+  { file: "code.css", label: "代码块与高对比语法着色", from: 764, to: 1169 },
+  { file: "statusbar.css", label: "底部状态栏", from: 1170, to: 1269 },
 ];
 
 // Refuse a blind re-run of an executed batch: DOMAINS' line numbers are
@@ -165,22 +170,32 @@ for (const d of DOMAINS) {
 }
 
 // --- assemble outputs --------------------------------------------------------
-// Banner + exactly ONE separation, and the separation is only added when the
-// slice body does not already start with a blank line. B2 ended the header with
-// two blank lines, which Prettier collapses - so the slices came out of the
-// splitter failing `npm run format:check` and needed a separate format pass.
-// Rule content is unaffected either way (the reassembly proof below only looks
-// at claimed + kept lines, never at the header).
-const header = (file, label) =>
-  [
+/**
+ * The bytes of one slice: banner, one blank line, then the claimed lines with
+ * their leading/trailing blank lines dropped. A domain's `to` is the last rule
+ * line + the separator blank that followed it, and `kept` starts on that same
+ * kind of blank - so without trimming, every slice ends with a blank line and
+ * the shrunk monolith starts with one, which `npm run format:check` rejects
+ * (B2 shipped exactly that and needed a separate prettier pass).
+ *
+ * Blank lines carry no rules, so trimming cannot change the cascade. It also
+ * cannot break the proof: the reassembly check below runs against the untouched
+ * line lists, before any trimming happens.
+ */
+const sliceText = (label, bodyLines) => {
+  const body = bodyLines.slice();
+  while (body.length && /^[ \t]*$/.test(body[0])) body.shift();
+  while (body.length && /^[ \t]*$/.test(body[body.length - 1])) body.pop();
+  const header = [
     `/* ========================================================================`,
     `   KnowSpace · ${label}`,
     `   从 src/styles.css 按域拆分而来（阶段 B）。加载顺序由 src/main.tsx 决定，`,
     `   必须与拆分前 styles.css 内的物理顺序一致 —— 改顺序等于改级联。`,
     `   ======================================================================== */`,
+    ``,
   ].join(nl);
-
-const separation = (bodyText) => (/^[ \t]*$/.test(bodyText.split(nl)[0] ?? "") ? nl : nl + nl);
+  return header + body.join(nl) + nl;
+};
 
 const outs = new Map(); // file -> ascending line numbers
 for (const d of DOMAINS) outs.set(d.file, []);
@@ -230,24 +245,16 @@ if (DRY) {
 // --- write -------------------------------------------------------------------
 fs.mkdirSync(OUT_DIR, { recursive: true });
 for (const d of DOMAINS) {
-  const body = outs
-    .get(d.file)
-    .map((l) => lines[l - 1])
-    .join(nl);
-  fs.writeFileSync(
-    path.join(OUT_DIR, d.file),
-    header(d.file, d.label) + separation(body) + body + nl,
-    "utf8",
-  );
+  const bodyLines = outs.get(d.file).map((l) => lines[l - 1]);
+  fs.writeFileSync(path.join(OUT_DIR, d.file), sliceText(d.label, bodyLines), "utf8");
   console.log(`wrote ${OUT_DIR}/${d.file}`);
 }
 
 // Rewrite styles.css WITHOUT the claimed lines. `kept` starts at the first
-// unclaimed line, which is the blank line that used to separate the two
-// domains - leading blanks are what Prettier collapses, so drop them here and
-// the shrunk monolith comes out of the splitter already format-clean.
-// (Blank lines carry no rules, so this cannot change the cascade; the
-// reassembly proof above ran against the untouched `kept`.)
+// unclaimed line - the blank that used to separate two domains - so drop the
+// leading blanks here and the shrunk monolith comes out of the splitter already
+// format-clean. (Blank lines carry no rules, so this cannot change the cascade;
+// the reassembly proof above ran against the untouched `kept`.)
 let writeKept = kept.slice();
 while (writeKept.length && /^[ \t]*$/.test(writeKept[0])) writeKept.shift();
 fs.writeFileSync(SRC, writeKept.join(nl), "utf8");

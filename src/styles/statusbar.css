@@ -1,0 +1,104 @@
+/* ========================================================================
+   KnowSpace · 底部状态栏
+   从 src/styles.css 按域拆分而来（阶段 B）。加载顺序由 src/main.tsx 决定，
+   必须与拆分前 styles.css 内的物理顺序一致 —— 改顺序等于改级联。
+   ======================================================================== */
+/* ==========================================================================
+   Bottom Status Bar (Dribbble Dock Aesthetic)
+   ========================================================================== */
+.status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  height: 28px;
+  padding: 0 14px;
+  background: var(--status-bar-bg);
+  color: var(--status-bar-text);
+  font-size: 11px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+  user-select: none;
+  z-index: 20;
+}
+
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.status-badge.saved {
+  background: rgba(16, 185, 129, 0.18);
+  color: #34d399;
+}
+
+.status-badge.dirty {
+  background: rgba(255, 77, 0, 0.2);
+  color: #ff8552;
+}
+
+.status-badge.readonly {
+  background: rgba(6, 182, 212, 0.18);
+  color: #22d3ee;
+}
+
+.status-filename {
+  font-weight: 600;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-metrics {
+  color: var(--status-bar-muted);
+}
+
+.status-metric {
+  font-weight: 500;
+}
+
+.status-metric.warning {
+  color: #fbbf24;
+}
+
+.status-separator {
+  opacity: 0.4;
+}
+
+.status-tech {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-pill {
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--status-bar-muted);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.status-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 10.5px;
+  margin-left: 4px;
+}

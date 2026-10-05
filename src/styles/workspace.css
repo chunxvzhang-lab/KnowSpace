@@ -1,0 +1,180 @@
+/* ========================================================================
+   KnowSpace · 文档工作区：分屏、全视图与窗格布局
+   从 src/styles.css 按域拆分而来（阶段 B）。加载顺序由 src/main.tsx 决定，
+   必须与拆分前 styles.css 内的物理顺序一致 —— 改顺序等于改级联。
+   ======================================================================== */
+/* ==========================================================================
+   Document Workspace (Split & Full View Modes)
+   ========================================================================== */
+.document-workspace {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+  background: var(--bg);
+}
+
+.workspace-pane {
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.workspace-pane.editor-section {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+}
+
+.workspace-pane.reader-section {
+  background: var(--bg);
+  overflow-y: auto;
+}
+
+.pane-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 14px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  user-select: none;
+  min-height: 30px;
+}
+
+.pane-header-title {
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+/* Sync Scroll Pill Badge */
+.sync-scroll-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 550;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: all 0.18s var(--ease-spring);
+}
+
+.sync-scroll-badge:hover {
+  border-color: var(--accent);
+  color: var(--text);
+  transform: translateY(-0.5px);
+}
+
+.sync-scroll-badge.active {
+  background: var(--accent-surface);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 650;
+}
+
+.sync-scroll-badge:active {
+  transform: scale(0.96);
+}
+
+/* Splitter Bar */
+.workspace-splitter {
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+  background: transparent;
+  position: relative;
+  flex-shrink: 0;
+  z-index: 10;
+  transition: background 0.2s var(--ease-smooth);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.workspace-splitter:hover,
+.document-workspace.is-resizing .workspace-splitter {
+  background: var(--accent-surface);
+}
+
+.splitter-handle {
+  width: 2px;
+  height: 36px;
+  border-radius: 2px;
+  background: var(--border);
+  transition: all 0.2s var(--ease-spring);
+}
+
+.workspace-splitter:hover .splitter-handle,
+.document-workspace.is-resizing .splitter-handle {
+  background: var(--accent);
+  height: 48px;
+}
+
+/* Large Document Notice */
+.large-doc-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: color-mix(in srgb, #f59e0b 10%, var(--surface));
+  border-bottom: 1px solid color-mix(in srgb, #f59e0b 25%, var(--border));
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.preview-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding: 3px 10px;
+  font-size: 11.5px;
+  font-weight: 550;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: all 0.15s var(--ease-spring);
+}
+
+.preview-refresh-btn:hover {
+  background: var(--surface-2);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+/* Editor Pane Container */
+.editor-pane-container {
+  height: 100%;
+  width: 100%;
+}
+
+.editor-pane-container .cm-editor {
+  height: 100%;
+}
+
+/* Source mode reader hidden on screen, active in print / export */
+.document-workspace.view-source .source-mode-reader,
+.source-mode-reader {
+  display: none;
+}

@@ -1,0 +1,410 @@
+/* ========================================================================
+   KnowSpace · 代码块与高对比语法着色
+   从 src/styles.css 按域拆分而来（阶段 B）。加载顺序由 src/main.tsx 决定，
+   必须与拆分前 styles.css 内的物理顺序一致 —— 改顺序等于改级联。
+   ======================================================================== */
+/* ==========================================================================
+   Code Blocks & High-Contrast Syntax Highlighting System
+   ========================================================================== */
+.markdown-body pre {
+  position: relative;
+  overflow: auto;
+  padding: 12px 18px !important;
+  padding-right: 84px !important;
+  border-radius: 8px;
+  background: #0d1117 !important;
+  border: 1px solid #30363d !important;
+  font-family: var(--font-mono, "JetBrains Mono", Consolas, "Fira Code", monospace);
+  font-size: 13.5px;
+  line-height: 1.65;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+}
+
+.markdown-body pre > code {
+  display: block;
+  overflow-x: auto;
+  color: #f0f6fc !important; /* Crisp bright white/slate default text */
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* Base Dark Theme Syntax Highlighting (High-Contrast, Vivid, Crystal Clear) */
+.markdown-body .hljs-comment,
+.markdown-body .hljs-quote {
+  color: #94a3b8 !important; /* Clear readable silver-slate, not invisible black */
+  font-style: italic;
+}
+
+.markdown-body .hljs-keyword,
+.markdown-body .hljs-selector-tag,
+.markdown-body .hljs-subst {
+  color: #ff7b72 !important; /* Vivid coral red */
+  font-weight: 600;
+}
+
+.markdown-body .hljs-string,
+.markdown-body .hljs-doctag,
+.markdown-body .hljs-regexp {
+  color: #a5d6ff !important; /* Crisp sky blue */
+}
+
+.markdown-body .hljs-number,
+.markdown-body .hljs-literal,
+.markdown-body .hljs-boolean {
+  color: #79c0ff !important; /* Bright blue */
+  font-weight: 600;
+}
+
+.markdown-body .hljs-title,
+.markdown-body .hljs-title.function_,
+.markdown-body .hljs-title.class_,
+.markdown-body .hljs-section {
+  color: #d2a8ff !important; /* Radiant lilac purple */
+  font-weight: 600;
+}
+
+.markdown-body .hljs-variable,
+.markdown-body .hljs-template-variable,
+.markdown-body .hljs-attr,
+.markdown-body .hljs-property,
+.markdown-body .hljs-params {
+  color: #7ee787 !important; /* Bright spring green */
+}
+
+.markdown-body .hljs-built_in,
+.markdown-body .hljs-type {
+  color: #ffa657 !important; /* Radiant amber orange */
+}
+
+.markdown-body .hljs-tag,
+.markdown-body .hljs-name {
+  color: #7ee787 !important; /* Emerald green */
+}
+
+.markdown-body .hljs-punctuation,
+.markdown-body .hljs-operator {
+  color: #cbd5e1 !important; /* Bright clean light gray */
+}
+
+.markdown-body .hljs-meta {
+  color: #e3b341 !important; /* Gold */
+  font-weight: 600;
+}
+
+.markdown-body .hljs-deletion {
+  color: #ffdcd7 !important;
+  background-color: #67060c !important;
+}
+
+.markdown-body .hljs-addition {
+  color: #aff5b4 !important;
+  background-color: #033a16 !important;
+}
+
+.markdown-body .hljs-emphasis {
+  font-style: italic;
+}
+
+.markdown-body .hljs-strong {
+  font-weight: 700;
+}
+
+/* Light Theme Syntax Highlighting */
+:root[data-theme="light"] .markdown-body pre,
+.app-shell.theme-light .markdown-body pre {
+  background: #f6f8fa !important;
+  border: 1px solid #d0d7de !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+:root[data-theme="light"] .markdown-body pre > code,
+.app-shell.theme-light .markdown-body pre > code {
+  color: #24292f !important;
+}
+
+:root[data-theme="light"] .markdown-body .hljs-comment,
+:root[data-theme="light"] .markdown-body .hljs-quote,
+.app-shell.theme-light .markdown-body .hljs-comment,
+.app-shell.theme-light .markdown-body .hljs-quote {
+  color: #6e7781 !important;
+}
+
+:root[data-theme="light"] .markdown-body .hljs-keyword,
+:root[data-theme="light"] .markdown-body .hljs-selector-tag,
+:root[data-theme="light"] .markdown-body .hljs-subst,
+.app-shell.theme-light .markdown-body .hljs-keyword,
+.app-shell.theme-light .markdown-body .hljs-selector-tag,
+.app-shell.theme-light .markdown-body .hljs-subst {
+  color: #cf222e !important;
+}
+
+:root[data-theme="light"] .markdown-body .hljs-string,
+:root[data-theme="light"] .markdown-body .hljs-doctag,
+:root[data-theme="light"] .markdown-body .hljs-regexp,
+.app-shell.theme-light .markdown-body .hljs-string,
+.app-shell.theme-light .markdown-body .hljs-doctag,
+.app-shell.theme-light .markdown-body .hljs-regexp {
+  color: #0a3069 !important;
+}
+
+:root[data-theme="light"] .markdown-body .hljs-number,
+:root[data-theme="light"] .markdown-body .hljs-literal,
+:root[data-theme="light"] .markdown-body .hljs-boolean,
+.app-shell.theme-light .markdown-body .hljs-number,
+.app-shell.theme-light .markdown-body .hljs-literal,
+.app-shell.theme-light .markdown-body .hljs-boolean {
+  color: #0550ae !important;
+}
+
+:root[data-theme="light"] .markdown-body .hljs-title,
+:root[data-theme="light"] .markdown-body .hljs-title.function_,
+:root[data-theme="light"] .markdown-body .hljs-title.class_,
+:root[data-theme="light"] .markdown-body .hljs-section,
+.app-shell.theme-light .markdown-body .hljs-title,
+.app-shell.theme-light .markdown-body .hljs-title.function_,
+.app-shell.theme-light .markdown-body .hljs-title.class_,
+.app-shell.theme-light .markdown-body .hljs-section {
+  color: #8250df !important;
+}
+
+:root[data-theme="light"] .markdown-body .hljs-variable,
+:root[data-theme="light"] .markdown-body .hljs-template-variable,
+:root[data-theme="light"] .markdown-body .hljs-attr,
+:root[data-theme="light"] .markdown-body .hljs-property,
+:root[data-theme="light"] .markdown-body .hljs-params,
+.app-shell.theme-light .markdown-body .hljs-variable,
+.app-shell.theme-light .markdown-body .hljs-template-variable,
+.app-shell.theme-light .markdown-body .hljs-attr,
+.app-shell.theme-light .markdown-body .hljs-property,
+.app-shell.theme-light .markdown-body .hljs-params {
+  color: #116329 !important;
+}
+
+:root[data-theme="light"] .markdown-body .hljs-built_in,
+:root[data-theme="light"] .markdown-body .hljs-type,
+.app-shell.theme-light .markdown-body .hljs-built_in,
+.app-shell.theme-light .markdown-body .hljs-type {
+  color: #953800 !important;
+}
+
+:root[data-theme="light"] .markdown-body .hljs-tag,
+:root[data-theme="light"] .markdown-body .hljs-name,
+.app-shell.theme-light .markdown-body .hljs-tag,
+.app-shell.theme-light .markdown-body .hljs-name {
+  color: #116329 !important;
+}
+
+:root[data-theme="light"] .markdown-body .hljs-punctuation,
+:root[data-theme="light"] .markdown-body .hljs-operator,
+.app-shell.theme-light .markdown-body .hljs-punctuation,
+.app-shell.theme-light .markdown-body .hljs-operator {
+  color: #57606a !important;
+}
+
+:root[data-theme="light"] .markdown-body .hljs-meta,
+.app-shell.theme-light .markdown-body .hljs-meta {
+  color: #953800 !important;
+}
+
+/* E-ink Theme Syntax Highlighting */
+:root[data-theme="eink"] .markdown-body pre,
+.app-shell.theme-eink .markdown-body pre {
+  background: #eee9df !important;
+  border: 1px solid #d5cebf !important;
+  box-shadow: none !important;
+}
+
+:root[data-theme="eink"] .markdown-body pre > code,
+.app-shell.theme-eink .markdown-body pre > code {
+  color: #1a1a1a !important;
+}
+
+:root[data-theme="eink"] .markdown-body .hljs-comment,
+:root[data-theme="eink"] .markdown-body .hljs-quote,
+.app-shell.theme-eink .markdown-body .hljs-comment,
+.app-shell.theme-eink .markdown-body .hljs-quote {
+  color: #666666 !important;
+  font-style: italic;
+}
+
+:root[data-theme="eink"] .markdown-body .hljs-keyword,
+:root[data-theme="eink"] .markdown-body .hljs-selector-tag,
+:root[data-theme="eink"] .markdown-body .hljs-subst,
+.app-shell.theme-eink .markdown-body .hljs-keyword,
+.app-shell.theme-eink .markdown-body .hljs-selector-tag,
+.app-shell.theme-eink .markdown-body .hljs-subst {
+  color: #111111 !important;
+  font-weight: 700;
+}
+
+:root[data-theme="eink"] .markdown-body .hljs-string,
+:root[data-theme="eink"] .markdown-body .hljs-doctag,
+:root[data-theme="eink"] .markdown-body .hljs-regexp,
+.app-shell.theme-eink .markdown-body .hljs-string,
+.app-shell.theme-eink .markdown-body .hljs-doctag,
+.app-shell.theme-eink .markdown-body .hljs-regexp {
+  color: #333333 !important;
+  font-style: italic;
+}
+
+:root[data-theme="eink"] .markdown-body .hljs-number,
+:root[data-theme="eink"] .markdown-body .hljs-literal,
+:root[data-theme="eink"] .markdown-body .hljs-boolean,
+.app-shell.theme-eink .markdown-body .hljs-number,
+.app-shell.theme-eink .markdown-body .hljs-literal,
+.app-shell.theme-eink .markdown-body .hljs-boolean {
+  color: #222222 !important;
+  font-weight: 600;
+}
+
+:root[data-theme="eink"] .markdown-body .hljs-title,
+:root[data-theme="eink"] .markdown-body .hljs-title.function_,
+:root[data-theme="eink"] .markdown-body .hljs-title.class_,
+:root[data-theme="eink"] .markdown-body .hljs-section,
+.app-shell.theme-eink .markdown-body .hljs-title,
+.app-shell.theme-eink .markdown-body .hljs-title.function_,
+.app-shell.theme-eink .markdown-body .hljs-title.class_,
+.app-shell.theme-eink .markdown-body .hljs-section {
+  color: #111111 !important;
+  font-weight: 700;
+}
+
+:root[data-theme="eink"] .markdown-body .hljs-variable,
+:root[data-theme="eink"] .markdown-body .hljs-template-variable,
+:root[data-theme="eink"] .markdown-body .hljs-attr,
+:root[data-theme="eink"] .markdown-body .hljs-property,
+:root[data-theme="eink"] .markdown-body .hljs-params,
+.app-shell.theme-eink .markdown-body .hljs-variable,
+.app-shell.theme-eink .markdown-body .hljs-template-variable,
+.app-shell.theme-eink .markdown-body .hljs-attr,
+.app-shell.theme-eink .markdown-body .hljs-property,
+.app-shell.theme-eink .markdown-body .hljs-params {
+  color: #262626 !important;
+}
+
+:root[data-theme="eink"] .markdown-body .hljs-built_in,
+:root[data-theme="eink"] .markdown-body .hljs-type,
+.app-shell.theme-eink .markdown-body .hljs-built_in,
+.app-shell.theme-eink .markdown-body .hljs-type {
+  color: #111111 !important;
+  font-weight: 600;
+}
+
+:root[data-theme="eink"] .markdown-body .hljs-tag,
+:root[data-theme="eink"] .markdown-body .hljs-name,
+.app-shell.theme-eink .markdown-body .hljs-tag,
+.app-shell.theme-eink .markdown-body .hljs-name {
+  color: #111111 !important;
+}
+
+:root[data-theme="eink"] .markdown-body .hljs-punctuation,
+:root[data-theme="eink"] .markdown-body .hljs-operator,
+.app-shell.theme-eink .markdown-body .hljs-punctuation,
+.app-shell.theme-eink .markdown-body .hljs-operator {
+  color: #444444 !important;
+}
+
+:root[data-theme="eink"] .markdown-body .hljs-meta,
+.app-shell.theme-eink .markdown-body .hljs-meta {
+  color: #333333 !important;
+}
+
+/* Inline Code Badges */
+.markdown-body :not(pre) > code {
+  padding: 2.5px 7px;
+  border-radius: 5px;
+  background: rgba(110, 118, 129, 0.2);
+  border: 1px solid rgba(110, 118, 129, 0.3);
+  font-family: var(--font-mono, "JetBrains Mono", Consolas, "Fira Code", monospace);
+  font-size: 0.88em;
+  color: #79c0ff;
+  font-weight: 550;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  white-space: normal;
+  display: inline;
+  box-sizing: border-box;
+}
+
+:root[data-theme="light"] .markdown-body :not(pre) > code,
+.app-shell.theme-light .markdown-body :not(pre) > code {
+  background: #fef3c7;
+  border-color: #fde68a;
+  color: #b45309;
+}
+
+:root[data-theme="eink"] .markdown-body :not(pre) > code,
+.app-shell.theme-eink .markdown-body :not(pre) > code {
+  background: #ede8df;
+  border-color: #d5cebf;
+  color: #1a1a1a;
+}
+
+.markdown-body pre.mermaid {
+  display: flex;
+  justify-content: center;
+  min-height: 140px;
+  margin: 24px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  white-space: pre-wrap;
+}
+
+.markdown-body pre.mermaid svg {
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+}
+
+.markdown-body pre.mermaid.mermaid-error {
+  display: block;
+  min-height: auto;
+  border: 1px dashed var(--border);
+  background: var(--surface-2);
+  padding: 0;
+  white-space: normal;
+}
+
+.mermaid-error-fallback {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 14px 18px;
+}
+
+.mermaid-error-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 8px;
+  letter-spacing: -0.01em;
+}
+
+.mermaid-error-source {
+  margin: 0 !important;
+  padding: 10px 14px !important;
+  background: #0d1117 !important;
+  border-radius: 6px !important;
+  font-family: var(--font-mono, "JetBrains Mono", Consolas, monospace) !important;
+  font-size: 12px !important;
+  line-height: 1.55 !important;
+  color: #c9d1d9 !important;
+  white-space: pre-wrap !important;
+  word-break: break-all !important;
+  box-sizing: border-box !important;
+}
+
+.markdown-body .katex-display {
+  max-width: 100%;
+  margin: 1.2em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px 0 10px;
+}

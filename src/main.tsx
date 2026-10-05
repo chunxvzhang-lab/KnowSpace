@@ -10,6 +10,10 @@ import { FlashCapsule } from "./components/FlashCapsule";
 import "./styles/tokens.css";
 import "./styles/shell.css";
 import "./styles/sidebar.css";
+import "./styles/workspace.css";
+import "./styles/reader.css";
+import "./styles/code.css";
+import "./styles/statusbar.css";
 import "./styles.css";
 
 const LazyApp = lazy(() => import("./App"));
