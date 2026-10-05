@@ -1,8 +1,8 @@
 # KnowSpace · 测试基线快照
 
 > **文档性质**：重构安全网的权威口径（release plan R3 交付物）
-> **生成时间**：2026-09-29
-> **应用版本**：`2.7.3`
+> **生成时间**：2026-10-05
+> **应用版本**：`2.7.5`
 > **生成方式**：`node scripts/capture-test-baseline.cjs`（自动生成，请勿手工编辑）
 
 ---
@@ -11,9 +11,9 @@
 
 | 项目 | 数值 |
 | :--- | ---: |
-| 测试文件 | **126** |
-| 用例总数 | **1537** |
-| 通过 | 1535 |
+| 测试文件 | **127** |
+| 用例总数 | **1545** |
+| 通过 | 1543 |
 | 失败 | 0 |
 | 跳过 | 2 |
 | 通过率 | 99.9% |
@@ -64,14 +64,14 @@
 | `src/__tests__/chapter-list.test.tsx` | 10 | ✅ |
 | `src/__tests__/editor-context-menu.test.ts` | 10 | ✅ |
 | `src/__tests__/global-shortcuts-hook.test.ts` | 10 | ✅ |
+| `src/__tests__/markdown-footnotes.test.ts` | 10 | ✅ |
+| `src/__tests__/markdown-supsub.test.tsx` | 10 | ✅ |
 | `src/__tests__/mindmap-xmind-export.test.tsx` | 10 | ✅ |
 | `src/__tests__/wheel-scroll-guard.test.ts` | 10 | ✅ |
 | `src/__tests__/command-bus.test.ts` | 9 | ✅ |
 | `src/__tests__/flash-capsule.test.ts` | 9 | ✅ |
 | `src/__tests__/graph.test.ts` | 9 | ✅ |
 | `src/__tests__/inflate.test.ts` | 9 | ✅ |
-| `src/__tests__/markdown-footnotes.test.ts` | 9 | ✅ |
-| `src/__tests__/markdown-supsub.test.tsx` | 9 | ✅ |
 | `src/__tests__/zip.test.ts` | 9 | ✅ |
 | `src/__tests__/editor-line-prefix-transform.test.tsx` | 8 | ✅ |
 | `src/__tests__/fsrs-verification.test.ts` | 8 | ✅ |
@@ -101,6 +101,7 @@
 | `src/__tests__/css-accent-info.test.ts` | 6 | ✅ |
 | `src/__tests__/css-custom-properties.test.ts` | 6 | ✅ |
 | `src/__tests__/diff-service.test.ts` | 6 | ✅ |
+| `src/__tests__/editor-list-continue.test.ts` | 6 | ✅ |
 | `src/__tests__/mindmap-link-parse.test.ts` | 6 | ✅ |
 | `src/__tests__/mindmap-marks-ui.test.tsx` | 6 | ✅ |
 | `src/__tests__/mindmap-numbering-ui.test.tsx` | 6 | ✅ |
@@ -163,7 +164,7 @@
 | 文件 | 当前行数 | 目标 |
 | :--- | ---: | :--- |
 | `src/components/CanvasView.tsx` | 932 | R2 待拆分: 目标各模块 < 2500 行 |
-| `src/App.tsx` | 805 | R1: < 500 行 |
+| `src/App.tsx` | 813 | R1: < 500 行 |
 | `src/services/canvasGraph.ts` | 26 | R2 已拆分 ✅ |
 | `src/services/canvasExport.ts` | 598 | R2 已拆分 ✅ |
 | `src/services/canvasGeometry.ts` | 126 | R2 已拆分 ✅ |
@@ -178,7 +179,7 @@
 
 任何重构都必须满足：
 
-1. 用例总数 **不低于 1537**（删除测试需在 PR 说明中论证）
+1. 用例总数 **不低于 1545**（删除测试需在 PR 说明中论证）
 2. 通过率 **100%**
 3. 单文件用例数**不得下降**（防止测试被静默删除）
 

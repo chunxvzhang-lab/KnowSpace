@@ -42,6 +42,30 @@ REGEX_PATTERNS = [
     (r"（v2\.2 → v[0-9.]+）", "（v2.2 → v{new}）"),
 ]
 
+# README 的徽章与下载区：用注释标记定位当前版本，替换任意旧值。
+# badge URL 里 Version-vX.Y.Z-1D9BF0 前后各有一个 '-'，颜色段保证锚点唯一。
+README_MARKERS = [
+    ("<!-- VERSION:BEGIN -->", "<!-- VERSION:END -->"),
+]
+README_REGEX_PATTERNS = [
+    (r"(badge/Version-v)[0-9.]+(-)", r"\g<1>{new}\g<2>"),
+    (r'(alt="Version )[0-9.]+"', r'\g<1>{new}"'),
+]
+
+
+def bump_readme(text: str, new: str) -> tuple[str, int]:
+    """提升 README 里'当前版本'的三处口径：VERSION 标记、Version 徽章、徽章 alt。"""
+    hits = 0
+    for begin, end in README_MARKERS:
+        pattern = re.escape(begin) + r"[^<]*?" + re.escape(end)
+        replacement = begin + new + end
+        text, n = re.subn(pattern, replacement, text)
+        hits += n
+    for pattern, replacement in README_REGEX_PATTERNS:
+        text, n = re.subn(pattern, replacement.format(new=new), text)
+        hits += n
+    return text, hits
+
 
 def main() -> int:
     if len(sys.argv) != 4:
@@ -51,6 +75,17 @@ def main() -> int:
     path = Path(sys.argv[1])
     old, new = sys.argv[2], sys.argv[3]
     text = path.read_text(encoding="utf-8")
+
+    # README 走独立口径：它没有用户手册那套固定句式，只有徽章、alt 文本和
+    # VERSION 标记三处"当前版本"。逐条断言命中数与手册同一标准。
+    if path.name.upper() == "README.MD":
+        text, hits = bump_readme(text, new)
+        if hits < len(README_MARKERS) + len(README_REGEX_PATTERNS):
+            print(f"README 当前版本替换应命中 {len(README_MARKERS) + len(README_REGEX_PATTERNS)} 处，实际 {hits} 处；未写入。")
+            return 1
+        path.write_text(text, encoding="utf-8")
+        print(f"\n已写入 {path}：README 当前版本 → v{new}")
+        return 0
 
     missing = []
     for old_pattern, new_pattern in PATTERNS:
