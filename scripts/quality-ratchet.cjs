@@ -8,10 +8,11 @@
  * 13 of the 15 oversized files stayed off the tech-debt table for a year).
  *
  * Metrics and their rules:
- *   colon-any / as-any      type escapes            - may only go DOWN
- *   files-over-1000-lines   size debt, file count   - may only go DOWN
- *   max-file-lines          size debt, worst file   - may only go DOWN
- *   src-lines (non-test)    overall size            - recorded, NOT gated
+ *   colon-any / as-any       type escapes           - may only go DOWN
+ *   files-over-1000-lines    size debt, file count  - may only go DOWN
+ *   max-file-lines           size debt, worst file  - may only go DOWN
+ *   undeclared-imports       phantom dependencies   - must be ZERO (hard gate)
+ *   src-lines (non-test)     overall size           - recorded, NOT gated
  *
  * The ratchet only asks "not worse than yesterday" - never a target value.
  * A target like "any = 0" is unreachable against 56k existing lines and gets
@@ -34,7 +35,121 @@ const root = path.resolve(__dirname, "..");
 const srcDir = path.join(root, "src");
 const docPath = path.join(root, "docs", "QUALITY_BASELINE.md");
 
-const GATED = new Set(["colon-any", "as-any", "files-over-1000-lines", "max-file-lines"]);
+const GATED = new Set([
+  "colon-any",
+  "as-any",
+  "files-over-1000-lines",
+  "max-file-lines",
+  "undeclared-imports",
+]);
+
+/**
+ * Extract import specifiers from source text.
+ *
+ * Comments are blanked by TypeScript's own scanner - the same one the compiler
+ * uses - not a hand-rolled state machine. Two traps earlier versions fell into:
+ * prose like `splitting "init" from "the handlers..."` matched a loose `from`
+ * pattern, and worse, `\b` treats CJK as word characters - so the Chinese word
+ * 从 followed by a quoted string in any comment matched `from` too (865 false
+ * positives). A gate with false positives gets switched off; a gate that reads
+ * real syntax keeps its credibility. Hence: no \b around keywords, statements
+ * anchored to line start, quotes captured by backreference.
+ */
+let tsLib = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  tsLib = require("typescript");
+} catch {
+  tsLib = null;
+}
+
+/**
+ * Comment-free code text, byte-offset-aligned with the original.
+ *
+ * Uses TypeScript's own scanner - the same one the compiler uses - not a
+ * hand-rolled state machine: the handwritten stripper broke on JSX attribute
+ * values containing regex-like quotes and then reported every relative import
+ * in the file as a phantom package (768 false positives). The scanner knows
+ * exactly which spans are comments; blanking them to spaces keeps offsets
+ * stable so findings still point at the right line.
+ */
+function blankComments(text) {
+  if (!tsLib) return text; // degrade to raw text + strict anchored patterns
+  const out = Array.from(text);
+  const ranges = tsLib.getLeadingCommentRanges(text, 0) || [];
+  for (const r of ranges) {
+    for (let i = r.pos; i < r.end && i < out.length; i++) {
+      if (out[i] !== "\n" && out[i] !== "\r") out[i] = " ";
+    }
+  }
+  return out.join("");
+}
+
+/** Import specifiers appearing at line start (static imports/exports). */
+const STATIC_IMPORT_RE = /^[ \t]*(?:import|export)[^;]*?\bfrom[ \t]+(["'])([^"'\n]+)\1/gms;
+const BARE_IMPORT_RE = /^[ \t]*import[ \t]+(["'])([^"'\n]+)\1[ \t]*;?[ \t]*$/gm;
+/** Dynamic import(): allowed anywhere, but must be real call syntax. */
+const DYNAMIC_IMPORT_RE = /(^|[^.\w$])import\([ \t]*(["'])([^"'\n]+)\2[ \t]*\)/g;
+
+function importSpecifiers(text) {
+  const code = blankComments(text);
+  const specs = [];
+  for (const re of [STATIC_IMPORT_RE, BARE_IMPORT_RE, DYNAMIC_IMPORT_RE]) {
+    const idx = re === DYNAMIC_IMPORT_RE ? 3 : 2;
+    for (const m of code.matchAll(re)) {
+      // Belt and braces: the statement must still begin with a real `import`/
+      // `export` keyword after the comment blanking.
+      if (!/^[ \t]*(?:import|export)\b/.test(m[0])) continue;
+      specs.push({ spec: m[idx], index: m.index });
+    }
+  }
+  return specs;
+}
+
+/**
+ * Third-party packages imported by src must be declared in package.json.
+ *
+ * A "phantom dependency" resolves today only because npm happens to hoist a
+ * transitive package to the top of node_modules. When the parent library
+ * changes its dependency tree, or hoisting shifts, `npm ci` on a clean machine
+ * breaks the build - and nothing in CI catches it until release day. This repo
+ * shipped exactly that failure mode: `katex` and `cytoscape` were imported by
+ * src/services/markdownMath.ts and graph/* while living only under mermaid.
+ *
+ * Scope rules (deliberately narrow so the gate never needs an escape hatch):
+ *   - relative imports ("./x") are skipped;
+ *   - "node:*" builtins are skipped;
+ *   - devDependencies count as declared (test tooling is fine);
+ *   - @scope/name takes the two-part specifier, everything else the first path
+ *     segment.
+ */
+function findUndeclaredImports(files, pkg) {
+  const declared = new Set([
+    ...Object.keys(pkg.dependencies || {}),
+    ...Object.keys(pkg.devDependencies || {}),
+  ]);
+  const undeclared = [];
+  for (const filePath of files) {
+    const rel = path.relative(root, filePath).replace(/\\/g, "/");
+    const raw = fs.readFileSync(filePath, "utf8");
+    const seen = new Set();
+    // Line numbers come from the ORIGINAL text; specifiers come from the
+    // comment-stripped text, so a finding never points at prose.
+    for (const { spec, index } of importSpecifiers(raw)) {
+      if (spec.startsWith(".") || spec.startsWith("node:") || spec.startsWith("/")) continue;
+      const pkgName = spec.startsWith("@")
+        ? spec.split("/").slice(0, 2).join("/")
+        : spec.split("/")[0];
+      if (declared.has(pkgName)) continue;
+      const key = `${rel}|${pkgName}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const line = raw.slice(0, index).split(/\r?\n/).length;
+      undeclared.push({ file: rel, line, pkg: pkgName });
+    }
+  }
+  return undeclared;
+}
 
 /** Same counting rule as capture-test-baseline.cjs: editor-visible lines. */
 function countLines(filePath) {
@@ -68,7 +183,9 @@ function measure() {
   let totalLines = 0;
   let maxLines = 0;
 
-  for (const filePath of listSources(srcDir)) {
+  const sources = listSources(srcDir);
+
+  for (const filePath of sources) {
     const rel = path.relative(root, filePath).replace(/\\/g, "/");
     const text = fs.readFileSync(filePath, "utf8");
 
@@ -96,6 +213,9 @@ function measure() {
 
   oversized.sort((a, b) => b.lines - a.lines);
 
+  const pkg = require(path.join(root, "package.json"));
+  const undeclared = findUndeclaredImports(sources, pkg);
+
   return {
     "colon-any": colonAny.length,
     "as-any": asAny.length,
@@ -106,7 +226,8 @@ function measure() {
     // grow past, so it must be the real maximum.
     "max-file-lines": maxLines,
     "src-lines": totalLines,
-    _detail: { colonAny, asAny, oversized },
+    "undeclared-imports": undeclared.length,
+    _detail: { colonAny, asAny, oversized, undeclared },
   };
 }
 
@@ -120,8 +241,9 @@ function parseCommittedBaseline() {
   }
   const text = fs.readFileSync(docPath, "utf8");
   const values = new Map();
-  for (const m of text.matchAll(/^\| `([a-z0-9-]+)` \| (\d+) \|/gm)) {
-    values.set(m[1], Number(m[2]));
+  for (const m of text.matchAll(/^\| `([a-z0-9-]+)` \| (\d+|见 [^|]+) \|/gm)) {
+    const v = Number(m[2]);
+    if (!Number.isNaN(v)) values.set(m[1], v);
   }
   return values;
 }
@@ -155,6 +277,9 @@ function generate(metrics) {
       metrics["files-over-1000-lines"] +
       " | 只减不增（src 非测试代码，> 1000 行） |",
     "| `max-file-lines` | " + metrics["max-file-lines"] + " | 只减不增（最大单文件行数） |",
+    "| `undeclared-imports` | " +
+      metrics["undeclared-imports"] +
+      " | 必须为 0（src 中 import 的第三方包必须在 package.json 显式声明，防幽灵依赖） |",
     "| `src-lines` | " + metrics["src-lines"] + " | 记录趋势，不设闸 |",
     "| `test-cases` | 见 `TEST_BASELINE.md` | 只增不减——由测试基线守护，本文件不重复设闸 |",
     "",
@@ -181,6 +306,14 @@ function generate(metrics) {
     "| 位置 | 代码 |",
     "| :--- | :--- |",
     ...d.asAny.map((e) => `| \`${e.file}:${e.line}\` | \`${e.snippet.trim()}\` |`),
+    "",
+    "---",
+    "",
+    "## 四、未声明的第三方 import（幽灵依赖清单，必须为空）",
+    "",
+    "| 位置 | 包名 |",
+    "| :--- | :--- |",
+    ...d.undeclared.map((e) => `| \`${e.file}:${e.line}\` | \`${e.pkg}\` |`),
     "",
   ];
 
@@ -216,6 +349,16 @@ function check(metrics) {
   }
 
   const detail = metrics._detail;
+  if (metrics["undeclared-imports"] > 0) {
+    // Hard gate, not a ratchet: a phantom dependency is never acceptable at
+    // any count. Print the list so the fix is obvious from the CI log alone.
+    console.error(`[ratchet] undeclared third-party imports (${metrics["undeclared-imports"]}):`);
+    for (const e of detail.undeclared) {
+      console.error(`  ${e.file}:${e.line}  ->  ${e.pkg}`);
+    }
+    console.error("Fix: npm install <pkg> --save  (or drop the import).");
+    failed = true;
+  }
   if (failed) {
     console.error(
       "\n[ratchet] If this regression is intentional, it needs a reviewed decision:\n" +
@@ -234,7 +377,8 @@ function main() {
     console.log(
       `[ratchet] baseline written to ${path.relative(root, docPath)}: ` +
         `colon-any ${metrics["colon-any"]}, as-any ${metrics["as-any"]}, ` +
-        `files>1000 ${metrics["files-over-1000-lines"]}, max ${metrics["max-file-lines"]}`,
+        `files>1000 ${metrics["files-over-1000-lines"]}, max ${metrics["max-file-lines"]}, ` +
+        `undeclared-imports ${metrics["undeclared-imports"]}`,
     );
   }
 }

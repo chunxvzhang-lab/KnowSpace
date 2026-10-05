@@ -1,8 +1,8 @@
 # KnowSpace · 质量棘轮基线
 
 > **文档性质**：代码质量债务的权威口径（与 `TEST_BASELINE.md` 同规格）
-> **生成时间**：2026-09-29
-> **应用版本**：`2.7.1`
+> **生成时间**：2026-10-05
+> **应用版本**：`2.7.5`
 > **生成方式**：`node scripts/quality-ratchet.cjs`（自动生成，**禁止手工编辑**）
 > **判定规则**：CI 中 `--check` 比对，门控指标只许改善不许恶化；放宽基线必须走评审
 > 并留下记录（改生成脚本的方法论，而不是改本文件）。
@@ -17,7 +17,8 @@
 | `as-any` | 10 | 只减不增（`as any`） |
 | `files-over-1000-lines` | 0 | 只减不增（src 非测试代码，> 1000 行） |
 | `max-file-lines` | 962 | 只减不增（最大单文件行数） |
-| `src-lines` | 70585 | 记录趋势，不设闸 |
+| `undeclared-imports` | 0 | 必须为 0（src 中 import 的第三方包必须在 package.json 显式声明，防幽灵依赖） |
+| `src-lines` | 71224 | 记录趋势，不设闸 |
 | `test-cases` | 见 `TEST_BASELINE.md` | 只增不减——由测试基线守护，本文件不重复设闸 |
 
 ---
@@ -37,9 +38,9 @@
 | :--- | :--- |
 | `src/components/DocumentWorkspace.tsx:33` | `: any) => void;` |
 | `src/components/DualDocumentWorkspace.tsx:33` | `: any) => void;` |
-| `src/components/EditorPane.tsx:581` | `: any, from: number, to: number) => {` |
-| `src/components/EditorPane.tsx:610` | `: any, from: number, to: number) => {` |
-| `src/components/EditorPane.tsx:647` | `: any, from: number, to: number) => {` |
+| `src/components/EditorPane.tsx:590` | `: any, from: number, to: number) => {` |
+| `src/components/EditorPane.tsx:619` | `: any, from: number, to: number) => {` |
+| `src/components/EditorPane.tsx:656` | `: any, from: number, to: number) => {` |
 | `src/components/GlobalGraphDialog.tsx:245` | `: any) => {` |
 | `src/components/GlobalGraphDialog.tsx:249` | `: any) => {` |
 | `src/components/GlobalGraphDialog.tsx:253` | `: any) => {` |
@@ -80,3 +81,10 @@
 | `src/components/LocalGraphView.tsx:138` | `as any,` |
 | `src/components/LocalGraphView.tsx:146` | `as any,` |
 | `src/services/markdownPlugins.ts:88` | `as any)("block_anchor", "span", 0);` |
+
+---
+
+## 四、未声明的第三方 import（幽灵依赖清单，必须为空）
+
+| 位置 | 包名 |
+| :--- | :--- |
