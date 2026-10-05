@@ -1,10 +1,10 @@
-import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { MindmapView } from "../components/MindmapView";
 import { parseMarkdownToMindmapTree } from "../services/mindmapService";
 import { parseMindmapLink } from "../core/mindmapLinks";
 import { emptySidecar, serializeSidecar, setNodeLink } from "../services/mindmapSidecar";
+import { loadAppCss } from "./helpers/loadAppCss";
 
 /**
  * 节点上那个链接徽章。
@@ -115,12 +115,15 @@ describe("节点上的链接徽章", () => {
     // `.mindmap-link-marker` 关掉了 pointer-events（它原本只是个记号，不该偷走节点的点击），
     // 而 pointer-events 是**继承**的 —— 子元素那个透明命中圆同样收不到事件。jsdom 不做命中
     // 测试，所以没有任何行为断言能发现它；能发现的只有"这一条规则还在不在"。
-    // 相对工作目录读：vitest + jsdom 下 `import.meta.url` 是 http 起始的地址，
-    // `new URL(..., import.meta.url)` 交给 readFileSync 会报"URL 必须是 file 协议"。
-    const css = readFileSync("src/styles.css", "utf8");
+    // 读的是**应用样式表**（阶段 B 之后 CSS 分布在 src/styles/*.css 与 styles.css）：
+    // 钉单个物理文件的话，这条规则一旦被切进切片，守卫就会在"规则其实还在"的情况下变红，
+    // 或者反过来——有人把它复制到别处也扫不到。
+    const css = loadAppCss();
     const actionRule = css.match(/\.mindmap-link-marker\.is-action\s*\{[^}]*\}/)?.[0] ?? "";
 
-    expect(actionRule).toContain("pointer-events: auto");
+    expect(actionRule, "找不到 .mindmap-link-marker.is-action 规则——它被改名或删掉了").toContain(
+      "pointer-events: auto",
+    );
   });
 
   it("没写协议的域名也是链接：仍是外链，只是打开时补上 https", () => {

@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { loadAppCss } from "./helpers/loadAppCss";
 
 /**
  * 青色强调色令牌（`--accent-info`）守卫。
@@ -24,9 +23,13 @@ import { resolve } from "node:path";
  *    同值；一旦有人改了其中一边，清单就腐坏了，测试会红并要求同步。
  *
  * 全部断言从 CSS 文本读，不复制常量——复制的那份迟早和 CSS 脱节。
+ *
+ * 读的是 **整个应用样式表**（`loadAppCss()`），不是某个物理文件：阶段 B 把令牌块切进了
+ * `src/styles/tokens.css`，只读 styles.css 会同时看不见"定义"和"字面量引用"，
+ * 守卫就从「全域不许出现字面量」退化成「剩余部分不许出现字面量」——静默变窄，全绿照旧。
  */
 
-const RAW_CSS = readFileSync(resolve(__dirname, "../styles.css"), "utf8");
+const RAW_CSS = loadAppCss();
 // 剥注释但**补回等量空格**：注释里会以散文形式写出 `#38bdf8`（比如令牌定义旁的说明），
 // 不剥会被当成真的引用；不补等量字符则后续按偏移定位会错位。
 const STRIPPED = RAW_CSS.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "));

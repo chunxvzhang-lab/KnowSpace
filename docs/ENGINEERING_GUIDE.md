@@ -26,6 +26,8 @@
 | 白板数据结构与序列化 | `src/services/canvasSerialization.ts` |
 | 弹窗通用样式令牌 | `src/components/canvas/canvasModalStyles.ts` |
 | 闪念胶囊配色令牌 | `src/styles.css` 中 `.flash-capsule-overlay` 的 `--flash-*` 定义块 |
+| 主题令牌（`:root` 与四主题取值、幽灵令牌桥接块） | `src/styles/tokens.css`（阶段 B 从 `styles.css` 切出） |
+| 应用样式表的**装载顺序**＝级联顺序 | `src/main.tsx` 顶部的 CSS import 序列（守卫：`css-entry-manifest.test.ts`；读它的守卫统一走 `src/__tests__/helpers/loadAppCss.ts`） |
 | 「系统主题」解析成具体主题 | `src/services/themeMode.ts` |
 | 测试用例数权威口径 | `docs/TEST_BASELINE.md`（脚本生成，**禁止手改**） |
 | 测试环境重置 | `src/__tests__/helpers/resetStores.ts` |
@@ -140,7 +142,9 @@
 闪念胶囊那 19 处漏覆盖就是这么暴露的：最低 1.48:1（`#cbd5e1` 配白水洗底）。
 守卫测试在 `src/__tests__/flash-capsule-theme-contrast.test.ts`。它做三件事：
 
-1. **从 `styles.css` 文本里按主题解析级联**——同一个控件往往有多条规则（基线、
+1. **从应用样式表文本里按主题解析级联**（`src/__tests__/helpers/loadAppCss.ts` 按
+   `src/main.tsx` 的 import 顺序拼接切片与 `styles.css`；阶段 B 之前它就是单个
+   `styles.css`）——同一个控件往往有多条规则（基线、
    `.theme-light`、`[data-theme="light"]`、`:hover`），测试按 CSS 的逐属性级联
    （特异度 → 源码顺序）算出每条规则**实际生效**的前景色和底色。手写一张
    「令牌 ↔ 底色」对照表看着更直白，但它会随 CSS 改动过期，而**过期正是这个 bug 的成因**。
@@ -691,7 +695,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/push.ps1
 | 中 | 启动闪屏恒定深色，浅色主题下会闪 | `src/main.tsx:16` 的 Suspense 占位用 `var(--bg-primary, #1e1e1e)`，而 `--bg-primary` **未定义** → 兜底 `#1e1e1e` 恒定生效。`index.html` 里**没有**「挂载前应用主题」的引导脚本，`<html>` 也没有 `data-theme`，所以首帧只有 `:root` 的默认（浅色）值 | **不要只改兜底值**——那只是把「浅色用户看到深色闪屏」换成「深色用户看到白色闪屏」，对谁都不算修。正确修法是往 `index.html` 加一段内联引导脚本：读持久化的主题 → 挂载前设 `data-theme`。加了以后要把存储键与 `src/services/themeMode.ts` 绑成单一事实来源（配守卫），否则键一改就又闪 |
 | 中 | TSX 里的内联强调色没跟着令牌走 | `--accent-info` / `--accent-info-rgb` 已在四个主题里定义，`styles.css` 的 **200 处**字面量已全部收编（规则 10.3）。但 TSX 里仍有 **30+ 处** `isDark ? "#38bdf8" : "#0284c7"` 的内联色（`GlobalGraphDialog` / `GraphViewPane` / `LocalGraphView` / `VersionHistoryDialog` / `CanvasView`），其中 `#0284c7` 在白底只有 **4.10:1**，低于正文阈值 | 把 TSX 的内联色改成读主题令牌，并把 `#0284c7` 统一到 `#0369a1`。另：`ActivityBar.tsx:180/237`、`EditorContextMenu.tsx:126/833`、`TabBar.tsx:137`、`LocalGraphView.tsx:269` 是**写死 `#38bdf8`、完全不带主题判断**的，浅色下同样 2.14:1 |
 | 低 | 9 处 `data-theme="dark"` 死选择器（已修） | `ThemeMode` 里没有 `"dark"`（那是被改名成 `"twitter"` 的遗留值），所以这 9 条**永远不匹配**。当时没造成视觉 bug——每条规则的列表里都另有一个活的 `[data-theme="twitter"]`，规则照样生效；但它会**教错词汇表**，下一个人照抄就写出永不生效的覆盖 | 2026-09-21 已删掉 `dark` 变体，并加了词汇表守卫（`css-theme-vocabulary.test.ts`，把 CSS 主题名与 `ThemeMode` 绑成单一事实来源）。详见规则 10.2 |
-| 低 | 令牌桥接块是过渡，不是终点 | `src/styles.css` 的 `:root` 里有一块把 9 个「幽灵令牌」桥接到既有令牌（`--surface-3: var(--surface-sunken)` 等），它们曾被引用 **63 处**却从未定义 | 桥接保住了正确性，但规则 1 要求一个概念只有一处定义。收敛办法：把这 63 处引用改成既有令牌，再删掉桥接块。守卫已覆盖（`css-custom-properties.test.ts`），删块忘改引用会立刻变红 |
+| 中 | 样式巨石仍在缩减中（阶段 B） | `src/styles.css` **11816 行**，是全仓最大文件——但它**不在** `max-file-lines` 的口径里（棘轮只数 ts/tsx），所以此前没有任何指标能看见它变大或变小。已按**连续前缀**切出 `src/styles/tokens.css` / `shell.css` / `sidebar.css`（1797 行） | 指标 `styles-css-lines` 只减不增（`docs/QUALITY_BASELINE.md`）；下一批用 `node scripts/split-styles-css.cjs --sections` 重新推导边界，只许切**当前文件的连续前缀**，且必须让脚本的重组证明通过。中段域（对话框、打印、导图等）需要单独的级联顺序证明，不能顺手外迁——浅色/墨水屏覆盖靠「同特异度后来者胜」生效，改顺序就是改外观 |
+| 低 | 令牌桥接块是过渡，不是终点 | `src/styles/tokens.css` 的 `:root` 里有一块把 9 个「幽灵令牌」桥接到既有令牌（`--surface-3: var(--surface-sunken)` 等），它们曾被引用 **63 处**却从未定义 | 桥接保住了正确性，但规则 1 要求一个概念只有一处定义。收敛办法：把这 63 处引用改成既有令牌，再删掉桥接块。守卫已覆盖（`css-custom-properties.test.ts`），删块忘改引用会立刻变红 |
 | 低 | 闪念胶囊里有 4 个死类名 | `src/components/FlashCapsule.tsx` 的 `className="text-orange"`（648 / 706 / 911）与 `"text-cyan"`（946）。仓库里**没有裸 `.text-orange` / `.text-cyan` 规则**——只有 `.about-icon.text-orange`、`.dual-pane-icon.text-orange` 这类绑定了父元素的复合选择器，所以这四个图标根本没吃到颜色 | 四个图标目前都从父元素继承到可读的颜色（`.flash-icon-btn.pinned` 与 `.flash-tool-insert-persistent` 是琥珀、`.flash-wikilink-item` 是主题色），所以**不是可读性问题**，是「设计想要的橙色/青色高亮丢了」。要么补一组胶囊作用域内的规则，要么删掉这些类名 |
 | 低 | 胶囊 CSS 曾整段放错位置（已修） | `.flash-wikilink-*`（约 8255~8353）物理上落在「Knowledge Graph」区块里，离胶囊主区块 3000 行，导致守卫测试按「连续区块」取范围时**漏扫了一半**，`.flash-wikilink-header .hint`（深色 3.30:1）与 `.flash-recorder-input`（eink 2.17:1）藏了很久 | 2026-09-21 已搬回胶囊主区块（纯搬移，行集合比对一致）。测试也已改成按选择器取范围，不再依赖位置 |
 

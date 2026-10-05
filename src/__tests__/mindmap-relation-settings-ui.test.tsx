@@ -12,6 +12,7 @@ import {
 } from "../services/mindmapSidecar";
 import { buildStandaloneMindmapSvg } from "../services/mindmapSvgExport";
 import { layoutMindmap } from "../services/mindmapLayout";
+import { loadAppCss } from "./helpers/loadAppCss";
 
 /**
  * A line's label, arrows, line style and colour, through the view.
@@ -114,14 +115,13 @@ describe("关系线的标签、箭头、形态与颜色", () => {
     expect(hitPaths()[0].classList.contains("mindmap-relation-hit")).toBe(true);
     expect(hitPaths()[0].getAttribute("d")).toBe(linePath().getAttribute("d"));
 
-    const fs = await import("node:fs/promises");
-    const path = await import("node:path");
-    const css = await fs.readFile(path.resolve(__dirname, "../styles.css"), "utf8");
-    const hitRule = css.slice(
-      css.indexOf(".mindmap-relation-hit"),
-      css.indexOf("}", css.indexOf(".mindmap-relation-hit")),
+    // 应用样式表（阶段 B 后 CSS 分布在多个文件），不是单个物理文件。
+    const css = loadAppCss();
+    const hitAt = css.indexOf(".mindmap-relation-hit");
+    const hitRule = hitAt === -1 ? "" : css.slice(hitAt, css.indexOf("}", hitAt));
+    expect(hitRule, "找不到 .mindmap-relation-hit 规则——它被改名或删掉了").toContain(
+      "stroke-width: 14",
     );
-    expect(hitRule).toContain("stroke-width: 14");
     expect(hitRule).toContain("stroke: transparent");
 
     clickLine();

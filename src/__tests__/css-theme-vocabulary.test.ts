@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { loadAppCss } from "./helpers/loadAppCss";
 
 /**
  * 主题词汇表守卫：CSS 里出现的主题名，必须是代码里真实存在的主题。
@@ -21,9 +22,12 @@ import { resolve } from "node:path";
  * 所以守卫不查「选择器是否生效」（那需要完整级联推导），只查一件更根本的事：
  * **CSS 里的主题名 ⊆ 代码里的主题名**。主题名和 `ThemeMode` 绑成单一事实来源——
  * 类型改了这里会跟着变，CSS 写了不存在的名字会立刻红。
+ *
+ * 扫描范围是**整个应用样式表**（`loadAppCss()`）：阶段 B 之后主题块分布在
+ * `src/styles/tokens.css` 等切片里，只读 styles.css 会让外迁出去的主题选择器脱离守卫。
  */
 
-const CSS = readFileSync(resolve(__dirname, "../styles.css"), "utf8");
+const CSS = loadAppCss();
 const TYPES = readFileSync(resolve(__dirname, "../core/types.ts"), "utf8");
 
 /** 从 `export type ThemeMode = "system" | "light" | "twitter" | "eink";` 取出取值集合。 */

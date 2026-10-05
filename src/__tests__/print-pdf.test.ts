@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { loadAppCss } from "./helpers/loadAppCss";
 
 describe("printToPDF options & filename sanitization", () => {
   it("sanitizes forbidden characters from PDF export title", () => {
@@ -23,11 +24,9 @@ describe("printToPDF options & filename sanitization", () => {
     expect(options.margins.marginType).toBe("none");
   });
 
-  it("verifies required selectors and break-inside avoidance in styles.css", async () => {
-    const fs = await import("node:fs/promises");
-    const path = await import("node:path");
-    const cssPath = path.resolve(__dirname, "../styles.css");
-    const cssContent = await fs.readFile(cssPath, "utf8");
+  it("verifies required selectors and break-inside avoidance in the app stylesheet", async () => {
+    // 阶段 B 之后 CSS 分布在 src/styles/*.css，断言对象是"应用样式表"而非某个物理文件。
+    const cssContent = loadAppCss();
 
     expect(cssContent).toContain("@media print");
     expect(cssContent).toContain(".editor-section");
@@ -44,9 +43,7 @@ describe("printToPDF options & filename sanitization", () => {
     // map is fitted to the paper instead. The view box that completes this is set
     // in MindmapView, because it depends on the laid-out bounds — see
     // mindmap-svg-export.test.tsx for that half.
-    const fs = await import("node:fs/promises");
-    const path = await import("node:path");
-    const cssContent = await fs.readFile(path.resolve(__dirname, "../styles.css"), "utf8");
+    const cssContent = loadAppCss();
 
     const printBlock = cssContent.slice(cssContent.indexOf("@media print {"));
     expect(printBlock.length).toBeGreaterThan(0);

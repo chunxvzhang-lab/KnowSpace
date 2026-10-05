@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { renderMarkdown } from "../services/markdown";
+import { loadAppCss } from "./helpers/loadAppCss";
 
 describe("blocklink & embedding", () => {
   it("extracts paragraph-end ^block-id and renders block-anchor badge", async () => {
@@ -52,9 +53,8 @@ describe("blocklink & embedding", () => {
   });
 
   it("defines jump-target-pulse animation with smooth duration and rounded border", async () => {
-    const fs = await import("fs");
-    const path = await import("path");
-    const css = fs.readFileSync(path.resolve(__dirname, "../styles.css"), "utf-8");
+    // 应用样式表（阶段 B 后 CSS 分散在 src/styles/*.css + styles.css），不是单个物理文件。
+    const css = loadAppCss();
 
     expect(css).toContain(".jump-target-pulse");
     expect(css).toContain("animation: jumpPulseGlow 1.4s ease-out forwards;");

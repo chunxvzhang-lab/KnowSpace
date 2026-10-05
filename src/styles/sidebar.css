@@ -1,0 +1,785 @@
+/* ========================================================================
+   KnowSpace · 侧边栏：目录树、书签、搜索面板
+   从 src/styles.css 按域拆分而来（阶段 B）。加载顺序由 src/main.tsx 决定，
+   必须与拆分前 styles.css 内的物理顺序一致 —— 改顺序等于改级联。
+   ======================================================================== */
+
+/* ==========================================================================
+   Workspace Flex Layout & Sidebars (Resizable Splitters)
+   ========================================================================== */
+.workspace {
+  display: flex;
+  flex-direction: row;
+  flex: 1 1 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  position: relative;
+}
+
+.chapter-list {
+  min-width: 160px;
+  max-width: 480px;
+  overflow: auto;
+  padding: 10px 8px;
+  background: var(--surface-2);
+  flex-shrink: 0;
+}
+
+.side-panel {
+  min-width: 180px;
+  max-width: 520px;
+  overflow: auto;
+  padding: 12px 10px;
+  background: var(--surface);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.reader-frame {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Draggable Splitter Divider between sidebars and reader */
+.layout-resizer {
+  position: relative;
+  width: 6px;
+  margin: 0 -3px;
+  z-index: 20;
+  cursor: col-resize;
+  flex-shrink: 0;
+  background: transparent;
+  transition: background-color 0.15s ease;
+}
+
+.layout-resizer::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 2.5px;
+  width: 1px;
+  background: var(--border);
+  transition: all 0.18s ease;
+}
+
+.layout-resizer:hover::after,
+.layout-resizer.is-active::after {
+  width: 3px;
+  left: 1.5px;
+  background: var(--accent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 70%, transparent);
+}
+
+body.is-resizing-col,
+body.is-resizing-col * {
+  user-select: none !important;
+  cursor: col-resize !important;
+}
+
+.tree-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px 10px;
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Shown only when the directory walk stopped early: the tree on screen is
+   missing documents, and saying so is the difference between "the app cannot
+   see my notes" and "the app told me why". Pinned to the bottom of the sidebar
+   so it stays visible however far down the tree the reader has scrolled. */
+.tree-scan-notice {
+  position: sticky;
+  bottom: 0;
+  margin: 8px 0 0;
+  padding: 6px 8px;
+  border-top: 1px solid rgba(245, 158, 11, 0.28);
+  background: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+  font-size: 10.5px;
+  line-height: 1.45;
+  border-radius: 0 0 4px 4px;
+}
+
+/* One line per thing that went wrong — a scan can both stop at the file ceiling
+   and have passed over a folder it could not open. */
+.tree-scan-notice p {
+  margin: 0;
+}
+
+.tree-scan-notice p + p {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(245, 158, 11, 0.18);
+}
+
+[data-theme="light"] .tree-scan-notice {
+  border-top-color: rgba(180, 83, 9, 0.28);
+  background: rgba(245, 158, 11, 0.12);
+  color: #b45309;
+}
+
+.tree-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s var(--ease-spring);
+}
+
+.tree-action-btn:hover {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+.tree-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 27px;
+  margin: 1px 0;
+  padding: 4px 8px 4px calc(8px + var(--tree-depth, 0) * 12px);
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  text-align: left;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.3;
+  transition: all 0.15s var(--ease-spring);
+}
+
+.tree-row span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-row svg {
+  flex-shrink: 0;
+}
+
+/* Documents hidden by a leading dot, shown because the reader asked for them.
+   Dimmed rather than hidden again: the point of turning the preference on is to
+   be able to open them, and they still read as the secondary set — which is
+   also why they sort after the visible ones. */
+.tree-row-name.is-hidden {
+  opacity: 0.72;
+  font-style: italic;
+}
+
+.tree-row:hover .tree-row-name.is-hidden,
+.tree-row-wrapper.is-active .tree-row-name.is-hidden {
+  opacity: 1;
+}
+
+.tree-row .folder-caret {
+  width: 12px;
+  height: 12px;
+  min-width: 12px;
+  min-height: 12px;
+  transition: transform 0.18s var(--ease-spring);
+}
+
+.tree-row .folder-caret.open {
+  transform: rotate(90deg);
+}
+
+.tree-row:hover {
+  background: color-mix(in srgb, var(--surface) 75%, transparent);
+  color: var(--text);
+}
+
+.tree-row.active {
+  background: var(--accent-surface);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.folder-row {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.tree-row-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.tree-row-wrapper .tree-row {
+  flex: 1;
+  padding-right: 28px;
+}
+
+.tree-rename-btn {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.15s ease;
+}
+
+.tree-row-wrapper:hover .tree-rename-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.tree-rename-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+/* Sidebar Panel (TOC / Bookmarks / Search) */
+.side-panel {
+  min-width: 0;
+  overflow: auto;
+  padding: 12px 10px;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 12px;
+}
+
+.tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+  padding: 3px;
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.tabs button {
+  height: 28px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 11.5px;
+  font-weight: 550;
+  transition: all 0.15s var(--ease-spring);
+}
+
+.tabs button:hover {
+  color: var(--text);
+}
+
+.tabs button.active {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.space-standalone-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 6px 10px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.space-standalone-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.space-standalone-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.space-standalone-close-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.toc-panel,
+.bookmark-panel,
+.search-panel {
+  display: grid;
+  gap: 6px;
+}
+
+.toc-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  border: 0;
+  border-left: 2px solid transparent;
+  border-radius: 0 6px 6px 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 5px 8px;
+  text-align: left;
+  line-height: 1.35;
+  font-size: 12px;
+  transition: all 0.15s var(--ease-spring);
+}
+
+.toc-link-text {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.toc-bookmark-marker {
+  flex: 0 0 auto;
+  color: var(--accent);
+}
+
+.toc-link.level-1 {
+  font-weight: 650;
+  color: var(--text);
+}
+
+.toc-link.level-2 {
+  padding-left: 18px;
+}
+
+.toc-link.level-3 {
+  padding-left: 28px;
+  font-size: 11px;
+}
+
+.toc-link:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.toc-link.active {
+  border-left-color: var(--accent);
+  background: var(--accent-surface);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Card Style: Bookmarks */
+.bookmark-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: start;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  box-shadow: var(--shadow);
+  transition: all 0.18s var(--ease-spring);
+}
+
+.bookmark-item:hover {
+  border-color: var(--border-hover);
+  transform: translateY(-1px);
+}
+
+.bookmark-main {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.bookmark-main span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.bookmark-main strong {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.bookmark-main small {
+  color: var(--accent);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.bookmark-main em {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-style: normal;
+  line-height: 1.4;
+}
+
+/* Card Style: Search Box & Results */
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  transition: all 0.18s var(--ease-spring);
+  position: relative;
+}
+
+.search-box:focus-within {
+  border-color: var(--accent);
+  background: var(--surface);
+  box-shadow: 0 0 0 2px var(--accent-surface);
+}
+
+.search-box-icon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.search-box input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+}
+
+.search-box input:focus {
+  outline: none;
+}
+
+.search-clear-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 0;
+  background: var(--surface-3);
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.search-clear-btn:hover {
+  background: var(--border-hover);
+  color: var(--text);
+}
+
+.search-count-badge {
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 2px 4px 6px;
+  font-weight: 550;
+}
+
+.search-results {
+  display: grid;
+  gap: 6px;
+}
+
+.search-result {
+  display: grid;
+  gap: 5px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  text-align: left;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: all 0.18s var(--ease-spring);
+}
+
+.search-result:hover {
+  border-color: var(--accent);
+  background: var(--surface-2);
+  transform: translateY(-1px);
+}
+
+.search-result.active {
+  border-color: var(--accent) !important;
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface)) !important;
+  box-shadow:
+    0 0 0 1.5px var(--accent),
+    0 4px 14px rgba(29, 155, 240, 0.25) !important;
+}
+
+.search-result-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.search-result strong {
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-result.active strong {
+  color: var(--accent) !important;
+}
+
+.search-result-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.search-block-count-tag {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 650;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  padding: 1px 5px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  line-height: 1.3;
+}
+
+.search-line-tag {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: var(--surface-3);
+  padding: 1px 5px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  font-family: var(--font-mono, monospace);
+  line-height: 1.3;
+}
+
+.search-result.active .search-line-tag {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.search-result-excerpt {
+  color: var(--text-muted);
+  font-size: 11.5px;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.search-excerpt-match {
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+  color: var(--accent);
+  font-weight: 700;
+  padding: 1px 3px;
+  border-radius: 3px;
+}
+
+/* Search Scope Bar */
+.search-scope-bar {
+  display: flex;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  gap: 2px;
+}
+
+.search-scope-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 550;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.search-scope-tab:hover {
+  color: var(--text);
+  background: var(--surface-3);
+}
+
+.search-scope-tab.active {
+  background: var(--surface);
+  color: var(--accent);
+  font-weight: 650;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.search-scope-count {
+  font-size: 9.5px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: var(--surface-3);
+  color: var(--text-muted);
+}
+
+.search-scope-tab.active .search-scope-count {
+  background: var(--accent-surface);
+  color: var(--accent);
+}
+
+/* Syntax Helper Chips */
+.search-syntax-chips {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.search-syntax-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.search-syntax-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-family: var(--font-mono, monospace);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.search-syntax-chip:hover {
+  background: var(--surface-3);
+  color: var(--accent);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+/* Chapter & Tag Badges in Search Results */
+.search-chapter-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--surface-3);
+  color: var(--text-muted);
+  max-width: 110px;
+  flex-shrink: 0;
+}
+
+.search-chapter-badge-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-result-badges-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.search-card-pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 9.5px;
+  font-weight: 600;
+  padding: 0 5px;
+  border-radius: 4px;
+  line-height: 1.4;
+}
+
+.search-card-pill.tag-pill {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.search-card-pill.link-pill {
+  background: rgba(var(--accent-info-rgb), 0.12);
+  color: #0284c7;
+  border: 1px solid rgba(var(--accent-info-rgb), 0.25);
+}
+
+.search-empty-state {
+  padding: 24px 12px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}

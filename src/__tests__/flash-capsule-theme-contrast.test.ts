@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { loadAppCss } from "./helpers/loadAppCss";
 
 /**
  * 闪念胶囊配色对比度守卫。
@@ -31,14 +30,16 @@ import { resolve } from "node:path";
  * 闪念胶囊那一段 CSS 的范围，**不按连续区块取**。
  *
  * 原来的做法是切「从 `KnowSpace Flash Capsule` 注释到 `Space Timeline` 注释」这一段。
- * 那是个陷阱：`flash-` 规则在文件里有**两个**聚集区——主区块（约 4566~5874）和
- * wikilink 下拉（约 8255~8353，物理上落在 Knowledge Graph 区块里，是放错位置的 CSS）。
- * 按连续切片取范围时，第二段**从来没被扫到**，于是 `.flash-wikilink-item:hover`
- * 在浅色下只有 1.84:1 也一直是绿的。
+ * 那是个陷阱：`flash-` 规则在文件里有**两个**聚集区——主区块和一处 wikilink 下拉
+ * （物理上落在 Knowledge Graph 区块里，是放错位置的 CSS）。按连续切片取范围时，
+ * 第二段**从来没被扫到**，于是 `.flash-wikilink-item:hover` 在浅色下只有 1.84:1
+ * 也一直是绿的。
  *
- * 改成「凡选择器里出现 `flash-` 就纳入」，范围由选择器本身决定，加在文件哪儿都算数。
+ * 改成「凡选择器里出现 `flash-` 就纳入」，范围由选择器本身决定，加在文件哪儿都算数——
+ * 阶段 B 把 CSS 拆进 `src/styles/*.css` 之后，这也正是唯一还成立的取法：扫描对象是
+ * **整个应用样式表**（`loadAppCss()`），不是某一个物理文件。
  */
-const RAW_CSS = readFileSync(resolve(__dirname, "../styles.css"), "utf8");
+const RAW_CSS = loadAppCss();
 // 先剥注释：注释里会以散文形式写出 `@media (prefers-color-scheme: light) { … }` 和
 // `var(--flash-accent)`，不剥的话前者会被当成真的 at-rule、后者会被当成真的引用。
 const { stripped: STRIPPED_CSS, atRules: AT_RULES } = stripAtRules(

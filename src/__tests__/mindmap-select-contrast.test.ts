@@ -1,7 +1,5 @@
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { loadAppCssBundle } from "./helpers/loadAppCss";
 
 /**
  * 思维导图下拉弹层的颜色守卫（第三版：手写弹层的成对同源令牌）。
@@ -14,15 +12,16 @@ import { describe, expect, it } from "vitest";
  * 3. 现在弹层是手写 DOM（MindmapSelect，portal 到 body），普通 CSS 规则
  *    真正生效——守卫钉住它的成对同源：弹层的底/字必须是同一主题块的
  *    var(--surface)/var(--text)，hover 底必须是同块的 var(--surface-2)，
- *    并逐主题用 styles.css 里**实际值对**验算对比度。
+ *    并逐主题用**应用样式表里实际值对**验算对比度。
  *
  * 历史两种失效形状（恒定底+主题字、主题底+恒定字）作为负向 fixture 保留：
  * 成对检查必须拒绝它们。
+ *
+ * 读 `loadAppCssBundle()`（阶段 B 之后主题令牌分布在 `src/styles/tokens.css` 等切片里）：
+ * 只读 styles.css 会拿 mid-file 的覆盖块当"主题取值"，验算的是不存在于级联里的颜色对。
  */
 
-const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
-const cssPath = join(repoRoot, "src", "styles.css");
-const cssText = readFileSync(cssPath, "utf8");
+const { css: cssText, locate } = loadAppCssBundle();
 
 /**
  * 注释剥除但补回等量换行：行号是这类测试唯一的定位手段，
@@ -62,7 +61,7 @@ function extractBlock(css: string, selector: string, what: string): { body: stri
   const close = open === -1 ? -1 : css.indexOf("}", open);
   if (open === -1 || close === -1) {
     throw new Error(
-      `解析失败：${what} 的选择器找到了，但花括号不配对——styles.css 在这一点上坏了。`,
+      `解析失败：${what} 的选择器找到了，但花括号不配对——应用样式表在 ${locate(lineOf(css, at))} 这一点上坏了。`,
     );
   }
   return { body: css.slice(open + 1, close), line: lineOf(css, at) };
@@ -136,7 +135,7 @@ describe("思维导图下拉弹层的颜色守卫（手写弹层 · 成对同源
       pop.body.includes("background: var(--surface)") && pop.body.includes("color: var(--text)");
     expect(
       paired,
-      `手写弹层是普通 DOM，令牌在这里真实生效——但两端必须同源。历史两种失效形状（恒定底+主题字 1.22:1、主题底+恒定字）都在某个主题下崩。当前块（styles.css:${pop.line}）：${pop.body.trim()}`,
+      `手写弹层是普通 DOM，令牌在这里真实生效——但两端必须同源。历史两种失效形状（恒定底+主题字 1.22:1、主题底+恒定字）都在某个主题下崩。当前块（${locate(pop.line)}）：${pop.body.trim()}`,
     ).toBe(true);
   });
 
@@ -167,7 +166,7 @@ describe("思维导图下拉弹层的颜色守卫（手写弹层 · 成对同源
   });
 
   it("负向对照：历史混合形（恒定底 + 主题字）必须被成对检查抓到", () => {
-    // 历史 bug 形状的原样 fixture——不是 styles.css 的内容。
+    // 历史 bug 形状的原样 fixture——不是应用样式表的内容。
     const broken = `.mindmap-select-pop {
         background: #1e293b;
         color: var(--text);

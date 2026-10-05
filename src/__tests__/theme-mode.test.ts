@@ -3,10 +3,17 @@ import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { resolveThemeMode } from "../services/themeMode";
 import { loadPreferences } from "../services/storage";
+import { loadAppCss } from "./helpers/loadAppCss";
 import type { ThemeMode } from "../core/types";
 
-/** 注释先剥掉：注释里会以散文形式提到 `var(--flash-accent)` 之类，会被误当成引用。 */
-const RAW_CSS = readFileSync(resolve(__dirname, "../styles.css"), "utf8");
+/**
+ * 注释先剥掉：注释里会以散文形式提到 `var(--flash-accent)` 之类，会被误当成引用。
+ *
+ * 读整个应用样式表（`loadAppCss()`）而不是 styles.css 一个文件：本守卫判断的是
+ * 「主窗口的 `[data-theme]` 规则会不会渗进胶囊窗口」，而主题规则现在分布在
+ * `src/styles/*.css` 切片里——只看一个物理文件＝守卫范围静默缩小。
+ */
+const RAW_CSS = loadAppCss();
 const CSS = RAW_CSS.replace(/\/\*[\s\S]*?\*\//g, "");
 
 /**

@@ -1,0 +1,251 @@
+/* ========================================================================
+   KnowSpace · 主题令牌与全局基础
+   从 src/styles.css 按域拆分而来（阶段 B）。加载顺序由 src/main.tsx 决定，
+   必须与拆分前 styles.css 内的物理顺序一致 —— 改顺序等于改级联。
+   ======================================================================== */
+
+:root {
+  color-scheme: light;
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #f4f4f6;
+  --surface-sunken: #f1f1f4;
+  --surface-elevated: #ffffff;
+  --activity-bg: #ffffff;
+  --text: #18181b;
+  --text-muted: #71717a;
+  --border: #e4e4e7;
+  --border-subtle: #f4f4f5;
+  --border-hover: #d4d4d8;
+  --accent: #d97706;
+  --accent-hover: #b45309;
+  --accent-surface: rgba(245, 158, 11, 0.12);
+  --accent-cyan: #f59e0b;
+  --accent-blue: #d97706;
+
+  /* ── 青色强调色（`--accent-info`）──────────────────────────────────────
+     图视图、局部图谱、思维导图、画布、块锚点、命令面板共用这个青色。它原来是一串
+     **字面量 `#38bdf8`**，散在 **112 条规则 / 200 处声明**里，且**没有任何主题覆盖**——
+     于是浅色主题下它一直是 `#38bdf8`：白底上 **2.14:1**、`--surface-2` 上 1.95:1，
+     而它被用在 39 处 `color:`（正文级文字）上。`#38bdf8` 是深色主题的正确取值
+     （黑底 9.80:1），错的是**没有随主题切换**。
+
+     修法是把它收成一个**语义令牌**，而不是逐条补浅色覆盖——逐条补正是当初出问题的
+     原因（`.flash-wikilink-item:hover` 就是这么漏掉的）。收成令牌后，任何新增规则
+     只要写 `var(--accent-info)` 就自动跟随主题，不需要记得补覆盖。
+
+     取值依据（实测对比度，脚本算的不是眼估的）：
+       - 深色 `#38bdf8`：黑底 9.80:1、`--surface` 上 8.64:1（维持原观感，不变）；
+       - 浅色/eink `#0369a1`：白底 **5.93:1**、`--surface-2` 5.40:1、eink 纸底 5.64:1
+         —— 全部达 AA 正文阈值 4.5:1。
+       为什么不沿用 TSX 里那套 `isDark ? "#38bdf8" : "#0284c7"`：`#0284c7` 在白底只有
+       **4.10:1**，低于正文阈值，只够 3:1 的图形阈值。`#0369a1` 与闪念胶囊的
+       `--flash-info` 取值一致（那边已经按对比度定过），所以两处也顺带收敛到同一档。
+
+     `-rgb` 是同一颜色的通道三元组，供 `rgba(var(--accent-info-rgb), 0.12)` 这类
+     需要**透明度合成**的地方使用（淡底、光晕、阴影共 80 处，alpha 有 21 种不同取值）。
+     三元组必须与上面的十六进制**成对维护**——守卫会核对两者是否指向同一颜色。 */
+  --accent-info: #0369a1;
+  --accent-info-rgb: 3, 105, 161;
+  --danger: #ef4444;
+  --status-bar-bg: #18181b;
+  --status-bar-text: #e4e4e7;
+  --status-bar-muted: #a1a1aa;
+  --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+  --shadow-card: 0 12px 36px -4px rgba(0, 0, 0, 0.08), 0 4px 12px -2px rgba(0, 0, 0, 0.04);
+  --shadow-modal: 0 24px 64px -12px rgba(0, 0, 0, 0.25), 0 4px 16px rgba(0, 0, 0, 0.08);
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-card: 14px;
+  --radius-pill: 9999px;
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ── 补齐「幽灵令牌」─────────────────────────────────────────────────────
+     下面这一组名字在仓库里共被引用 **63 处**，但**从来没有定义过**——
+     `git log -S "--surface-3:" -- src/styles.css` 连初始提交都查不到，也就是说
+     它们是照着**外部设计系统的词汇**写下的（`--surface-3` / `--text-secondary` /
+     `--border-strong` 是典型的一套），而本项目用的是 `--surface-2` / `--text-muted` /
+     `--border-hover`。
+
+     分布：`--surface-3` 13、`--font-mono` 13、`--text-tertiary` 10、`--text-primary` 9、
+     `--text-secondary` 8、`--surface-hover` 5、`--border-strong` 2、`--shadow-floating` 2、
+     `--surface-bg` 1。
+
+     后果不是报错，而是**静默失效**：`background: var(--surface-3)` 里 var 解析不出来，
+     整条声明被浏览器丢弃（不是回退到默认值，是这条属性**完全没应用**）。实测症状：
+     悬停没有底色、标签/徽章没有底色、`.tab-context-menu` 既没边框也没阴影、
+     `.local-graph-header` 没有底色、`.item-snippet` 不显次要色。
+
+     这里把每个幽灵名字**桥接到本项目已有的同角色令牌**，而不是另造一套值。桥接是惰性的
+     （`var()` 在**使用处**才解析），所以四个主题各自取到正确的值，不会出现
+     「按浅色挑的值在深色下不对」。映射依据逐条写在右边。
+
+     想收敛成单一词汇表的话：把这些引用改成右边的既有令牌，再删掉这个桥接块。 */
+  --surface-3: var(
+    --surface-sunken
+  ); /* 比 --surface-2 再远一档：.empty-action-card
+                                              用 --surface-2、其 :hover 用 --surface-3，
+                                              可见两者是相邻两级 */
+  --surface-hover: var(--surface-2); /* 悬停洗底 */
+  --surface-bg: var(
+    --surface-2
+  ); /* 面板头底色（映射到 --surface 会与面板同色
+                                              ＝等于没修，看不出是条 header） */
+  --border-strong: var(--border-hover); /* 既有的最强边框色 */
+  --shadow-floating: var(
+    --shadow-modal
+  ); /* 浮层阴影取最高一级：右键菜单现在既无边框
+                                              也无阴影，用更轻的 --shadow-card 仍会显平 */
+  --text-secondary: var(--text-muted); /* 既有的次要文字色 */
+
+  /* `--text-primary`（9 处）与 `--text-tertiary`（10 处）覆盖的是**整个思维导图节点编辑
+     UI**——右键菜单、笔记输入框、链接输入框、标签输入/芯片、节点编号、浮动文字、
+     图标按钮 hover、布局下拉。它们的底色是 `var(--surface)` / `var(--surface-2)`
+     （**随主题**），而 `--text-primary` 的兜底是 `#e2e8f0`（近白）——
+     浅色主题下就是近白字配近白底，实测 **1.23:1**（eink 1.17:1），等于看不见。
+     桥接到既有令牌后 16~18:1。 */
+  --text-primary: var(--text);
+  --text-tertiary: var(--text-muted);
+
+  /* 以下三个**故意不桥接**，因为它们的兜底值是「死代码」而非 bug：
+     `--surface-1`（#1e293b）/ `--text-normal`（#f8fafc）/ `--border-color`
+     只出现在命令面板与快速工具条上，而这两处的浅色/eink 配色由
+     `[data-theme="light"] .command-palette-*` 等**显式覆盖**兜住了，实测不会漏。
+     也就是说：兜底值恒定不生效，但主题覆盖让结果正确。真要收口，改成既有令牌即可。 */
+
+  /* 等宽字体。这个栈与文件里 8 处直接写死的 `ui-monospace, SFMono-Regular, …` 一致，
+     把 JetBrains Mono / Fira Code 放在最前是为了**保持代码块现有观感**——应用没有加载
+     webfont，它们只在用户本机装了时才生效，和定义这个令牌之前的行为一样。 */
+  --font-mono:
+    "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --surface-elevated: #ffffff;
+  --activity-bg: #ffffff;
+}
+
+:root[data-theme="eink"] {
+  color-scheme: light;
+  --bg: #f4f1ea;
+  --surface: #fbf9f4;
+  --surface-2: #ede8df;
+  --surface-sunken: #e2dcd0;
+  --surface-elevated: #fdfcf9;
+  --activity-bg: #eae5dc;
+  --text: #1a1a1a;
+  --text-muted: #57544e;
+  --border: #d5cebf;
+  --border-subtle: #e6dfd2;
+  --border-hover: #9c9586;
+  --accent: #2b2925;
+  --accent-hover: #111111;
+  --accent-surface: rgba(0, 0, 0, 0.08);
+  --accent-cyan: #3b3935;
+  --accent-blue: #222222;
+  /* 青色强调色：eink 是浅底纸张主题，与浅色同档（纸底 5.64:1）。见 `:root` 的说明。 */
+  --accent-info: #0369a1;
+  --accent-info-rgb: 3, 105, 161;
+  --danger: #842029;
+  --status-bar-bg: #eae5dc;
+  --status-bar-text: #1a1a1a;
+  --status-bar-muted: #6b665c;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-card: 0 4px 12px rgba(0, 0, 0, 0.08), 0 0 0 1px #d8d1c2;
+  --shadow-modal: 0 12px 32px rgba(0, 0, 0, 0.18), 0 0 0 1px #ccc4b4;
+}
+
+:root[data-theme="twitter"] {
+  color-scheme: dark;
+  --bg: #000000;
+  --surface: #0f1419;
+  --surface-2: #16181c;
+  --surface-sunken: #0b0e14;
+  --surface-elevated: #1a202c;
+  --activity-bg: #000000;
+  --text: #e7e9ea;
+  --text-muted: #71767b;
+  --border: #2f3336;
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-hover: rgba(255, 255, 255, 0.2);
+  --accent: #1d9bf0;
+  --accent-hover: #1a8cd8;
+  --accent-surface: rgba(29, 155, 240, 0.14);
+  --accent-cyan: #22d3ee;
+  --accent-blue: #1d9bf0;
+  /* 青色强调色：深色下就是原来的 `#38bdf8`（黑底 9.80:1）。见 `:root` 的说明。 */
+  --accent-info: #38bdf8;
+  --accent-info-rgb: 56, 189, 248;
+  --danger: #f87171;
+  --status-bar-bg: #000000;
+  --status-bar-text: #e7e9ea;
+  --status-bar-muted: #71767b;
+  --shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --shadow-card: 0 16px 44px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --shadow-modal: 0 32px 80px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"] {
+    color-scheme: dark;
+    --bg: #000000;
+    --surface: #0f1419;
+    --surface-2: #16181c;
+    --surface-sunken: #0b0e14;
+    --surface-elevated: #1a202c;
+    --activity-bg: #000000;
+    --text: #e7e9ea;
+    --text-muted: #71767b;
+    --border: #2f3336;
+    --border-subtle: rgba(255, 255, 255, 0.06);
+    --border-hover: rgba(255, 255, 255, 0.2);
+    --accent: #1d9bf0;
+    --accent-hover: #1a8cd8;
+    --accent-surface: rgba(29, 155, 240, 0.14);
+    --accent-cyan: #22d3ee;
+    --accent-blue: #1d9bf0;
+    /* 青色强调色：跟随系统深色时与 twitter 同值。见 `:root` 的说明。 */
+    --accent-info: #38bdf8;
+    --accent-info-rgb: 56, 189, 248;
+    --danger: #f87171;
+    --status-bar-bg: #000000;
+    --status-bar-text: #e7e9ea;
+    --status-bar-muted: #71767b;
+    --shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    --shadow-card: 0 16px 44px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    --shadow-modal: 0 32px 80px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(255, 255, 255, 0.12);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}

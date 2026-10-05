@@ -11,9 +11,9 @@
 
 | 项目 | 数值 |
 | :--- | ---: |
-| 测试文件 | **127** |
-| 用例总数 | **1545** |
-| 通过 | 1543 |
+| 测试文件 | **128** |
+| 用例总数 | **1550** |
+| 通过 | 1548 |
 | 失败 | 0 |
 | 跳过 | 2 |
 | 通过率 | 99.9% |
@@ -117,6 +117,7 @@
 | `src/__tests__/use-auto-save.test.tsx` | 6 | ✅ |
 | `src/__tests__/blocklink.test.ts` | 5 | ✅ |
 | `src/__tests__/book-source.test.ts` | 5 | ✅ |
+| `src/__tests__/css-entry-manifest.test.ts` | 5 | ✅ |
 | `src/__tests__/media-lightbox.test.tsx` | 5 | ✅ |
 | `src/__tests__/mindmap-alignment.test.tsx` | 5 | ✅ |
 | `src/__tests__/mindmap-link-badge.test.tsx` | 5 | ✅ |
@@ -179,7 +180,7 @@
 
 任何重构都必须满足：
 
-1. 用例总数 **不低于 1545**（删除测试需在 PR 说明中论证）
+1. 用例总数 **不低于 1550**（删除测试需在 PR 说明中论证）
 2. 通过率 **100%**
 3. 单文件用例数**不得下降**（防止测试被静默删除）
 

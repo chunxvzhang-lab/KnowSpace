@@ -1,0 +1,777 @@
+/* ========================================================================
+   KnowSpace · 应用外壳：dock、顶栏、滚动条、动画关键帧
+   从 src/styles.css 按域拆分而来（阶段 B）。加载顺序由 src/main.tsx 决定，
+   必须与拆分前 styles.css 内的物理顺序一致 —— 改顺序等于改级联。
+   ======================================================================== */
+
+/* ==========================================================================
+   Shared Animation Keyframes
+   ========================================================================== */
+/* 这一组是**跨区块共用**的动画形状，集中定义而不是贴着某一处引用：
+   写在引用点旁边会让人以为只服务于那一个组件，下次有人删掉那个组件就会连带删掉定义。
+
+   它们此前**全都没有定义**。引用一个不存在的动画名不会报任何错——浏览器把整条
+   `animation` 声明当无效值丢掉，元素瞬间出现而不是淡入/滑入。所以这些「动效」
+   一直是死的，且没人会发现：没有报错、没有视觉异常、测试也看不见。
+   `src/__tests__/css-animation-keyframes.test.ts` 现在会拦住这一类。
+
+   取值对齐既有变体，不新造时长/曲线；duration/easing 由各引用点自己给：
+   - fadeIn      同 backdropFadeIn / cpFadeIn：纯透明度。
+   - fadeInScale 同 canvasCtxFadeIn：0.96 → 1 的缩放淡入。
+   - slideDown   同 flashDrawerSlide：从上方 -8px 滑入。原本 `flashDrawerSlide`
+                 与它形状完全一样，只是名字带组件前缀，已合并到这一个。 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ==========================================================================
+   Custom Minimalist Scrollbars
+   ========================================================================== */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--text-muted) 25%, transparent);
+  border-radius: 999px;
+  transition: background 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--text-muted) 50%, transparent);
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  color: inherit;
+  user-select: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   App Shell Layout (Left Dock + Main Viewport)
+   ========================================================================== */
+.app-shell {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+/* Activity Bar (Left Vertical Dock) */
+.activity-bar {
+  width: 52px;
+  height: 100%;
+  background: var(--activity-bg);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 0;
+  gap: 8px;
+  flex-shrink: 0;
+  z-index: 30;
+  transition: all 0.24s var(--ease-spring);
+  /* The dock can need more vertical room than a short window offers. Scroll it
+     instead of letting .app-shell's overflow:hidden cut the bottom controls
+     off — that is what made the lower buttons disappear. */
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.activity-bar::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+/* Every direct child keeps its natural height: without this the flex column
+   shrinks the groups (they default to flex-shrink:1) before it ever scrolls,
+   which squashed the icons instead of revealing them. */
+.activity-brand,
+.activity-group,
+.activity-divider,
+.activity-bottom {
+  flex-shrink: 0;
+}
+
+.activity-brand {
+  position: relative;
+  margin-bottom: 6px;
+  cursor: pointer;
+}
+
+.brand-badge {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--accent) 25%, transparent);
+  transition:
+    transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.brand-badge:hover {
+  transform: scale(1.15) translateY(-1px);
+  border-color: var(--accent);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.brand-logo-img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.2));
+}
+
+.activity-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  align-items: center;
+}
+
+.activity-divider {
+  width: 26px;
+  height: 1px;
+  background: var(--border);
+  margin: 1px 0;
+  opacity: 0.8;
+}
+
+.activity-bottom {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  /* Keeps the dock anchored to the bottom when there is room to spare, while
+     still stacking normally once the column has to scroll. */
+  padding-top: 2px;
+}
+
+.activity-viewmodes {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 3px;
+  background: var(--surface-sunken);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+.activity-thememodes {
+  margin-top: 2px;
+}
+
+.activity-thememodes .activity-btn.theme-twitter-active.active {
+  color: #1d9bf0;
+  background: rgba(29, 155, 240, 0.18);
+  border-color: rgba(29, 155, 240, 0.4);
+}
+
+.activity-thememodes .activity-btn.theme-eink-active.active {
+  color: #1a1a1a;
+  background: #ded8cb;
+  border-color: #a8a090;
+}
+
+.app-shell.theme-eink .activity-viewmodes {
+  background: #ede8df;
+  border-color: #d5cebf;
+}
+
+.app-shell.theme-eink .activity-btn.mini.active {
+  background: #ded8cb;
+  color: #111111;
+  border-color: #b8b0a0;
+}
+
+/* ── Short-window adaptations ─────────────────────────────────────────────
+   The dock stacks a lot of controls vertically. On a shorter screen it used to
+   simply run out of room and the bottom rows were clipped away, so it now
+   tightens up progressively. Anything that still does not fit is reachable by
+   scrolling the dock (see .activity-bar). */
+
+@media (max-height: 900px) {
+  .activity-bar {
+    padding: 8px 0;
+    gap: 6px;
+  }
+
+  .activity-group {
+    gap: 5px;
+  }
+
+  .activity-bottom {
+    gap: 5px;
+  }
+
+  .activity-brand {
+    margin-bottom: 2px;
+  }
+
+  .activity-btn {
+    width: 34px;
+    height: 34px;
+  }
+}
+
+@media (max-height: 800px) {
+  .activity-brand {
+    display: none;
+  }
+
+  .activity-btn {
+    width: 32px;
+    height: 32px;
+  }
+
+  .activity-btn.mini {
+    width: 25px;
+    height: 25px;
+  }
+
+  .activity-group {
+    gap: 4px;
+  }
+
+  .activity-viewmodes {
+    gap: 2px;
+    padding: 2px;
+  }
+}
+
+@media (max-height: 680px) {
+  .activity-bar {
+    padding: 6px 0;
+    gap: 4px;
+  }
+
+  .activity-btn {
+    width: 30px;
+    height: 30px;
+  }
+
+  .activity-btn.mini {
+    width: 22px;
+    height: 22px;
+  }
+
+  .activity-bottom {
+    gap: 4px;
+  }
+}
+
+/* Activity Bar Button System */
+.activity-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transform-origin: center center;
+  transition:
+    transform 0.24s cubic-bezier(0.34, 1.56, 0.64, 1),
+    background-color 0.18s ease,
+    color 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.activity-btn.mini {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+}
+
+.activity-btn:hover {
+  background: var(--surface-2);
+  color: var(--text);
+  transform: scale(1.15) translateY(-1px);
+  border-color: var(--border-hover);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 10;
+}
+
+.activity-btn:active {
+  transform: scale(0.92) translateY(0);
+}
+
+.activity-btn.active {
+  background: var(--accent-surface);
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  box-shadow:
+    0 0 12px color-mix(in srgb, var(--accent) 30%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.activity-btn.active:hover {
+  transform: scale(1.15) translateY(-1px);
+  box-shadow:
+    0 0 18px color-mix(in srgb, var(--accent) 45%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.activity-btn .activity-dot {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+  /* 原来是 `pulse-dot`：kebab-case 写法，但定义叫 `pulseDot`（本文件唯一一个点脉冲
+     动画，同族的另两处 6px/7px 圆点也都用它）。名字对不上 → 整条声明被丢弃，
+     活动栏未读红点其实一直是静止的。 */
+  animation: pulseDot 2.4s ease-in-out infinite;
+}
+
+/* Floating Tooltips
+   Rendered through a portal by ActivityBar rather than with ::after, because
+   the dock is scrollable on short windows and a scroll container clips any
+   overflowing pseudo-element. `position: fixed` is immune to that. */
+.activity-btn[data-tooltip],
+.activity-brand[data-tooltip] {
+  position: relative;
+}
+
+.activity-tooltip {
+  position: fixed;
+  transform: translateY(-50%);
+  background: rgba(15, 20, 25, 0.94);
+  color: #f7f9f9;
+  font-size: 11.5px;
+  font-weight: 550;
+  white-space: nowrap;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow:
+    0 6px 20px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  pointer-events: none;
+  z-index: 10000;
+  animation: activity-tooltip-in 0.18s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* Arrow pointing back at the dock */
+.activity-tooltip::before {
+  content: "";
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  border-width: 5px 6px 5px 0;
+  border-style: solid;
+  border-color: transparent rgba(15, 20, 25, 0.94) transparent transparent;
+}
+
+@keyframes activity-tooltip-in {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) translateX(-4px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0) scale(1);
+  }
+}
+
+:root[data-theme="light"] .activity-tooltip {
+  background: rgba(255, 255, 255, 0.96);
+  color: #0f1419;
+  border-color: rgba(0, 0, 0, 0.12);
+  box-shadow:
+    0 6px 20px rgba(0, 0, 0, 0.12),
+    0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+
+:root[data-theme="light"] .activity-tooltip::before {
+  border-color: transparent rgba(255, 255, 255, 0.96) transparent transparent;
+}
+
+:root[data-theme="eink"] .activity-btn[data-tooltip]::after,
+:root[data-theme="eink"] .activity-brand[data-tooltip]::after {
+  background: #fbf9f4;
+  color: #1a1a1a;
+  border-color: #d5cebf;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+
+:root[data-theme="eink"] .activity-btn[data-tooltip]::before,
+:root[data-theme="eink"] .activity-brand[data-tooltip]::before {
+  border-color: transparent #fbf9f4 transparent transparent;
+}
+
+/* Main Viewport Container */
+.main-viewport-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ==========================================================================
+   Toolbar Header (Top Bar)
+   ========================================================================== */
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  height: 50px;
+  min-height: 50px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  z-index: 20;
+  flex-shrink: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.toolbar-left,
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.toolbar-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.title-stack {
+  display: grid;
+  min-width: 0;
+}
+
+.title-stack strong,
+.title-stack span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.title-stack strong {
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.title-stack span {
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+
+.chapter-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dirty-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+  flex-shrink: 0;
+  animation: pulseDot 2s infinite ease-in-out;
+}
+
+@keyframes pulseDot {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.25);
+    opacity: 0.75;
+  }
+}
+
+.tree-dirty-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: auto;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
+  flex-shrink: 0;
+}
+
+/* Action Buttons with Spring Micro-Interactions */
+.icon-button,
+.command-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 550;
+  cursor: pointer;
+  box-shadow:
+    var(--shadow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transform-origin: center center;
+  transition:
+    transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    color 0.18s ease;
+}
+
+.icon-button {
+  padding: 0;
+  width: 32px;
+  border-radius: 8px;
+}
+
+.icon-button:hover,
+.command-button:hover {
+  border-color: var(--border-hover);
+  background: var(--surface-2);
+  transform: translateY(-2px) scale(1.05);
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.icon-button:active,
+.command-button:active {
+  transform: scale(0.93) translateY(0);
+}
+
+.icon-button.active {
+  background: var(--accent-surface);
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.icon-button:disabled,
+.command-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+  transform: none;
+  box-shadow: none;
+}
+
+.icon-button.small {
+  min-width: 26px;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+}
+
+.command-button.primary,
+.command-button.highlight {
+  background: linear-gradient(180deg, #1d9bf0 0%, #1a8cd8 100%);
+  border-color: #1d9bf0;
+  color: #ffffff;
+  font-weight: 650;
+  box-shadow:
+    0 2px 10px rgba(29, 155, 240, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.command-button.primary:hover,
+.command-button.highlight:hover {
+  filter: brightness(1.08);
+  border-color: #1a8cd8;
+  transform: translateY(-2px) scale(1.04);
+  box-shadow:
+    0 4px 16px rgba(29, 155, 240, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+.command-button.secondary {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.command-button.secondary:hover {
+  border-color: var(--border-hover);
+  background: var(--surface-2);
+}
+
+.font-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow:
+    var(--shadow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.font-control:hover {
+  border-color: var(--border-hover);
+  transform: translateY(-1px);
+}
+
+.font-control input {
+  width: 72px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ==========================================================================
+   View Mode Segmented Control (Dock Capsule)
+   ========================================================================== */
+.view-mode-control {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px;
+  border-radius: 20px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  gap: 2px;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+.view-mode-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  font-size: 11.5px;
+  font-weight: 550;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 16px;
+  cursor: pointer;
+  transform-origin: center center;
+  transition:
+    transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    background-color 0.18s ease,
+    color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.view-mode-btn:hover:not(:disabled) {
+  color: var(--text);
+  transform: scale(1.05);
+}
+
+.view-mode-btn:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+.view-mode-btn.active {
+  background: var(--surface);
+  color: var(--accent);
+  font-weight: 650;
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.15),
+    0 0 0 1px var(--border);
+}
+
+.view-mode-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

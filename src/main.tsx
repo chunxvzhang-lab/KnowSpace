@@ -2,6 +2,14 @@ import React, { Suspense, lazy } from "react";
 import ReactDOM from "react-dom/client";
 import "katex/dist/katex.min.css";
 import { FlashCapsule } from "./components/FlashCapsule";
+// Styles are split by domain (phase B). This import order MUST stay in the same
+// order as the original physical order inside styles.css — the light/eink theme
+// overrides rely on "same specificity, later wins", so swapping imports is a
+// visual regression, not a refactor. New slices move out only as contiguous
+// prefixes of what remains in styles.css (see scripts/split-styles-css.cjs).
+import "./styles/tokens.css";
+import "./styles/shell.css";
+import "./styles/sidebar.css";
 import "./styles.css";
 
 const LazyApp = lazy(() => import("./App"));
