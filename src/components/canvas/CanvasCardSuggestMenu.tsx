@@ -38,8 +38,9 @@ export type CanvasCardSuggestMenuProps = {
  * transformed world, and a popup rendered there would be scaled and clipped with
  * it. For the same reason the colours come from the canvas theme rather than from
  * the stylesheet, which only knows about the app's theme. The metrics mirror the
- * document editor's completion popup (`styles.css` → `.cm-tooltip-autocomplete`),
- * because `/` is supposed to read the same in both editors.
+ * document editor's completion popup (`src/styles/reader.css` →
+ * `.cm-tooltip-autocomplete`), because `/` is supposed to read the same in both
+ * editors.
  *
  * Being portalled is also why this popup has to stop the wheel itself. The canvas
  * pans on wheel and decides whose wheel it is by walking up from the event target

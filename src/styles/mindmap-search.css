@@ -1,0 +1,120 @@
+/* ========================================================================
+   KnowSpace · 画布内搜索与拖拽重排
+   从 src/styles.css 按域拆分而来（阶段 B）。加载顺序由 src/main.tsx 决定，
+   必须与拆分前 styles.css 内的物理顺序一致 —— 改顺序等于改级联。
+   ======================================================================== */
+/* ==========================================================================
+   Mindmap In-Canvas Search & Drag Reparenting
+   ========================================================================== */
+.mindmap-search-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.mindmap-search-box {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  /* 与旁边的按钮同高：此前它只有 2px 内边距，在一排 30px 的控件里矮一截。 */
+  min-height: 30px;
+  padding: 0 8px;
+  background: rgba(24, 28, 36, 0.85);
+  border: 1px solid rgba(var(--accent-info-rgb), 0.35);
+  border-radius: 7px;
+  margin-left: 6px;
+  backdrop-filter: blur(12px);
+  animation: contextMenuFadeIn 0.15s ease-out;
+}
+
+[data-theme="light"] .mindmap-search-box,
+.theme-light .mindmap-search-box {
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(217, 119, 6, 0.35);
+}
+
+[data-theme="eink"] .mindmap-search-box,
+.theme-eink .mindmap-search-box {
+  background: #f4f1ea;
+  border: 1.5px solid #222222;
+}
+
+.mindmap-search-input {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  width: 140px;
+  outline: none;
+  padding: 2px 4px;
+}
+
+.mindmap-search-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-info);
+  margin: 0 4px;
+}
+
+[data-theme="light"] .mindmap-search-count,
+.theme-light .mindmap-search-count {
+  color: #d97706;
+}
+
+[data-theme="eink"] .mindmap-search-count,
+.theme-eink .mindmap-search-count {
+  color: #111111;
+}
+
+.mindmap-search-nav-btn {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-size: 11px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0.8;
+  transition:
+    opacity 0.12s,
+    background 0.12s;
+}
+
+.mindmap-search-nav-btn:hover:not(:disabled) {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.mindmap-search-nav-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* Floating Drag Ghost Badge */
+.mindmap-drag-ghost {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(15, 23, 42, 0.92);
+  border: 1.5px dashed var(--accent-info);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  color: var(--accent-info);
+  font-size: 12px;
+  font-weight: 600;
+  backdrop-filter: blur(10px);
+}
+
+[data-theme="light"] .mindmap-drag-ghost,
+.theme-light .mindmap-drag-ghost {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: #d97706;
+  color: #d97706;
+}
+
+.mindmap-drag-ghost .ghost-target-hint {
+  color: #4ade80;
+  font-size: 11px;
+  font-weight: 700;
+}

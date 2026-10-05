@@ -1,0 +1,915 @@
+/* ========================================================================
+   KnowSpace · 思维导图视图与块级互联锚点
+   从 src/styles.css 按域拆分而来（阶段 B）。加载顺序由 src/main.tsx 决定，
+   必须与拆分前 styles.css 内的物理顺序一致 —— 改顺序等于改级联。
+   ======================================================================== */
+/* ==========================================================================
+   KnowSpace v1.9.0: Mindmap View (思维导图) & Blocklink Anchors (块级互联)
+   ========================================================================== */
+
+/* Mindmap Viewport Container */
+.mindmap-view-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  user-select: none;
+  background-color: var(--bg);
+  cursor: grab;
+  /* 顶栏按"这块地方有多宽"决定一行还是两行 —— 但量的不是这个容器的宽度查询，
+     而是 MindmapToolbar 里对顶栏自身的一次实测（见 .mindmap-toolbar 的注释）。
+     关心这块地方的宽度仍然是对的：窗口宽度不是它，打开文件目录与大纲之后，
+     窗口一点没变，导图区却窄了一大截。 */
+}
+
+.mindmap-view-container.is-dragging {
+  cursor: grabbing;
+}
+
+/* Mindmap Top Floating Toolbar */
+.mindmap-toolbar {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  /* 顶栏是一张网格，不是一条会自己换行的横排。
+     差别在"换行发生在哪里"能不能由我们决定。横排里换行由浏览器在"这行放不下"的那一刻临时
+     决定，被推下去的恰好是右边的缩放与导出那一组 —— 它落成第二行、独自靠右，上面空着另外
+     半行；而中间那块（flex: 1 1 auto）的基准宽度是它的最大内容宽度，等于先把整行占下，
+     于是"空半行"几乎必然发生（打开文件目录与大纲后最明显）。
+     网格里四件东西各就各位：标题一列，控件区一列，设置控件一列，看什么 / 带走什么
+     （缩放与导出）一列。
+     一行还是两行、标签留不留，不由这里的阈值决定，由 MindmapToolbar 实测决定：
+     它把四种排法各量一遍（见 .is-measuring），第一种放得下的胜出。阈值回答不了这个问题 ——
+     同一扇窗户里，打开搜索框、多选一个节点、换个长标题，都会让"放得下"的宽度变上一截，
+     而窗户一点没动。实测的那套逻辑只管选排法，落位仍然靠这张网格：
+     .is-two-row 把设置控件与缩放导出整组挪到第二行，设置控件与第一行第一个控件对齐，
+     缩放导出落在第二行右端 —— 两行因此都是满的，不再有"下半行空着"的那道沟。 */
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  column-gap: 10px;
+  row-gap: 8px;
+  padding: 7px 12px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  z-index: 50;
+  box-sizing: border-box;
+  max-width: calc(100% - 24px);
+  overflow: visible;
+}
+
+.mindmap-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex-shrink: 0;
+}
+
+.mindmap-toolbar-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--text);
+  white-space: nowrap;
+  max-width: 200px;
+  min-width: 0;
+}
+
+.mindmap-toolbar-title strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mindmap-node-count-badge {
+  font-size: 11.5px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-weight: 500;
+  border: 1px solid var(--border);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.mindmap-toolbar-center {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  /* 两组之间 6px、组内 4px（见 .mindmap-toolbar-btn-group）：间距的分级就是层级的分级，
+     全是同一个数的时候，读者看不出哪些控件是一家的。 */
+  column-gap: 6px;
+  row-gap: 6px;
+  min-width: 0;
+}
+
+.mindmap-toolbar-btn-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.mindmap-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+  white-space: nowrap;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.mindmap-tool-btn svg {
+  display: block;
+  flex-shrink: 0;
+}
+
+.mindmap-tool-btn span {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  line-height: 1;
+  transform: translateY(0.5px);
+}
+
+.mindmap-tool-btn.text-btn {
+  padding: 0 9px;
+}
+
+.mindmap-tool-btn:hover {
+  background: var(--surface);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.mindmap-tool-btn.highlight-btn {
+  background: color-mix(in srgb, var(--accent-info) 8%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--accent-info) 30%, var(--border));
+  color: var(--accent-info);
+}
+
+.mindmap-tool-btn.highlight-btn:hover {
+  background: color-mix(in srgb, var(--accent-info) 16%, var(--surface-2));
+  border-color: var(--accent-info);
+}
+
+.mindmap-tool-btn.highlight-btn.active {
+  background: color-mix(in srgb, var(--accent-info) 20%, var(--surface-2));
+  border-color: var(--accent-info);
+  color: var(--accent-info);
+}
+
+.mindmap-tool-btn.delete-btn:hover:not(:disabled) {
+  color: #f43f5e;
+  border-color: color-mix(in srgb, #f43f5e 40%, var(--border));
+  background: color-mix(in srgb, #f43f5e 12%, transparent);
+}
+
+.mindmap-toolbar-divider {
+  width: 1px;
+  height: 16px;
+  background: var(--border);
+  margin: 0 3px;
+  flex-shrink: 0;
+}
+
+.mindmap-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  /* 右端由下面那组（缩放 + 导出）一起占据，所以这里不再各自往右顶。 */
+  margin-left: 0;
+  position: relative;
+  z-index: 2;
+}
+
+/* 设置控件（搜索 / 主题 / 布局 / 编号）：一行版的第三列，紧跟在结构控件那一列之后。 */
+.mindmap-toolbar-settings {
+  grid-column: 3;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  column-gap: 6px;
+  row-gap: 6px;
+  min-width: 0;
+}
+
+/* 两行版：设置控件整组落到第二行，从控件列的左边缘起排 —— 与第一行第一个控件对齐，
+   两行才读成一列；缩放与导出跟着搬到第二行右端，第二行因此是满的。
+   旧版把缩放导出留在第一行右端，第二行只剩设置控件，右半边空成一道沟 —— 那道沟就是
+   这次要收拾的东西。中间列因此要容得下"结构控件"与"设置控件"里较宽的那个，
+   这与 MindmapToolbar 里两行版需求宽度的算法是一回事。 */
+.mindmap-toolbar.is-two-row {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.mindmap-toolbar.is-two-row .mindmap-toolbar-settings {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.mindmap-toolbar.is-two-row .mindmap-toolbar-view {
+  grid-column: 3;
+  grid-row: 2;
+}
+
+/* 两行版里，结构控件那一行不以分隔线收尾：它后面不是另一个组，而是换行本身。 */
+.mindmap-toolbar.is-two-row .mindmap-toolbar-center > .mindmap-toolbar-divider:last-child {
+  display: none;
+}
+
+/* 缩放与导出装在一个盒子里：一行版里是网格的第四列，两者一起待在右上角；
+   两行版里搬到第二行右端（见上面 .is-two-row）。地图级控件怎么重排都不拆开它们。 */
+.mindmap-toolbar-view {
+  grid-column: 4;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.mindmap-toolbar-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+/* 主题与布局两个下拉别把顶栏撑宽：它们是选了就走的控件，不是要读的内容。 */
+.mindmap-select-trigger {
+  max-width: 132px;
+}
+
+/* ── 标签密度：放不下的时候，先收标签，再收行 ──────────────────────────────
+   两个档位由 MindmapToolbar 实测后加类，不是媒体查询：同一个窗口宽度下，搜索框开没开、
+   选中几个节点、标题多长，都会改变"放得下"的答案，而宽度查询看不见这些。
+   收起来的按钮仍有图标与 tooltip —— 少的是一个词，不是整个控件。
+   ─────────────────────────────────────────────────────────────────────── */
+
+/* 次级动作收成图标：外观样式、全选、折叠、展开。 */
+.mindmap-toolbar.is-density-secondary .mindmap-tool-btn.secondary-action span {
+  display: none;
+}
+
+.mindmap-toolbar.is-density-secondary
+  .mindmap-toolbar-btn-group
+  .mindmap-tool-btn.secondary-action {
+  padding: 0 8px;
+}
+
+/* 连主级动作也收成图标：同级主题、子主题、编号，以及搜索开关。
+   到这一步通常已经进了两行版，再下一步就是 ultra-narrow 的"更多"菜单。 */
+.mindmap-toolbar.is-density-compact .mindmap-tool-btn.secondary-action span,
+.mindmap-toolbar.is-density-compact .mindmap-tool-btn.highlight-btn span,
+.mindmap-toolbar.is-density-compact .mindmap-search-group .mindmap-tool-btn span {
+  display: none;
+}
+
+.mindmap-toolbar.is-density-compact .mindmap-tool-btn.highlight-btn,
+.mindmap-toolbar.is-density-compact .mindmap-search-group .mindmap-tool-btn {
+  padding: 0 8px;
+}
+
+/* 量宽度时的临时形态：绝对定位、不可见、按内容自然展开成一条横排。
+   网格在这里换成 flex，于是四块各报各的自然宽度，没有被轨道挤压过的痕迹。
+   MindmapToolbar 在同一个任务里加上又移除这一条，浏览器来不及画出中间态。 */
+.mindmap-toolbar.is-measuring {
+  display: flex;
+  position: absolute;
+  visibility: hidden;
+  width: max-content;
+  max-width: none;
+  pointer-events: none;
+}
+
+/* More Actions Dropdown in Mindmap Toolbar */
+.mindmap-more-dropdown {
+  position: relative;
+  display: inline-flex;
+}
+
+.mindmap-more-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 175px;
+  background: var(--surface-elevated, var(--surface));
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 5px;
+  box-shadow: var(--shadow-modal, 0 10px 30px rgba(0, 0, 0, 0.2));
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: contextMenuFadeIn 0.15s ease-out;
+}
+
+.mindmap-more-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.mindmap-more-menu-item:hover {
+  background: var(--surface-2, rgba(0, 0, 0, 0.05));
+  color: var(--accent);
+}
+
+.mindmap-more-menu-item svg {
+  flex-shrink: 0;
+}
+
+/* ==========================================================================
+   Responsive Modes for Mindmap Toolbar
+   1. Semi-Compact (width < 1220px): tighten margins, shorten the title
+   2. Compact Mode (width < 1000px): shorten the title further
+   3. Narrow Mode (width < 820px): Collapse sync text, hide badges, slim margins
+   4. Ultra-Narrow Mode (width < 650px): Fold secondary tools into More (···) menu
+   文字收成图标不再由宽度档位决定，归 .is-density-* 管 —— 那要实测（见上面"标签密度"）。
+   ========================================================================== */
+
+/* 1. Semi-Compact Mode (w < 1220px) - When dual sidebars (folder + outline) are open */
+.mindmap-view-container.is-semi-compact .mindmap-toolbar {
+  left: 10px;
+  right: 10px;
+  padding: 0 8px;
+}
+
+.mindmap-view-container.is-semi-compact .mindmap-toolbar-title {
+  max-width: 140px;
+}
+
+.mindmap-view-container.is-semi-compact .mindmap-toolbar-center {
+  gap: 4px;
+  margin: 0 6px;
+}
+
+/* 次级动作收图标由 .is-density-secondary 决定（见上面"标签密度"一节）——
+   那要看实测，不是看宽度：搜索框开没开、多选没多选，都会改变放得下的答案。 */
+
+/* 2. Compact Mode (w < 1000px) - When user starts resizing the left sidebar */
+.mindmap-view-container.is-compact .mindmap-toolbar-title {
+  max-width: 110px;
+}
+
+/* 主级动作收图标同样归 .is-density-compact 管，理由同上。 */
+
+/* 3. Narrow Mode (w < 820px) - Moderately squeezed workspace */
+.mindmap-view-container.is-narrow .mindmap-toolbar {
+  left: 6px;
+  right: 6px;
+  padding: 0 6px;
+}
+
+.mindmap-view-container.is-narrow .mindmap-toolbar-title {
+  max-width: 80px;
+  font-size: 12px;
+}
+
+.mindmap-view-container.is-narrow .mindmap-node-count-badge {
+  display: none !important;
+}
+
+.mindmap-view-container.is-narrow .mindmap-sync-doc-btn span {
+  display: none !important;
+}
+
+.mindmap-view-container.is-narrow .mindmap-sync-doc-btn {
+  padding: 0 8px;
+}
+
+.mindmap-view-container.is-narrow .mindmap-toolbar-center {
+  gap: 3px;
+  margin: 0 4px;
+}
+
+.mindmap-view-container.is-narrow .mindmap-toolbar-btn-group {
+  gap: 2px;
+}
+
+.mindmap-view-container.is-narrow .mindmap-toolbar-divider {
+  margin: 0 2px;
+}
+
+.mindmap-view-container.is-narrow .mindmap-search-box {
+  margin-left: 3px;
+  padding: 2px 4px;
+}
+
+.mindmap-view-container.is-narrow .mindmap-search-input {
+  width: 90px;
+  font-size: 11px;
+}
+
+/* 4. Ultra-Narrow Mode (w < 650px) - Severely squeezed workspace */
+.mindmap-view-container.is-ultra-narrow .mindmap-toolbar {
+  left: 4px;
+  right: 4px;
+  padding: 4px;
+  min-height: 40px;
+}
+
+.mindmap-view-container.is-ultra-narrow .mindmap-toolbar-title {
+  max-width: 60px;
+}
+
+.mindmap-view-container.is-ultra-narrow .mindmap-toolbar-center {
+  gap: 2px;
+  margin: 0 2px;
+}
+
+.mindmap-view-container.is-ultra-narrow .mindmap-tool-btn {
+  height: 28px;
+  padding: 0 6px;
+}
+
+.mindmap-view-container.is-ultra-narrow .mindmap-tool-btn.export-btn span {
+  font-size: 11px;
+}
+
+/* 各窄档位此前只调左右内边距，上下写成 0 —— 一行的时候够用，两行就贴边了。
+   这里统一补回上下留白：这几条在那些规则之后，所以是覆盖，不是并列。 */
+.mindmap-view-container.is-semi-compact .mindmap-toolbar,
+.mindmap-view-container.is-compact .mindmap-toolbar,
+.mindmap-view-container.is-narrow .mindmap-toolbar,
+.mindmap-view-container.is-ultra-narrow .mindmap-toolbar {
+  padding-block: 6px;
+}
+
+/* 一行还是两行，从前在这里按一个写死的容器宽度切（1800px）。那个数有两个问题：
+   它是"全都带着文字、搜索框还开着"时量出来的，于是搜索框没开、标题不长的绝大多数
+   窗口明明放得下一行，却照样落进两行；而它又管不了另一头 —— 打开搜索框、多选几个
+   节点，一行又会从 1800px 里溢出去。现在这件事由 MindmapToolbar 实测决定，
+   这里不再需要阈值。 */
+
+/* SVG Canvas & Node Elements */
+.mindmap-svg-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.mindmap-branch-path {
+  transition:
+    stroke-width 0.2s ease,
+    stroke-opacity 0.2s ease;
+}
+
+.mindmap-node-interactive {
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.mindmap-node-rect {
+  fill: var(--surface);
+  transition:
+    stroke-width 0.15s ease,
+    filter 0.15s ease,
+    fill 0.15s ease;
+}
+
+.mindmap-node-rect[data-transparent="true"] {
+  fill: transparent !important;
+}
+
+.mindmap-node-interactive.is-root .mindmap-node-rect:not([data-custom-color="true"]) {
+  fill: color-mix(in srgb, var(--accent-info) 12%, var(--surface));
+}
+
+.mindmap-node-interactive:hover .mindmap-node-rect:not([data-custom-color="true"]) {
+  fill: color-mix(in srgb, var(--accent) 8%, var(--surface));
+}
+
+.mindmap-node-title-text {
+  font-size: 12.5px;
+  font-weight: 500;
+  fill: var(--text);
+  /* text-anchor / dominant-baseline are set per-node via inline style in MindmapView
+     (CSS declarations override SVG presentation attributes, so they must NOT live here) */
+  pointer-events: none;
+  font-family: inherit;
+}
+
+.mindmap-node-title-text.root-title {
+  font-size: 14px;
+  font-weight: 700;
+  fill: var(--accent-info);
+}
+
+.mindmap-collapse-btn {
+  cursor: pointer;
+}
+
+.mindmap-collapse-circle {
+  fill: var(--surface);
+  transition:
+    fill 0.15s ease,
+    filter 0.15s ease;
+}
+
+.mindmap-collapse-btn:hover .mindmap-collapse-circle {
+  fill: var(--surface-2);
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.18));
+}
+
+/* XMind Interactive Selection & Focus */
+.mindmap-node-selection-ring {
+  pointer-events: none;
+  animation: mindmap-ring-pulse 2s ease-in-out infinite;
+}
+
+@keyframes mindmap-ring-pulse {
+  0%,
+  100% {
+    stroke-opacity: 0.9;
+  }
+  50% {
+    stroke-opacity: 0.45;
+  }
+}
+
+.mindmap-node-interactive.is-selected .mindmap-node-rect:not([data-custom-color="true"]) {
+  fill: color-mix(in srgb, var(--accent-info) 14%, var(--surface));
+}
+
+/* Quick Add Subtopic Button on Node */
+.mindmap-node-add-btn {
+  cursor: pointer;
+}
+
+/* Node Resize Handle */
+.mindmap-node-resize-handle {
+  cursor: nwse-resize;
+  opacity: 0.75;
+  transition: opacity 0.15s ease;
+}
+
+.mindmap-node-resize-handle:hover {
+  opacity: 1;
+}
+
+.mindmap-node-resize-handle:hover line {
+  stroke: #0284c7;
+}
+
+.mindmap-resize-hitarea {
+  cursor: nwse-resize;
+}
+
+/* Mindmap Toolbar Buttons */
+.mindmap-tool-btn.highlight-btn {
+  color: var(--accent-info);
+  font-weight: 500;
+}
+
+.mindmap-tool-btn.highlight-btn:hover {
+  background: color-mix(in srgb, var(--accent-info) 15%, transparent);
+}
+
+.mindmap-tool-btn.delete-btn:hover:not(:disabled) {
+  color: #f43f5e;
+  background: color-mix(in srgb, #f43f5e 12%, transparent);
+}
+
+/* Inline Mindmap Topic Text Input */
+.mindmap-inline-edit-input {
+  position: absolute;
+  box-sizing: border-box;
+  background: var(--surface);
+  color: var(--text);
+  border: 1.5px solid var(--accent-info);
+  border-radius: 6px;
+  padding: 2px 8px;
+  outline: none;
+  box-shadow:
+    0 4px 14px rgba(var(--accent-info-rgb), 0.28),
+    0 0 0 2px rgba(var(--accent-info-rgb), 0.2);
+  z-index: 30;
+  font-family: inherit;
+  font-weight: 500;
+}
+
+/* Right-Click Context Menu for Mind Map */
+.mindmap-context-menu {
+  position: absolute;
+  width: 250px;
+  max-height: calc(100% - 32px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.28),
+    0 0 0 1px rgba(255, 255, 255, 0.06);
+  z-index: 60;
+  user-select: none;
+  animation: mindmap-menu-appear 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes mindmap-menu-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.mindmap-ctx-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* The menu scrolls when it is tall, and these menus are tall: the header stays put, so
+     a reader scrolling down to the colours still knows which node they belong to. It is
+     also the thing that makes scrolling the menu feel like scrolling a menu — without it
+     the title slid away and the panel read as a loose column of rows.
+     The negative offsets pull it flush over the menu's own 10px padding, and the radius
+     follows the menu's so the corners do not square off while it covers them. */
+  position: sticky;
+  top: -10px;
+  z-index: 1;
+  margin: -10px -10px 8px;
+  padding: 10px 10px 8px;
+  background: var(--surface);
+  border-radius: 10px 10px 0 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.mindmap-ctx-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 195px;
+}
+
+.mindmap-ctx-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.mindmap-ctx-close:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.mindmap-ctx-section {
+  margin-bottom: 8px;
+}
+
+.mindmap-ctx-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.mindmap-ctx-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.mindmap-custom-color-trigger {
+  position: relative;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+}
+
+.mindmap-hidden-color-input {
+  position: absolute;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+
+.mindmap-custom-color-badge {
+  font-size: 10.5px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.12s ease;
+  user-select: none;
+}
+
+.mindmap-custom-color-trigger:hover .mindmap-custom-color-badge {
+  background: var(--surface);
+  color: var(--accent-info);
+  border-color: var(--accent-info);
+}
+
+.mindmap-bold-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.12s ease;
+  user-select: none;
+}
+
+.mindmap-bold-toggle-btn:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.mindmap-bold-toggle-btn.is-active {
+  background: var(--accent-info);
+  color: #0f172a;
+  border-color: var(--accent-info);
+}
+
+.mindmap-ctx-palette {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 4px;
+  align-items: center;
+}
+
+.mindmap-color-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+.mindmap-color-swatch:hover {
+  transform: scale(1.22);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+.mindmap-color-swatch.is-active {
+  outline: 2px solid var(--accent-info);
+  outline-offset: 1px;
+  box-shadow: 0 0 6px rgba(var(--accent-info-rgb), 0.6);
+}
+
+.mindmap-color-swatch.is-transparent-swatch {
+  background: repeating-conic-gradient(#94a3b8 0% 25%, #ffffff 0% 50%) 50% / 6px 6px !important;
+  position: relative;
+}
+
+.mindmap-ctx-pills {
+  display: flex;
+  gap: 4px;
+  background: var(--surface-2);
+  padding: 2px;
+  border-radius: 6px;
+}
+
+.mindmap-pill-btn {
+  flex: 1;
+  height: 24px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.12s ease;
+  white-space: nowrap;
+}
+
+.mindmap-pill-btn:hover {
+  color: var(--text);
+}
+
+.mindmap-pill-btn.is-active {
+  background: var(--surface);
+  color: var(--accent-info);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.mindmap-align-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 0 4px;
+}
+
+.mindmap-ctx-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 8px 0;
+}
+
+.mindmap-ctx-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mindmap-ctx-action-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 28px;
+  padding: 0 8px;
+  border: none;
+  background: transparent;
+  border-radius: 5px;
+  font-size: 11.5px;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.12s ease;
+  box-sizing: border-box;
+  white-space: nowrap;
+}
+
+.mindmap-ctx-action-item:hover {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+}
+
+.mindmap-ctx-action-item.is-delete:hover {
+  background: rgba(244, 63, 94, 0.12);
+  color: #f43f5e;
+}

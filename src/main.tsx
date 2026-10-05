@@ -30,6 +30,10 @@ import "./styles/review-panel.css";
 import "./styles/backlinks-panel.css";
 import "./styles/graph.css";
 import "./styles/graph-workspace.css";
+import "./styles/mindmap.css";
+import "./styles/blocklink.css";
+import "./styles/editor-context-menu.css";
+import "./styles/mindmap-search.css";
 import "./styles.css";
 
 const LazyApp = lazy(() => import("./App"));
