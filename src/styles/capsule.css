@@ -1,0 +1,873 @@
+/* ========================================================================
+   KnowSpace · 闪念胶囊浮窗与快捷键自定义
+   从 src/styles.css 按域拆分而来（阶段 B）。加载顺序由 src/main.tsx 决定，
+   必须与拆分前 styles.css 内的物理顺序一致 —— 改顺序等于改级联。
+   ======================================================================== */
+/* ==========================================================================
+   KnowSpace Flash Capsule (闪念胶囊) Floating Window & Hotkey Customization
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   闪念胶囊配色令牌
+
+   为什么要有这一层：本区块原先 100% 硬编码颜色，浅色/eink 覆盖是逐条手补的，
+   结果漏了 19 处——琥珀前景 #f59e0b 直接落在白底上只有 2.15:1，
+   `rgba(255,255,255,…)` 的水洗底在白底上等于不存在（文字 #cbd5e1 只有 1.48:1）。
+   逐条补丁已经漏过一次，还会漏第二次，所以改成令牌：一处定义，处处引用。
+
+   为什么**不**复用全局 `--accent`：胶囊窗口会把 data-theme 写到 documentElement，
+   全局令牌确实可见，但 twitter 主题下 `--accent` 是蓝色 #1d9bf0、eink 下是近黑
+   #2b2925。套进来会把胶囊的琥珀品牌色改成蓝/黑——注意 `.flash-btn-primary`
+   在 eink 下也刻意保持琥珀，说明"跨主题保持琥珀身份"是既定设计。所以令牌
+   作用域限定在 `.flash-capsule-overlay` 内，只让明度随主题走，色相不变。
+
+   基线 = 深色（theme-twitter / theme-system 暗）。**所有令牌都必须在这里给出值**：
+   若某个主题漏定义，属性会在计算值阶段变成 unset（继承或初始值），
+   那比硬编码更糟——会静默拿到别的颜色。
+
+   取值全部按 WCAG 2.1 算过，在**该主题实际用到的每一种底**上都 ≥ 4.5:1
+   （改动前最低 1.48:1）。三处取值上的说明：
+
+   - `--flash-accent-on-tint` 是叠在琥珀底上时用的。深色下取 #fbbf24（amber-400）
+     而不是 #f59e0b：琥珀底最深到 0.30（`.flash-mini-btn:hover`），#f59e0b 在上面
+     只有 4.06:1。amber-400 也不是新发明的值——原来 `.flash-shortcut-badge:hover`
+     和 `.flash-tab-btn.active` 用的就是它，这里只是把它推广到全部"叠琥珀底"的场景。
+   - `--flash-danger` 深色下是 #f87171，配 0.15 的红色淡底达标（4.95:1）。所以
+     `.flash-close-btn:hover` 的红色底从 0.25 归一到 0.15：0.25 时 #f87171 只有
+     4.32:1。它同时被当**文字**色用（`.flash-status-msg.error`），不能只按图标的
+     3:1 阈值放行。
+   - `--flash-hint` 不只用纯底，还叠在**中性水洗底**（`rgba(0,0,0,.04~.05)`）和
+     eink 的**实色米底**（#ded9cd）上。所以 light 取 #475569（纯底 7.58、0.05 洗底
+     6.77），而不是纯底刚好及格的 #64748b（纯底 4.76，但 0.05 洗底只有 4.25）。
+
+   「实际用到的底」必须**按主题分别取**：区块里最深的黑水洗是 0.3，但那条规则
+   （`.flash-recorder-input`）属于深色主题，拿它约束浅色的令牌会造出一个不存在的
+   场景。这也是守卫测试用逐对表格、而不是"扫一个全局最深档"的原因。
+
+   守卫测试：`src/__tests__/flash-capsule-theme-contrast.test.ts`
+   -------------------------------------------------------------------------- */
+.flash-capsule-overlay {
+  --flash-accent: #f59e0b;
+  --flash-accent-on-tint: #fbbf24;
+  --flash-success: #22c55e;
+  --flash-danger: #f87171;
+  --flash-info: #38bdf8;
+  /* 通道三元组：实色用 `--flash-info`，需要透明度合成的地方（淡底、边框、光晕）用
+     `rgba(var(--flash-info-rgb), a)`。胶囊**不消费任何全局变量**（规则 9）——
+     它的主题是靠渲染层解析 `data-theme` 决定的，一旦读全局令牌，解析前后外观会变。
+     所以这里必须自带一份，不能借用 `--accent-info` / `--accent-info-rgb`。 */
+  --flash-info-rgb: 56, 189, 248;
+  --flash-hint: #94a3b8;
+}
+
+.flash-capsule-overlay.theme-light,
+[data-theme="light"] .flash-capsule-overlay {
+  --flash-accent: #b45309;
+  --flash-accent-on-tint: #92400e;
+  /* emerald-800 而不是 700（#047857）：700 落在 0.15 的绿淡底上只有 4.51:1，
+     而这个淡底是 rgba 合成出来的（有取整），0.01 的余量等于随时可能翻。
+     800 给到 6.75:1（eink 纸底 6.32:1）。 */
+  --flash-success: #065f46;
+  --flash-danger: #b91c1c;
+  --flash-info: #0369a1;
+  --flash-info-rgb: 3, 105, 161;
+  --flash-hint: #475569;
+}
+
+/* eink 是低饱和"纸张"主题：主强调色与 light 相同（都是浅底），但叠色用的
+   `-on-tint` 要比 light 更深——eink 的淡底是**实色**米色（#ded9cd / #cfc7b5），
+   比 light 的黑水洗更暗，#92400e 落在 #cfc7b5 上只有 4.22:1。 */
+.flash-capsule-overlay.theme-eink,
+[data-theme="eink"] .flash-capsule-overlay {
+  --flash-accent: #b45309;
+  --flash-accent-on-tint: #78350f;
+  --flash-success: #065f46;
+  --flash-danger: #b91c1c;
+  --flash-info: #0369a1;
+  --flash-info-rgb: 3, 105, 161;
+  --flash-hint: #57544e;
+}
+
+/* 浅色取值只有这一处来源。系统主题（`theme-system`）不在这里覆盖——它在渲染层就被
+   解析成了具体主题（`resolveThemeMode()`，浅色系统 → `theme-light`），所以
+   `.theme-light` 是浅色的唯一入口。这里原来另有一组
+   `@media (prefers-color-scheme: light) { .flash-capsule-overlay.theme-system … }`，
+   是手工复制出来的第二份来源，只覆盖了容器和两个 textarea，其余控件全漏了——
+   "跟随系统 + 浅色系统"这条**默认**路径因此拿到白水洗底配 #cbd5e1（1.48:1）。 */
+
+html:has(.flash-capsule-overlay),
+body:has(.flash-capsule-overlay) {
+  background: transparent !important;
+  overflow: hidden !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.flash-capsule-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  user-select: none;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.flash-capsule-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  background: rgba(22, 25, 32, 0.96);
+  backdrop-filter: blur(32px) saturate(190%);
+  -webkit-backdrop-filter: blur(32px) saturate(190%);
+  color: #f8fafc;
+  border: none !important;
+  box-shadow: none !important;
+  transition: background 0.2s ease;
+  overflow: hidden;
+}
+
+/* Light Theme Frosted Glass */
+.flash-capsule-overlay.theme-light .flash-capsule-container,
+[data-theme="light"] .flash-capsule-container {
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(32px) saturate(190%);
+  -webkit-backdrop-filter: blur(32px) saturate(190%);
+  border: none !important;
+  color: #0f172a;
+  box-shadow: none !important;
+}
+
+/* E-ink Theme Frosted Glass */
+.flash-capsule-overlay.theme-eink .flash-capsule-container,
+[data-theme="eink"] .flash-capsule-container {
+  background: rgba(248, 246, 240, 0.98);
+  backdrop-filter: blur(32px) saturate(190%);
+  -webkit-backdrop-filter: blur(32px) saturate(190%);
+  border: none !important;
+  color: #111111;
+  box-shadow: none !important;
+}
+
+/* Header */
+.flash-header {
+  height: 40px;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  box-sizing: border-box;
+  flex-shrink: 0;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.flash-capsule-overlay.theme-light .flash-header,
+[data-theme="light"] .flash-header {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.flash-capsule-overlay.theme-eink .flash-header,
+[data-theme="eink"] .flash-header {
+  border-bottom: 1px solid #d5cebf;
+}
+
+.flash-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex-shrink: 0;
+}
+
+.flash-logo-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  color: inherit;
+}
+
+.flash-title {
+  white-space: nowrap;
+  flex-shrink: 0;
+  color: var(--flash-accent) !important;
+  font-weight: 800;
+}
+
+.flash-zap-icon {
+  color: var(--flash-accent);
+  flex-shrink: 0;
+}
+
+.flash-shortcut-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #f1f5f9;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-weight: 600;
+  transition: all 0.15s ease;
+}
+
+.flash-shortcut-badge:hover {
+  background: rgba(245, 158, 11, 0.25);
+  color: var(--flash-accent-on-tint);
+  border-color: rgba(245, 158, 11, 0.5);
+}
+
+.flash-capsule-overlay.theme-light .flash-shortcut-badge,
+[data-theme="light"] .flash-shortcut-badge {
+  background: rgba(0, 0, 0, 0.06);
+  color: #1e293b;
+  border-color: rgba(0, 0, 0, 0.15);
+  font-weight: 600;
+}
+
+.flash-capsule-overlay.theme-light .flash-shortcut-badge:hover,
+[data-theme="light"] .flash-shortcut-badge:hover {
+  background: rgba(217, 119, 6, 0.15);
+  color: var(--flash-accent-on-tint);
+}
+
+.flash-capsule-overlay.theme-eink .flash-shortcut-badge,
+[data-theme="eink"] .flash-shortcut-badge {
+  background: #ded9cd;
+  color: #111111;
+  border-color: #8c8273;
+  font-weight: 700;
+}
+
+.flash-target-path {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #cbd5e1;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 2.5px 8px;
+  border-radius: 6px;
+  max-width: 220px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.flash-capsule-overlay.theme-light .flash-target-path,
+[data-theme="light"] .flash-target-path {
+  color: #1e293b;
+  background: rgba(0, 0, 0, 0.05);
+  border-color: rgba(0, 0, 0, 0.12);
+}
+
+.flash-capsule-overlay.theme-eink .flash-target-path,
+[data-theme="eink"] .flash-target-path {
+  color: #111111;
+  background: #ded9cd;
+  border-color: #8c8273;
+  font-weight: 700;
+}
+
+.flash-header-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.flash-icon-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.flash-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+}
+
+.flash-capsule-overlay.theme-light .flash-icon-btn,
+[data-theme="light"] .flash-icon-btn {
+  color: #334155;
+}
+
+.flash-capsule-overlay.theme-light .flash-icon-btn:hover,
+[data-theme="light"] .flash-icon-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: #0f172a;
+}
+
+.flash-capsule-overlay.theme-eink .flash-icon-btn,
+[data-theme="eink"] .flash-icon-btn {
+  color: #2b2926;
+}
+
+.flash-capsule-overlay.theme-eink .flash-icon-btn:hover,
+[data-theme="eink"] .flash-icon-btn:hover {
+  background: #ded9cd;
+  color: #000000;
+}
+
+.flash-icon-btn.active {
+  background: rgba(245, 158, 11, 0.25);
+  color: var(--flash-accent-on-tint);
+}
+
+.flash-close-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--flash-danger);
+}
+
+/* Quick Tools Bar */
+.flash-tools-bar {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  overflow-x: auto;
+  scrollbar-width: none;
+  flex-shrink: 0;
+}
+
+.flash-tools-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.flash-capsule-overlay.theme-light .flash-tools-bar,
+[data-theme="light"] .flash-tools-bar {
+  background: rgba(0, 0, 0, 0.03);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.flash-capsule-overlay.theme-eink .flash-tools-bar,
+[data-theme="eink"] .flash-tools-bar {
+  background: #ede8df;
+  border-bottom: 1px solid #d5cebf;
+}
+
+.flash-tool-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #f1f5f9;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.flash-tool-tag:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.flash-capsule-overlay.theme-light .flash-tool-tag,
+[data-theme="light"] .flash-tool-tag {
+  background: rgba(0, 0, 0, 0.05);
+  border-color: rgba(0, 0, 0, 0.12);
+  color: #0f172a;
+}
+
+.flash-capsule-overlay.theme-light .flash-tool-tag:hover,
+[data-theme="light"] .flash-tool-tag:hover {
+  background: rgba(0, 0, 0, 0.1);
+  color: #000000;
+  border-color: rgba(0, 0, 0, 0.2);
+}
+
+.flash-capsule-overlay.theme-eink .flash-tool-tag,
+[data-theme="eink"] .flash-tool-tag {
+  background: #ded9cd;
+  border-color: #8c8273;
+  color: #111111;
+  font-weight: 700;
+}
+
+.flash-capsule-overlay.theme-eink .flash-tool-tag:hover,
+[data-theme="eink"] .flash-tool-tag:hover {
+  background: #cfc7b5;
+  color: #000000;
+}
+
+/* Settings Drawer */
+.flash-settings-drawer {
+  background: rgba(15, 17, 21, 0.95);
+  border-bottom: 1px solid rgba(245, 158, 11, 0.3);
+  padding: 10px 14px;
+  animation: slideDown 0.2s ease-out;
+}
+
+[data-theme="light"] .flash-settings-drawer {
+  background: rgba(248, 250, 252, 0.98);
+  border-bottom: 1px solid rgba(217, 119, 6, 0.3);
+}
+
+[data-theme="eink"] .flash-settings-drawer {
+  background: #f4f1ea;
+  border-bottom: 1px solid #d5cebf;
+}
+
+.flash-settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--flash-accent);
+}
+
+.flash-settings-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.flash-settings-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--flash-hint);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.flash-preset-row,
+.flash-recorder-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 11px;
+}
+
+.flash-preset-label {
+  color: var(--flash-hint);
+  min-width: 65px;
+}
+
+.flash-preset-tag {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #cbd5e1;
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  font-family: monospace;
+}
+
+.flash-preset-tag:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* 白水洗底（rgba(255,255,255,…)）在浅色主题的白底上等于不存在，文字 #cbd5e1
+   只有 1.48:1。这里不是"换个颜色"，而是把水洗方向翻过来——和 .flash-starter-tag
+   的既有做法一致。 */
+.flash-capsule-overlay.theme-light .flash-preset-tag,
+[data-theme="light"] .flash-preset-tag {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.1);
+  color: #475569;
+}
+
+.flash-capsule-overlay.theme-light .flash-preset-tag:hover,
+[data-theme="light"] .flash-preset-tag:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.flash-capsule-overlay.theme-eink .flash-preset-tag,
+[data-theme="eink"] .flash-preset-tag {
+  background: #ded9cd;
+  border-color: #8c8273;
+  color: #111111;
+}
+
+.flash-preset-tag.current {
+  background: rgba(245, 158, 11, 0.25);
+  border-color: var(--flash-accent);
+  color: var(--flash-accent-on-tint);
+  font-weight: 600;
+}
+
+/* `.flash-preset-tag.current` 只有 (0,2,0)，会被上面 (0,3,0) 的主题覆盖整条盖掉，
+   浅色主题下"当前预设"就丢了琥珀高亮——看起来和没选中一样。所以状态类必须
+   各自带主题变体；既有的 `.flash-tab-btn.active` 就是这么处理的，照抄这个约定。 */
+.flash-capsule-overlay.theme-light .flash-preset-tag.current,
+[data-theme="light"] .flash-preset-tag.current {
+  background: rgba(245, 158, 11, 0.25);
+  border-color: var(--flash-accent);
+  color: var(--flash-accent-on-tint);
+}
+
+.flash-capsule-overlay.theme-eink .flash-preset-tag.current,
+[data-theme="eink"] .flash-preset-tag.current {
+  background: #fdfcf9;
+  border-color: #8c8273;
+  color: #111111;
+}
+
+.flash-recorder-input {
+  flex: 1;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(0, 0, 0, 0.3);
+  color: #f8fafc;
+  font-size: 11px;
+  font-family: monospace;
+  outline: none;
+}
+
+.flash-recorder-input.recording {
+  border-color: var(--flash-accent);
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25);
+  background: rgba(245, 158, 11, 0.08);
+}
+
+[data-theme="light"] .flash-recorder-input {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+/* `.flash-recorder-input.recording` 与 `[data-theme="light"] .flash-recorder-input`
+   特异度相同（都是 0,2,0），后者在源码里更靠后，于是浅色主题下录音态的琥珀边框
+   和底色被整条盖掉——录制时完全没有视觉反馈。所以这条必须比上面那条更具体。 */
+.flash-capsule-overlay.theme-light .flash-recorder-input.recording,
+[data-theme="light"] .flash-recorder-input.recording {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: var(--flash-accent);
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.3);
+}
+
+/* eink 原来**没有** `.flash-recorder-input` 覆盖：基线是 `rgba(0,0,0,0.3)` 的黑洗底配
+   `#f8fafc`，落在纸色上合成出中灰（约 rgb(174,172,168)），近白文字只有 2.17:1。
+   取值跟 `.flash-dir-path` / 两个 textarea 的既有 eink 约定一致。 */
+.flash-capsule-overlay.theme-eink .flash-recorder-input,
+[data-theme="eink"] .flash-recorder-input {
+  background: #e2dcd0;
+  border-color: #8c8273;
+  color: #111111;
+}
+
+/* 同上一条的坑：eink 覆盖与 `.recording` 特异度相同，不补这条会让 eink 下录音态
+   没有琥珀反馈。 */
+.flash-capsule-overlay.theme-eink .flash-recorder-input.recording,
+[data-theme="eink"] .flash-recorder-input.recording {
+  background: rgba(245, 158, 11, 0.14);
+  border-color: var(--flash-accent);
+}
+
+.flash-settings-toggles-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.1);
+  font-size: 11px;
+}
+
+[data-theme="light"] .flash-settings-toggles-row {
+  border-top-color: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="eink"] .flash-settings-toggles-row {
+  border-top-color: #ded9cd;
+}
+
+.flash-toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  color: #94a3b8;
+  transition: color 0.15s ease;
+}
+
+.flash-toggle-label:hover {
+  color: #f1f5f9;
+}
+
+[data-theme="light"] .flash-toggle-label {
+  color: #64748b;
+}
+
+[data-theme="light"] .flash-toggle-label:hover {
+  color: #0f172a;
+}
+
+[data-theme="eink"] .flash-toggle-label {
+  color: #403e39;
+}
+
+.flash-toggle-label input[type="checkbox"] {
+  accent-color: var(--flash-accent);
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+
+.flash-feedback {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  margin-top: 4px;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.flash-feedback-error {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--flash-danger);
+}
+
+.flash-feedback-success {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--flash-success);
+}
+
+/* Textarea Input */
+.flash-input-wrapper {
+  flex: 1;
+  min-height: 0;
+  padding: 8px 12px;
+  display: flex;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.flash-textarea {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+  outline: none;
+  resize: none;
+  color: #f8fafc !important;
+  font-size: 13.5px;
+  font-weight: 450;
+  line-height: 1.6;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  box-sizing: border-box;
+}
+
+.flash-textarea::placeholder {
+  color: #94a3b8 !important;
+  opacity: 1 !important;
+  font-weight: 450;
+}
+
+/* Light Theme overrides */
+.flash-capsule-overlay.theme-light .flash-textarea,
+[data-theme="light"] .flash-textarea {
+  color: #0f172a !important;
+}
+
+.flash-capsule-overlay.theme-light .flash-textarea::placeholder,
+[data-theme="light"] .flash-textarea::placeholder {
+  color: #475569 !important;
+}
+
+/* E-ink Theme overrides */
+.flash-capsule-overlay.theme-eink .flash-textarea,
+[data-theme="eink"] .flash-textarea {
+  color: #111111 !important;
+  font-weight: 550;
+}
+
+.flash-capsule-overlay.theme-eink .flash-textarea::placeholder,
+[data-theme="eink"] .flash-textarea::placeholder {
+  color: #383530 !important;
+}
+
+/* Footer */
+.flash-footer {
+  height: 38px;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+[data-theme="light"] .flash-footer {
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="eink"] .flash-footer {
+  border-top: 1px solid #d5cebf;
+}
+
+.flash-footer-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.flash-char-count {
+  font-size: 11.5px;
+  font-weight: 550;
+  color: var(--flash-hint);
+}
+
+[data-theme="light"] .flash-char-count {
+  color: #334155;
+}
+
+[data-theme="eink"] .flash-char-count {
+  color: #111111;
+  font-weight: 600;
+}
+
+.flash-status-msg {
+  font-size: 11.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+}
+
+.flash-status-msg.saving {
+  color: var(--flash-info);
+}
+
+.flash-status-msg.saved {
+  color: var(--flash-success);
+}
+
+.flash-status-msg.error {
+  color: var(--flash-danger);
+}
+
+.flash-footer-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.flash-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s ease;
+}
+
+.flash-btn-secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: #cbd5e1;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.flash-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+}
+
+.flash-capsule-overlay.theme-light .flash-btn-secondary,
+[data-theme="light"] .flash-btn-secondary {
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  color: #1e293b;
+}
+
+.flash-capsule-overlay.theme-light .flash-btn-secondary:hover,
+[data-theme="light"] .flash-btn-secondary:hover {
+  background: rgba(0, 0, 0, 0.1);
+  color: #000000;
+}
+
+.flash-capsule-overlay.theme-eink .flash-btn-secondary,
+[data-theme="eink"] .flash-btn-secondary {
+  background: #ded9cd;
+  border: 1px solid #8c8273;
+  color: #111111;
+}
+
+.flash-capsule-overlay.theme-eink .flash-btn-secondary:hover,
+[data-theme="eink"] .flash-btn-secondary:hover {
+  background: #cfc7b5;
+  color: #000000;
+}
+
+.flash-btn-primary,
+.flash-save-btn {
+  background: #f59e0b !important;
+  color: #000000 !important;
+  font-weight: 700 !important;
+  border: none !important;
+  box-shadow: 0 2px 6px rgba(245, 158, 11, 0.35);
+}
+
+.flash-btn-primary:hover,
+.flash-save-btn:hover {
+  background: #d97706 !important;
+  color: #000000 !important;
+}
+
+[data-theme="eink"] .flash-btn-primary,
+[data-theme="eink"] .flash-save-btn {
+  background: #f59e0b !important;
+  color: #000000 !important;
+  border: none !important;
+}
+
+[data-theme="eink"] .flash-btn-primary:hover,
+[data-theme="eink"] .flash-save-btn:hover {
+  background: #d97706 !important;
+  color: #000000 !important;
+}
