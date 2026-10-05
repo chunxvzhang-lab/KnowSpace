@@ -1,0 +1,53 @@
+/* ========================================================================
+   KnowSpace · 预览行号沟
+   从 src/styles.css 按域拆分而来（阶段 B）。加载顺序由 src/main.tsx 决定，
+   必须与拆分前 styles.css 内的物理顺序一致 —— 改顺序等于改级联。
+   ======================================================================== */
+/* ==========================================================================
+   Preview Line Numbers Gutter (Dedicated Leftmost Column)
+   ========================================================================== */
+.markdown-body.show-line-numbers {
+  padding-left: 58px !important;
+  position: relative;
+}
+
+/* Subtle vertical guide line separating line numbers from content */
+.markdown-body.show-line-numbers::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 46px;
+  width: 1px;
+  background: var(--border);
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+.markdown-body.show-line-numbers > [data-source-line] {
+  position: relative;
+}
+
+.markdown-body.show-line-numbers > [data-source-line]::before {
+  content: attr(data-source-line);
+  position: absolute;
+  left: -52px;
+  width: 36px;
+  text-align: right;
+  font-family: var(--font-mono, "JetBrains Mono", Consolas, "Fira Code", monospace);
+  font-size: 11.5px;
+  line-height: inherit;
+  color: var(--text-muted);
+  opacity: 0.65;
+  user-select: none;
+  pointer-events: none;
+  transition:
+    opacity 0.15s ease,
+    color 0.15s ease;
+}
+
+.markdown-body.show-line-numbers > [data-source-line]:hover::before {
+  opacity: 1;
+  color: var(--accent);
+  font-weight: 700;
+}

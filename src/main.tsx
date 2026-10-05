@@ -14,6 +14,11 @@ import "./styles/workspace.css";
 import "./styles/reader.css";
 import "./styles/code.css";
 import "./styles/statusbar.css";
+import "./styles/dialogs.css";
+import "./styles/search-nav.css";
+import "./styles/gutter.css";
+import "./styles/about.css";
+import "./styles/tabbar.css";
 import "./styles.css";
 
 const LazyApp = lazy(() => import("./App"));

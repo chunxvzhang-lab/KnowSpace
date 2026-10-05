@@ -1,0 +1,376 @@
+/* ========================================================================
+   KnowSpace · 模态框与对话框基座
+   从 src/styles.css 按域拆分而来（阶段 B）。加载顺序由 src/main.tsx 决定，
+   必须与拆分前 styles.css 内的物理顺序一致 —— 改顺序等于改级联。
+   ======================================================================== */
+/* ==========================================================================
+   Modals & Dialogs
+   ========================================================================== */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(9, 10, 15, 0.65);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+  animation: backdropFadeIn 0.2s var(--ease-smooth);
+}
+
+@keyframes backdropFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.modal-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-modal);
+  width: 100%;
+  max-width: 480px;
+  padding: 24px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  animation: modalSpringIn 0.24s var(--ease-spring);
+}
+
+@keyframes modalSpringIn {
+  from {
+    transform: scale(0.95) translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+.modal-card.modal-conflict {
+  max-width: 540px;
+}
+
+.modal-header {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.modal-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.modal-icon.warning {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
+.modal-icon.error {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.modal-header h3 {
+  margin: 0 0 6px;
+  font-size: 16.5px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.modal-desc {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.btn {
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.18s var(--ease-spring);
+  border: 1px solid transparent;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #ffffff;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.btn-primary:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+.btn-primary:active {
+  transform: scale(0.96);
+}
+
+.btn-secondary {
+  background: var(--surface-2);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.btn-secondary:hover {
+  border-color: var(--border-hover);
+  background: var(--surface-sunken);
+  transform: translateY(-1px);
+}
+
+.btn-danger {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--danger);
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
+.btn-danger:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: var(--danger);
+  transform: translateY(-1px);
+}
+
+/* Toast Notifications */
+.toast {
+  position: fixed;
+  right: 20px;
+  bottom: 40px;
+  z-index: 1050;
+  max-width: 380px;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-modal);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  animation: toastSlideUp 0.24s var(--ease-spring);
+}
+
+@keyframes toastSlideUp {
+  from {
+    transform: translateY(16px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Empty Reader States */
+.empty-reader {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  padding: 0;
+}
+
+.empty-reader div {
+  max-width: 440px;
+  text-align: center;
+}
+
+.empty-reader h1 {
+  margin: 0 0 12px;
+  color: var(--text);
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.empty-reader p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+/* Responsive adjustments */
+@media (max-width: 980px) {
+  .toolbar {
+    height: auto;
+    min-height: 50px;
+    padding: 8px 12px;
+  }
+
+  .document-workspace.view-split {
+    flex-direction: column;
+  }
+
+  .document-workspace.view-split .workspace-splitter {
+    width: 100%;
+    height: 8px;
+    cursor: row-resize;
+  }
+
+  .document-workspace.view-split .splitter-handle {
+    width: 40px;
+    height: 2px;
+  }
+
+  .workspace-pane.editor-section {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .reader-pane {
+    padding: 8px 8px 36px;
+  }
+
+  .markdown-body {
+    padding: 16px 12px;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .status-metrics {
+    display: none;
+  }
+
+  .command-button span {
+    display: none;
+  }
+}
+
+@media (max-width: 680px) {
+  .toolbar {
+    gap: 8px;
+    padding: 6px 10px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .toolbar::-webkit-scrollbar {
+    display: none;
+  }
+  .toolbar-left {
+    max-width: 140px;
+  }
+  .toolbar-actions {
+    gap: 4px;
+  }
+  .icon-button {
+    min-width: 28px;
+    height: 28px;
+    padding: 0 6px;
+  }
+  .view-mode-control button {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+}
+
+/* Synchronized Selection Highlighting (Split Mode) */
+.markdown-body [data-source-line] {
+  transition:
+    background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  border-radius: 6px;
+}
+
+.markdown-body [data-source-line].sync-highlight-active {
+  background: rgba(245, 158, 11, 0.12) !important;
+  box-shadow:
+    0 0 0 1.5px rgba(245, 158, 11, 0.55),
+    0 3px 12px rgba(245, 158, 11, 0.12) !important;
+  border-radius: 6px !important;
+}
+
+.markdown-body li[data-source-line].sync-highlight-active {
+  background: rgba(245, 158, 11, 0.16) !important;
+  box-shadow: 0 0 0 1.5px rgba(245, 158, 11, 0.6) !important;
+  border-radius: 6px !important;
+  padding-left: 6px;
+  padding-right: 6px;
+  margin-left: -4px;
+}
+
+[data-theme="twitter"] .markdown-body [data-source-line].sync-highlight-active,
+:root[data-theme="twitter"] .markdown-body [data-source-line].sync-highlight-active {
+  background: rgba(29, 155, 240, 0.16) !important;
+  box-shadow:
+    0 0 0 1.5px rgba(29, 155, 240, 0.7),
+    0 4px 18px rgba(29, 155, 240, 0.22) !important;
+  border-radius: 6px !important;
+}
+
+[data-theme="twitter"] .markdown-body li[data-source-line].sync-highlight-active,
+:root[data-theme="twitter"] .markdown-body li[data-source-line].sync-highlight-active {
+  background: rgba(29, 155, 240, 0.2) !important;
+  box-shadow: 0 0 0 1.5px rgba(29, 155, 240, 0.75) !important;
+  border-radius: 6px !important;
+  padding-left: 6px;
+  padding-right: 6px;
+  margin-left: -4px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"] .markdown-body [data-source-line].sync-highlight-active {
+    background: rgba(29, 155, 240, 0.16) !important;
+    box-shadow:
+      0 0 0 1.5px rgba(29, 155, 240, 0.7),
+      0 4px 18px rgba(29, 155, 240, 0.22) !important;
+    border-radius: 6px !important;
+  }
+  :root[data-theme="system"] .markdown-body li[data-source-line].sync-highlight-active {
+    background: rgba(29, 155, 240, 0.2) !important;
+    box-shadow: 0 0 0 1.5px rgba(29, 155, 240, 0.75) !important;
+    border-radius: 6px !important;
+    padding-left: 6px;
+    padding-right: 6px;
+    margin-left: -4px;
+  }
+}
+
+/* E-ink Mode: Consistent Light Gray Synchronized Selection Highlight */
+[data-theme="eink"] .markdown-body [data-source-line].sync-highlight-active,
+:root[data-theme="eink"] .markdown-body [data-source-line].sync-highlight-active,
+.app-shell.theme-eink .markdown-body [data-source-line].sync-highlight-active {
+  background: #ded9cd !important;
+  box-shadow:
+    0 0 0 1.5px #a8a090,
+    0 2px 8px rgba(0, 0, 0, 0.05) !important;
+  border-radius: 6px !important;
+}
+
+[data-theme="eink"] .markdown-body li[data-source-line].sync-highlight-active,
+:root[data-theme="eink"] .markdown-body li[data-source-line].sync-highlight-active,
+.app-shell.theme-eink .markdown-body li[data-source-line].sync-highlight-active {
+  background: #ded9cd !important;
+  box-shadow: 0 0 0 1.5px #a8a090 !important;
+  border-radius: 6px !important;
+  padding-left: 6px;
+  padding-right: 6px;
+  margin-left: -4px;
+}
+
+.document-workspace.view-split .markdown-body [data-source-line] {
+  cursor: text;
+}

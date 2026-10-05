@@ -1,8 +1,9 @@
 // Phase B splitter: moves domain blocks out of src/styles.css with a
-// brace-balanced slicer. The DOMAINS list below is the CURRENT batch's
-// parameter - B2 shipped tokens/shell/sidebar, B3 ships workspace/reader/code/
-// statusbar (see git log for the executed batches; the ranges are not
-// recoverable from the shrunk file).
+// brace-balanced slicer. The DOMAINS list below is the batch that has NOT run
+// yet — once it has, the ranges are history (the executed roster lives in
+// `git log` and in docs/QUALITY_BASELINE.md's 看板, not restated here, because a
+// re-listed roster is one batch out of date immediately). Re-derive the next
+// batch with `--sections`; the shrunk file's old line numbers are gone.
 //
 // Why a script instead of hand-editing 13k lines: slice points are top-level
 // block boundaries; a human moving blocks would clip rules. The script
@@ -121,10 +122,11 @@ const blocks = scanBlocks(lines);
 // overrides work in this file. Mid-file domains need a segmented split, to be
 // done in a later batch with a cascade-order proof.
 const DOMAINS = [
-  { file: "workspace.css", label: "文档工作区：分屏、全视图与窗格布局", from: 1, to: 176 },
-  { file: "reader.css", label: "阅读区：Markdown 卡片排版", from: 177, to: 763 },
-  { file: "code.css", label: "代码块与高对比语法着色", from: 764, to: 1169 },
-  { file: "statusbar.css", label: "底部状态栏", from: 1170, to: 1269 },
+  { file: "dialogs.css", label: "模态框与对话框基座", from: 1, to: 372 },
+  { file: "search-nav.css", label: "搜索结果导航与关键词高亮", from: 373, to: 500 },
+  { file: "gutter.css", label: "预览行号沟", from: 501, to: 549 },
+  { file: "about.css", label: "关于对话框：模态与卡片", from: 550, to: 1071 },
+  { file: "tabbar.css", label: "多标签页标签栏", from: 1072, to: 1236 },
 ];
 
 // Refuse a blind re-run of an executed batch: DOMAINS' line numbers are

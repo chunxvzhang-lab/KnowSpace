@@ -1,0 +1,132 @@
+/* ========================================================================
+   KnowSpace · 搜索结果导航与关键词高亮
+   从 src/styles.css 按域拆分而来（阶段 B）。加载顺序由 src/main.tsx 决定，
+   必须与拆分前 styles.css 内的物理顺序一致 —— 改顺序等于改级联。
+   ======================================================================== */
+/* ==========================================================================
+   Search Result Navigation & Highlighting (Broad Block & Keyword Marks)
+   ========================================================================== */
+.markdown-body .search-highlight-active {
+  background: rgba(245, 158, 11, 0.12) !important;
+  box-shadow:
+    0 0 0 2px #d97706,
+    0 4px 18px rgba(245, 158, 11, 0.22) !important;
+  border-radius: 8px !important;
+  padding: 8px 12px !important;
+  margin-top: 4px;
+  margin-bottom: 4px;
+  transition:
+    background-color 0.25s ease,
+    box-shadow 0.25s ease,
+    padding 0.2s ease;
+}
+
+[data-theme="twitter"] .markdown-body .search-highlight-active,
+:root[data-theme="twitter"] .markdown-body .search-highlight-active {
+  background: rgba(29, 155, 240, 0.16) !important;
+  box-shadow:
+    0 0 0 2px #1d9bf0,
+    0 6px 26px rgba(29, 155, 240, 0.32) !important;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"] .markdown-body .search-highlight-active {
+    background: rgba(29, 155, 240, 0.16) !important;
+    box-shadow:
+      0 0 0 2px #1d9bf0,
+      0 6px 26px rgba(29, 155, 240, 0.32) !important;
+  }
+}
+
+/* E-ink Mode: Consistent Light Gray Search Result Jump Highlight */
+[data-theme="eink"] .markdown-body .search-highlight-active,
+:root[data-theme="eink"] .markdown-body .search-highlight-active,
+.app-shell.theme-eink .markdown-body .search-highlight-active {
+  background: #ded9cd !important;
+  box-shadow:
+    0 0 0 2px #9c9586,
+    0 2px 8px rgba(0, 0, 0, 0.05) !important;
+  border-radius: 8px !important;
+}
+
+.markdown-body li.search-highlight-active {
+  padding: 4px 8px !important;
+  margin-left: -4px;
+}
+
+.markdown-body ol.search-highlight-active,
+.markdown-body ul.search-highlight-active {
+  padding: 8px 14px 8px 34px !important;
+  margin-top: 6px;
+  margin-bottom: 6px;
+}
+
+.markdown-body table.search-highlight-active {
+  padding: 6px !important;
+  border-radius: 8px !important;
+}
+
+.markdown-body blockquote.search-highlight-active {
+  padding: 10px 16px !important;
+}
+
+.markdown-body pre.search-highlight-active {
+  padding: 14px 16px !important;
+}
+
+/* Individual keyword matches inside the broad highlighted paragraph/block */
+.markdown-body mark.search-keyword-match {
+  background: #d97706 !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  padding: 1px 4px !important;
+  border-radius: 3px !important;
+  box-shadow: 0 1px 4px rgba(217, 119, 6, 0.35) !important;
+  display: inline-block;
+}
+
+[data-theme="twitter"] .markdown-body mark.search-keyword-match,
+:root[data-theme="twitter"] .markdown-body mark.search-keyword-match {
+  background: #1d9bf0 !important;
+  color: #ffffff !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25) !important;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"] .markdown-body mark.search-keyword-match {
+    background: #1d9bf0 !important;
+    color: #ffffff !important;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25) !important;
+  }
+}
+
+/* E-ink Mode: Consistent Light Gray Search Keyword Match */
+[data-theme="eink"] .markdown-body mark.search-keyword-match,
+:root[data-theme="eink"] .markdown-body mark.search-keyword-match,
+.app-shell.theme-eink .markdown-body mark.search-keyword-match {
+  background: #d5cebf !important;
+  color: #1a1a1a !important;
+  border: 1px solid #a8a090 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important;
+}
+
+@keyframes searchPulse {
+  0% {
+    box-shadow:
+      0 0 0 4px var(--accent, #d97706),
+      0 0 24px color-mix(in srgb, var(--accent, #d97706) 60%, transparent);
+    background: var(--accent-surface, rgba(245, 158, 11, 0.2));
+  }
+  50% {
+    box-shadow:
+      0 0 0 2px var(--accent, #d97706),
+      0 4px 18px color-mix(in srgb, var(--accent, #d97706) 30%, transparent);
+    background: var(--accent-surface, rgba(245, 158, 11, 0.12));
+  }
+  100% {
+    box-shadow:
+      0 0 0 2px var(--accent, #d97706),
+      0 4px 18px color-mix(in srgb, var(--accent, #d97706) 30%, transparent);
+    background: var(--accent-surface, rgba(245, 158, 11, 0.12));
+  }
+}

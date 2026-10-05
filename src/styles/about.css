@@ -1,0 +1,526 @@
+/* ========================================================================
+   KnowSpace · 关于对话框：模态与卡片
+   从 src/styles.css 按域拆分而来（阶段 B）。加载顺序由 src/main.tsx 决定，
+   必须与拆分前 styles.css 内的物理顺序一致 —— 改顺序等于改级联。
+   ======================================================================== */
+/* ==========================================================================
+   About Dialog (Modal & Card)
+   ========================================================================== */
+.about-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(6px);
+  padding: 16px;
+  animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.about-dialog-card {
+  position: relative;
+  width: 100%;
+  max-width: 620px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow:
+    0 24px 60px -12px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  /* 原来是 `scaleUp`——这个名字全文件没有定义（也没有 shape 相近的定义），
+     所以关于对话框的入场动画一直是死的。改用共用的 fadeInScale（同为
+     缩放 + 淡入），曲线本来就是 --ease-spring 的值。 */
+  animation: fadeInScale 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.about-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 22px 26px 18px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.about-brand-section {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.about-logo-wrapper {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(29, 155, 240, 0.12), rgba(37, 99, 235, 0.15));
+  border: 1px solid rgba(29, 155, 240, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(29, 155, 240, 0.15);
+}
+
+.about-logo-img {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+}
+
+.about-header-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.about-app-name {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.about-version-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--accent-surface, rgba(29, 155, 240, 0.15));
+  color: var(--accent, #1d9bf0);
+  border: 1px solid rgba(29, 155, 240, 0.3);
+}
+
+.about-tagline {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.about-close-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.about-close-btn:hover {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.about-body {
+  padding: 20px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-height: calc(85vh - 160px);
+  overflow-y: auto;
+}
+
+.about-card {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.about-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.about-description {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--text-muted);
+  text-align: justify;
+}
+
+.about-info-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.about-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.about-info-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  flex-wrap: wrap;
+}
+
+.about-label {
+  color: var(--text-muted);
+  font-size: 12.5px;
+  flex-shrink: 0;
+}
+
+.about-value {
+  color: var(--text);
+  font-weight: 600;
+  font-size: 12.5px;
+}
+
+.about-value.highlight {
+  color: var(--accent, #1d9bf0);
+}
+
+.about-tech-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.about-tech-tag {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font-mono, Consolas, monospace);
+  line-height: 1.4;
+}
+
+.about-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent, #1d9bf0);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 12.5px;
+  word-break: break-all;
+  transition: all 0.15s ease;
+}
+
+.about-link:hover {
+  color: var(--accent-hover, #40b3ff);
+  text-decoration: underline;
+}
+
+.about-code-path {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  background: var(--surface-3);
+  padding: 3px 6px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  color: var(--text);
+  user-select: text;
+  word-break: break-all;
+}
+
+/* ── Changelog card ── */
+.about-changelog-card {
+  background: linear-gradient(135deg, rgba(2, 132, 199, 0.06) 0%, rgba(16, 185, 129, 0.05) 100%);
+  border-color: rgba(2, 132, 199, 0.22);
+}
+
+.about-changelog-version-badge {
+  margin-left: auto;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: rgba(2, 132, 199, 0.12);
+  color: #0284c7;
+  border: 1px solid rgba(2, 132, 199, 0.28);
+}
+
+.about-changelog-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.about-changelog-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.about-changelog-group-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.about-changelog-items {
+  margin: 0;
+  padding: 0 0 0 4px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.about-changelog-items li {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-muted);
+  padding-left: 2px;
+}
+
+.about-changelog-items li strong {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.about-icon.text-orange {
+  color: #ff4d00;
+}
+
+.about-icon.text-purple {
+  color: #8b5cf6;
+}
+.about-icon.text-blue {
+  color: #0284c7;
+}
+.about-icon.text-green {
+  color: #10b981;
+}
+.about-icon.text-emerald {
+  color: #10b981;
+}
+.about-icon.text-cyan {
+  color: #06b6d4;
+}
+.about-icon.text-amber {
+  color: #f59e0b;
+}
+
+.about-slogan-card {
+  background: linear-gradient(135deg, rgba(29, 155, 240, 0.08) 0%, rgba(139, 92, 246, 0.06) 100%);
+  border-color: rgba(29, 155, 240, 0.25);
+  text-align: center;
+}
+
+.about-slogan-title {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  background: linear-gradient(135deg, #1d9bf0 0%, #8b5cf6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.about-slogan-sub {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.about-pillars-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.about-pillar-item {
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+
+.about-pillar-item:hover {
+  border-color: rgba(29, 155, 240, 0.35);
+  background: var(--surface);
+}
+
+.about-pillar-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.about-pillar-desc {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.about-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.about-footer-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.about-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 7px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s var(--ease-spring);
+}
+
+.about-action-btn.secondary {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.about-action-btn.secondary:hover {
+  background: var(--surface-3);
+  border-color: var(--border-strong);
+}
+
+.about-action-btn.primary {
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  color: #ffffff;
+}
+
+.about-action-btn.primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+/* Empty State / Welcome Canvas */
+.empty-reader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 40px;
+  background: radial-gradient(
+    circle at 50% 30%,
+    color-mix(in srgb, var(--accent) 4%, transparent),
+    transparent 70%
+  );
+}
+
+.empty-reader-card {
+  max-width: 520px;
+  width: 100%;
+  padding: 36px 32px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-floating);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  animation: fadeInScale 0.3s var(--ease-spring);
+}
+
+.empty-reader-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.02em;
+}
+
+.empty-reader-desc {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.empty-actions-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  width: 100%;
+  margin-top: 8px;
+}
+
+.empty-action-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s var(--ease-spring);
+}
+
+.empty-action-card:hover {
+  background: var(--surface-3);
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card);
+}
+
+.empty-library {
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}

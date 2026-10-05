@@ -1,0 +1,169 @@
+/* ========================================================================
+   KnowSpace · 多标签页标签栏
+   从 src/styles.css 按域拆分而来（阶段 B）。加载顺序由 src/main.tsx 决定，
+   必须与拆分前 styles.css 内的物理顺序一致 —— 改顺序等于改级联。
+   ======================================================================== */
+/* ==========================================================================
+   v1.5.0: Multi-Document Tab Bar (TabBar)
+   ========================================================================== */
+.tab-bar-container {
+  display: flex;
+  align-items: center;
+  height: 38px;
+  min-height: 38px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+  user-select: none;
+  position: relative;
+  z-index: 10;
+}
+
+.tab-bar-list {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  padding: 0 4px;
+  gap: 2px;
+}
+
+.tab-bar-list::-webkit-scrollbar {
+  display: none;
+}
+
+.tab-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: 200px;
+  transition: all 0.15s ease;
+  border: 1px solid transparent;
+}
+
+.tab-item:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.tab-item.is-active {
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: 600;
+  border-color: var(--border);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  position: relative;
+}
+
+.tab-item.is-active::after {
+  content: "";
+  position: absolute;
+  bottom: -4px;
+  left: 8px;
+  right: 8px;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 999px;
+}
+
+.tab-icon {
+  font-size: 13px;
+  opacity: 0.7;
+}
+
+.tab-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.tab-dirty-indicator {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #f59e0b;
+  flex-shrink: 0;
+  animation: pulseDot 1.5s infinite;
+}
+
+.tab-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 10px;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: all 0.15s ease;
+  padding: 0;
+}
+
+.tab-close-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  opacity: 1;
+}
+
+.tab-context-menu {
+  position: fixed;
+  z-index: 10000;
+  min-width: 140px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  box-shadow: var(--shadow-floating);
+  padding: 4px;
+  animation: fadeInScale 0.15s ease;
+}
+
+.tab-context-menu .menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.tab-context-menu .menu-item:hover {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.tab-context-menu .menu-item.menu-item-highlight {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.tab-context-menu .menu-item.menu-item-highlight:hover {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.tab-context-menu .menu-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
