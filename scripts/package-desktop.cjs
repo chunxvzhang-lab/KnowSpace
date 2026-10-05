@@ -26,7 +26,6 @@ const PORTABLE_DOC_ENTRIES = [
   "LICENSE",
   "USER_MANUAL.md",
   "PICTURE_MANUAL.md",
-  "全功能高清图片手册.md",
   "README.txt",
   "manual-images",
 ];
@@ -220,12 +219,11 @@ async function main() {
       path.join(appDocsDir, "PICTURE_MANUAL.md"),
     );
   } catch (e) {}
-  try {
-    await fs.copyFile(
-      path.join(root, "docs", "全功能高清图片手册.md"),
-      path.join(appDocsDir, "全功能高清图片手册.md"),
-    );
-  } catch (e) {}
+  // 2026-10: `全功能高清图片手册.md` was a byte-for-byte copy of PICTURE_MANUAL.md
+  // kept under a second name. Two names for one document means two readers' paths
+  // that can drift; the ASCII name is the one README and tooling link to, so the
+  // duplicate is gone. Old portable dirs still holding it are pruned by step 3's
+  // whitelist cleanup above.
   try {
     await copyDirectory(
       path.join(root, "docs", "manual-images"),
