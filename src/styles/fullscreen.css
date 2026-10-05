@@ -1,0 +1,133 @@
+/* ========================================================================
+   KnowSpace · 全屏视图：自适应全屏与画布纯全屏
+   从 src/styles.css 按域拆分而来（阶段 B）。加载顺序由 src/main.tsx 决定，
+   必须与拆分前 styles.css 内的物理顺序一致 —— 改顺序等于改级联。
+   ======================================================================== */
+/* ==========================================================================
+   v1.5.0: Adaptive Fullscreen View System
+   ========================================================================== */
+.app-shell.is-fullscreen {
+  width: 100vw;
+  height: 100vh;
+}
+
+/* ==========================================================================
+   v2.3.1: Canvas Pure Fullscreen System: Whiteboard Area Only
+   ========================================================================== */
+.app-shell.is-canvas-fullscreen {
+  width: 100vw !important;
+  height: 100vh !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+.app-shell.is-canvas-fullscreen .activity-bar,
+.app-shell.is-canvas-fullscreen .toolbar,
+.app-shell.is-canvas-fullscreen .chapter-list-container,
+.app-shell.is-canvas-fullscreen .chapter-list,
+.app-shell.is-canvas-fullscreen .side-panel,
+.app-shell.is-canvas-fullscreen .layout-resizer,
+.app-shell.is-canvas-fullscreen .tab-bar,
+.app-shell.is-canvas-fullscreen .status-bar {
+  display: none !important;
+}
+
+.app-shell.is-canvas-fullscreen .main-viewport-container {
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: 100vw !important;
+  max-height: 100vh !important;
+  flex: 1 1 100% !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.app-shell.is-canvas-fullscreen .workspace {
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: 100vw !important;
+  max-height: 100vh !important;
+  flex: 1 1 100% !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.app-shell.is-canvas-fullscreen .reader-frame {
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: 100vw !important;
+  max-height: 100vh !important;
+  flex: 1 1 100% !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+}
+
+.app-shell.is-canvas-fullscreen .knowspace-canvas-view {
+  width: 100vw !important;
+  height: 100vh !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+}
+
+.app-shell.is-fullscreen .main-viewport-container {
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.app-shell.is-fullscreen .workspace {
+  width: 100%;
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.app-shell.is-fullscreen .reader-frame,
+.app-shell.is-fullscreen .document-workspace {
+  width: 100%;
+  height: 100%;
+}
+
+.app-shell.is-fullscreen .reader-pane {
+  width: 100%;
+  height: 100%;
+  padding: 12px clamp(8px, 1.8vw, 20px) 48px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.app-shell.is-fullscreen .markdown-body {
+  width: 100%;
+  max-width: 100%;
+  min-height: calc(100vh - 120px);
+  padding: 24px clamp(18px, 2.8vw, 36px);
+  border-radius: 0;
+  box-shadow: none;
+  box-sizing: border-box;
+}
+
+.app-shell.is-fullscreen .frontmatter-card {
+  width: 100%;
+  max-width: 100%;
+  border-radius: 0;
+  box-shadow: none;
+  box-sizing: border-box;
+}
+
+.app-shell.is-fullscreen .workspace-pane.editor-section,
+.app-shell.is-fullscreen .workspace-pane.reader-section {
+  height: 100%;
+  width: 100%;
+}
+
+.app-shell.is-fullscreen .cm-editor {
+  width: 100%;
+  height: 100%;
+}

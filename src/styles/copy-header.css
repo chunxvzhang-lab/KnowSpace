@@ -1,0 +1,70 @@
+/* ========================================================================
+   KnowSpace · 代码块复制头与徽标
+   从 src/styles.css 按域拆分而来（阶段 B）。加载顺序由 src/main.tsx 决定，
+   必须与拆分前 styles.css 内的物理顺序一致 —— 改顺序等于改级联。
+   ======================================================================== */
+/* ==========================================================================
+   v1.5.0: Code Copy Header Bar & Badges
+   ========================================================================== */
+.markdown-body pre.hljs,
+.markdown-body pre {
+  position: relative;
+  padding: 12px 18px !important;
+  padding-right: 84px !important;
+}
+
+.code-header-bar {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.code-lang-label {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  opacity: 0.75;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 1.5px 6px;
+  border-radius: 4px;
+  user-select: none;
+}
+
+.code-copy-btn {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.code-copy-btn:hover {
+  background: rgba(29, 155, 240, 0.18);
+  border-color: var(--accent);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.code-copy-btn.is-copied {
+  background: rgba(34, 197, 94, 0.22) !important;
+  border-color: #22c55e !important;
+  color: #22c55e !important;
+  font-weight: 600;
+}

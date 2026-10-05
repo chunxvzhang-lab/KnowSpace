@@ -122,11 +122,10 @@ const blocks = scanBlocks(lines);
 // overrides work in this file. Mid-file domains need a segmented split, to be
 // done in a later batch with a cascade-order proof.
 const DOMAINS = [
-  { file: "dialogs.css", label: "模态框与对话框基座", from: 1, to: 372 },
-  { file: "search-nav.css", label: "搜索结果导航与关键词高亮", from: 373, to: 500 },
-  { file: "gutter.css", label: "预览行号沟", from: 501, to: 549 },
-  { file: "about.css", label: "关于对话框：模态与卡片", from: 550, to: 1071 },
-  { file: "tabbar.css", label: "多标签页标签栏", from: 1072, to: 1236 },
+  { file: "copy-header.css", label: "代码块复制头与徽标", from: 1, to: 66 },
+  { file: "lightbox.css", label: "媒体灯箱：图片与 Mermaid 平移缩放", from: 67, to: 220 },
+  { file: "fullscreen.css", label: "全屏视图：自适应全屏与画布纯全屏", from: 221, to: 349 },
+  { file: "dual-split.css", label: "多标签双文档分屏与无边框布局", from: 350, to: 601 },
 ];
 
 // Refuse a blind re-run of an executed batch: DOMAINS' line numbers are

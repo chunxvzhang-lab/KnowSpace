@@ -19,6 +19,10 @@ import "./styles/search-nav.css";
 import "./styles/gutter.css";
 import "./styles/about.css";
 import "./styles/tabbar.css";
+import "./styles/copy-header.css";
+import "./styles/lightbox.css";
+import "./styles/fullscreen.css";
+import "./styles/dual-split.css";
 import "./styles.css";
 
 const LazyApp = lazy(() => import("./App"));
