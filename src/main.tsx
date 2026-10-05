@@ -34,6 +34,10 @@ import "./styles/mindmap.css";
 import "./styles/blocklink.css";
 import "./styles/editor-context-menu.css";
 import "./styles/mindmap-search.css";
+import "./styles/print.css";
+import "./styles/command-palette.css";
+import "./styles/mindmap-export.css";
+import "./styles/graph-filters.css";
 import "./styles.css";
 
 const LazyApp = lazy(() => import("./App"));

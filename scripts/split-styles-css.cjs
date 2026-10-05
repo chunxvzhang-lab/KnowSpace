@@ -123,28 +123,28 @@ const blocks = scanBlocks(lines);
 // done in a later batch with a cascade-order proof.
 const DOMAINS = [
   {
-    file: "mindmap.css",
-    label: "思维导图视图与块级互联锚点",
+    file: "print.css",
+    label: "打印与 PDF 导出样式表",
     from: 1,
-    to: 911,
+    to: 164,
   },
   {
-    file: "blocklink.css",
-    label: "块级互联锚点与嵌入卡片",
-    from: 912,
-    to: 1105,
+    file: "command-palette.css",
+    label: "命令面板（Ctrl+K）与快速切换器",
+    from: 165,
+    to: 498,
   },
   {
-    file: "editor-context-menu.css",
-    label: "编辑器上下文菜单与表格选择面板",
-    from: 1106,
-    to: 1821,
+    file: "mindmap-export.css",
+    label: "思维导图多格式导出下拉",
+    from: 499,
+    to: 555,
   },
   {
-    file: "mindmap-search.css",
-    label: "画布内搜索与拖拽重排",
-    from: 1822,
-    to: 1937,
+    file: "graph-filters.css",
+    label: "图谱视图筛选组与标签样式",
+    from: 556,
+    to: 587,
   },
 ];
 

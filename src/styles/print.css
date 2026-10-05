@@ -1,0 +1,168 @@
+/* ========================================================================
+   KnowSpace · 打印与 PDF 导出样式表
+   从 src/styles.css 按域拆分而来（阶段 B）。加载顺序由 src/main.tsx 决定，
+   必须与拆分前 styles.css 内的物理顺序一致 —— 改顺序等于改级联。
+   ======================================================================== */
+/* ==========================================================================
+   High-Fidelity Professional Print & PDF Export Stylesheet
+   ========================================================================== */
+@page {
+  size: A4;
+  margin: 15mm 15mm;
+  background: #ffffff !important;
+}
+
+@media print {
+  /* 隐藏所有界面外壳控件与非打印部件 */
+  .activity-bar,
+  .sidebar,
+  .tab-bar-container,
+  .tab-bar,
+  .toolbar,
+  .status-bar,
+  .workspace-splitter,
+  .splitter-handle,
+  .mindmap-toolbar,
+  .editor-section,
+  .editor-pane-container,
+  .pane-header-bar,
+  .large-doc-notice,
+  .code-copy-btn,
+  .wikilink-preview-popover,
+  .flash-capsule-overlay,
+  .editor-context-menu,
+  .portal-submenu,
+  .table-picker-panel,
+  .dual-pane-header,
+  .dual-splitter,
+  .tab-graph-toggle-btn,
+  .chapter-list-container,
+  .chapter-list,
+  .side-panel,
+  .layout-resizer,
+  .article-backlinks-footer,
+  .lightbox-backdrop,
+  .modal-overlay {
+    display: none !important;
+  }
+
+  /* 充满纸张宽度并解除所有祖先容器的高度、滚动条与裁剪限制 */
+  html,
+  body,
+  #root,
+  .app-shell,
+  .app-layout,
+  .main-viewport-container,
+  .reader-frame,
+  .workspace,
+  .document-workspace,
+  .workspace-pane,
+  .workspace-pane.reader-section,
+  .reader-section,
+  .reader-pane,
+  .markdown-body {
+    background: #ffffff !important;
+    color: #111111 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    position: static !important;
+    float: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  /* ── 思维导图视图：整张图适配纸张，而不是纸上的半个视口 ────────────────
+     屏幕上的导图是无限画布，"看得见什么"由读者的平移与缩放决定；纸张没有读者，
+     所以这里解除变换，让整张图缩放到页面之内。
+     viewBox 只能由代码给出（它取决于布局算出的边界），见 MindmapView 里
+     打印前后设置与复原 viewBox 的那个 effect —— 样式表拿不到边界。 */
+  .mindmap-view-container {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+    cursor: default !important;
+  }
+
+  /* 宽度撑满纸张、高度按比例，并封顶在一页之内：preserveAspectRatio 默认 meet，
+     于是过宽或过高的图会被整体缩小，而不是被裁掉。 */
+  .mindmap-svg-canvas {
+    width: 100% !important;
+    height: auto !important;
+    max-height: 240mm !important;
+  }
+
+  /* 平移与缩放属于读者的位置，不属于图。 */
+  .mindmap-viewport {
+    transform: none !important;
+  }
+
+  /* 与 PNG / SVG 导出去的剔除名单是同一批：这些是控件，不是图的内容。 */
+  .mindmap-node-selection-ring,
+  .mindmap-node-add-btn,
+  .mindmap-node-resize-handle,
+  .mindmap-context-menu,
+  .mindmap-inline-edit-input {
+    display: none !important;
+  }
+
+  /* 无论在编辑模式、分屏模式还是预览模式下，确保文章阅读渲染区绝对可见并正常分页排版 */
+  .workspace-pane.reader-section,
+  .reader-section,
+  .reader-pane,
+  .source-mode-reader,
+  .print-only-reader {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    flex: none !important;
+  }
+
+  .markdown-body {
+    padding: 0 !important;
+    font-size: 11.5pt !important;
+    line-height: 1.65 !important;
+  }
+
+  /* 打印分页保护：避免标题、代码块、表格、图表跨页截断 */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+    color: #000000 !important;
+  }
+
+  pre,
+  code,
+  table,
+  blockquote,
+  .wikilink-embed-card,
+  svg,
+  .mermaid-wrapper {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* 代码块在打印时保持清新边框与浅色底 */
+  pre {
+    background: #f6f8fa !important;
+    border: 1px solid #d0d7de !important;
+    color: #24292f !important;
+  }
+
+  /* 超链接打印优化 */
+  a {
+    color: #0969da !important;
+    text-decoration: underline !important;
+  }
+}

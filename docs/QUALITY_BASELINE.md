@@ -17,9 +17,9 @@
 | `as-any` | 10 | 只减不增（`as any`） |
 | `files-over-1000-lines` | 0 | 只减不增（src 非测试代码，> 1000 行） |
 | `max-file-lines` | 962 | 只减不增（最大单文件行数） |
-| `styles-css-lines` | 2256 | 只减不增（阶段 B：CSS 按**连续前缀**外迁到 src/styles/*.css；回升意味着有人手工折叠了切片，那会改级联） |
+| `styles-css-lines` | 1669 | 只减不增（阶段 B：CSS 按**连续前缀**外迁到 src/styles/*.css；回升意味着有人手工折叠了切片，那会改级联） |
 | `undeclared-imports` | 0 | 必须为 0（src 中 import 的第三方包必须在 package.json 显式声明，防幽灵依赖） |
-| `src-lines` | 71257 | 记录趋势，不设闸 |
+| `src-lines` | 71261 | 记录趋势，不设闸 |
 | `test-cases` | 见 `TEST_BASELINE.md` | 只增不减——由测试基线守护，本文件不重复设闸 |
 
 ---
@@ -66,7 +66,11 @@ import 顺序 = 拆分前 styles.css 内的物理顺序；只有连续前缀可�
 | `src/styles/blocklink.css`（切片） | 198 |
 | `src/styles/editor-context-menu.css`（切片） | 720 |
 | `src/styles/mindmap-search.css`（切片） | 120 |
-| `src/styles.css`（剩余） | 2256 |
+| `src/styles/print.css`（切片） | 168 |
+| `src/styles/command-palette.css`（切片） | 338 |
+| `src/styles/mindmap-export.css`（切片） | 61 |
+| `src/styles/graph-filters.css`（切片） | 36 |
+| `src/styles.css`（剩余） | 1669 |
 
 ---
 
