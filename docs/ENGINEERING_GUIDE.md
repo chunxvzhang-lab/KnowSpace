@@ -386,6 +386,36 @@ CSS 里 `animation: fadeIn 0.2s` 引用一个**不存在**的 `@keyframes fadeIn
 > 给胶囊补一份自己的 `--flash-info-rgb`。**这个坑是守卫抓到的，不是我看出来的——
 > 那 3 处在深色下观感完全正常。**
 
+#### 10.4 令牌化的另一半：JS 消费者拿不到级联，必须走镜像表 + 同源守卫
+
+CSS 侧收成令牌不等于颜色问题修完。有一类消费者**读不到级联**：Cytoscape 的样式表、
+SVG/PNG 导出器、画布调色板——它们要的是**解析后的字面色值**。阶段 B 之后清点，TS/TSX
+里还留着 **45 处** `isDark ? "#38bdf8" : "#0284c7"` 三元组，外加几处主题盲写死
+（ActivityBar / TabBar / TablePickerPanel）。同一个 bug，另外半边。
+
+修法是**按消费者分两类**，不是一刀切：
+
+| 消费者 | 机制 | 为什么 |
+| :--- | :--- | :--- |
+| DOM 内联样式（React style、SVG attribute，**含 portal 弹层**） | 直接写 `var(--accent-info)` / `rgba(var(--accent-info-rgb), α)` | portal 挂在 `body` 下也在 `<html data-theme>` 之下，级联照常解析；不需要 JS 参与 |
+| 字面色值消费者（Cytoscape / SVG 导出 / canvasTheme） | `src/services/themeTokens.ts` 的镜像表 `getAccentInfo(theme, prefersDark)` | Cytoscape 不认 `var()`；导出的文件脱离文档，注释里写得很清楚——「在一个引擎里算出的值未必能被下一个打开它的引擎解析」 |
+
+三条纪律：
+
+1. **镜像表必须有成对断言（规则 5）**。复制品比没有更危险：改了 tokens.css 忘了同步
+   表，浅色用户拿到旧值且全绿。守卫 `tsx-accent-info.test.ts` 从 `loadAppCss()` 读各
+   主题的 `--accent-info` 定义与表逐主题比对——漂移即红。
+2. **L2 不许摸 `window`**（eslint 分层规则对新文件不豁免）。`system` 主题的深浅判定
+   由调用方把自己已解析的 `isDark` 作为 `prefersDark` 传入；缺省按 light（两种解析值
+   里 light 是安全侧，浅色令牌在深浅底上都不低于阈值）。
+3. **允许清单会腐坏**。守卫同时断言：清单上的文件若青色字面量已全部搬走，必须同刀
+   出列——白名单是债务台账，不是永久许可证。
+
+**语义边界（该留的字面量别误伤）**：导图「天蓝」标记色（`mindmapPalette` /
+`mindmapThemes` / `graphService` 分支色 / `MindmapNodeStyleMenu`）是**写进文档的用户
+批注**，不随 UI 主题变，留在清单里；补全弹层浅色下的琥珀高亮镜像 reader.css 的同名
+设计，本就不是青色令牌语义。**先分清"这是主题强调色还是内容色"，再决定动不动。**
+
 ---
 
 ## 三、提交前门禁（四条，缺一不可）
@@ -693,7 +723,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/push.ps1
 | 低 | 发布清理脚本已失效（已删） | `scripts/organize-release.cjs` **0 处**引用 KnowSpace，整篇指向改名前的 `BookMD-Reader-win-x64` / `BookMD Reader.exe`，且只搬 MSI、不清理历史版本 | 2026-09-26 已删除——留着比没有更危险，会让人以为清理过了。清理口径见上一条 |
 | 低 | 闪念胶囊控件轮廓在浅色/eink 下几乎看不见 | `.flash-mini-btn` 的淡琥珀底（0.18）与淡琥珀描边（0.35）相对所在底分别只有 **1.14:1 / 1.28:1**（eink 同）；`.flash-tool-insert-persistent`（0.12 底 / 0.3 描边）是 **1.09:1 / 1.24:1**。文字已达标（浅色 5.83:1、eink 7.39:1），但控件轮廓未达 WCAG 1.4.11 的 3:1 | 把浅色/eink 的描边换成实色 `var(--flash-accent)` 即可达 **4.69:1 / 4.65:1**（已验算），底也可以顺势加深。这是**刻意留下**的：本次只修文字可读性，改轮廓会动到按钮的外观手感，该由设计定 |
 | 中 | 启动闪屏恒定深色，浅色主题下会闪 | `src/main.tsx:16` 的 Suspense 占位用 `var(--bg-primary, #1e1e1e)`，而 `--bg-primary` **未定义** → 兜底 `#1e1e1e` 恒定生效。`index.html` 里**没有**「挂载前应用主题」的引导脚本，`<html>` 也没有 `data-theme`，所以首帧只有 `:root` 的默认（浅色）值 | **不要只改兜底值**——那只是把「浅色用户看到深色闪屏」换成「深色用户看到白色闪屏」，对谁都不算修。正确修法是往 `index.html` 加一段内联引导脚本：读持久化的主题 → 挂载前设 `data-theme`。加了以后要把存储键与 `src/services/themeMode.ts` 绑成单一事实来源（配守卫），否则键一改就又闪 |
-| 中 | TSX 里的内联强调色没跟着令牌走（已修，阶段 C1） | `--accent-info` 在 CSS 侧收编 200 处后，JS 侧还留着 **45 处** `isDark ? "#38bdf8" : "#0284c7"` 三元组与几处主题盲写死——`#0284c7` 白底只有 4.10:1，低于正文阈值；同一个 bug 的另外半边 | 2026-10-05 已修：DOM 内联样式改读 `var(--accent-info)`（含 portal 弹层，都在 `html[data-theme]` 之下）；拿不到级联的消费者（Cytoscape、SVG/PNG 导出、canvas 调色板）走新镜像表 `src/services/themeTokens.ts`。守卫 `tsx-accent-info.test.ts` 钉两件事：字面量清零（允许清单自带腐坏检查）、镜像表与各主题令牌定义同源。**未动**：导图「天蓝」用户标记色（存进文档、不随 UI 主题变）与胶囊补全弹层的浅色琥珀（镜像 reader.css 补全弹层，本就不是青色令牌语义） |
+| 中 | TSX 里的内联强调色没跟着令牌走（已修，阶段 C1） | `--accent-info` 在 CSS 侧收编 200 处后，JS 侧还留着 **45 处** `isDark ? "#38bdf8" : "#0284c7"` 三元组与几处主题盲写死——`#0284c7` 白底只有 4.10:1，低于正文阈值；同一个 bug 的另外半边 | 2026-10-05 已修：DOM 内联样式改读 `var(--accent-info)`（含 portal 弹层，都在 `html[data-theme]` 之下）；拿不到级联的消费者（Cytoscape、SVG/PNG 导出、canvas 调色板）走新镜像表 `src/services/themeTokens.ts`。守卫 `tsx-accent-info.test.ts` 钉两件事：字面量清零（允许清单自带腐坏检查）、镜像表与各主题令牌定义同源。**未动**：导图「天蓝」用户标记色（存进文档、不随 UI 主题变）与胶囊补全弹层的浅色琥珀（镜像 reader.css 补全弹层，本就不是青色令牌语义）。模式已入册为规则 10.4 |
 | 低 | 9 处 `data-theme="dark"` 死选择器（已修） | `ThemeMode` 里没有 `"dark"`（那是被改名成 `"twitter"` 的遗留值），所以这 9 条**永远不匹配**。当时没造成视觉 bug——每条规则的列表里都另有一个活的 `[data-theme="twitter"]`，规则照样生效；但它会**教错词汇表**，下一个人照抄就写出永不生效的覆盖 | 2026-09-21 已删掉 `dark` 变体，并加了词汇表守卫（`css-theme-vocabulary.test.ts`，把 CSS 主题名与 `ThemeMode` 绑成单一事实来源）。详见规则 10.2 |
 | 中 | 样式巨石已切到最后一个域（阶段 B 完结；C2 结论：不再细分） | `src/styles.css` 曾是全仓**最大**文件——但它**不在** `max-file-lines` 的口径里（棘轮只数 ts/tsx），所以此前没有任何指标能看见它变大或变小。当前行数与已切出的域切片清单以 `docs/QUALITY_BASELINE.md` 的 `styles-css-lines` + 「CSS 拆分进度看板」为准（脚本生成；本表**不复述数字**，复述的每一批都会先过期一次）。批次 2–10 已把 13,614 行切成 31 个域切片，剩余部分是**单一连续域**（无限画布卡片富文本与导图功能块），不再存在「下一批顺手外迁」。**C2 可行性结论（2026-10-05）**：剩余域内部只有 `/* ── … ── */` 子节注释、无域级横幅；实测跨刀风险真实存在——eink 覆盖与基础规则交错（如 `.canvas-selection-box` 的 `[data-theme="twitter"]`/`[data-theme="eink"]` 覆盖就写在开头功能块内、紧跟其基础规则），任何按子节的切法都必须逐条证明这些交错对的先后关系不翻转，收益递减——判定为**不动刀**，以 `styles-css-lines` 只减不增防手工折叠回退即可 | 指标 `styles-css-lines` 只减不增（防手工折叠切片改级联）。拆分器已完成使命，归档于 `scripts/_archive/split-styles-css.cjs`；若未来因新功能必须再拆，先按阶段 B 的证明模板做逐子节级联顺序证明——浅色/墨水屏覆盖靠「同特异度后来者胜」生效，改顺序就是改外观，不是重构 |
 | 低 | 令牌桥接块是过渡，不是终点 | `src/styles/tokens.css` 的 `:root` 里有一块把 9 个「幽灵令牌」桥接到既有令牌（`--surface-3: var(--surface-sunken)` 等），它们曾被引用 **63 处**却从未定义 | 桥接保住了正确性，但规则 1 要求一个概念只有一处定义。收敛办法：把这 63 处引用改成既有令牌，再删掉桥接块。守卫已覆盖（`css-custom-properties.test.ts`），删块忘改引用会立刻变红 |
