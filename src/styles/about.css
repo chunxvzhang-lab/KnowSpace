@@ -116,7 +116,7 @@
 }
 
 .about-close-btn:hover {
-  background: var(--surface-3);
+  background: var(--surface-sunken);
   color: var(--text);
 }
 
@@ -206,7 +206,7 @@
   font-weight: 600;
   padding: 2px 8px;
   border-radius: 6px;
-  background: var(--surface-3);
+  background: var(--surface-sunken);
   border: 1px solid var(--border);
   color: var(--text);
   font-family: var(--font-mono, Consolas, monospace);
@@ -233,7 +233,7 @@
 .about-code-path {
   font-family: var(--font-mono);
   font-size: 11.5px;
-  background: var(--surface-3);
+  background: var(--surface-sunken);
   padding: 3px 6px;
   border-radius: 5px;
   border: 1px solid var(--border);
@@ -357,7 +357,7 @@
 }
 
 .about-pillar-item {
-  background: var(--surface-3);
+  background: var(--surface-sunken);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 10px 12px;
@@ -421,8 +421,8 @@
 }
 
 .about-action-btn.secondary:hover {
-  background: var(--surface-3);
-  border-color: var(--border-strong);
+  background: var(--surface-sunken);
+  border-color: var(--border-hover);
 }
 
 .about-action-btn.primary {
@@ -458,7 +458,7 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 16px;
-  box-shadow: var(--shadow-floating);
+  box-shadow: var(--shadow-modal);
   text-align: center;
   display: flex;
   flex-direction: column;
@@ -507,7 +507,7 @@
 }
 
 .empty-action-card:hover {
-  background: var(--surface-3);
+  background: var(--surface-sunken);
   border-color: var(--accent);
   transform: translateY(-2px);
   box-shadow: var(--shadow-card);

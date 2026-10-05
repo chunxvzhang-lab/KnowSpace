@@ -261,7 +261,7 @@ body.is-resizing-col * {
 }
 
 .tree-rename-btn:hover {
-  background: var(--surface-hover);
+  background: var(--surface-2);
   color: var(--text);
 }
 
@@ -341,7 +341,7 @@ body.is-resizing-col * {
 }
 
 .space-standalone-close-btn:hover {
-  background: var(--surface-hover);
+  background: var(--surface-2);
   color: var(--text);
 }
 
@@ -508,7 +508,7 @@ body.is-resizing-col * {
   height: 18px;
   border-radius: 50%;
   border: 0;
-  background: var(--surface-3);
+  background: var(--surface-sunken);
   color: var(--text-muted);
   cursor: pointer;
   padding: 0;
@@ -608,7 +608,7 @@ body.is-resizing-col * {
   font-size: 10.5px;
   font-weight: 700;
   color: var(--text-muted);
-  background: var(--surface-3);
+  background: var(--surface-sunken);
   padding: 1px 5px;
   border-radius: 4px;
   flex-shrink: 0;
@@ -666,7 +666,7 @@ body.is-resizing-col * {
 
 .search-scope-tab:hover {
   color: var(--text);
-  background: var(--surface-3);
+  background: var(--surface-sunken);
 }
 
 .search-scope-tab.active {
@@ -680,7 +680,7 @@ body.is-resizing-col * {
   font-size: 9.5px;
   padding: 0 4px;
   border-radius: 9px;
-  background: var(--surface-3);
+  background: var(--surface-sunken);
   color: var(--text-muted);
 }
 
@@ -720,7 +720,7 @@ body.is-resizing-col * {
 }
 
 .search-syntax-chip:hover {
-  background: var(--surface-3);
+  background: var(--surface-sunken);
   color: var(--accent);
   border-color: var(--accent);
   transform: translateY(-1px);
@@ -735,7 +735,7 @@ body.is-resizing-col * {
   font-weight: 600;
   padding: 1px 5px;
   border-radius: 4px;
-  background: var(--surface-3);
+  background: var(--surface-sunken);
   color: var(--text-muted);
   max-width: 110px;
   flex-shrink: 0;

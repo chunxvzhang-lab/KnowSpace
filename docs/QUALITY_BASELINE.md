@@ -39,7 +39,7 @@ import 顺序 = 拆分前 styles.css 内的物理顺序；每批只切连续前�
 
 | 文件 | 行数 |
 | :--- | ---: |
-| `src/styles/tokens.css`（切片） | 251 |
+| `src/styles/tokens.css`（切片） | 219 |
 | `src/styles/shell.css`（切片） | 777 |
 | `src/styles/sidebar.css`（切片） | 785 |
 | `src/styles/workspace.css`（切片） | 180 |

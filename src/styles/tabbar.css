@@ -126,9 +126,9 @@
   z-index: 10000;
   min-width: 140px;
   background: var(--surface);
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--border-hover);
   border-radius: 8px;
-  box-shadow: var(--shadow-floating);
+  box-shadow: var(--shadow-modal);
   padding: 4px;
   animation: fadeInScale 0.15s ease;
 }

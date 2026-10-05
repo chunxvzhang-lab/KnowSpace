@@ -604,7 +604,7 @@
   font-size: 10px;
   font-weight: 600;
   color: var(--text-muted, #94a3b8);
-  background: var(--surface-3, rgba(255, 255, 255, 0.08));
+  background: var(--surface-sunken, rgba(255, 255, 255, 0.08));
   padding: 1px 6px;
   border-radius: 4px;
   white-space: nowrap;
@@ -740,7 +740,7 @@
   border: none;
   border-radius: 6px;
   background: transparent;
-  color: var(--text-primary, #e2e8f0);
+  color: var(--text, #e2e8f0);
   font-size: 12.5px;
   text-align: left;
   cursor: pointer;
@@ -876,7 +876,7 @@
   border: 1px solid rgba(148, 163, 184, 0.28);
   border-radius: 6px;
   background: var(--surface-2);
-  color: var(--text-primary, #e2e8f0);
+  color: var(--text, #e2e8f0);
   font-family: inherit;
   font-size: 12px;
   line-height: 1.5;
@@ -886,7 +886,7 @@
 }
 
 .mindmap-note-input::placeholder {
-  color: var(--text-tertiary, #64748b);
+  color: var(--text-muted, #64748b);
 }
 
 .mindmap-note-input:focus-visible {
@@ -1027,7 +1027,7 @@
 }
 
 .mindmap-floating-text {
-  fill: var(--text-primary, #e2e8f0);
+  fill: var(--text, #e2e8f0);
   font-size: 13px;
   font-weight: 500;
   /* The box is the handle: a drag that started on the text would otherwise be a
@@ -1120,7 +1120,7 @@
   border: 1px solid rgba(148, 163, 184, 0.28);
   border-radius: 5px;
   background: transparent;
-  color: var(--text-secondary, #cbd5e1);
+  color: var(--text-muted, #cbd5e1);
   font-size: 11px;
   cursor: pointer;
   transition:
@@ -1152,7 +1152,7 @@
 
 .mindmap-node-number {
   pointer-events: none;
-  fill: color-mix(in srgb, var(--accent-info) 70%, var(--text-primary, #e2e8f0));
+  fill: color-mix(in srgb, var(--accent-info) 70%, var(--text, #e2e8f0));
   font-size: 10px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -1193,13 +1193,13 @@
   border: 1px solid rgba(148, 163, 184, 0.28);
   border-radius: 6px;
   background: var(--surface-2);
-  color: var(--text-primary, #e2e8f0);
+  color: var(--text, #e2e8f0);
   font-family: inherit;
   font-size: 12px;
 }
 
 .mindmap-link-input::placeholder {
-  color: var(--text-tertiary, #64748b);
+  color: var(--text-muted, #64748b);
 }
 
 .mindmap-link-input:focus-visible {
@@ -1241,7 +1241,7 @@
   border: 1px solid rgba(148, 163, 184, 0.28);
   border-radius: 5px;
   background: transparent;
-  color: var(--text-secondary, #cbd5e1);
+  color: var(--text-muted, #cbd5e1);
   font-size: 11px;
   cursor: pointer;
 }
@@ -1267,8 +1267,8 @@
 }
 
 .mindmap-tag-chip.is-more {
-  fill: color-mix(in srgb, var(--text-tertiary, #64748b) 18%, var(--surface-1, #1e293b));
-  stroke: color-mix(in srgb, var(--text-tertiary, #64748b) 45%, transparent);
+  fill: color-mix(in srgb, var(--text-muted, #64748b) 18%, var(--surface-1, #1e293b));
+  stroke: color-mix(in srgb, var(--text-muted, #64748b) 45%, transparent);
 }
 
 .mindmap-tag-chip-text {
@@ -1278,7 +1278,7 @@
 }
 
 .mindmap-tag-chip.is-more + .mindmap-tag-chip-text {
-  fill: var(--text-tertiary, #64748b);
+  fill: var(--text-muted, #64748b);
 }
 
 .mindmap-tag-input {
@@ -1288,13 +1288,13 @@
   border: 1px solid rgba(148, 163, 184, 0.28);
   border-radius: 6px;
   background: var(--surface-2);
-  color: var(--text-primary, #e2e8f0);
+  color: var(--text, #e2e8f0);
   font-family: inherit;
   font-size: 12px;
 }
 
 .mindmap-tag-input::placeholder {
-  color: var(--text-tertiary, #64748b);
+  color: var(--text-muted, #64748b);
 }
 
 .mindmap-tag-input:focus-visible {
@@ -1319,7 +1319,7 @@
   border: 1px solid rgba(148, 163, 184, 0.28);
   border-radius: 10px;
   background: transparent;
-  color: var(--text-secondary, #cbd5e1);
+  color: var(--text-muted, #cbd5e1);
   font-size: 11px;
   cursor: pointer;
   overflow: hidden;
@@ -1351,7 +1351,7 @@
 
 .mindmap-ctx-hint {
   font-size: 11px;
-  color: var(--text-tertiary, #64748b);
+  color: var(--text-muted, #64748b);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1421,8 +1421,8 @@
 
 /* The dial itself, in both places it is drawn. */
 .mindmap-progress-track {
-  fill: color-mix(in srgb, var(--text-tertiary, #64748b) 22%, transparent);
-  stroke: color-mix(in srgb, var(--text-tertiary, #64748b) 55%, transparent);
+  fill: color-mix(in srgb, var(--text-muted, #64748b) 22%, transparent);
+  stroke: color-mix(in srgb, var(--text-muted, #64748b) 55%, transparent);
   stroke-width: 1;
 }
 
@@ -1484,7 +1484,7 @@
 
 .mindmap-icon-group-label {
   font-size: 10.5px;
-  color: var(--text-tertiary, #64748b);
+  color: var(--text-muted, #64748b);
 }
 
 .mindmap-icon-grid {
@@ -1502,7 +1502,7 @@
   border: 1px solid transparent;
   border-radius: 5px;
   background: transparent;
-  color: var(--text-secondary, #cbd5e1);
+  color: var(--text-muted, #cbd5e1);
   cursor: pointer;
   transition:
     background 0.12s ease,
@@ -1512,7 +1512,7 @@
 
 .mindmap-icon-btn:hover {
   background: var(--surface-2);
-  color: var(--text-primary, #e2e8f0);
+  color: var(--text, #e2e8f0);
 }
 
 .mindmap-icon-btn.is-active {
@@ -1531,7 +1531,7 @@
   border: 1px solid rgba(148, 163, 184, 0.28);
   border-radius: 5px;
   background: transparent;
-  color: var(--text-secondary, #cbd5e1);
+  color: var(--text-muted, #cbd5e1);
   font-size: 11px;
   cursor: pointer;
 }
@@ -1546,7 +1546,7 @@
    must never take the click meant for the node under it. */
 .mindmap-node-icon {
   pointer-events: none;
-  color: color-mix(in srgb, var(--accent-info) 82%, var(--text-primary, #e2e8f0));
+  color: color-mix(in srgb, var(--accent-info) 82%, var(--text, #e2e8f0));
 }
 
 .mindmap-note-marker {
