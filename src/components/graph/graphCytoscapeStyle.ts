@@ -1,4 +1,5 @@
 import type { ThemeMode } from "../../core/types";
+import { getAccentInfo } from "../../services/themeTokens";
 
 /**
  * The full Cytoscape stylesheet of the graph pane, as static data.
@@ -20,6 +21,8 @@ export function graphCytoscapeStyle(theme: ThemeMode, clusterByFolder: boolean) 
     theme === "twitter" ||
     (theme === "system" && window.matchMedia?.("(prefers-color-scheme: dark)").matches);
   const isEink = theme === "eink";
+  // 青色族走 --accent-info 的 TS 镜像表（阶段 C1）；#0284c7 白底不达正文阈值。
+  const accentInfo = getAccentInfo(theme, isDark);
 
   // Obsidian style colors: clean solid nodes without outer border circles
   const currentBg = isEink ? "#000000" : isDark ? "#8b5cf6" : "#7c3aed"; // Obsidian vivid purple for active node
@@ -30,7 +33,7 @@ export function graphCytoscapeStyle(theme: ThemeMode, clusterByFolder: boolean) 
     : isDark
       ? "rgba(148, 163, 184, 0.22)"
       : "rgba(100, 116, 139, 0.2)";
-  const crossFolderEdgeColor = isEink ? "#000000" : isDark ? "#38bdf8" : "#0284c7"; // Cyan/sky blue for cross-folder links
+  const crossFolderEdgeColor = isEink ? "#000000" : accentInfo.accent; // Cyan/sky blue for cross-folder links
   const nodeTextColor = isEink ? "#000000" : isDark ? "#f8fafc" : "#0f172a";
   const textOutlineColor = isEink ? "#ffffff" : isDark ? "#0b0f19" : "#ffffff";
 
@@ -127,15 +130,15 @@ export function graphCytoscapeStyle(theme: ThemeMode, clusterByFolder: boolean) 
         "z-index": 1000,
         opacity: 1,
         "border-width": 2,
-        "border-color": isEink ? "#000000" : isDark ? "#38bdf8" : "#0284c7",
+        "border-color": isEink ? "#000000" : accentInfo.accent,
         "border-opacity": 0.85,
       },
     },
     {
       selector: "edge.hovered",
       style: {
-        "line-color": isEink ? "#000000" : isDark ? "#38bdf8" : "#0284c7",
-        "target-arrow-color": isEink ? "#000000" : isDark ? "#38bdf8" : "#0284c7",
+        "line-color": isEink ? "#000000" : accentInfo.accent,
+        "target-arrow-color": isEink ? "#000000" : accentInfo.accent,
         width: 2.0,
         opacity: 1,
         "z-index": 1000,

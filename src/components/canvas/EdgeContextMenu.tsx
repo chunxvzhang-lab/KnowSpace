@@ -207,7 +207,7 @@ export const EdgeContextMenu = memo(function EdgeContextMenu({
                   setContextMenu(null);
                 }}
               >
-                <Shuffle size={13} color="#0284c7" />
+                <Shuffle size={13} color="var(--accent-info)" />
                 <span>批量反转连线流向</span>
                 <span className="canvas-ctx-shortcut">R</span>
               </div>
@@ -447,7 +447,7 @@ export const EdgeContextMenu = memo(function EdgeContextMenu({
               }}
               title={`反转连线流向: ${fromTitle} ⇄ ${toTitle}`}
             >
-              <Shuffle size={13} color="#0284c7" />
+              <Shuffle size={13} color="var(--accent-info)" />
               <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                 <span>反转连线流向</span>
                 <span

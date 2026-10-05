@@ -14,6 +14,8 @@
  * out wrong.
  */
 
+import { getAccentInfo } from "./themeTokens";
+
 export type StandaloneMindmapSvgOptions = {
   /** The laid-out map's bounds, in canvas coordinates. */
   bounds: { minX: number; minY: number; width: number; height: number };
@@ -172,7 +174,7 @@ const DECORATION_RULES: DecorationRule[] = [
   },
   {
     selector: ".mindmap-node-marks .mindmap-progress-fill",
-    fill: { dark: "#7dd3fc", light: "#0284c7" },
+    fill: { dark: "#7dd3fc", light: getAccentInfo("light").accent },
   },
   // Tags, under the node.
   {
@@ -249,7 +251,9 @@ export function buildStandaloneMindmapSvg(
 
   const nodeFill = options.dark ? "#1e293b" : "#ffffff";
   const nodeTextFill = options.dark ? "#f8fafc" : "#0f172a";
-  const rootTextFill = "#38bdf8";
+  const rootTextFill = options.dark
+    ? getAccentInfo("twitter").accent
+    : getAccentInfo("light").accent;
 
   // Rects and circles take their fill from a stylesheet on screen, which does
   // not travel with the file. The inline style is the node's own choice and wins

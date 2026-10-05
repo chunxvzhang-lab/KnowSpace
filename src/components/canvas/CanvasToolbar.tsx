@@ -30,6 +30,7 @@ import {
   Scan,
 } from "lucide-react";
 import type { ThemeMode } from "../../core/types";
+import { getAccentInfo } from "../../services/themeTokens";
 import type { CanvasData, CanvasNode, CanvasViewport } from "../../types/canvasTypes";
 import type { getCanvasThemeColors } from "../../services/canvasTheme";
 import {
@@ -170,6 +171,9 @@ export function CanvasToolbar({
   handleToggleFullscreen,
   onClose,
 }: CanvasToolbarProps) {
+  // 青色族走 --accent-info 的 TS 镜像表（阶段 C1）；#0284c7 白底只有 4.10:1，不达正文阈值。
+  const accentInfo = getAccentInfo(theme, isDark);
+
   // ── Ring spacing controls (toolbar-local) ────────────────────────────────
   // Live metrics for the alignment dropdown's radius slider. Only meaningful
   // while three or more selected cards actually sit on a common circle.
@@ -302,7 +306,7 @@ export function CanvasToolbar({
             ...toolBtnStyle(theme, colors),
             position: "relative",
             fontWeight: isDirty ? 600 : 500,
-            color: isDirty ? "#0284c7" : colors.cardText,
+            color: isDirty ? accentInfo.accent : colors.cardText,
           }}
         >
           <Save size={14} />
@@ -372,12 +376,8 @@ export function CanvasToolbar({
         }
         style={{
           ...toolBtnStyle(theme, colors),
-          backgroundColor: isBoxSelectMode
-            ? isDark
-              ? "rgba(56, 189, 248, 0.2)"
-              : "rgba(2, 132, 199, 0.12)"
-            : "transparent",
-          color: isBoxSelectMode ? (isDark ? "#38bdf8" : "#0284c7") : colors.cardText,
+          backgroundColor: isBoxSelectMode ? `rgba(${accentInfo.accentRgb}, 0.18)` : "transparent",
+          color: isBoxSelectMode ? accentInfo.accent : colors.cardText,
         }}
       >
         <BoxSelect size={14} />
@@ -426,9 +426,9 @@ export function CanvasToolbar({
             title="在选中的卡片/分组之间自动建立顺序链式连线"
             style={{
               ...toolBtnStyle(theme, colors),
-              backgroundColor: "rgba(2, 132, 199, 0.15)",
-              color: "#0284c7",
-              border: "1px solid rgba(2, 132, 199, 0.3)",
+              backgroundColor: `rgba(${accentInfo.accentRgb}, 0.15)`,
+              color: accentInfo.accent,
+              border: `1px solid rgba(${accentInfo.accentRgb}, 0.3)`,
               fontWeight: 600,
             }}
           >
@@ -464,10 +464,10 @@ export function CanvasToolbar({
               style={{
                 ...toolBtnStyle(theme, colors),
                 backgroundColor: showAlignMenu
-                  ? "rgba(2, 132, 199, 0.24)"
-                  : "rgba(2, 132, 199, 0.12)",
-                color: "#0284c7",
-                border: "1px solid rgba(2, 132, 199, 0.25)",
+                  ? `rgba(${accentInfo.accentRgb}, 0.24)`
+                  : `rgba(${accentInfo.accentRgb}, 0.12)`,
+                color: accentInfo.accent,
+                border: `1px solid rgba(${accentInfo.accentRgb}, 0.25)`,
                 fontWeight: 600,
               }}
             >
@@ -702,7 +702,7 @@ export function CanvasToolbar({
         title="导出白板为高清图片 (PNG / 矢量 SVG)"
         style={{
           ...toolBtnStyle(theme, colors),
-          color: "#0284c7",
+          color: accentInfo.accent,
           fontWeight: 600,
         }}
       >

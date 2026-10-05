@@ -72,7 +72,7 @@ export const ExportModal = memo(function ExportModal({
           }}
         >
           <h3 style={{ margin: 0, fontSize: 16, display: "flex", alignItems: "center", gap: 8 }}>
-            <ImageIcon size={18} color="#0284c7" /> 导出白板为图片
+            <ImageIcon size={18} color="var(--accent-info)" /> 导出白板为图片
           </h3>
           <button
             onClick={onClose}
@@ -119,8 +119,11 @@ export const ExportModal = memo(function ExportModal({
                 flex: 1,
                 padding: "10px 12px",
                 borderRadius: 8,
-                border: format === "png" ? "2px solid #0284c7" : `1px solid ${colors.cardBorder}`,
-                background: format === "png" ? "rgba(2,132,199,0.12)" : "transparent",
+                border:
+                  format === "png"
+                    ? `2px solid var(--accent-info)`
+                    : `1px solid ${colors.cardBorder}`,
+                background: format === "png" ? "rgba(var(--accent-info-rgb), 0.12)" : "transparent",
                 color: colors.cardText,
                 fontWeight: format === "png" ? 600 : 400,
                 cursor: "pointer",
@@ -142,8 +145,11 @@ export const ExportModal = memo(function ExportModal({
                 flex: 1,
                 padding: "10px 12px",
                 borderRadius: 8,
-                border: format === "svg" ? "2px solid #0284c7" : `1px solid ${colors.cardBorder}`,
-                background: format === "svg" ? "rgba(2,132,199,0.12)" : "transparent",
+                border:
+                  format === "svg"
+                    ? `2px solid var(--accent-info)`
+                    : `1px solid ${colors.cardBorder}`,
+                background: format === "svg" ? "rgba(var(--accent-info-rgb), 0.12)" : "transparent",
                 color: colors.cardText,
                 fontWeight: format === "svg" ? 600 : 400,
                 cursor: "pointer",
@@ -177,9 +183,12 @@ export const ExportModal = memo(function ExportModal({
                   borderRadius: 6,
                   fontSize: 12,
                   border:
-                    background === b.id ? "1.5px solid #0284c7" : `1px solid ${colors.cardBorder}`,
-                  background: background === b.id ? "rgba(2,132,199,0.1)" : "transparent",
-                  color: background === b.id ? "#0284c7" : colors.cardText,
+                    background === b.id
+                      ? "1.5px solid var(--accent-info)"
+                      : `1px solid ${colors.cardBorder}`,
+                  background:
+                    background === b.id ? "rgba(var(--accent-info-rgb), 0.1)" : "transparent",
+                  color: background === b.id ? "var(--accent-info)" : colors.cardText,
                   fontWeight: background === b.id ? 600 : 400,
                   cursor: "pointer",
                 }}
@@ -219,7 +228,7 @@ export const ExportModal = memo(function ExportModal({
             disabled={isExporting}
             style={{
               ...toolBtnStyle(theme, colors),
-              backgroundColor: "#0284c7",
+              backgroundColor: "var(--accent-info)",
               color: "#ffffff",
               padding: "7px 16px",
               borderRadius: 6,

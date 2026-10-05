@@ -286,7 +286,7 @@ export function ContextMenuPortal({
             onMouseEnter={(e) => handleOpenTablePicker(e.currentTarget)}
             onClick={(e) => handleOpenTablePicker(e.currentTarget)}
           >
-            <Table size={14} className="menu-icon" style={{ color: "#38bdf8" }} />
+            <Table size={14} className="menu-icon" style={{ color: "var(--accent-info)" }} />
             <span className="menu-label">插入表格 (自定义行列)</span>
             <ChevronRight size={13} className="submenu-arrow" />
           </div>

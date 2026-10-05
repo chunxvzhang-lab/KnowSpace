@@ -235,7 +235,7 @@ export const NodeContextMenu = memo(function NodeContextMenu({
                   className="canvas-ctx-item"
                   onClick={() => handleSelectGroupNodes(targetNode as CanvasGroupNode)}
                 >
-                  <CheckSquare size={13} color="#0284c7" />
+                  <CheckSquare size={13} color="var(--accent-info)" />
                   <span>选中组内所有卡片</span>
                 </div>
 
@@ -432,7 +432,7 @@ export const NodeContextMenu = memo(function NodeContextMenu({
 
                 {/* Connect selected nodes (Chain) */}
                 <div className="canvas-ctx-item" onClick={handleConnectSelectedNodes}>
-                  <Link size={13} color="#0284c7" />
+                  <Link size={13} color="var(--accent-info)" />
                   <span>🔗 建立顺序链式连线 ({selectedNodeIds.size} 项)</span>
                 </div>
 
@@ -477,11 +477,11 @@ export const NodeContextMenu = memo(function NodeContextMenu({
                 <div className="canvas-ctx-section-label">对齐与分布</div>
 
                 <div className="canvas-ctx-item" onClick={() => handleAlignSelected("horizontal")}>
-                  <AlignJustify size={13} color="#0284c7" />
+                  <AlignJustify size={13} color="var(--accent-info)" />
                   <span style={{ fontWeight: 600 }}>水平中线对齐 (中心 Y 对齐)</span>
                 </div>
                 <div className="canvas-ctx-item" onClick={() => handleAlignSelected("vertical")}>
-                  <AlignCenter size={13} color="#0284c7" />
+                  <AlignCenter size={13} color="var(--accent-info)" />
                   <span style={{ fontWeight: 600 }}>垂直中线对齐 (中心 X 对齐)</span>
                 </div>
 
@@ -723,7 +723,7 @@ export const NodeContextMenu = memo(function NodeContextMenu({
                     className="canvas-ctx-item"
                     onClick={() => handleCopyNodeWikilink(targetNode)}
                   >
-                    <Link size={13} color="#0284c7" />
+                    <Link size={13} color="var(--accent-info)" />
                     <span>复制双链引用 [[...]]</span>
                   </div>
                 )}

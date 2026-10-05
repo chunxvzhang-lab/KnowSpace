@@ -551,7 +551,7 @@ export function CanvasOverlayMenus({
                         setContextMenu(null);
                       }}
                     >
-                      <ImageIcon size={13} color="#0284c7" />
+                      <ImageIcon size={13} color="var(--accent-info)" />
                       <span>插入图片...</span>
                     </div>
                     <div
@@ -615,14 +615,14 @@ export function CanvasOverlayMenus({
 
                 {data.edges.length > 0 && (
                   <div className="canvas-ctx-item" onClick={handleSelectAllEdges}>
-                    <Link size={13} color="#0284c7" />
+                    <Link size={13} color="var(--accent-info)" />
                     <span>全选所有连线 ({data.edges.length} 条)</span>
                   </div>
                 )}
 
                 {editable && (
                   <div className="canvas-ctx-item" onClick={handleAlignToGrid}>
-                    <Grid size={13} color="#0284c7" />
+                    <Grid size={13} color="var(--accent-info)" />
                     <span>对齐所有卡片到网格 (20px)</span>
                   </div>
                 )}
@@ -707,7 +707,7 @@ export function CanvasOverlayMenus({
                     setContextMenu(null);
                   }}
                 >
-                  <ImageIcon size={13} color="#0284c7" />
+                  <ImageIcon size={13} color="var(--accent-info)" />
                   <span>📸 导出白板为图片...</span>
                 </div>
               </>

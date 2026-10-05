@@ -11,6 +11,7 @@ import {
   History,
 } from "lucide-react";
 import type { ThemeMode } from "../core/types";
+import { getAccentInfo } from "../services/themeTokens";
 import type { SnapshotItem, SnapshotDetail } from "../types/desktop";
 import {
   computeLineDiff,
@@ -172,12 +173,15 @@ export const VersionHistoryDialog = memo(function VersionHistoryDialog({
 
   const isDark = theme === "twitter";
   const isEink = theme === "eink";
+  // 青色族走 --accent-info 的 TS 镜像表（阶段 C1）；#0284c7 白底不达正文阈值。
+  // 本弹层其余取色都把非 twitter 一律按浅色处理，system 在这里保持同一口径。
+  const accentInfo = getAccentInfo(theme, isDark);
 
   const modalBg = isEink ? "#f4f1ea" : isDark ? "#0f172a" : "#ffffff";
   const modalColor = isEink ? "#1a1a1a" : isDark ? "#f1f5f9" : "#1e293b";
   const borderColor = isEink ? "#1a1a1a" : isDark ? "rgba(255,255,255,0.12)" : "#e2e8f0";
   const sidebarBg = isEink ? "#ebe6dc" : isDark ? "#141e33" : "#f8fafc";
-  const itemActiveBg = isEink ? "#ddd7cb" : isDark ? "rgba(56, 189, 248, 0.15)" : "#e0f2fe";
+  const itemActiveBg = isEink ? "#ddd7cb" : `rgba(${accentInfo.accentRgb}, ${isDark ? 0.15 : 0.1})`;
 
   return (
     <div
@@ -232,8 +236,8 @@ export const VersionHistoryDialog = memo(function VersionHistoryDialog({
                 width: 32,
                 height: 32,
                 borderRadius: 8,
-                backgroundColor: isDark ? "rgba(56, 189, 248, 0.15)" : "#e0f2fe",
-                color: "#38bdf8",
+                backgroundColor: `rgba(${accentInfo.accentRgb}, ${isDark ? 0.15 : 0.1})`,
+                color: accentInfo.accent,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -268,8 +272,7 @@ export const VersionHistoryDialog = memo(function VersionHistoryDialog({
                   fontSize: 12,
                   border: "none",
                   borderRadius: 4,
-                  backgroundColor:
-                    viewMode === "side-by-side" ? (isDark ? "#38bdf8" : "#0284c7") : "transparent",
+                  backgroundColor: viewMode === "side-by-side" ? accentInfo.accent : "transparent",
                   color: viewMode === "side-by-side" ? "#ffffff" : "inherit",
                   cursor: "pointer",
                   display: "flex",
@@ -287,8 +290,7 @@ export const VersionHistoryDialog = memo(function VersionHistoryDialog({
                   fontSize: 12,
                   border: "none",
                   borderRadius: 4,
-                  backgroundColor:
-                    viewMode === "unified" ? (isDark ? "#38bdf8" : "#0284c7") : "transparent",
+                  backgroundColor: viewMode === "unified" ? accentInfo.accent : "transparent",
                   color: viewMode === "unified" ? "#ffffff" : "inherit",
                   cursor: "pointer",
                   display: "flex",
@@ -395,7 +397,7 @@ export const VersionHistoryDialog = memo(function VersionHistoryDialog({
                         cursor: "pointer",
                         backgroundColor: isSelected ? itemActiveBg : "transparent",
                         border: isSelected
-                          ? `1px solid ${isDark ? "#38bdf8" : "#0284c7"}`
+                          ? `1px solid ${accentInfo.accent}`
                           : "1px solid transparent",
                         transition: "all 0.15s ease",
                       }}

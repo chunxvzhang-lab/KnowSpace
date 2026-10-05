@@ -88,7 +88,7 @@ export function TablePickerPanel({
     >
       <div className="table-picker-header">
         <div className="table-picker-title">
-          <Table size={15} style={{ color: "#38bdf8" }} />
+          <Table size={15} style={{ color: "var(--accent-info)" }} />
           <span>自定义表格</span>
         </div>
         <span className="table-picker-badge">

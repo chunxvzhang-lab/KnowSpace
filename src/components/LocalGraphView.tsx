@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import cytoscape, { type Core } from "cytoscape";
 import { Maximize2, RotateCcw, ZoomIn, ZoomOut } from "lucide-react";
 import type { ThemeMode } from "../core/types";
+import { getAccentInfo } from "../services/themeTokens";
 import {
   extractLocalSubgraph,
   toCytoscapeElements,
@@ -45,8 +46,11 @@ export function LocalGraphView({
       theme === "twitter" ||
       (theme === "system" && window.matchMedia?.("(prefers-color-scheme: dark)").matches);
     const isEink = theme === "eink";
+    // 青色族走 --accent-info 的 TS 镜像表（阶段 C1）：原来的 #0284c7 白底只有
+    // 4.10:1，不达正文阈值；令牌浅色定值 #0369a1（5.93:1），深色维持 #38bdf8。
+    const accentInfo = getAccentInfo(theme, isDark);
 
-    const currentBg = isEink ? "#000000" : isDark ? "#38bdf8" : "#0284c7";
+    const currentBg = isEink ? "#000000" : accentInfo.accent;
     const normalBg = isEink ? "#555555" : isDark ? "#475569" : "#94a3b8";
     const spaceBg = isEink ? "#777777" : "#f59e0b";
     const edgeColor = isEink
@@ -54,7 +58,7 @@ export function LocalGraphView({
       : isDark
         ? "rgba(148, 163, 184, 0.3)"
         : "rgba(100, 116, 139, 0.3)";
-    const crossFolderEdgeColor = isEink ? "#000000" : isDark ? "#38bdf8" : "#0284c7";
+    const crossFolderEdgeColor = isEink ? "#000000" : accentInfo.accent;
     const textColor = isEink ? "#000000" : isDark ? "#cbd5e1" : "#334155";
 
     // 3. Initialize Cytoscape with low-overhead flags
@@ -270,7 +274,7 @@ export function LocalGraphView({
           <strong>{hoverNode.label}</strong>
           {hoverNode.isCurrent && <span className="current-tag">当前</span>}
           {hoverNode.folderGroup && (
-            <span style={{ fontSize: 10, color: "#38bdf8", marginLeft: 4 }}>
+            <span style={{ fontSize: 10, color: "var(--accent-info)", marginLeft: 4 }}>
               [{hoverNode.folderGroup}]
             </span>
           )}

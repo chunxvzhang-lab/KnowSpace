@@ -183,7 +183,7 @@ export function MindmapNodeLayer({
           strokeColor = node.borderColor;
         } else if (customBg && !isCustomTransparent) {
           strokeColor = isSelected
-            ? "#38bdf8"
+            ? "var(--accent-info)"
             : isHovered
               ? "rgba(255, 255, 255, 0.75)"
               : "rgba(0, 0, 0, 0.18)";
@@ -193,7 +193,7 @@ export function MindmapNodeLayer({
         const autoContrastTextColor =
           customBg && !isCustomTransparent ? getContrastTextColor(customBg) : "";
         const resolvedTextColor =
-          node.textColor || autoContrastTextColor || (isRoot ? "#38bdf8" : undefined);
+          node.textColor || autoContrastTextColor || (isRoot ? "var(--accent-info)" : undefined);
 
         return (
           <g
@@ -267,8 +267,8 @@ export function MindmapNodeLayer({
                   height={node.height + 14}
                   rx={12}
                   ry={12}
-                  fill="rgba(56, 189, 248, 0.22)"
-                  stroke="#38bdf8"
+                  fill="rgba(var(--accent-info-rgb), 0.22)"
+                  stroke="var(--accent-info)"
                   strokeWidth={2.5}
                   strokeDasharray="5 3"
                 />
@@ -276,7 +276,7 @@ export function MindmapNodeLayer({
                   x={node.width / 2}
                   y={-10}
                   textAnchor="middle"
-                  fill="#38bdf8"
+                  fill="var(--accent-info)"
                   fontSize={11}
                   fontWeight="bold"
                 >
@@ -299,7 +299,7 @@ export function MindmapNodeLayer({
                 x2={node.width + 6}
                 y1={dropPosition === "before" ? -8 : node.height + 8}
                 y2={dropPosition === "before" ? -8 : node.height + 8}
-                stroke="#38bdf8"
+                stroke="var(--accent-info)"
                 strokeWidth={3}
                 strokeLinecap="round"
               />
@@ -351,7 +351,7 @@ export function MindmapNodeLayer({
                           : 9
                 }
                 className="mindmap-node-selection-ring"
-                stroke="#38bdf8"
+                stroke="var(--accent-info)"
                 strokeWidth={2}
                 fill="none"
                 strokeDasharray="4 2"
@@ -609,7 +609,7 @@ export function MindmapNodeLayer({
                   y1={2}
                   x2={2}
                   y2={7}
-                  stroke="#38bdf8"
+                  stroke="var(--accent-info)"
                   strokeWidth={1.4}
                   strokeLinecap="round"
                 />
@@ -618,7 +618,7 @@ export function MindmapNodeLayer({
                   y1={5}
                   x2={5}
                   y2={7}
-                  stroke="#38bdf8"
+                  stroke="var(--accent-info)"
                   strokeWidth={1.4}
                   strokeLinecap="round"
                 />

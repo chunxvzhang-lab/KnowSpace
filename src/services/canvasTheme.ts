@@ -1,4 +1,5 @@
 import type { ThemeMode } from "../core/types";
+import { getAccentInfo } from "./themeTokens";
 
 /**
  * Single source of truth for every canvas colour.
@@ -85,10 +86,10 @@ export function getCanvasThemeColors(theme: ThemeMode): CanvasThemeColors {
       cardShadow: "0 4px 16px rgba(0,0,0,0.06)",
       groupBorder: "rgba(100, 116, 139, 0.4)",
       groupBg: "rgba(241, 245, 249, 0.6)",
-      edgeColor: "#0284c7",
+      edgeColor: getAccentInfo("light").accent,
       edgeLabelBg: "#ffffff",
       edgeLabelText: "#0f172a",
-      anchorDotBg: "#0284c7",
+      anchorDotBg: getAccentInfo("light").accent,
       codeBg: "rgba(15,23,42,0.06)",
       quoteBorder: "rgba(100,116,139,0.45)",
       isDark: false,
@@ -109,10 +110,10 @@ export function getCanvasThemeColors(theme: ThemeMode): CanvasThemeColors {
     cardShadow: "0 8px 24px rgba(0,0,0,0.35)",
     groupBorder: "rgba(255,255,255,0.2)",
     groupBg: "rgba(255,255,255,0.03)",
-    edgeColor: "#38bdf8",
+    edgeColor: getAccentInfo("twitter").accent,
     edgeLabelBg: "#1e293b",
     edgeLabelText: "#f1f5f9",
-    anchorDotBg: "#38bdf8",
+    anchorDotBg: getAccentInfo("twitter").accent,
     codeBg: "rgba(255,255,255,0.08)",
     quoteBorder: "rgba(255,255,255,0.28)",
     isDark: true,

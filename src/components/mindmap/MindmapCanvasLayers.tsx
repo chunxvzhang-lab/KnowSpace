@@ -98,8 +98,8 @@ export function MindmapCanvasLayers({
             y={Math.min(marquee.y1, marquee.y2)}
             width={Math.abs(marquee.x2 - marquee.x1)}
             height={Math.abs(marquee.y2 - marquee.y1)}
-            fill="rgba(56, 189, 248, 0.12)"
-            stroke="#38bdf8"
+            fill="rgba(var(--accent-info-rgb), 0.12)"
+            stroke="var(--accent-info)"
             strokeWidth={1.5}
             strokeDasharray="4 3"
             pointerEvents="none"

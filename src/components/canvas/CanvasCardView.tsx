@@ -213,6 +213,9 @@ export function CanvasCardView({
   handleCardBodyActivate,
   openMediaPreview,
 }: CanvasCardViewProps) {
+  // 青色族走 CSS 令牌（阶段 C1）：这些样式都渲染在主题 DOM 里，var() 直接跟随。
+  const accentInfo = "var(--accent-info)";
+  const accentSoft = "rgba(var(--accent-info-rgb), 0.6)";
   const isConnectingTarget = connectingState !== null && connectingState.fromNodeId !== node.id;
   const outgoingInfo = nodeOutgoingMap.get(node.id);
   const isOneToManySource = !!outgoingInfo && outgoingInfo.count >= 2;
@@ -260,9 +263,9 @@ export function CanvasCardView({
           : isSelected
             ? "2px solid #f59e0b"
             : isConnectingTarget && isHovered
-              ? "2px solid #0284c7"
+              ? `2px solid ${accentInfo}`
               : isConnectingTarget
-                ? "2px dashed rgba(2, 132, 199, 0.6)"
+                ? `2px dashed ${accentSoft}`
                 : isOneToManySource && sourceColorPalette
                   ? `2px solid ${sourceColorPalette.stroke}`
                   : palette
@@ -275,7 +278,7 @@ export function CanvasCardView({
           : isSelected
             ? "0 12px 36px rgba(245,158,11,0.35)"
             : isConnectingTarget && isHovered
-              ? "0 0 0 3px rgba(2, 132, 199, 0.4), 0 12px 36px rgba(2, 132, 199, 0.35)"
+              ? "0 0 0 3px rgba(var(--accent-info-rgb), 0.4), 0 12px 36px rgba(var(--accent-info-rgb), 0.35)"
               : isOneToManySource && sourceColorPalette
                 ? `0 0 0 1px ${sourceColorPalette.stroke}88, 0 8px 24px ${sourceColorPalette.stroke}22`
                 : colors.cardShadow,
@@ -365,7 +368,7 @@ export function CanvasCardView({
             top: -24,
             left: "50%",
             transform: "translateX(-50%)",
-            backgroundColor: "#0284c7",
+            backgroundColor: accentInfo,
             color: "#ffffff",
             fontSize: 11,
             fontWeight: 600,
@@ -495,7 +498,7 @@ export function CanvasCardView({
               {node.type === "file" &&
                 (() => {
                   const mType = getMediaFileType(node.file);
-                  if (mType === "image") return <ImageIcon size={13} color="#0284c7" />;
+                  if (mType === "image") return <ImageIcon size={13} color="var(--accent-info)" />;
                   if (mType === "audio") return <Music size={13} color="#a855f7" />;
                   if (mType === "video") return <Video size={13} color="#ef4444" />;
                   return <FileText size={13} color="#10b981" />;

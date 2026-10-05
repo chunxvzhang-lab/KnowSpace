@@ -116,7 +116,7 @@ export function CanvasPresentationChrome({
                 );
                 title = n.text.trim().split("\n")[0] || "文本卡片";
               } else if (n.type === "file") {
-                icon = <ImageIcon size={13} color="#0284c7" />;
+                icon = <ImageIcon size={13} color="var(--accent-info)" />;
                 title = n.file ? n.file.split(/[/\\]/).pop() || n.file : "文件卡片";
               } else if (n.type === "link") {
                 icon = <ExternalLink size={13} color="#10b981" />;

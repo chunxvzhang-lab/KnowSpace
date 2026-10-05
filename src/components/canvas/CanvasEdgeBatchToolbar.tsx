@@ -140,7 +140,7 @@ export const CanvasEdgeBatchToolbar = memo(function CanvasEdgeBatchToolbar({
       {/* Reverse flow */}
       <button
         onClick={onReverse}
-        style={{ ...toolBtn, color: "#0284c7" }}
+        style={{ ...toolBtn, color: "var(--accent-info)" }}
         title="批量反转连线流向 (R)"
       >
         <Shuffle size={12} />

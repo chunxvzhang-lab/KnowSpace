@@ -99,6 +99,8 @@ export function CanvasGroupView({
   handleDeleteNode,
   handleSaveNodeEdit,
 }: CanvasGroupViewProps) {
+  // 青色族走 CSS 令牌（阶段 C1）：样式渲染在主题 DOM 里，var() 直接跟随。
+  const accentInfo = "var(--accent-info)";
   const currentSlideNodeId = isPresentationMode ? presentationSequence[currentSlideIndex] : null;
   const currentSlideNode = currentSlideNodeId ? nodeMap.get(currentSlideNodeId) : null;
   const isCurrentGroupSlide = isPresentationMode && currentSlideNodeId === node.id;
@@ -163,9 +165,9 @@ export function CanvasGroupView({
             : isSelected
               ? "2px solid #f59e0b"
               : isGroupConnectingTarget && isHovered
-                ? "2px solid #0284c7"
+                ? `2px solid ${accentInfo}`
                 : isGroupConnectingTarget
-                  ? "2px dashed rgba(2, 132, 199, 0.7)"
+                  ? `2px dashed rgba(var(--accent-info-rgb), 0.7)`
                   : palette
                     ? `2px dashed ${palette.stroke}`
                     : `2px dashed ${colors.groupBorder}`,
@@ -181,7 +183,7 @@ export function CanvasGroupView({
             : isSelected
               ? "0 0 16px rgba(245,158,11,0.3)"
               : isGroupConnectingTarget && isHovered
-                ? "0 0 0 3px rgba(2, 132, 199, 0.4), 0 0 16px rgba(2, 132, 199, 0.3)"
+                ? "0 0 0 3px rgba(var(--accent-info-rgb), 0.4), 0 0 16px rgba(var(--accent-info-rgb), 0.3)"
                 : undefined,
         display: "flex",
         flexDirection: "column",
@@ -255,7 +257,7 @@ export function CanvasGroupView({
             top: -24,
             left: "50%",
             transform: "translateX(-50%)",
-            backgroundColor: "#0284c7",
+            backgroundColor: accentInfo,
             color: "#ffffff",
             fontSize: 11,
             fontWeight: 600,

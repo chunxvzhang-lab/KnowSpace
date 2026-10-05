@@ -177,7 +177,7 @@ export function ActivityBar({
             data-tooltip="反向链接与引用"
             aria-label="反向链接与引用"
           >
-            <GitFork size={18} style={{ color: "#38bdf8" }} />
+            <GitFork size={18} style={{ color: "var(--accent-info)" }} />
             {backlinksCount > 0 && <span className="activity-badge">{backlinksCount}</span>}
           </button>
         </div>
@@ -232,7 +232,7 @@ export function ActivityBar({
               data-tooltip="知识网络全景图谱 (Ctrl+G)"
               aria-label="知识网络全景图谱"
             >
-              <Network size={18} style={{ color: "#38bdf8" }} />
+              <Network size={18} style={{ color: "var(--accent-info)" }} />
             </button>
           )}
         </div>

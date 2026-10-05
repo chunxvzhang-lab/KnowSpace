@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { CanvasThemeColors } from "../../services/canvasTheme";
+import { getAccentInfo } from "../../services/themeTokens";
 
 /** One row of the popup. The caller owns what a row means; this only draws it. */
 export interface CanvasCardSuggestItem {
@@ -64,12 +65,17 @@ export function CanvasCardSuggestMenu({
   onPick,
   onHover,
 }: CanvasCardSuggestMenuProps) {
+  // 选中行配色镜像文档编辑器补全弹层（reader.css `.cm-tooltip-autocomplete`）：
+  // 深色走青色强调色——这里必须用**字面值**而不是 var()，因为本弹层挂在 body 下、
+  // 在画布的 CSS transform 世界之外，取的是 canvasTheme 那套显式色。浅色/eink 的
+  // 琥珀来自 reader.css 的同名覆盖（#b45309），与青色令牌无关，保持原样。
+  const accentInfo = getAccentInfo(isEink ? "eink" : isDark ? "twitter" : "light");
   const accent = isEink
     ? "rgba(0,0,0,0.10)"
     : !isDark
       ? "rgba(245,158,11,0.15)"
-      : "rgba(56,189,248,0.2)";
-  const accentText = isEink ? "#000000" : !isDark ? "#b45309" : "#38bdf8";
+      : `rgba(${accentInfo.accentRgb}, 0.2)`;
+  const accentText = isEink ? "#000000" : !isDark ? "#b45309" : accentInfo.accent;
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   /**

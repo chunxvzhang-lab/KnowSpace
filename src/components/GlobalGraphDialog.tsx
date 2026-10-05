@@ -12,6 +12,7 @@ import {
   ZoomOut,
 } from "lucide-react";
 import type { ThemeMode } from "../core/types";
+import { getAccentInfo } from "../services/themeTokens";
 import {
   computeOrganicGraphPositions,
   filterGraphData,
@@ -187,8 +188,10 @@ export function GlobalGraphDialog({
       theme === "twitter" ||
       (theme === "system" && window.matchMedia?.("(prefers-color-scheme: dark)").matches);
     const isEink = theme === "eink";
+    // 青色族走 --accent-info 的 TS 镜像表（阶段 C1）；#0284c7 白底不达正文阈值。
+    const accentInfo = getAccentInfo(theme, isDark);
 
-    const currentBg = isEink ? "#000000" : isDark ? "#38bdf8" : "#0284c7";
+    const currentBg = isEink ? "#000000" : accentInfo.accent;
     const normalBg = isEink ? "#444444" : isDark ? "#334155" : "#94a3b8";
     const spaceBg = isEink ? "#777777" : "#f59e0b";
     const edgeColor = isEink
@@ -196,7 +199,7 @@ export function GlobalGraphDialog({
       : isDark
         ? "rgba(148, 163, 184, 0.28)"
         : "rgba(100, 116, 139, 0.25)";
-    const crossFolderEdgeColor = isEink ? "#000000" : isDark ? "#38bdf8" : "#0284c7";
+    const crossFolderEdgeColor = isEink ? "#000000" : accentInfo.accent;
     const nodeTextColor = isEink ? "#000000" : isDark ? "#f8fafc" : "#0f172a";
     const textOutlineColor = isEink ? "#ffffff" : isDark ? "#0b0f19" : "#ffffff";
 
@@ -304,15 +307,15 @@ export function GlobalGraphDialog({
             "z-index": 1000,
             opacity: 1,
             "border-width": 2,
-            "border-color": isEink ? "#000000" : isDark ? "#38bdf8" : "#0284c7",
+            "border-color": isEink ? "#000000" : accentInfo.accent,
             "border-opacity": 0.85,
           },
         },
         {
           selector: "edge.hovered",
           style: {
-            "line-color": isEink ? "#000000" : isDark ? "#38bdf8" : "#0284c7",
-            "target-arrow-color": isEink ? "#000000" : isDark ? "#38bdf8" : "#0284c7",
+            "line-color": isEink ? "#000000" : accentInfo.accent,
+            "target-arrow-color": isEink ? "#000000" : accentInfo.accent,
             width: 2.2,
             opacity: 1,
             "z-index": 1000,
@@ -910,7 +913,10 @@ export function GlobalGraphDialog({
               <span className="legend-dot dot-space" /> 闪念 Space
             </div>
             <div className="legend-item">
-              <span className="legend-dot" style={{ background: "#38bdf8", borderRadius: 2 }} />{" "}
+              <span
+                className="legend-dot"
+                style={{ background: "var(--accent-info)", borderRadius: 2 }}
+              />{" "}
               跨文件夹连线
             </div>
             <div className="legend-item hint-text">提示：双击节点直接打开</div>

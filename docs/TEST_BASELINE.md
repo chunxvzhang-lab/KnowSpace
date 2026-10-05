@@ -11,9 +11,9 @@
 
 | 项目 | 数值 |
 | :--- | ---: |
-| 测试文件 | **128** |
-| 用例总数 | **1551** |
-| 通过 | 1549 |
+| 测试文件 | **129** |
+| 用例总数 | **1555** |
+| 通过 | 1553 |
 | 失败 | 0 |
 | 跳过 | 2 |
 | 通过率 | 99.9% |
@@ -140,6 +140,7 @@
 | `src/__tests__/snapshots-node.test.ts` | 4 | ✅ |
 | `src/__tests__/storage.test.ts` | 4 | ✅ |
 | `src/__tests__/toc-and-bookmarks.test.tsx` | 4 | ✅ |
+| `src/__tests__/tsx-accent-info.test.ts` | 4 | ✅ |
 | `src/__tests__/web-snapshot-service.test.ts` | 4 | ✅ |
 | `src/__tests__/wikilink.test.ts` | 4 | ✅ |
 | `src/__tests__/backlinks-panel.test.tsx` | 3 | ✅ |
@@ -180,7 +181,7 @@
 
 任何重构都必须满足：
 
-1. 用例总数 **不低于 1551**（删除测试需在 PR 说明中论证）
+1. 用例总数 **不低于 1555**（删除测试需在 PR 说明中论证）
 2. 通过率 **100%**
 3. 单文件用例数**不得下降**（防止测试被静默删除）
 

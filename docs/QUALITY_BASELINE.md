@@ -19,7 +19,7 @@
 | `max-file-lines` | 962 | 只减不增（最大单文件行数） |
 | `styles-css-lines` | 1669 | 只减不增（阶段 B：CSS 按**连续前缀**外迁到 src/styles/*.css；回升意味着有人手工折叠了切片，那会改级联） |
 | `undeclared-imports` | 0 | 必须为 0（src 中 import 的第三方包必须在 package.json 显式声明，防幽灵依赖） |
-| `src-lines` | 71261 | 记录趋势，不设闸 |
+| `src-lines` | 71364 | 记录趋势，不设闸 |
 | `test-cases` | 见 `TEST_BASELINE.md` | 只增不减——由测试基线守护，本文件不重复设闸 |
 
 ---
@@ -85,26 +85,26 @@ import 顺序 = 拆分前 styles.css 内的物理顺序；每批只切连续前�
 | `src/components/EditorPane.tsx:590` | `: any, from: number, to: number) => {` |
 | `src/components/EditorPane.tsx:619` | `: any, from: number, to: number) => {` |
 | `src/components/EditorPane.tsx:656` | `: any, from: number, to: number) => {` |
-| `src/components/GlobalGraphDialog.tsx:245` | `: any) => {` |
-| `src/components/GlobalGraphDialog.tsx:249` | `: any) => {` |
-| `src/components/GlobalGraphDialog.tsx:253` | `: any) => {` |
-| `src/components/GlobalGraphDialog.tsx:361` | `: any) => positions.get(node.data("id"))` |
-| `src/components/GlobalGraphDialog.tsx:446` | `: any) => Boolean(e.data("isCrossFolder"` |
-| `src/components/GlobalGraphDialog.tsx:512` | `: any) => Boolean(e.data("isCrossFolder"` |
-| `src/components/GlobalGraphDialog.tsx:586` | `: any) => {` |
-| `src/components/GlobalGraphDialog.tsx:607` | `: any) => Boolean(e.data("isCrossFolder"` |
-| `src/components/graph/graphCytoscapeStyle.ts:66` | `: any) => {` |
-| `src/components/graph/graphCytoscapeStyle.ts:70` | `: any) => {` |
-| `src/components/graph/graphCytoscapeStyle.ts:74` | `: any) => {` |
+| `src/components/GlobalGraphDialog.tsx:248` | `: any) => {` |
+| `src/components/GlobalGraphDialog.tsx:252` | `: any) => {` |
+| `src/components/GlobalGraphDialog.tsx:256` | `: any) => {` |
+| `src/components/GlobalGraphDialog.tsx:364` | `: any) => positions.get(node.data("id"))` |
+| `src/components/GlobalGraphDialog.tsx:449` | `: any) => Boolean(e.data("isCrossFolder"` |
+| `src/components/GlobalGraphDialog.tsx:515` | `: any) => Boolean(e.data("isCrossFolder"` |
+| `src/components/GlobalGraphDialog.tsx:589` | `: any) => {` |
+| `src/components/GlobalGraphDialog.tsx:610` | `: any) => Boolean(e.data("isCrossFolder"` |
+| `src/components/graph/graphCytoscapeStyle.ts:69` | `: any) => {` |
+| `src/components/graph/graphCytoscapeStyle.ts:73` | `: any) => {` |
+| `src/components/graph/graphCytoscapeStyle.ts:77` | `: any) => {` |
 | `src/components/graph/useCytoscapeGraph.ts:176` | `: any) => positions.get(node.data("id"))` |
 | `src/components/graph/useCytoscapeGraph.ts:250` | `: any) => Boolean(e.data("isCrossFolder"` |
 | `src/components/graph/useCytoscapeGraph.ts:331` | `: any) => Boolean(e.data("isCrossFolder"` |
 | `src/components/graph/useCytoscapeGraph.ts:449` | `: any) => {` |
 | `src/components/graph/useCytoscapeGraph.ts:470` | `: any) =>` |
-| `src/components/LocalGraphView.tsx:92` | `: any) => {` |
 | `src/components/LocalGraphView.tsx:96` | `: any) => {` |
 | `src/components/LocalGraphView.tsx:100` | `: any) => {` |
-| `src/components/LocalGraphView.tsx:141` | `: any) => (node.data("isCurrent") ? 2 :` |
+| `src/components/LocalGraphView.tsx:104` | `: any) => {` |
+| `src/components/LocalGraphView.tsx:145` | `: any) => (node.data("isCurrent") ? 2 :` |
 | `src/hooks/useBacklinkIndex.ts:374` | `: any) {` |
 | `src/hooks/useDocumentCreation.ts:206` | `: any) {` |
 | `src/hooks/useDocumentCreation.ts:287` | `: any) {` |
@@ -115,15 +115,15 @@ import 顺序 = 拆分前 styles.css 内的物理顺序；每批只切连续前�
 
 | 位置 | 代码 |
 | :--- | :--- |
-| `src/components/GlobalGraphDialog.tsx:358` | `as any,` |
-| `src/components/GlobalGraphDialog.tsx:362` | `as any,` |
-| `src/components/GlobalGraphDialog.tsx:510` | `as any)` |
-| `src/components/GlobalGraphDialog.tsx:759` | `as any)}` |
-| `src/components/graph/graphCytoscapeStyle.ts:207` | `as any;` |
+| `src/components/GlobalGraphDialog.tsx:361` | `as any,` |
+| `src/components/GlobalGraphDialog.tsx:365` | `as any,` |
+| `src/components/GlobalGraphDialog.tsx:513` | `as any)` |
+| `src/components/GlobalGraphDialog.tsx:762` | `as any)}` |
+| `src/components/graph/graphCytoscapeStyle.ts:210` | `as any;` |
 | `src/components/graph/useCytoscapeGraph.ts:177` | `as any,` |
 | `src/components/graph/useCytoscapeGraph.ts:329` | `as any)` |
-| `src/components/LocalGraphView.tsx:138` | `as any,` |
-| `src/components/LocalGraphView.tsx:146` | `as any,` |
+| `src/components/LocalGraphView.tsx:142` | `as any,` |
+| `src/components/LocalGraphView.tsx:150` | `as any,` |
 | `src/services/markdownPlugins.ts:88` | `as any)("block_anchor", "span", 0);` |
 
 ---
