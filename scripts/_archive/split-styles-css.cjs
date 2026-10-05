@@ -1,3 +1,11 @@
+// ARCHIVED (阶段 B 完结, batch 10): this splitter ran its last batch on
+// 2026-10-05. src/styles.css is down to one contiguous domain (the infinite-
+// canvas / mindmap-feature block); any further split needs per-subsection
+// cascade proofs and is a NEW project, not the remaining tail of this one.
+// Deletable once docs/QUALITY_BASELINE.md's 看板 + git log fully describe the
+// slice roster they already do. Do NOT re-run: DOMAINS below still names
+// batch 10's ranges against a file that no longer has those lines.
+//
 // Phase B splitter: moves domain blocks out of src/styles.css with a
 // brace-balanced slicer. The DOMAINS list below is the batch that has NOT run
 // yet — once it has, the ranges are history (the executed roster lives in
