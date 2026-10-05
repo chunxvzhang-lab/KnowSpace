@@ -1,0 +1,538 @@
+/* ========================================================================
+   KnowSpace · 图谱工作区分栏布局（嵌入式图谱）
+   从 src/styles.css 按域拆分而来（阶段 B）。加载顺序由 src/main.tsx 决定，
+   必须与拆分前 styles.css 内的物理顺序一致 —— 改顺序等于改级联。
+   ======================================================================== */
+/* ==========================================================================
+   Graph Workspace Split Layout (Obsidian Style Embedded Graph)
+   ========================================================================== */
+.graph-workspace-layout {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.graph-workspace-layout.is-column {
+  flex-direction: column;
+}
+
+.graph-workspace-left-pane {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 240px;
+  position: relative;
+  overflow: hidden;
+}
+
+.graph-workspace-layout.is-column .graph-workspace-left-pane {
+  width: 100% !important;
+  min-width: 0;
+  min-height: 140px;
+}
+
+.graph-workspace-left-pane > * {
+  height: 100% !important;
+}
+
+.graph-workspace-splitter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 20;
+  background: var(--border, rgba(148, 163, 184, 0.2));
+  transition: background 0.15s ease;
+  flex-shrink: 0;
+}
+
+.graph-workspace-splitter:not(.is-column) {
+  width: 8px;
+  height: 100%;
+  margin: 0 -4px;
+  cursor: col-resize;
+}
+
+.graph-workspace-splitter.is-column {
+  width: 100%;
+  height: 8px;
+  margin: -4px 0;
+  cursor: row-resize;
+}
+
+.graph-workspace-splitter:hover,
+.graph-workspace-splitter.is-active,
+.graph-workspace-layout.is-resizing .graph-workspace-splitter {
+  background: var(--accent, var(--accent-info));
+}
+
+.graph-workspace-splitter .splitter-handle {
+  display: block;
+  background: var(--border, rgba(148, 163, 184, 0.45));
+  border-radius: 4px;
+  transition: all 0.15s ease;
+  pointer-events: none;
+}
+
+.graph-workspace-splitter:not(.is-column) .splitter-handle {
+  width: 4px;
+  height: 36px;
+}
+
+.graph-workspace-splitter.is-column .splitter-handle {
+  width: 36px;
+  height: 4px;
+}
+
+.graph-workspace-splitter:hover .splitter-handle {
+  background: #ffffff;
+}
+
+/* Quick actions bar on splitter hover */
+.splitter-quick-bar {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 20px;
+  background: var(--surface-1, #1e293b);
+  border: 1px solid var(--border, rgba(148, 163, 184, 0.25));
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease;
+  z-index: 30;
+  font-size: 11px;
+}
+
+[data-theme="light"] .splitter-quick-bar {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.graph-workspace-splitter:hover .splitter-quick-bar,
+.splitter-quick-bar:hover {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.graph-workspace-splitter:not(.is-column) .splitter-quick-bar {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  flex-direction: column;
+}
+
+.graph-workspace-splitter.is-column .splitter-quick-bar {
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  flex-direction: row;
+}
+
+.splitter-btn-orientation {
+  padding: 3px 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  border-radius: 12px;
+  border: 1px solid var(--border, rgba(148, 163, 184, 0.25));
+  background: var(--surface-2, rgba(255, 255, 255, 0.08));
+  color: var(--text, #f8fafc);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+[data-theme="light"] .splitter-btn-orientation {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+.splitter-btn-orientation:hover {
+  background: var(--accent, var(--accent-info));
+  color: #ffffff;
+  border-color: var(--accent, var(--accent-info));
+}
+
+.splitter-ratio-chip {
+  padding: 2px 7px;
+  font-size: 11px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted, #94a3b8);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.12s ease;
+}
+
+.splitter-ratio-chip:hover {
+  background: rgba(var(--accent-info-rgb), 0.15);
+  color: var(--accent, var(--accent-info));
+}
+
+.splitter-ratio-chip.is-active {
+  background: var(--accent, var(--accent-info));
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.graph-workspace-right-pane {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 240px;
+  position: relative;
+  overflow: hidden;
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.graph-workspace-layout.is-column .graph-workspace-right-pane {
+  width: 100% !important;
+  min-width: 0;
+  min-height: 140px;
+  border-left: none;
+  border-top: 1px solid var(--border);
+}
+
+/* Graph View Pane Component */
+.graph-view-pane {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.graph-pane-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 36px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+  user-select: none;
+  z-index: 10;
+  gap: 8px;
+}
+
+.graph-pane-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.graph-pane-icon {
+  flex-shrink: 0;
+}
+
+.graph-pane-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.graph-pane-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.graph-pane-actions .graph-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  padding: 0;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: all 0.15s ease;
+}
+
+.graph-pane-actions .graph-action-btn:hover {
+  background: var(--surface-hover, rgba(0, 0, 0, 0.06));
+  color: var(--text);
+  border-color: var(--border-hover, var(--border));
+}
+
+.graph-pane-actions .graph-action-btn.is-active {
+  background: rgba(var(--accent-info-rgb), 0.15);
+  border-color: rgba(var(--accent-info-rgb), 0.45);
+  color: var(--accent, #0284c7);
+}
+
+.graph-zoom-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 26px;
+}
+
+.graph-zoom-group .graph-zoom-input {
+  width: 48px;
+  height: 26px;
+  line-height: 24px;
+  padding: 0 4px;
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-weight: 600;
+  text-align: center;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  outline: none;
+  box-sizing: border-box;
+  transition: all 0.15s ease;
+}
+
+.graph-zoom-group .graph-zoom-input:hover {
+  border-color: var(--accent, var(--accent-info));
+}
+
+.graph-zoom-group .graph-zoom-input:focus {
+  background: var(--surface);
+  border-color: var(--accent, var(--accent-info));
+  box-shadow: 0 0 0 2px rgba(var(--accent-info-rgb), 0.2);
+}
+
+.graph-pane-divider {
+  width: 1px;
+  height: 16px;
+  background: var(--border);
+  margin: 0 3px;
+  flex-shrink: 0;
+}
+
+.graph-pane-close-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  padding: 0;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: all 0.15s ease;
+}
+
+.graph-pane-close-btn:hover {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.graph-pane-canvas-wrapper {
+  flex: 1;
+  width: 100%;
+  /* 高度完全交给 flex 计算：写死 calc(100% - 36px) 会在筛选栏展开/窗口变矮时
+     让画布区超出分栏底部，被 .graph-view-pane 的 overflow:hidden 裁掉，
+     表现为底部提示卡片下方被遮挡 */
+  position: relative;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.graph-pane-canvas {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  inset: 0;
+}
+
+/* 关闭画布上的焦点环与移动端点击高亮，避免点击图谱区域时出现额外轮廓/圆形 */
+.graph-pane-canvas,
+.graph-pane-canvas:focus,
+.graph-pane-canvas:focus-visible,
+.graph-pane-canvas:active,
+.graph-pane-canvas > div,
+.graph-pane-canvas canvas {
+  outline: none !important;
+  box-shadow: none !important;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.graph-pane-canvas-wrapper.space-panning {
+  cursor: grab !important;
+}
+
+.graph-pane-canvas-wrapper.space-panning:active,
+.graph-pane-canvas-wrapper.space-panning .graph-pane-canvas:active {
+  cursor: grabbing !important;
+}
+
+/* Collapsible Filter Bar */
+.graph-filter-drawer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  animation: slideDown 0.15s ease-out;
+  z-index: 9;
+}
+
+.graph-filter-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 5px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.graph-search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: 12px;
+  outline: none;
+}
+
+.graph-filter-options {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.graph-filter-pill {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.graph-filter-pill.is-active {
+  background: var(--accent);
+  color: #ffffff;
+  border-color: var(--accent);
+}
+
+/* Inspector Card — positioned relative to graph-view-pane, outside overflow:hidden canvas */
+.graph-pane-inspector {
+  position: absolute;
+  bottom: 48px;
+  left: 16px;
+  width: 280px;
+  max-width: calc(100% - 32px);
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid color-mix(in srgb, var(--border) 75%, var(--accent));
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.42),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 200;
+  animation: inspectorSlideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-sizing: border-box;
+}
+
+/* Mindmap Document Sync Button & Dirty Indicator */
+.mindmap-sync-doc-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mindmap-sync-doc-btn.is-dirty {
+  background: color-mix(in srgb, #10b981 16%, transparent);
+  color: #10b981;
+  border: 1px solid color-mix(in srgb, #10b981 40%, transparent);
+  box-shadow: 0 0 12px color-mix(in srgb, #10b981 22%, transparent);
+}
+
+.mindmap-sync-doc-btn.is-dirty:hover {
+  background: color-mix(in srgb, #10b981 26%, transparent);
+  border-color: #10b981;
+  color: #10b981;
+  box-shadow: 0 0 16px color-mix(in srgb, #10b981 35%, transparent);
+}
+
+.sync-dirty-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 6px #10b981;
+  display: inline-block;
+  animation: pulseGlow 1.8s infinite;
+}
+
+@keyframes pulseGlow {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.3);
+    opacity: 1;
+    box-shadow: 0 0 10px #10b981;
+  }
+}
+
+.sync-icon-spin {
+  animation: subtleSpin 6s linear infinite;
+}
+
+@keyframes subtleSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}

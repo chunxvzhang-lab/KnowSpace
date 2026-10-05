@@ -28,6 +28,8 @@ import "./styles/capsule-panel.css";
 import "./styles/space-timeline.css";
 import "./styles/review-panel.css";
 import "./styles/backlinks-panel.css";
+import "./styles/graph.css";
+import "./styles/graph-workspace.css";
 import "./styles.css";
 
 const LazyApp = lazy(() => import("./App"));
