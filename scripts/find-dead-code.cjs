@@ -96,9 +96,19 @@ for (const file of sources) {
 if (!unusedImports) console.log("  (none)");
 
 // ── 2. Unused CSS classes ──────────────────────────────────────────────────
-console.log(`\n=== unused .${prefix}* classes in src/styles.css ===`);
-const cssPath = path.join(root, "src", "styles.css");
-const css = fs.readFileSync(cssPath, "utf8");
+// 阶段 B 之后应用样式表 = src/styles/*.css（切片）+ src/styles.css（剩余）。
+// 只读 styles.css 会漏扫已经切出去的域，报出来的"未使用类名"就是假的。
+console.log(`\n=== unused .${prefix}* classes in the app stylesheet ===`);
+const cssFiles = [];
+(function collectCss(dir) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name === "__tests__" || entry.name === "node_modules") continue;
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) collectCss(full);
+    else if (entry.name.endsWith(".css")) cssFiles.push(full);
+  }
+})(path.join(root, "src"));
+const css = cssFiles.map((f) => fs.readFileSync(f, "utf8")).join("\n");
 
 const classRe = new RegExp(`\\.(${prefix}[a-z0-9-]+)`, "g");
 const declared = new Set();

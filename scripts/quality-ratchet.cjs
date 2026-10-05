@@ -11,6 +11,10 @@
  *   colon-any / as-any       type escapes           - may only go DOWN
  *   files-over-1000-lines    size debt, file count  - may only go DOWN
  *   max-file-lines           size debt, worst file  - may only go DOWN
+ *   styles-css-lines         the styles.css monolith - may only go DOWN (phase B:
+ *                            CSS moves out to src/styles/*.css one contiguous
+ *                            prefix at a time; growing it back means a slice was
+ *                            folded in by hand, which breaks cascade guarantees)
  *   undeclared-imports       phantom dependencies   - must be ZERO (hard gate)
  *   src-lines (non-test)     overall size           - recorded, NOT gated
  *
@@ -41,6 +45,7 @@ const GATED = new Set([
   "files-over-1000-lines",
   "max-file-lines",
   "undeclared-imports",
+  "styles-css-lines",
 ]);
 
 /**
@@ -213,6 +218,25 @@ function measure() {
 
   oversized.sort((a, b) => b.lines - a.lines);
 
+  // The CSS monolith is measured here and NOT via listSources (that walk is
+  // ts/tsx only): styles.css is the single largest file in the repository, yet
+  // it sat outside every size metric. Without its own metric nothing could see
+  // the phase-B split making progress - and, worse, nothing could see a slice
+  // being folded back in by hand, which silently reorders the cascade.
+  const stylesPath = path.join(srcDir, "styles.css");
+  const stylesCssLines = fs.existsSync(stylesPath) ? countLines(stylesPath) : 0;
+  const cssSlices = [];
+  const stylesDir = path.join(srcDir, "styles");
+  if (fs.existsSync(stylesDir)) {
+    for (const name of fs.readdirSync(stylesDir).sort()) {
+      if (!name.endsWith(".css")) continue;
+      cssSlices.push({
+        file: `src/styles/${name}`,
+        lines: countLines(path.join(stylesDir, name)),
+      });
+    }
+  }
+
   const pkg = require(path.join(root, "package.json"));
   const undeclared = findUndeclaredImports(sources, pkg);
 
@@ -227,7 +251,8 @@ function measure() {
     "max-file-lines": maxLines,
     "src-lines": totalLines,
     "undeclared-imports": undeclared.length,
-    _detail: { colonAny, asAny, oversized, undeclared },
+    "styles-css-lines": stylesCssLines,
+    _detail: { colonAny, asAny, oversized, undeclared, cssSlices },
   };
 }
 
@@ -277,6 +302,9 @@ function generate(metrics) {
       metrics["files-over-1000-lines"] +
       " | 只减不增（src 非测试代码，> 1000 行） |",
     "| `max-file-lines` | " + metrics["max-file-lines"] + " | 只减不增（最大单文件行数） |",
+    "| `styles-css-lines` | " +
+      metrics["styles-css-lines"] +
+      " | 只减不增（阶段 B：CSS 按**连续前缀**外迁到 src/styles/*.css；回升意味着有人手工折叠了切片，那会改级联） |",
     "| `undeclared-imports` | " +
       metrics["undeclared-imports"] +
       " | 必须为 0（src 中 import 的第三方包必须在 package.json 显式声明，防幽灵依赖） |",
@@ -293,7 +321,20 @@ function generate(metrics) {
     "",
     "---",
     "",
-    "## 三、类型逃逸清单",
+    "## 三、CSS 拆分进度看板（阶段 B）",
+    "",
+    "`src/styles.css` 的按域外迁清单。**顺序即级联**：下表顺序 = `src/main.tsx` 的",
+    "import 顺序 = 拆分前 styles.css 内的物理顺序；只有连续前缀可以外迁（见",
+    "`scripts/split-styles-css.cjs` 的重组证明）。",
+    "",
+    "| 文件 | 行数 |",
+    "| :--- | ---: |",
+    ...d.cssSlices.map((f) => `| \`${f.file}\`（切片） | ${f.lines} |`),
+    `| \`src/styles.css\`（剩余） | ${metrics["styles-css-lines"]} |`,
+    "",
+    "---",
+    "",
+    "## 四、类型逃逸清单",
     "",
     "### `: any`",
     "",
@@ -309,7 +350,7 @@ function generate(metrics) {
     "",
     "---",
     "",
-    "## 四、未声明的第三方 import（幽灵依赖清单，必须为空）",
+    "## 五、未声明的第三方 import（幽灵依赖清单，必须为空）",
     "",
     "| 位置 | 包名 |",
     "| :--- | :--- |",
@@ -378,6 +419,7 @@ function main() {
       `[ratchet] baseline written to ${path.relative(root, docPath)}: ` +
         `colon-any ${metrics["colon-any"]}, as-any ${metrics["as-any"]}, ` +
         `files>1000 ${metrics["files-over-1000-lines"]}, max ${metrics["max-file-lines"]}, ` +
+        `styles.css ${metrics["styles-css-lines"]}, ` +
         `undeclared-imports ${metrics["undeclared-imports"]}`,
     );
   }
