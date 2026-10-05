@@ -122,12 +122,18 @@ const blocks = scanBlocks(lines);
 // overrides work in this file. Mid-file domains need a segmented split, to be
 // done in a later batch with a cascade-order proof.
 const DOMAINS = [
-  { file: "capsule.css", label: "闪念胶囊浮窗与快捷键自定义", from: 1, to: 869 },
+  { file: "space-timeline.css", label: "Space 时间线与闪记收集箱面板", from: 1, to: 654 },
   {
-    file: "capsule-panel.css",
-    label: "闪念胶囊增强：标签页、钉住、Space 目录与持久笔记",
-    from: 870,
-    to: 1483,
+    file: "review-panel.css",
+    label: "每日复习面板（FSRS 间隔重复）",
+    from: 655,
+    to: 1161,
+  },
+  {
+    file: "backlinks-panel.css",
+    label: "反链与未链接提及面板",
+    from: 1162,
+    to: 1611,
   },
 ];
 

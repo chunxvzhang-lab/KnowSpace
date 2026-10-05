@@ -25,6 +25,9 @@ import "./styles/fullscreen.css";
 import "./styles/dual-split.css";
 import "./styles/capsule.css";
 import "./styles/capsule-panel.css";
+import "./styles/space-timeline.css";
+import "./styles/review-panel.css";
+import "./styles/backlinks-panel.css";
 import "./styles.css";
 
 const LazyApp = lazy(() => import("./App"));

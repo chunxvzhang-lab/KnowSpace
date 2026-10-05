@@ -17,9 +17,9 @@
 | `as-any` | 10 | 只减不增（`as any`） |
 | `files-over-1000-lines` | 0 | 只减不增（src 非测试代码，> 1000 行） |
 | `max-file-lines` | 962 | 只减不增（最大单文件行数） |
-| `styles-css-lines` | 7227 | 只减不增（阶段 B：CSS 按**连续前缀**外迁到 src/styles/*.css；回升意味着有人手工折叠了切片，那会改级联） |
+| `styles-css-lines` | 5616 | 只减不增（阶段 B：CSS 按**连续前缀**外迁到 src/styles/*.css；回升意味着有人手工折叠了切片，那会改级联） |
 | `undeclared-imports` | 0 | 必须为 0（src 中 import 的第三方包必须在 package.json 显式声明，防幽灵依赖） |
-| `src-lines` | 71247 | 记录趋势，不设闸 |
+| `src-lines` | 71250 | 记录趋势，不设闸 |
 | `test-cases` | 见 `TEST_BASELINE.md` | 只增不减——由测试基线守护，本文件不重复设闸 |
 
 ---
@@ -57,7 +57,10 @@ import 顺序 = 拆分前 styles.css 内的物理顺序；只有连续前缀可�
 | `src/styles/dual-split.css`（切片） | 256 |
 | `src/styles/capsule.css`（切片） | 873 |
 | `src/styles/capsule-panel.css`（切片） | 618 |
-| `src/styles.css`（剩余） | 7227 |
+| `src/styles/space-timeline.css`（切片） | 658 |
+| `src/styles/review-panel.css`（切片） | 511 |
+| `src/styles/backlinks-panel.css`（切片） | 454 |
+| `src/styles.css`（剩余） | 5616 |
 
 ---
 
