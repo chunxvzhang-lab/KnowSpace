@@ -138,13 +138,6 @@ const ALLOW_UNDEFINED = new Map<string, string>([
   ],
   ["--border-color", "同上（命令面板）：浅色/eink 由显式覆盖给出边框色"],
   ["--bg-sidebar", "`.backlinks-panel`：兜底是 `transparent`，就是要融进所在面板，不是遗漏"],
-  [
-    "--bg-primary",
-    "`main.tsx` 的 Suspense 加载占位。**这是已知未修问题**：`index.html` 没有「挂载前应用主题」" +
-      "的引导脚本，所以此刻 `:root` 只有默认（浅色）值——把兜底从深色改成 `var(--bg)` 只会把" +
-      "「浅色主题用户看到深色闪屏」换成「深色主题用户看到白色闪屏」，对谁都不算修。" +
-      "正确修法是加引导脚本，已记入技术债",
-  ],
 ]);
 
 describe("CSS 自定义属性（令牌）守卫", () => {

@@ -4,7 +4,22 @@ const BOOKMARKS_V1_KEY = "bookmd.bookmarks.v1";
 const BOOKMARKS_V2_KEY = "bookmd.bookmarks.v2";
 const POSITIONS_V1_KEY = "bookmd.positions.v1";
 const POSITIONS_V2_KEY = "bookmd.positions.v2";
-const PREFS_KEY = "bookmd.preferences.v1";
+/**
+ * 主题偏好的存储键。**必须与 `index.html` 里「挂载前应用主题」引导脚本读的同一个键**：
+ * 那段脚本要在打包之前同步运行、无法 import 这里，所以键名、别名表、缺省值都是**复制品**——
+ * 复制品必须有成对断言（规则 5）。守卫 `src/__tests__/boot-theme.test.ts` 取出脚本正文，
+ * 用同一批存储内容跑两边比对结果。改这里忘改脚本 = 首帧又闪一次，且没有任何编译期信号。
+ */
+export const PREFS_KEY = "bookmd.preferences.v1";
+/** 没有偏好（或存储坏了）时的缺省主题。 */
+export const DEFAULT_THEME: ThemeMode = "system";
+/**
+ * 遗留主题取值 → 现在的取值。`ThemeMode` 里没有 `"dark"`——那个深色项改名叫
+ * `"twitter"`，但老用户的 localStorage 里还写着 `"dark"`，读出来必须折一次。
+ * 用 `Map` 而不是对象：存储里的键是用户给的任意字符串，对象查表会摸到
+ * `Object.prototype` 上的东西（`"constructor"` 这类），Map 不会。
+ */
+export const THEME_ALIASES = new Map<string, ThemeMode>([["dark", "twitter"]]);
 const MINDMAP_COLLAPSED_KEY = "bookmd.mindmap.collapsed.v1";
 const MINDMAP_THEME_KEY = "bookmd.mindmap.theme.v1";
 const MINDMAP_LAYOUT_KEY = "bookmd.mindmap.layout.v1";
@@ -96,7 +111,7 @@ export function saveReadingPosition(position: ReadingPosition): void {
 
 export function loadPreferences(): Preferences {
   const fallback: Preferences = {
-    theme: "system",
+    theme: DEFAULT_THEME,
     fontScale: 1,
     showLineNumbers: true,
     flashCapsuleShortcut: "Alt+Space",
@@ -104,7 +119,10 @@ export function loadPreferences(): Preferences {
   };
   try {
     const raw = JSON.parse(localStorage.getItem(PREFS_KEY) ?? "{}");
-    const theme: ThemeMode = raw.theme === "dark" ? "twitter" : (raw.theme ?? "system");
+    // 别名表与缺省值的写法与 index.html 的引导脚本一一对应（boot-theme.test.ts 逐值比对）。
+    // 必须用 `.get()`：`THEME_ALIASES["constructor"]` 会摸到原型上那个函数并当成主题返回。
+    const theme: ThemeMode =
+      raw.theme == null ? DEFAULT_THEME : (THEME_ALIASES.get(String(raw.theme)) ?? raw.theme);
     const showLineNumbers = raw.showLineNumbers !== undefined ? Boolean(raw.showLineNumbers) : true;
     const showHiddenFiles =
       raw.showHiddenFiles !== undefined ? Boolean(raw.showHiddenFiles) : false;

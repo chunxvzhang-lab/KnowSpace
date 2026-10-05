@@ -6,6 +6,41 @@
     <meta name="color-scheme" content="light dark" />
     <link rel="icon" type="image/png" href="./icon.png" />
     <title>KnowSpace · 个人知识工作台</title>
+    <script>
+      // 挂载前把主题落到 <html>。
+      //
+      // 为什么要这一段：主题覆盖写在 `:root[data-theme=…]` 上，而写这个属性的是
+      // `useDesktopBridgeSync`——它在 lazy 加载的 App 里，要等整个 bundle 下载并
+      // 执行完才跑第一次。在那之前 `<html>` 没有属性，级联只剩 `:root` 的默认值
+      // （浅色），于是深色 / eink 用户每次启动都白闪一下。占位层写死兜底色也救不了：
+      // 那只是把「浅色用户看黑闪」换成「深色用户看白闪」，对谁都不算修。
+      //
+      // 这里的存储键、遗留别名与缺省值是 `src/services/storage.ts` 的复制品——
+      // 脚本要在打包之前同步运行，无法 import。复制品由
+      // `src/__tests__/boot-theme.test.ts` 逐值比对钉住：改一边忘另一边会立刻变红。
+      (function () {
+        var theme = "system";
+        try {
+          var raw = JSON.parse(localStorage.getItem("bookmd.preferences.v1") || "{}");
+          var stored = raw && raw.theme;
+          if (stored !== null && stored !== undefined) {
+            // "dark" 是深色项改名成 "twitter" 之前的旧值（ThemeMode 已不含 "dark"）。
+            theme = stored === "dark" ? "twitter" : stored;
+          }
+        } catch (e) {
+          // 没有偏好或存储坏了：与 loadPreferences() 的兜底一致，不猜主题。
+          theme = "system";
+        }
+        document.documentElement.setAttribute("data-theme", theme);
+      })();
+    </script>
+    <!--
+      别在这里加 `html { background: … }` 之类的兜底：样式表到达之前拿不到任何令牌，
+      写死的底色会**盖掉** `<meta name="color-scheme" content="light dark">` 交给
+      操作系统的画布色，等于把深色用户的白闪从「React 挂载前」延长到「样式到达前」。
+      样式一到，`tokens.css` 的 `body { background: var(--bg) }` 就接管，而它现在
+      第一次就能取到正确主题——这正是上面那段脚本负责的事。
+    -->
   </head>
   <body>
     <div id="root"></div>

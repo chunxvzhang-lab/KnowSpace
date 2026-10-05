@@ -57,7 +57,12 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             style={{
               width: "100vw",
               height: "100vh",
-              backgroundColor: "var(--bg-primary, #1e1e1e)",
+              // 读 `--bg`——`.app-shell` 与 `body` 用的都是它，所以占位与首帧同色。
+              // 这里原先引用的是 `--bg-primary`（**从未被定义**）并兜底 `#1e1e1e`：
+              // 带兜底的悬空引用不报错，只是永远拿不到主题值，于是深色占位恒定生效、
+              // 浅色用户每次启动白闪一下。让占位能取到正确主题的，是 `index.html` 里
+              // 「挂载前落 data-theme」的引导脚本（键名/别名由 boot-theme.test.ts 绑定）。
+              backgroundColor: "var(--bg)",
             }}
           />
         }
