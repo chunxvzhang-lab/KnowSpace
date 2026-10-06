@@ -37,7 +37,6 @@ import { useUnsavedGuard } from "./hooks/useUnsavedGuard";
 import { useWikiLinkNavigation } from "./hooks/useWikiLinkNavigation";
 
 import { useUiStore } from "./store/useUiStore";
-import { useReviewStore } from "./store/useReviewStore";
 import { useTabStore, tabsWithDirtyFlags, type TabMeta } from "./store/useTabStore";
 import { useVaultStore } from "./store/useVaultStore";
 import { samePath } from "./core/paths";
@@ -60,17 +59,13 @@ export function App() {
 
   // ── Vault (useVaultStore · R1 batch B2) ───────────────────────────────────
   //
-  // The open folder, its bookmarks, the two indexes built from its documents
-  // and the search fields. Same aliasing as the earlier batches — `manifest`
-  // alone is read in over a hundred places and not one of them changed.
+  // The open folder. Batch B7 moved the bookmark list, the bookmark writer and
+  // the read-only search fields into SidebarPanel - the only thing that renders
+  // them - leaving App subscribed to state it did nothing with. The two setters
+  // stay: the query handler clears the active match and the highlights in the
+  // same action that writes the new query.
   const manifest = useVaultStore((s) => s.manifest);
-  const bookmarks = useVaultStore((s) => s.bookmarks);
-  const persistBookmarks = useVaultStore((s) => s.persistBookmarks);
-  const searchQuery = useVaultStore((s) => s.searchQuery);
   const setSearchQuery = useVaultStore((s) => s.setSearchQuery);
-  const searchScope = useVaultStore((s) => s.searchScope);
-  const setSearchScope = useVaultStore((s) => s.setSearchScope);
-  const activeSearchMatchId = useVaultStore((s) => s.activeSearchMatchId);
   const setActiveSearchMatchId = useVaultStore((s) => s.setActiveSearchMatchId);
 
   const manifestRef = useRef<BookManifest | null>(manifest);
@@ -211,15 +206,6 @@ export function App() {
     () => tabsWithDirtyFlags(tabs, chapterId, isDirty),
     [tabs, chapterId, isDirty],
   );
-
-  /**
-   * A counter for "start a review", bumped by the command palette.
-   *
-   * The review lives behind the Space panel's own tab, which the workspace does not
-   * otherwise control — so the request travels as a changing number it can watch,
-   * rather than as a flag it might already be showing.
-   */
-  const reviewRequest = useReviewStore((s) => s.reviewRequest);
 
   /**
    * The open document as the review can use it, or null.
@@ -678,19 +664,13 @@ export function App() {
         sidebarOpen &&
         (manifest || sidebarTab === "space") ? (
           <SidebarPanel
-            manifest={manifest}
             session={session}
             renderedChapter={renderedChapter}
             activeHeadingId={activeHeadingId}
             bookmarkedHeadingIds={bookmarkedHeadingIds}
             jumpToHeading={jumpToHeading}
             jumpBookmark={jumpBookmark}
-            bookmarks={bookmarks}
-            persistBookmarks={persistBookmarks}
-            searchQuery={searchQuery}
             searchResults={searchResults}
-            activeSearchMatchId={activeSearchMatchId}
-            searchScope={searchScope}
             onQueryChange={(q) => {
               setSearchQuery(q);
               setActiveSearchMatchId(null);
@@ -698,10 +678,8 @@ export function App() {
                 clearSearchHighlights();
               }
             }}
-            onScopeChange={setSearchScope}
             handleSearchJump={handleSearchJump}
             reviewableDocument={reviewableDocument}
-            openReviewRequest={reviewRequest}
             onOpenNoteFile={(filePath) => openDesktopMarkdownPathRef.current?.(filePath)}
             handleReviewActiveChange={handleReviewActiveChange}
             handleMergeFlashNote={handleMergeFlashNote}

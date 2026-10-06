@@ -1,6 +1,5 @@
 import { X, Zap } from "lucide-react";
 import type {
-  BookManifest,
   Bookmark,
   DocumentSession,
   RenderedChapter,
@@ -8,7 +7,6 @@ import type {
   SidebarTab,
   ThemeMode,
 } from "../core/types";
-import type { SearchScope } from "./SearchPanel";
 import { BacklinksPanel } from "./BacklinksPanel";
 import { BookmarkPanel } from "./BookmarkPanel";
 import { SearchPanel } from "./SearchPanel";
@@ -16,6 +14,8 @@ import { SpaceTimelinePanel } from "./SpaceTimelinePanel";
 import { TocPanel } from "./TocPanel";
 import { extractHeadingsFromSource } from "../services/markdown";
 import { useUiStore } from "../store/useUiStore";
+import { useVaultStore } from "../store/useVaultStore";
+import { useReviewStore } from "../store/useReviewStore";
 import type { useBacklinkIndex } from "../hooks/useBacklinkIndex";
 
 /** The slice of the backlinks hook the sidebar's panel renders. */
@@ -30,24 +30,21 @@ export type BacklinksView = Pick<
 >;
 
 type SidebarPanelProps = {
-  manifest: BookManifest | null;
+  // R1 batch B7: `manifest`, the bookmark list and the search fields (query /
+  // scope / active match) are **not props any more**. The sidebar renders
+  // exactly what the vault store holds, so it subscribes to those fields
+  // itself - one source of truth instead of a pass-through App had to keep in
+  // sync, and App no longer re-renders for a search-scope change it never uses.
   session: DocumentSession | null;
   renderedChapter: RenderedChapter | null;
   activeHeadingId: string | undefined;
   bookmarkedHeadingIds: ReadonlySet<string>;
   jumpToHeading: (headingId: string, behavior?: ScrollBehavior, highlight?: boolean) => void;
   jumpBookmark: (bookmark: Bookmark) => void;
-  bookmarks: Bookmark[];
-  persistBookmarks: (bookmarks: Bookmark[]) => void;
-  searchQuery: string;
   searchResults: SearchResult[];
-  activeSearchMatchId: string | null;
-  searchScope: SearchScope;
   onQueryChange: (query: string) => void;
-  onScopeChange: (scope: SearchScope) => void;
   handleSearchJump: (result: SearchResult) => void;
   reviewableDocument: { filePath: string; content: string; dirty: boolean } | null;
-  openReviewRequest: number;
   onOpenNoteFile: (filePath: string) => void;
   handleReviewActiveChange: (active: boolean) => void;
   handleMergeFlashNote: (content: string, fileName: string) => void;
@@ -73,24 +70,16 @@ const tabLabels: Record<SidebarTab, string> = {
  * the way the store owns it, and receives only the content it renders.
  */
 export function SidebarPanel({
-  manifest,
   session,
   renderedChapter,
   activeHeadingId,
   bookmarkedHeadingIds,
   jumpToHeading,
   jumpBookmark,
-  bookmarks,
-  persistBookmarks,
-  searchQuery,
   searchResults,
-  activeSearchMatchId,
-  searchScope,
   onQueryChange,
-  onScopeChange,
   handleSearchJump,
   reviewableDocument,
-  openReviewRequest,
   onOpenNoteFile,
   handleReviewActiveChange,
   handleMergeFlashNote,
@@ -104,6 +93,22 @@ export function SidebarPanel({
   const setSidebarTab = useUiStore((s) => s.setSidebarTab);
   const sidebarWidth = useUiStore((s) => s.sidebarWidth);
   const resizingType = useUiStore((s) => s.resizingType);
+  // R1 batch B7: these seven come straight from the stores that own them. The
+  // scope setter is included - it used to arrive as `onScopeChange`, a prop
+  // whose only job was to forward a store action back into the store.
+  const manifest = useVaultStore((s) => s.manifest);
+  const bookmarks = useVaultStore((s) => s.bookmarks);
+  const persistBookmarks = useVaultStore((s) => s.persistBookmarks);
+  const searchQuery = useVaultStore((s) => s.searchQuery);
+  const activeSearchMatchId = useVaultStore((s) => s.activeSearchMatchId);
+  const searchScope = useVaultStore((s) => s.searchScope);
+  const setSearchScope = useVaultStore((s) => s.setSearchScope);
+  // A counter for "start a review", bumped by the command palette. The review
+  // lives behind this panel's own tab, which the workspace does not otherwise
+  // control — so the request travels as a changing number that can be watched,
+  // rather than as a flag that might already be showing. (R1 batch B7 moved this
+  // read, and the note explaining it, down from App.tsx together with the prop.)
+  const openReviewRequest = useReviewStore((s) => s.reviewRequest);
 
   return (
     <>
@@ -187,7 +192,7 @@ export function SidebarPanel({
                   results={searchResults}
                   activeResultId={activeSearchMatchId}
                   scope={searchScope}
-                  onScopeChange={onScopeChange}
+                  onScopeChange={setSearchScope}
                   vaultDocCount={manifest?.chapters?.length}
                   onQueryChange={onQueryChange}
                   onJump={handleSearchJump}

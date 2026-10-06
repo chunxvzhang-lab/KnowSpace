@@ -11,9 +11,9 @@
 
 | 项目 | 数值 |
 | :--- | ---: |
-| 测试文件 | **132** |
-| 用例总数 | **1575** |
-| 通过 | 1573 |
+| 测试文件 | **133** |
+| 用例总数 | **1579** |
+| 通过 | 1577 |
 | 失败 | 0 |
 | 跳过 | 2 |
 | 通过率 | 99.9% |
@@ -143,6 +143,7 @@
 | `src/__tests__/storage.test.ts` | 4 | ✅ |
 | `src/__tests__/toc-and-bookmarks.test.tsx` | 4 | ✅ |
 | `src/__tests__/tsx-accent-info.test.ts` | 4 | ✅ |
+| `src/__tests__/tsx-entry-manifest.test.ts` | 4 | ✅ |
 | `src/__tests__/web-snapshot-service.test.ts` | 4 | ✅ |
 | `src/__tests__/wikilink.test.ts` | 4 | ✅ |
 | `src/__tests__/backlinks-panel.test.tsx` | 3 | ✅ |
@@ -169,7 +170,7 @@
 | 文件 | 当前行数 | 目标 |
 | :--- | ---: | :--- |
 | `src/components/CanvasView.tsx` | 932 | R2 待拆分: 目标各模块 < 2500 行 |
-| `src/App.tsx` | 813 | R1: < 500 行 |
+| `src/App.tsx` | 791 | R1: < 500 行 |
 | `src/services/canvasGraph.ts` | 26 | R2 已拆分 ✅ |
 | `src/services/canvasExport.ts` | 598 | R2 已拆分 ✅ |
 | `src/services/canvasGeometry.ts` | 126 | R2 已拆分 ✅ |
@@ -184,7 +185,7 @@
 
 任何重构都必须满足：
 
-1. 用例总数 **不低于 1575**（删除测试需在 PR 说明中论证）
+1. 用例总数 **不低于 1579**（删除测试需在 PR 说明中论证）
 2. 通过率 **100%**
 3. 单文件用例数**不得下降**（防止测试被静默删除）
 
