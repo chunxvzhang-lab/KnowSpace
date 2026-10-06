@@ -1,7 +1,7 @@
 # KnowSpace · 测试基线快照
 
 > **文档性质**：重构安全网的权威口径（release plan R3 交付物）
-> **生成时间**：2026-10-05
+> **生成时间**：2026-10-06
 > **应用版本**：`2.7.5`
 > **生成方式**：`node scripts/capture-test-baseline.cjs`（自动生成，请勿手工编辑）
 
@@ -12,8 +12,8 @@
 | 项目 | 数值 |
 | :--- | ---: |
 | 测试文件 | **131** |
-| 用例总数 | **1569** |
-| 通过 | 1567 |
+| 用例总数 | **1572** |
+| 通过 | 1570 |
 | 失败 | 0 |
 | 跳过 | 2 |
 | 通过率 | 99.9% |
@@ -69,6 +69,7 @@
 | `src/__tests__/mindmap-xmind-export.test.tsx` | 10 | ✅ |
 | `src/__tests__/wheel-scroll-guard.test.ts` | 10 | ✅ |
 | `src/__tests__/command-bus.test.ts` | 9 | ✅ |
+| `src/__tests__/css-custom-properties.test.ts` | 9 | ✅ |
 | `src/__tests__/flash-capsule.test.ts` | 9 | ✅ |
 | `src/__tests__/graph.test.ts` | 9 | ✅ |
 | `src/__tests__/inflate.test.ts` | 9 | ✅ |
@@ -101,7 +102,6 @@
 | `src/__tests__/review-focus.test.tsx` | 7 | ✅ |
 | `src/__tests__/review-source-reader.test.ts` | 7 | ✅ |
 | `src/__tests__/css-accent-info.test.ts` | 6 | ✅ |
-| `src/__tests__/css-custom-properties.test.ts` | 6 | ✅ |
 | `src/__tests__/diff-service.test.ts` | 6 | ✅ |
 | `src/__tests__/editor-list-continue.test.ts` | 6 | ✅ |
 | `src/__tests__/mindmap-link-parse.test.ts` | 6 | ✅ |
@@ -183,7 +183,7 @@
 
 任何重构都必须满足：
 
-1. 用例总数 **不低于 1569**（删除测试需在 PR 说明中论证）
+1. 用例总数 **不低于 1572**（删除测试需在 PR 说明中论证）
 2. 通过率 **100%**
 3. 单文件用例数**不得下降**（防止测试被静默删除）
 

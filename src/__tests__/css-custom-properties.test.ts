@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { resolve, join } from "node:path";
+import { matchesElement, themeQualifiers } from "./helpers/cssCascade";
 
 /**
  * CSS 自定义属性（令牌）守卫。
@@ -124,24 +125,127 @@ const scan = (text: string, file: string) => {
 for (const f of CSS_FILES) scan(stripComments(readFileSync(f, "utf8")), rel(f));
 for (const f of TS_FILES) scan(stripComments(readFileSync(f, "utf8")), rel(f));
 
+// ------------------------------------------------------- 深色底的主题覆盖判据
+/** 每个 CSS 文件的（相对路径, 剥注释正文）；覆盖判据要按规则解析。 */
+const CSS_TEXTS = CSS_FILES.map((f) => ({
+  file: rel(f),
+  text: stripComments(readFileSync(f, "utf8")),
+}));
+
+type Rule = { sel: string; body: string; file: string };
+
 /**
- * 允许「引用了但未定义」的令牌 —— 每一条都必须写明为什么它是安全的。
+ * 拆出「选择器 + 声明体」的扁平规则表。
+ *
+ * `[^{}]+{[^{}]*}` 只收内层规则：`@media` / `@keyframes` 这类带嵌套的会被跳过，
+ * 里层的 `0% {}` 反过来会被收到——对本判据无害（它们不是 background 声明的来源）。
+ * 注释已剥，所以选择器文本里不会再混进注释正文。
+ */
+function rulesOf(text: string, file: string): Rule[] {
+  const out: Rule[] = [];
+  for (const m of text.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    out.push({ sel: m[1].replace(/\s+/g, " ").trim(), body: m[2], file });
+  }
+  return out;
+}
+
+/**
+ * 找出「背景色来自**未定义**令牌的色值兜底，却没有浅色 / eink 覆盖」的规则。
+ *
+ * 为什么这一类必须单独判：有兜底的悬空引用不会坏，只会**永远是那个写死的值**。当它写的是
+ * `background` 而里面的文字读的是主题令牌时，就得到一个「不跟主题走的深色面板」——
+ * 分栏快捷条就是这么坏的：浅色有覆盖、eink 漏了，于是透明底的 `.splitter-ratio-chip`
+ * 把 eink 深字（`--text-muted` #57544e）压在恒定深底 #1e293b 上实测 **1.94:1**；同栏的
+ * `.splitter-btn-orientation` 自带 `--surface-2` 浅底，所以它没事。
+ *
+ * 判据是**结构性**的（同一次核查学到的：覆盖判定别自造，用 `helpers/cssCascade` 里
+ * 已被闪念胶囊守卫验证过的 matchesElement / themeQualifiers）：
+ * - 只认色值兜底（`#hex` / `rgb(a)`）；`transparent` 是「就是要融进面板」，不算；
+ * - 令牌必须有定义就跳过（那是另一类问题，交给上面的「引用 ⊆ 定义」）；
+ * - 带主题限定的规则本身不参与（它是覆盖，不是被覆盖者）；
+ * - 缺哪个主题就报哪个，逐个点名。
+ */
+function ghostDarkBackgrounds(
+  texts: { file: string; text: string }[],
+  defined: { has(name: string): boolean },
+): string[] {
+  const rules = texts.flatMap((t) => rulesOf(t.text, t.file));
+  const offenders: string[] = [];
+  for (const r of rules) {
+    const m =
+      /(?:^|[;{])\s*background(?:-color)?\s*:\s*var\(\s*(--[\w-]+)\s*,\s*(#[0-9a-fA-F]{3,8}|rgba?\([^)]*\))/.exec(
+        r.body,
+      );
+    if (!m || defined.has(m[1])) continue;
+    for (const part of r.sel
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)) {
+      if (themeQualifiers(part).length) continue;
+      for (const theme of ["light", "eink"]) {
+        const covered = rules.some(
+          (o) =>
+            o !== r &&
+            themeQualifiers(o.sel).includes(theme) &&
+            matchesElement(o.sel, part) &&
+            /(?:^|[;{])\s*background(?:-color)?\s*:/.test(o.body),
+        );
+        if (!covered) offenders.push(`${r.file} ${part} 缺 ${theme} 覆盖（兜底 ${m[2]} 恒定生效）`);
+      }
+    }
+  }
+  return offenders;
+}
+
+/**
+ * 允许「引用了但未定义」的令牌 —— 每一条都要写明**为什么安全**，并**点名它出现在哪些文件**。
  *
  * 这个清单的**唯一**用途是承认「兜底值恒定生效、但结果正确」。往里加东西之前先问：
  * 是真的有主题覆盖兜住，还是只是把问题藏起来了？答案若是后者，就该修而不是加白名单。
+ *
+ * `sites` 不是装饰。2026-10-05 实测到清单会**说谎**：`--surface-1` 的理由写着
+ * 「命令面板 / 快速工具条，有显式覆盖兜住」，而 9 处引用里有 **7 处在思维导图**——
+ * 那些站点有没有覆盖没人核过；同一次核查还发现分栏快捷条**只有浅色覆盖、漏了 eink**，
+ * 于是透明底芯片的 eink 深字压在恒定深底上实测 1.94:1（已补覆盖，见 `graph-workspace.css`）。
+ * 所以「安全」必须落到**可核对的站点**：下面有双向对齐断言 + 「深色底必须有浅色与 eink 覆盖」
+ * 的结构判据，两条各配变异断言。
  */
-const ALLOW_UNDEFINED = new Map<string, string>([
+type AllowEntry = { why: string; sites: string[] };
+const ALLOW_UNDEFINED = new Map<string, AllowEntry>([
   [
     "--surface-1",
-    "命令面板 / 快速工具条：兜底 #1e293b 是自洽深色面板的一部分，浅色与 eink 配色由 " +
-      '`[data-theme="light"] .command-palette-*` 等显式覆盖兜住，实测不漏',
+    {
+      why:
+        "兜底 #1e293b 是自洽深色面板/深色徽章的一部分。命令面板与分栏快捷条由 " +
+        '`[data-theme="light"|"eink"]` 同名规则显式覆盖（快捷条的 eink 覆盖是 2026-10-05 补的）；' +
+        "styles.css 那 7 处是 `fill:` 的**图内固定观感**——同族描边与文字也写死（#f59e0b / #c084fc /" +
+        " #fcd34d），本来就不跟应用主题走，不适用「底色须有主题覆盖」那条判据。",
+      sites: ["styles/command-palette.css", "styles/graph-workspace.css", "styles.css"],
+    },
   ],
   [
     "--text-normal",
-    "同上（命令面板）：与 --surface-1 的深底配对，浅色由显式覆盖改为 #0f172a / #1e293b",
+    {
+      why: "与 --surface-1 的深底配对（浅字压深底），命令面板的浅色/eink 由显式覆盖给出深色文字",
+      sites: ["styles/command-palette.css"],
+    },
   ],
-  ["--border-color", "同上（命令面板）：浅色/eink 由显式覆盖给出边框色"],
-  ["--bg-sidebar", "`.backlinks-panel`：兜底是 `transparent`，就是要融进所在面板，不是遗漏"],
+  [
+    "--border-color",
+    {
+      why:
+        "命令面板边框色：浅色/eink 由显式覆盖给出；graph-filters 那 1 处是 rgba(148,163,184,.2)" +
+        " 的半透明分隔线，压深压浅都读得清，不依赖具体主题",
+      sites: ["styles/command-palette.css", "styles/graph-filters.css"],
+    },
+  ],
+  [
+    "--bg-sidebar",
+    {
+      why: "`.backlinks-panel`：兜底是 `transparent`，就是要融进所在面板，不是遗漏",
+      sites: ["styles/backlinks-panel.css"],
+    },
+  ],
 ]);
 
 describe("CSS 自定义属性（令牌）守卫", () => {
@@ -198,10 +302,75 @@ describe("CSS 自定义属性（令牌）守卫", () => {
     );
   });
 
-  it("允许清单里的每一条都写了理由", () => {
-    for (const [name, why] of ALLOW_UNDEFINED) {
-      expect(why.length, `${name} 的理由太短，说不清为什么安全`).toBeGreaterThan(20);
+  it("允许清单里的每一条都写了理由，并列出了站点", () => {
+    for (const [name, entry] of ALLOW_UNDEFINED) {
+      expect(entry.why.length, `${name} 的理由太短，说不清为什么安全`).toBeGreaterThan(20);
+      expect(entry.sites.length, `${name} 没列出站点，等于没写理由`).toBeGreaterThan(0);
     }
+  });
+
+  it("允许清单说到的站点 = 实际引用的文件（双向对齐，清单不许说谎）", () => {
+    // 理由是「命令面板安全」，实际 9 处里 7 处在导图——这种脱节以前没人看得见。
+    const actual = new Map<string, Set<string>>();
+    for (const r of REFS) {
+      if (DEFINED.has(r.name)) continue;
+      if (!actual.has(r.name)) actual.set(r.name, new Set());
+      actual.get(r.name)!.add(r.file);
+    }
+    const problems: string[] = [];
+    for (const [name, entry] of ALLOW_UNDEFINED) {
+      const used = actual.get(name) ?? new Set<string>();
+      for (const f of entry.sites) if (!used.has(f)) problems.push(`${name} 声称 ${f}，实际没引用`);
+      for (const f of used)
+        if (!entry.sites.includes(f)) problems.push(`${name} 实际被 ${f} 引用，清单没写`);
+    }
+    expect(problems, `白名单与站点不一致：${problems.join(" | ")}`).toEqual([]);
+  });
+
+  it("未定义令牌的背景色兜底必须有浅色与 eink 覆盖（结构判据）", () => {
+    const offenders = ghostDarkBackgrounds(CSS_TEXTS, DEFINED);
+    expect(
+      offenders,
+      `这些规则的背景是一个不跟主题走的写死色（兜底恒定生效），却没有对应主题覆盖：` +
+        `${offenders.join(" | ")}`,
+    ).toEqual([]);
+  });
+
+  it("三条清单判据都不是空转（变异断言）", () => {
+    // ① 站点：谎报一个没引用的文件，必须被双向对齐逻辑点出来
+    const lying = new Map<string, { why: string; sites: string[] }>([
+      ["--surface-1", { why: "x".repeat(30), sites: ["styles/does-not-use-it.css"] }],
+    ]);
+    const flagged: string[] = [];
+    for (const [name, entry] of lying) {
+      const used = new Set(["styles.css"]); // 真实引用集合
+      for (const f of entry.sites) if (!used.has(f)) flagged.push(`${name} 声称 ${f}，实际没引用`);
+      for (const f of used) if (!entry.sites.includes(f)) flagged.push(`${name} 实际被 ${f} 引用`);
+    }
+    expect(flagged.length, "谎报站点没被抓到——对齐逻辑是空转").toBe(2);
+
+    // ② 覆盖判据：造一条只有浅色覆盖的深色底规则，必须报出 eink 缺失
+    const synthetic = [
+      {
+        file: "a.css",
+        text: ".ghost-panel { background: var(--nope-x, #1e293b); color: var(--text); }",
+      },
+      { file: "a.css", text: '[data-theme="light"] .ghost-panel { background: #ffffff; }' },
+    ];
+    const found = ghostDarkBackgrounds(synthetic, new Set(["--text", "--nope-y"]));
+    expect(
+      found.some((o) => /ghost-panel/.test(o) && /eink/.test(o)),
+      `植入的「缺 eink 覆盖」没被抓到：${found.join(" | ")}`,
+    ).toBe(true);
+
+    // ③ 反向：补齐 eink 覆盖后必须转好（否则判据会误报）
+    const fixed = synthetic.concat([
+      { file: "a.css", text: '[data-theme="eink"] .ghost-panel { background: #fbf9f4; }' },
+    ]);
+    expect(
+      ghostDarkBackgrounds(fixed, new Set(["--text", "--nope-y"])),
+      "补齐覆盖后仍报，判据误报",
+    ).toEqual([]);
   });
 
   it("幽灵令牌已收口：桥接块必须不在，`--font-mono` 必须还在（回归锚点）", () => {

@@ -118,6 +118,20 @@
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
 }
 
+/* 墨水屏同样必须覆盖：那条底色声明读的是**未定义**的 `--surface-1`，于是兜底
+   `#1e293b` 恒定生效——它不随主题走。浅色有上面那条救回来，eink 之前是漏的，
+   而栏里 `.splitter-ratio-chip` 是**透明底**、文字直接压在栏面上，文字色读主题令牌
+   `var(--text-muted)`（eink 是 `#57544e`）：深字压深底实测 **1.94:1**，
+   三个比例快捷键在墨水屏上等于看不见。（`.splitter-btn-orientation` 自己有
+   `--surface-2` 的浅底，所以它没事——坏的是透明底的那些。）
+   这里读主题令牌而不是写死值：栏底 `--surface`、边框 `--border`，与浅色版
+   「浅底 + 略深按钮」的层次一致；补覆盖后芯片实测 **7.17:1**。 */
+[data-theme="eink"] .splitter-quick-bar {
+  background: var(--surface);
+  border-color: var(--border);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
 .graph-workspace-splitter:hover .splitter-quick-bar,
 .splitter-quick-bar:hover {
   opacity: 1;

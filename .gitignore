@@ -60,3 +60,10 @@ baseline-capture.log
 # write. A workstation artifact, not a KnowSpace document: no version, no owner,
 # and otherwise it shows up as untracked noise in every `git status`.
 PROJECT_MEMORY.md
+
+# DSH Agent Teams state: team manifests and retired-member records, dropped
+# into whatever directory the team happened to be created in. Same reasoning as
+# PROJECT_MEMORY.md — versionless, ownerless, regenerated on the next run. Left
+# here it pollutes every `git status` and turns `prettier --check .` red, which
+# is exactly how it got noticed.
+.agent-teams/
