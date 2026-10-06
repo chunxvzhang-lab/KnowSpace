@@ -21,8 +21,8 @@ import { useChapterRename } from "./hooks/useChapterRename";
 import { useAutoSave } from "./hooks/useAutoSave";
 import { useColumnResize } from "./hooks/useColumnResize";
 import { useDesktopBridgeSync } from "./hooks/useDesktopBridgeSync";
-import { useDisposableListener } from "./hooks/useDisposableListener";
 import { useDocumentAuthoring } from "./hooks/useDocumentAuthoring";
+import { useFullscreenSync } from "./hooks/useFullscreenSync";
 import { useDocumentCreation } from "./hooks/useDocumentCreation";
 import { useVaultOpening } from "./hooks/useVaultOpening";
 import { useSearch } from "./hooks/useSearch";
@@ -120,9 +120,6 @@ export function App() {
   const setSidebarOpen = useUiStore((s) => s.setSidebarOpen);
   const setDirectoryOpen = useUiStore((s) => s.setDirectoryOpen);
   const setSidebarTab = useUiStore((s) => s.setSidebarTab);
-  // The store calls this one setFullscreen; the local alias keeps the existing
-  // call sites reading naturally.
-  const setIsFullscreen = useUiStore((s) => s.setFullscreen);
   const setNotice = useUiStore((s) => s.setNotice);
   const setIsGraphPaneOpen = useUiStore((s) => s.setGraphPaneOpen);
   // The chrome-side setters (themes, about, palette, history, typewriter,
@@ -466,24 +463,12 @@ export function App() {
     navLockUntilRef,
   });
 
-  // Sync fullscreen state. The document-side listener goes through the
-  // lifecycle guard (2-10): paired removal is structural, not manual.
-  useDisposableListener(document, "fullscreenchange", () => {
-    setIsFullscreen(Boolean(document.fullscreenElement));
-  });
-  useEffect(() => {
-    if (window.bookMDDesktop?.system.isFullScreen) {
-      window.bookMDDesktop.system.isFullScreen().then((full) => {
-        setIsFullscreen(Boolean(full));
-      });
-    }
-    const unsubDesktop = window.bookMDDesktop?.system.onFullScreenChanged?.((full) => {
-      setIsFullscreen(Boolean(full));
-    });
-    return () => {
-      unsubDesktop?.();
-    };
-  }, []);
+  // ── Fullscreen state (R1 batch B8) ────────────────────────────────────────
+  //
+  // Both directions of the sync live in one hook now - the document's own
+  // fullscreenchange, and the bridge's initial read (the window may already be
+  // fullscreen when the renderer mounts) plus its event.
+  useFullscreenSync();
 
   // Handle launch path once on startup and register global event listeners
   const initialHandledRef = useRef(false);
