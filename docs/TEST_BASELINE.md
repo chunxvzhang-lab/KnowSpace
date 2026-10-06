@@ -11,9 +11,9 @@
 
 | 项目 | 数值 |
 | :--- | ---: |
-| 测试文件 | **131** |
-| 用例总数 | **1572** |
-| 通过 | 1570 |
+| 测试文件 | **132** |
+| 用例总数 | **1575** |
+| 通过 | 1573 |
 | 失败 | 0 |
 | 跳过 | 2 |
 | 通过率 | 99.9% |
@@ -147,6 +147,7 @@
 | `src/__tests__/wikilink.test.ts` | 4 | ✅ |
 | `src/__tests__/backlinks-panel.test.tsx` | 3 | ✅ |
 | `src/__tests__/css-animation-keyframes.test.ts` | 3 | ✅ |
+| `src/__tests__/css-frozen.test.ts` | 3 | ✅ |
 | `src/__tests__/mindmap-bounds.test.ts` | 3 | ✅ |
 | `src/__tests__/mindmap-shortcut-scope.test.tsx` | 3 | ✅ |
 | `src/__tests__/paths.test.ts` | 3 | ✅ |
@@ -183,7 +184,7 @@
 
 任何重构都必须满足：
 
-1. 用例总数 **不低于 1572**（删除测试需在 PR 说明中论证）
+1. 用例总数 **不低于 1575**（删除测试需在 PR 说明中论证）
 2. 通过率 **100%**
 3. 单文件用例数**不得下降**（防止测试被静默删除）
 
