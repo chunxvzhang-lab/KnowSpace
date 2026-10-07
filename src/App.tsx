@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { scheduleMermaidWarmUp } from "./services/mermaid";
 
 import { AppOverlays } from "./components/AppOverlays";
@@ -19,6 +19,7 @@ import { useAppCommands } from "./hooks/useAppCommands";
 import { useChapterLoading } from "./hooks/useChapterLoading";
 import { useChapterRename } from "./hooks/useChapterRename";
 import { useAutoSave } from "./hooks/useAutoSave";
+import { useActiveDocument } from "./hooks/useActiveDocument";
 import { useColumnResize } from "./hooks/useColumnResize";
 import { useDesktopBridgeSync } from "./hooks/useDesktopBridgeSync";
 import { useDocumentAuthoring } from "./hooks/useDocumentAuthoring";
@@ -37,7 +38,7 @@ import { useUnsavedGuard } from "./hooks/useUnsavedGuard";
 import { useWikiLinkNavigation } from "./hooks/useWikiLinkNavigation";
 
 import { useUiStore } from "./store/useUiStore";
-import { useTabStore, tabsWithDirtyFlags, type TabMeta } from "./store/useTabStore";
+import { useTabStore, type TabMeta } from "./store/useTabStore";
 import { useVaultStore } from "./store/useVaultStore";
 import { samePath } from "./core/paths";
 
@@ -195,47 +196,22 @@ export function App() {
     scheduleMermaidWarmUp();
   }, []);
 
-  const activeTab = useMemo(() => tabs.find((item) => item.id === chapterId), [tabs, chapterId]);
-  // Applying the dirty flag here rather than storing it means typing in a saved
-  // document changes this memo and nothing else — no tab array, no effect, no
-  // second render pass to settle the tab bar.
-  const tabsForDisplay = useMemo(
-    () => tabsWithDirtyFlags(tabs, chapterId, isDirty),
-    [tabs, chapterId, isDirty],
-  );
-
-  /**
-   * The open document as the review can use it, or null.
-   *
-   * Null for anything that is not Markdown: the review's progress is a comment block
-   * appended to the file, and a canvas document or a mind map's companion is not a
-   * place to append one.
-   *
-   * `dirty` travels with it, because the review turns this source down while the
-   * document has unsaved changes — see DailyReviewPanel, which explains why that is a
-   * rule rather than a warning.
-   */
-  const reviewableDocument = useMemo(() => {
-    if (!session?.absolutePath) return null;
-    const fileName = session.fileName.toLowerCase();
-    if (!fileName.endsWith(".md") && !fileName.endsWith(".markdown")) return null;
-    return { filePath: session.absolutePath, content: session.source, dirty: isDirty };
-  }, [session?.absolutePath, session?.fileName, session?.source, isDirty]);
-  const activeChapter = useMemo(() => {
-    const fromManifest = manifest?.chapters.find((item) => item.id === chapterId);
-    if (fromManifest) return fromManifest;
-    if (activeTab) {
-      return {
-        id: activeTab.id,
-        title: activeTab.title,
-        src: activeTab.relativePath || activeTab.title,
-        absolutePath: activeTab.absolutePath,
-      };
-    }
-    return undefined;
-  }, [manifest?.chapters, chapterId, activeTab]);
-  const activeHeading = renderedChapter?.headings.find((heading) => heading.id === activeHeadingId);
-  const activeIndex = manifest?.chapters.findIndex((item) => item.id === chapterId) ?? -1;
+  // ── Derived views of the open document (R1 batch B10-A) ───────────────────
+  //
+  // Five values the shell renders, all pure functions of the inputs below; the
+  // reasoning about their dependency arrays lives with them in useActiveDocument.
+  // (`activeTab` stays inside the hook - App has no use for it once the chapter
+  // lookup moved with it, and eslint is what proved that, not a grep.)
+  const { tabsForDisplay, reviewableDocument, activeChapter, activeHeading, activeIndex } =
+    useActiveDocument({
+      tabs,
+      chapterId,
+      isDirty,
+      session,
+      manifest,
+      renderedChapter,
+      activeHeadingId,
+    });
 
   // Recording a visit belongs to the store now, which owns the de-duplication
   // and the cap as well.
