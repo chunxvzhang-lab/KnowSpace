@@ -39,30 +39,24 @@ export function App() {
   const restoredChapterIdRef = useRef<string | null>(null);
   const navLockUntilRef = useRef<number>(0);
 
-  // ── Vault (useVaultStore · R1 batch B2) ───────────────────────────────────
+  // ── Vault (useVaultStore) ─────────────────────────────────────────────────
   //
-  // The open folder. Batch B7 moved the bookmark list, the bookmark writer and
-  // the read-only search fields into the panel that renders them; B16 followed
-  // with the two search setters and the panel's tab/theme reads, because
-  // SidebarRegion is what writes a query and clears the active match in the same
-  // action. What is left here is the manifest - the shell's own class name and
-  // the chapter lookup still read it.
+  // B7 moved the bookmark list and the read-only search fields out of here, B16
+  // followed with the panel's tab/theme reads and its query setters: each value
+  // now lives in the component that renders it (see SidebarRegion). What is left
+  // is the manifest, which the shell's own class name and the chapter lookup
+  // read. The migration rationale is written down once, in the store's header.
   const manifest = useVaultStore((s) => s.manifest);
 
   const manifestRef = useRef<BookManifest | null>(manifest);
   manifestRef.current = manifest;
 
-  // ── Tabs (useTabStore · R1 batch B1) ──────────────────────────────────────
+  // ── Tabs (useTabStore) ────────────────────────────────────────────────────
   //
-  // Same technique as the UI store: these aliases keep the identifiers the
-  // useState calls used, so roughly ninety reads of `chapterId` and fifteen
-  // `setTabs` call sites needed no change.
-  //
-  // What did change is that a tab no longer carries a dirty flag. Only the
-  // active tab can be dirty — there is a single editing session — so it is
-  // derived at render instead (see tabsForDisplay). That removes the effect
-  // which used to mirror `isDirty` into this array, and with it the last path
-  // by which a keystroke reached tab state.
+  // These selectors keep the identifiers the old useState calls used, which is
+  // what let the rest of the file stay as it was. A tab carries no dirty flag:
+  // only the active tab can be dirty, so it is derived at render (see
+  // tabsForDisplay) - both decisions are recorded in useTabStore's header.
   const tabs = useTabStore((s) => s.tabs);
   const ensureTab = useTabStore((s) => s.ensureTab);
   const chapterId = useTabStore((s) => s.activeTabId);
@@ -79,16 +73,12 @@ export function App() {
   const secondaryReaderRef = useRef<HTMLElement | null>(null);
   const isDualSplitMode = Boolean(dualSplitTabId && tabs.some((t) => t.id === dualSplitTabId));
 
-  // ── UI chrome (useUiStore · R1 batch B0) ──────────────────────────────────
+  // ── UI chrome (useUiStore) ────────────────────────────────────────────────
   //
-  // Layout, overlays and appearance now live in a Zustand store, so this
-  // component stops owning state that no other shell logic cares about.
-  //
-  // The selector names deliberately match the useState identifiers they
-  // replace — that is what let the rest of the file stay exactly as it was:
-  // every read, every set, including the 14 functional-update call sites. Only
-  // the callbacks that hand-rolled localStorage persistence needed edits,
-  // because the store owns that now too.
+  // Layout, overlays and appearance live in the store; only the fields this
+  // component actually renders or passes on are subscribed here, and the chrome
+  // setters that no shell logic reads were dropped in B0/B16 (see
+  // useUiStore's header for the migration and the localStorage it took over).
   const sidebarOpen = useUiStore((s) => s.sidebarOpen);
   const directoryOpen = useUiStore((s) => s.directoryOpen);
   const isFullscreen = useUiStore((s) => s.isFullscreen);
@@ -156,10 +146,9 @@ export function App() {
 
   // ── Derived views of the open document (R1 batch B10-A) ───────────────────
   //
-  // Five values the shell renders, all pure functions of the inputs below; the
-  // reasoning about their dependency arrays lives with them in useActiveDocument.
-  // (`activeTab` stays inside the hook - App has no use for it once the chapter
-  // lookup moved with it, and eslint is what proved that, not a grep.)
+  // Five pure functions of the inputs below; the reasoning about their
+  // dependency arrays - and why `activeTab` stays inside - lives with them in
+  // useActiveDocument.
   const { tabsForDisplay, reviewableDocument, activeChapter, activeHeading, activeIndex } =
     useActiveDocument({
       tabs,
@@ -171,11 +160,10 @@ export function App() {
       activeHeadingId,
     });
 
-  // ── Column dragging and fitting (R1 batch B3b) ────────────────────────────
+  // ── Column dragging and fitting (useColumnResize) ─────────────────────────
   //
-  // The first hook out of App.tsx. Its four handlers keep the names the JSX
-  // already used, so the two resizer elements below are unchanged. The width
-  // stores stay subscribed here because the resizers render their width.
+  // The first hook out of App.tsx. Its handlers keep the names the JSX already
+  // bound; the width state and the drag/fit bounds live with the hook.
   const {
     handleDirResizeMouseDown,
     handleSidebarResizeMouseDown,
