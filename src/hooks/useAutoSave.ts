@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /**
  * Auto-save (plan 2-7): after the last keystroke, park for
@@ -51,4 +51,42 @@ export function useAutoSave(params: AutoSaveParams): void {
     }, AUTOSAVE_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
   }, [enabled, isDirty, isSaving, conflictActive, sourceRevision, absolutePath]);
+}
+
+/**
+ * The auto-save switch itself (R1 batch B11).
+ *
+ * This used to be a `useState` in App.tsx plus the effect that fed it. Moving
+ * it next to the scheduler puts both halves of the contract - whether a write
+ * is allowed, and when it happens - in one file, and it puts the effect under
+ * `react-hooks/exhaustive-deps`: App.tsx is still on the legacy exemption list
+ * in eslint.config.mjs, new modules are not. The array is empty on purpose and
+ * still honest: the only value the effect closes over is `setEnabled`, a state
+ * setter, and the bridge is read off `window` inside the effect.
+ *
+ * Both directions are wired, exactly as they were: the initial read (the app
+ * may have been switched while the window was closed) and the live broadcast,
+ * so the About-dialog toggle applies without a restart. Everything is
+ * optional-chained because in the browser build and in tests there is no
+ * bridge at all - the default stays ON, which is what the settings screen
+ * shows as well.
+ */
+export function useAutoSaveEnabled(): boolean {
+  const [enabled, setEnabled] = useState(true);
+
+  useEffect(() => {
+    const desktop = window.bookMDDesktop;
+    desktop?.system
+      .getAppSettings?.()
+      .then((settings) => {
+        if (settings) setEnabled(settings.autoSaveEnabled);
+      })
+      .catch(() => {});
+    const unsubscribe = desktop?.system.onAppSettingsUpdated?.((settings) => {
+      setEnabled(settings.autoSaveEnabled);
+    });
+    return () => unsubscribe?.();
+  }, []);
+
+  return enabled;
 }

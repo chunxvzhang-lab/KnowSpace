@@ -18,7 +18,7 @@ import { useAppActions } from "./hooks/useAppActions";
 import { useAppCommands } from "./hooks/useAppCommands";
 import { useChapterLoading } from "./hooks/useChapterLoading";
 import { useChapterRename } from "./hooks/useChapterRename";
-import { useAutoSave } from "./hooks/useAutoSave";
+import { useAutoSave, useAutoSaveEnabled } from "./hooks/useAutoSave";
 import { useActiveDocument } from "./hooks/useActiveDocument";
 import { useColumnResize } from "./hooks/useColumnResize";
 import { useDesktopBridgeSync } from "./hooks/useDesktopBridgeSync";
@@ -162,23 +162,10 @@ export function App() {
   sessionRef.current = session;
 
   // Auto-save (2-7): the same saveSession a Ctrl+S runs, AUTOSAVE_DEBOUNCE_MS
-  // after the last keystroke. The switch lives in app settings (default ON)
-  // and follows the settings broadcast, so the About dialog toggle applies
-  // without a restart.
-  const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
-  useEffect(() => {
-    const desktop = window.bookMDDesktop;
-    desktop?.system
-      .getAppSettings?.()
-      .then((settings) => {
-        if (settings) setAutoSaveEnabled(settings.autoSaveEnabled);
-      })
-      .catch(() => {});
-    const unsubscribe = desktop?.system.onAppSettingsUpdated?.((settings) => {
-      setAutoSaveEnabled(settings.autoSaveEnabled);
-    });
-    return () => unsubscribe?.();
-  }, []);
+  // after the last keystroke. The switch itself - app settings (default ON) and
+  // the broadcast that makes the About dialog toggle apply without a restart -
+  // moved next to the scheduler in R1 batch B11; see useAutoSaveEnabled.
+  const autoSaveEnabled = useAutoSaveEnabled();
   useAutoSave({
     enabled: autoSaveEnabled,
     isDirty,
