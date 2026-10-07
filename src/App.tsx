@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 import { AppOverlays } from "./components/AppOverlays";
 import { AppShellChrome } from "./components/AppShellChrome";
@@ -9,6 +9,7 @@ import type { BookManifest, Bookmark, RenderedChapter, SearchResult } from "./co
 import { EditorView } from "@codemirror/view";
 import { useCommandLayer } from "./hooks/useCommandLayer";
 import { useChapterRename } from "./hooks/useChapterRename";
+import { useChapterSelection } from "./hooks/useChapterSelection";
 import { useAutoSave, useAutoSaveEnabled } from "./hooks/useAutoSave";
 import { useActiveDocument } from "./hooks/useActiveDocument";
 import { useColumnResize } from "./hooks/useColumnResize";
@@ -199,46 +200,25 @@ export function App() {
     absolutePath: session?.absolutePath,
   });
 
-  const selectChapter = useCallback(
-    (nextChapterId: string) => {
-      const targetChap = manifestRef.current?.chapters.find((c) => c.id === nextChapterId);
-      const targetTab = tabsRef.current?.find((t) => t.id === nextChapterId);
-      const targetSrc =
-        targetChap?.src || targetTab?.relativePath || targetChap?.title || targetTab?.title || "";
-      const isCanvas = targetSrc.toLowerCase().endsWith(".canvas");
-      if (isCanvas) {
-        setDirectoryOpen(false);
-        setSidebarOpen(false);
-        setViewMode("canvas");
-      }
-      if (nextChapterId === chapterId) return;
-      guardAction({ type: "select-chapter", chapterId: nextChapterId });
-    },
-    [chapterId, guardAction],
-  );
-  selectChapterRef.current = selectChapter;
-
-  // Keep the active document's tab registered, and its metadata fresh.
+  // ── Choosing a chapter, and the tab that follows (R1 batch B18) ───────────
   //
-  // This was a forty-nine line effect that also mirrored `isDirty` into the tab
-  // array — which is what made a keystroke write into tab state, and why the
-  // dependency list carried both `isDirty` and `chapterId`. The dirty flag is
-  // derived now, so all that remains is registration and renames, and ensureTab
-  // returns the untouched state when neither has happened.
-  //
-  // One thing the old code carried that is worth recording: a guard reading
-  // `activeChapter.id === chapterId`. It could never be false — activeChapter is
-  // looked up *by* chapterId — so it was dead, and dropping it here is not a
-  // behaviour change.
-  useEffect(() => {
-    if (!activeChapter) return;
-    ensureTab({
-      id: activeChapter.id,
-      title: activeChapter.title,
-      relativePath: activeChapter.src,
-      absolutePath: activeChapter.absolutePath,
-    });
-  }, [activeChapter, ensureTab]);
+  // The last imperative wiring in this component: the callback every tab click,
+  // palette result and backlink jump funnels through, the ref that carries it to
+  // hooks registered earlier, and the effect that keeps the opened document in
+  // the tab strip. Its dependency array is complete in the new file - the one
+  // that is actually checked, rather than exempted.
+  const { selectChapter } = useChapterSelection({
+    chapterId,
+    activeChapter,
+    guardAction,
+    ensureTab,
+    manifestRef,
+    tabsRef,
+    setDirectoryOpen,
+    setSidebarOpen,
+    setViewMode,
+    selectChapterRef,
+  });
 
   // openDesktopMarkdownPath itself moved into useDocumentOpening above (B12);
   // the other guardAction wrappers and the command bindings that consume them
