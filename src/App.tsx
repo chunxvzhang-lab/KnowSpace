@@ -6,13 +6,7 @@ import { AppShellChrome } from "./components/AppShellChrome";
 import { SidebarPanel } from "./components/SidebarPanel";
 import { TabBar } from "./components/TabBar";
 import { WorkspaceRouter } from "./components/WorkspaceRouter";
-import type {
-  BookManifest,
-  Bookmark,
-  ChapterSource,
-  RenderedChapter,
-  SearchResult,
-} from "./core/types";
+import type { BookManifest, Bookmark, RenderedChapter, SearchResult } from "./core/types";
 import { EditorView } from "@codemirror/view";
 import { useAppActions } from "./hooks/useAppActions";
 import { useAppCommands } from "./hooks/useAppCommands";
@@ -24,8 +18,7 @@ import { useColumnResize } from "./hooks/useColumnResize";
 import { useDesktopBridgeSync } from "./hooks/useDesktopBridgeSync";
 import { useDocumentAuthoring } from "./hooks/useDocumentAuthoring";
 import { useFullscreenSync } from "./hooks/useFullscreenSync";
-import { useDocumentCreation } from "./hooks/useDocumentCreation";
-import { useVaultOpening } from "./hooks/useVaultOpening";
+import { useDocumentOpening } from "./hooks/useDocumentOpening";
 import { useSearch } from "./hooks/useSearch";
 import { useBacklinkIndex } from "./hooks/useBacklinkIndex";
 import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
@@ -34,13 +27,11 @@ import { useDocumentSession } from "./hooks/useDocumentSession";
 import { useReadingPersistence } from "./hooks/useReadingPersistence";
 import { useReadingTracker } from "./hooks/useReadingTracker";
 import { useTabActions } from "./hooks/useTabActions";
-import { useUnsavedGuard } from "./hooks/useUnsavedGuard";
 import { useWikiLinkNavigation } from "./hooks/useWikiLinkNavigation";
 
 import { useUiStore } from "./store/useUiStore";
 import { useTabStore, type TabMeta } from "./store/useTabStore";
 import { useVaultStore } from "./store/useVaultStore";
-import { samePath } from "./core/paths";
 
 export function App() {
   const readerRef = useRef<HTMLElement | null>(null);
@@ -244,40 +235,33 @@ export function App() {
       pendingNavigationRef,
     });
 
-  const { doOpenMarkdownFile, doOpenDesktopMarkdownPath, doOpenMarkdownDirectory } =
-    useVaultOpening({
-      openSession,
-      setViewMode,
-      activeLoadedChapterIdRef,
-      pendingBookmarkRef,
-    });
-
-  const { doCreateNewFile, doCreateNewMindmap, doCreateNewCanvas } = useDocumentCreation({
-    openSession,
-    setViewMode,
-    activeLoadedChapterIdRef,
-  });
-
-  // ── The unsaved-changes guard (R1 batch) ──────────────────────────────────
+  // ── Opening documents, and the gate that stops it (R1 batch B12) ──────────
   //
-  // Every mutating navigation funnels through guardAction: with unsaved changes
-  // the action is parked and the dialog raised, without them it executes at
-  // once. The dialog's three answers are wired to AppOverlays below.
-  const { guardAction, handleDialogSave, handleDialogDiscard, handleDialogCancel } =
-    useUnsavedGuard({
-      isDirty,
-      saveSession,
-      discardChanges,
-      setViewMode,
-      manifestRef,
-      tabsRef,
-      doOpenMarkdownFile,
-      doOpenDesktopMarkdownPath,
-      doOpenMarkdownDirectory,
-      doCreateNewFile,
-      doCreateNewMindmap,
-      doCreateNewCanvas,
-    });
+  // The folder/file pickers, the three create entry points and the unsaved
+  // changes guard were wired in a row right here: one domain, because the guard
+  // exists precisely to stop those paths discarding edits. The raw do-open /
+  // do-create handlers no longer come back to App at all - only the gate, the
+  // two latest-value refs the keyboard and wiki links read, and the dialog's
+  // three answers.
+  const {
+    guardAction,
+    guardActionRef,
+    openDesktopMarkdownPathRef,
+    handleDialogSave,
+    handleDialogDiscard,
+    handleDialogCancel,
+  } = useDocumentOpening({
+    openSession,
+    pendingBookmarkRef,
+    activeLoadedChapterIdRef,
+    isDirty,
+    saveSession,
+    discardChanges,
+    setViewMode,
+    manifestRef,
+    tabsRef,
+    absolutePath: session?.absolutePath,
+  });
 
   const selectChapter = useCallback(
     (nextChapterId: string) => {
@@ -320,27 +304,11 @@ export function App() {
     });
   }, [activeChapter, ensureTab]);
 
-  // The other guardAction wrappers (the open/create entry points) and the
-  // command bindings that consume them live in useAppCommands below. This one
-  // stays here because the ref that carries it into useWikiLinkNavigation and
-  // useGlobalShortcuts is created before those hooks are called.
-  const openDesktopMarkdownPath = useCallback(
-    (absolutePath: string, preloadedSource?: ChapterSource | null) => {
-      if (samePath(session?.absolutePath, absolutePath)) {
-        return;
-      }
-      guardAction({ type: "open-desktop-file", absolutePath, preloadedSource });
-    },
-    [session?.absolutePath, guardAction],
-  );
-
-  const openDesktopMarkdownPathRef = useRef(openDesktopMarkdownPath);
-  const guardActionRef = useRef(guardAction);
-
-  useEffect(() => {
-    openDesktopMarkdownPathRef.current = openDesktopMarkdownPath;
-    guardActionRef.current = guardAction;
-  });
+  // openDesktopMarkdownPath itself moved into useDocumentOpening above (B12) -
+  // it is that same gate with a same-file short circuit, and the two refs it
+  // feeds are created there, still before the hooks that consume them are
+  // called. The other guardAction wrappers (the open/create entry points) and
+  // the command bindings that consume them live in useAppCommands below.
 
   // ── Tab-bar actions (R1 batch) ────────────────────────────────────────────
   //
