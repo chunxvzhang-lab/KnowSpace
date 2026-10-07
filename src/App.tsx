@@ -19,13 +19,10 @@ import { useDesktopBridgeSync } from "./hooks/useDesktopBridgeSync";
 import { useDocumentAuthoring } from "./hooks/useDocumentAuthoring";
 import { useFullscreenSync } from "./hooks/useFullscreenSync";
 import { useDocumentOpening } from "./hooks/useDocumentOpening";
-import { useSearch } from "./hooks/useSearch";
+import { useReadingSession } from "./hooks/useReadingSession";
 import { useBacklinkIndex } from "./hooks/useBacklinkIndex";
 import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
-import { useBookmarks } from "./hooks/useBookmarks";
 import { useDocumentSession } from "./hooks/useDocumentSession";
-import { useReadingPersistence } from "./hooks/useReadingPersistence";
-import { useReadingTracker } from "./hooks/useReadingTracker";
 import { useTabActions } from "./hooks/useTabActions";
 import { useWikiLinkNavigation } from "./hooks/useWikiLinkNavigation";
 
@@ -43,8 +40,6 @@ export function App() {
     highlight?: boolean;
     searchResult?: SearchResult;
   } | null>(null);
-  const activeHeadingRef = useRef<string | undefined>(undefined);
-  const scrollRatioRef = useRef(0);
   const activeLoadedChapterIdRef = useRef<string>("");
   const restoredChapterIdRef = useRef<string | null>(null);
   const navLockUntilRef = useRef<number>(0);
@@ -197,14 +192,6 @@ export function App() {
     if (chapterId) rememberVisitedDoc(chapterId);
   }, [chapterId, rememberVisitedDoc]);
 
-  // bookmarkedHeadingIds lives in useBookmarks with the rest of the bookmark
-  // logic; see the call below.
-
-  // Bookmark writes moved into the store with the bookmark list. Keeping the
-  // replacement and the disk write in one action is what stops them drifting
-  // apart: the write needs the manifest id, so it has to read the same state
-  // the replacement does.
-
   // ── Column dragging and fitting (R1 batch B3b) ────────────────────────────
   //
   // The first hook out of App.tsx. Its four handlers keep the names the JSX
@@ -216,24 +203,6 @@ export function App() {
     handleDirDoubleClick,
     handleSidebarDoubleClick,
   } = useColumnResize();
-
-  // ── Search (R1 batch B3b-4) ──────────────────────────────────────────────
-  //
-  // The five names the rest of the file uses come back out of the hook: the
-  // bookmark jump calls jumpToHeading and jumpToRatio, three effects call them,
-  // and SearchPanel takes searchResults and handleSearchJump as props.
-  const { searchResults, jumpToHeading, jumpToRatio, clearSearchHighlights, handleSearchJump } =
-    useSearch({
-      renderedChapter,
-      session,
-      viewMode,
-      editorViewRef,
-      readerRef,
-      selectChapterRef,
-      setActiveHeadingId,
-      navLockUntilRef,
-      pendingNavigationRef,
-    });
 
   // ── Opening documents, and the gate that stops it (R1 batch B12) ──────────
   //
@@ -304,11 +273,45 @@ export function App() {
     });
   }, [activeChapter, ensureTab]);
 
-  // openDesktopMarkdownPath itself moved into useDocumentOpening above (B12) -
-  // it is that same gate with a same-file short circuit, and the two refs it
-  // feeds are created there, still before the hooks that consume them are
-  // called. The other guardAction wrappers (the open/create entry points) and
-  // the command bindings that consume them live in useAppCommands below.
+  // openDesktopMarkdownPath itself moved into useDocumentOpening above (B12);
+  // the other guardAction wrappers and the command bindings that consume them
+  // live in useAppCommands below.
+
+  // ── Where the reader is, and every way to move it (R1 batch B13) ──────────
+  //
+  // Search, bookmarks, reading-position persistence and the scroll tracker were
+  // four calls in four places that feed each other: the bookmark jump uses the
+  // search module's jumpToHeading / jumpToRatio, the tracker's scroll idle is
+  // what drives the save, and the restore path picks up a queued bookmark or a
+  // cross-document navigation. The position saver itself stays inside - its only
+  // caller was the tracker.
+  const {
+    searchResults,
+    jumpToHeading,
+    clearSearchHighlights,
+    handleSearchJump,
+    bookmarkedHeadingIds,
+    jumpBookmark,
+    addBookmark,
+  } = useReadingSession({
+    session,
+    renderedChapter,
+    viewMode,
+    chapterId,
+    activeChapter,
+    activeHeading,
+    activeHeadingId,
+    selectChapter,
+    setActiveHeadingId,
+    readerRef,
+    editorViewRef,
+    selectChapterRef,
+    navLockUntilRef,
+    pendingBookmarkRef,
+    pendingNavigationRef,
+    restoredChapterIdRef,
+    primeRenderedCache,
+  });
 
   // ── Tab-bar actions (R1 batch) ────────────────────────────────────────────
   //
@@ -344,55 +347,8 @@ export function App() {
     activeLoadedChapterIdRef,
   });
 
-  // ── Bookmarks (R1 batch B3b-7) ────────────────────────────────────────────
-  //
-  // The two names the JSX and the outline need come back out. pendingBookmarkRef
-  // travels in because a bookmark pointing at another chapter cannot be resolved
-  // until that chapter loads, and the reading-position restore below picks it up.
-  const { bookmarkedHeadingIds, jumpBookmark, addBookmark } = useBookmarks({
-    renderedChapter,
-    activeChapter,
-    activeHeading,
-    selectChapter,
-    jumpToHeading,
-    jumpToRatio,
-    readerRef,
-    scrollRatioRef,
-    pendingBookmarkRef,
-  });
-
-  // ── Reading-position persistence (R1 batch) ──────────────────────────────
-  //
-  // Saving the position as the reader settles, restoring it (or a queued
-  // bookmark / cross-document navigation) when a document renders, and
-  // pre-rendering the neighbours. Must sit before useReadingTracker, which
-  // reports the scroll idle that drives the save.
-  const { saveCurrentReadingPosition } = useReadingPersistence({
-    chapterId,
-    renderedChapter,
-    activeHeadingId,
-    readerRef,
-    editorViewRef,
-    activeHeadingRef,
-    scrollRatioRef,
-    pendingBookmarkRef,
-    pendingNavigationRef,
-    restoredChapterIdRef,
-    jumpToHeading,
-    jumpToRatio,
-    handleSearchJump,
-    primeRenderedCache,
-  });
-
-  useReadingTracker({
-    containerRef: readerRef,
-    headings: renderedChapter?.headings ?? [],
-    activeHeadingRef,
-    scrollRatioRef,
-    onActiveHeadingChange: setActiveHeadingId,
-    onScrollIdle: saveCurrentReadingPosition,
-    navLockUntilRef,
-  });
+  // Bookmarks, the reading position and the scroll tracker moved up into
+  // useReadingSession with the search helpers they all read (B13).
 
   // ── Fullscreen state (R1 batch B8) ────────────────────────────────────────
   //

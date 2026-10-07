@@ -22,6 +22,12 @@ import type { Bookmark, ChapterManifest, Heading, RenderedChapter } from "../cor
  * App.tsx picks it up afterwards. That ref is therefore shared rather than owned
  * here. \`jumpToHeading\` and \`jumpToRatio\` come from useSearch, because a
  * bookmark resolves to one or the other.
+ *
+ * The writes are not here: the bookmark list, the replacement and the disk write
+ * live in the vault store, in one action - the write needs the manifest id, so it
+ * has to read the same state the replacement does, and giving two owners the job
+ * is how they drift apart. (R1 batch B13 moved this note out of App.tsx, where it
+ * had become a comment pointing at code that no longer lived there.)
  */
 
 type UseBookmarksParams = {
