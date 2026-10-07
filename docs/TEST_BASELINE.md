@@ -12,8 +12,8 @@
 | 项目 | 数值 |
 | :--- | ---: |
 | 测试文件 | **133** |
-| 用例总数 | **1579** |
-| 通过 | 1577 |
+| 用例总数 | **1580** |
+| 通过 | 1578 |
 | 失败 | 0 |
 | 跳过 | 2 |
 | 通过率 | 99.9% |
@@ -56,10 +56,10 @@
 | `src/__tests__/table-generator.test.ts` | 14 | ✅ |
 | `src/__tests__/document-creation.test.ts` | 13 | ✅ |
 | `src/__tests__/mindmap-export-ecosystem.test.ts` | 13 | ✅ |
+| `src/__tests__/app-smoke.test.tsx` | 12 | ✅ |
 | `src/__tests__/backlink-index-hook.test.ts` | 12 | ✅ |
 | `src/__tests__/mindmap-relations.test.ts` | 12 | ✅ |
 | `src/__tests__/slash-command-trigger.test.ts` | 12 | ✅ |
-| `src/__tests__/app-smoke.test.tsx` | 11 | ✅ |
 | `src/__tests__/scan-notice.test.ts` | 11 | ✅ |
 | `src/__tests__/chapter-list.test.tsx` | 10 | ✅ |
 | `src/__tests__/editor-context-menu.test.ts` | 10 | ✅ |
@@ -170,7 +170,7 @@
 | 文件 | 当前行数 | 目标 |
 | :--- | ---: | :--- |
 | `src/components/CanvasView.tsx` | 932 | R2 待拆分: 目标各模块 < 2500 行 |
-| `src/App.tsx` | 752 | R1: < 500 行 |
+| `src/App.tsx` | 596 | R1: < 500 行 |
 | `src/services/canvasGraph.ts` | 26 | R2 已拆分 ✅ |
 | `src/services/canvasExport.ts` | 598 | R2 已拆分 ✅ |
 | `src/services/canvasGeometry.ts` | 126 | R2 已拆分 ✅ |
@@ -185,7 +185,7 @@
 
 任何重构都必须满足：
 
-1. 用例总数 **不低于 1579**（删除测试需在 PR 说明中论证）
+1. 用例总数 **不低于 1580**（删除测试需在 PR 说明中论证）
 2. 通过率 **100%**
 3. 单文件用例数**不得下降**（防止测试被静默删除）
 
