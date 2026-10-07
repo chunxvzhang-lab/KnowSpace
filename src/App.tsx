@@ -8,8 +8,7 @@ import { TabBar } from "./components/TabBar";
 import { WorkspaceRouter } from "./components/WorkspaceRouter";
 import type { BookManifest, Bookmark, RenderedChapter, SearchResult } from "./core/types";
 import { EditorView } from "@codemirror/view";
-import { useAppActions } from "./hooks/useAppActions";
-import { useAppCommands } from "./hooks/useAppCommands";
+import { useCommandLayer } from "./hooks/useCommandLayer";
 import { useChapterLoading } from "./hooks/useChapterLoading";
 import { useChapterRename } from "./hooks/useChapterRename";
 import { useAutoSave, useAutoSaveEnabled } from "./hooks/useAutoSave";
@@ -21,7 +20,6 @@ import { useFullscreenSync } from "./hooks/useFullscreenSync";
 import { useDocumentOpening } from "./hooks/useDocumentOpening";
 import { useReadingSession } from "./hooks/useReadingSession";
 import { useBacklinkIndex } from "./hooks/useBacklinkIndex";
-import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts";
 import { useDocumentSession } from "./hooks/useDocumentSession";
 import { useTabActions } from "./hooks/useTabActions";
 import { useWikiLinkNavigation } from "./hooks/useWikiLinkNavigation";
@@ -275,7 +273,8 @@ export function App() {
 
   // openDesktopMarkdownPath itself moved into useDocumentOpening above (B12);
   // the other guardAction wrappers and the command bindings that consume them
-  // live in useAppCommands below.
+  // live in the command layer below (useCommandLayer, which calls
+  // useAppCommands).
 
   // ── Where the reader is, and every way to move it (R1 batch B13) ──────────
   //
@@ -357,9 +356,6 @@ export function App() {
   // fullscreen when the renderer mounts) plus its event.
   useFullscreenSync();
 
-  // Handle launch path once on startup and register global event listeners
-  const initialHandledRef = useRef(false);
-
   // ── Chapter loading and view sync (R1 batch) ──────────────────────────────
   //
   // Turning "the active tab is chapter X" into "the session holds chapter X":
@@ -380,12 +376,13 @@ export function App() {
   // re-listing that makes it visible at once) — see useDesktopBridgeSync.
   useDesktopBridgeSync({ manifestRef });
 
-  // ── Document actions for the workspace and overlays (final trim) ──────────
+  // ── The command layer (R1 batch B14) ──────────────────────────────────────
   //
-  // Print, extract-to-note, flash capture, mindmap toggle, TOC reveal, flash
-  // merge, review focus and history revert: the single-caller actions of the
-  // editing session that WorkspaceRouter, SidebarPanel and AppOverlays bind as
-  // props. The hook reads the stores it needs itself.
+  // Session actions, the command registrations around them, and the keyboard
+  // that runs them through the bus: three calls in a row that were one layer.
+  // The launch-handled flag stays inside it, and so does the wiring that hands
+  // the print action to the command list - the chrome and the command can no
+  // longer be given different print handlers.
   const {
     handleReviewActiveChange,
     handlePrintDocument,
@@ -395,24 +392,6 @@ export function App() {
     handleRevealInToc,
     handleMergeFlashNote,
     handleRevertToContent,
-  } = useAppActions({
-    session,
-    setViewMode,
-    updateSource,
-    renderPreviewNow,
-    saveSession,
-    activeChapter,
-    editorViewRef,
-  });
-
-  // ── Command bindings and the guardAction wrappers (final trim) ────────────
-  //
-  // The 27 command ids bound once here, the open/create wrappers both the
-  // bindings and the chrome share, the palette action list, and the
-  // navigation/appearance callbacks the commands exist around (focus search,
-  // previous/next, fullscreen, typewriter, graph pane). focusSearch stays
-  // inside the hook — nothing outside the bindings uses it.
-  const {
     handleOpenCommandPalette,
     handleToggleGraphPane,
     handleCloseGraphPane,
@@ -426,32 +405,24 @@ export function App() {
     toggleTypewriterMode,
     toggleFullscreen,
     commandActions,
-  } = useAppCommands({
-    guardAction,
+  } = useCommandLayer({
+    session,
     setViewMode,
+    updateSource,
+    renderPreviewNow,
     saveSession,
+    activeChapter,
+    editorViewRef,
+    guardAction,
     saveSessionAs,
     addBookmark,
     selectChapter,
     manifest,
     activeIndex,
-    handlePrintDocument,
-  });
-
-  // Global keybindings
-  // ── Desktop shell wiring and keyboard shortcuts (R1 batch B3b-6) ─────────
-  //
-  // Keybindings execute commands through the bus; the handlers themselves are
-  // bound once in useCommandRegistrations above, so the keyboard holds no
-  // second copy of any action. The refs still passed here serve the shell
-  // wiring (launch file, close guard) rather than actions.
-  useGlobalShortcuts({
-    initialHandledRef,
     openDesktopMarkdownPathRef,
     guardActionRef,
     handleCloseDualSplit,
     handleCloseTab,
-    selectChapter,
   });
 
   useEffect(() => {
