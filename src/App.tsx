@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { AppOverlays } from "./components/AppOverlays";
 import { AppShellChrome } from "./components/AppShellChrome";
-import { SidebarPanel } from "./components/SidebarPanel";
+import { SidebarRegion } from "./components/SidebarRegion";
 import { TabBar } from "./components/TabBar";
 import { WorkspaceRouter } from "./components/WorkspaceRouter";
 import type { BookManifest, Bookmark, RenderedChapter, SearchResult } from "./core/types";
@@ -42,13 +42,12 @@ export function App() {
   // ── Vault (useVaultStore · R1 batch B2) ───────────────────────────────────
   //
   // The open folder. Batch B7 moved the bookmark list, the bookmark writer and
-  // the read-only search fields into SidebarPanel - the only thing that renders
-  // them - leaving App subscribed to state it did nothing with. The two setters
-  // stay: the query handler clears the active match and the highlights in the
-  // same action that writes the new query.
+  // the read-only search fields into the panel that renders them; B16 followed
+  // with the two search setters and the panel's tab/theme reads, because
+  // SidebarRegion is what writes a query and clears the active match in the same
+  // action. What is left here is the manifest - the shell's own class name and
+  // the chapter lookup still read it.
   const manifest = useVaultStore((s) => s.manifest);
-  const setSearchQuery = useVaultStore((s) => s.setSearchQuery);
-  const setActiveSearchMatchId = useVaultStore((s) => s.setActiveSearchMatchId);
 
   const manifestRef = useRef<BookManifest | null>(manifest);
   manifestRef.current = manifest;
@@ -92,7 +91,6 @@ export function App() {
   // because the store owns that now too.
   const sidebarOpen = useUiStore((s) => s.sidebarOpen);
   const directoryOpen = useUiStore((s) => s.directoryOpen);
-  const sidebarTab = useUiStore((s) => s.sidebarTab);
   const isFullscreen = useUiStore((s) => s.isFullscreen);
   const notice = useUiStore((s) => s.notice);
   const preferences = useUiStore((s) => s.preferences);
@@ -103,7 +101,6 @@ export function App() {
   const setDirectoryOpen = useUiStore((s) => s.setDirectoryOpen);
   const setSidebarTab = useUiStore((s) => s.setSidebarTab);
   const setNotice = useUiStore((s) => s.setNotice);
-  const setIsGraphPaneOpen = useUiStore((s) => s.setGraphPaneOpen);
   // The chrome-side setters (themes, about, palette, history, typewriter,
   // preferences) and the pane widths the chrome renders are no longer aliased
   // here: AppShellChrome, useAppCommands and useAppActions read the same store
@@ -476,44 +473,35 @@ export function App() {
         handleDirResizeMouseDown={handleDirResizeMouseDown}
         handleDirDoubleClick={handleDirDoubleClick}
       >
-        {!isDualSplitMode &&
-        !isCanvasFullscreen &&
-        sidebarOpen &&
-        (manifest || sidebarTab === "space") ? (
-          <SidebarPanel
-            session={session}
-            renderedChapter={renderedChapter}
-            activeHeadingId={activeHeadingId}
-            bookmarkedHeadingIds={bookmarkedHeadingIds}
-            jumpToHeading={jumpToHeading}
-            jumpBookmark={jumpBookmark}
-            searchResults={searchResults}
-            onQueryChange={(q) => {
-              setSearchQuery(q);
-              setActiveSearchMatchId(null);
-              if (!q.trim()) {
-                clearSearchHighlights();
-              }
-            }}
-            handleSearchJump={handleSearchJump}
-            reviewableDocument={reviewableDocument}
-            onOpenNoteFile={(filePath) => openDesktopMarkdownPathRef.current?.(filePath)}
-            handleReviewActiveChange={handleReviewActiveChange}
-            handleMergeFlashNote={handleMergeFlashNote}
-            handleSidebarResizeMouseDown={handleSidebarResizeMouseDown}
-            handleSidebarDoubleClick={handleSidebarDoubleClick}
-            backlinks={{
-              currentDocTitle,
-              currentLinkedReferences,
-              currentUnlinkedMentions,
-              handleJumpToBacklink,
-              handleConvertMention,
-              graphData,
-            }}
-            theme={preferences.theme}
-            onOpenGlobalGraph={() => setIsGraphPaneOpen(true)}
-          />
-        ) : null}
+        {/* The panel decides its own visibility, reads its own tab/theme and
+            owns the search box - see SidebarRegion. */}
+        <SidebarRegion
+          isDualSplitMode={isDualSplitMode}
+          isCanvasFullscreen={isCanvasFullscreen}
+          session={session}
+          renderedChapter={renderedChapter}
+          activeHeadingId={activeHeadingId}
+          reviewableDocument={reviewableDocument}
+          bookmarkedHeadingIds={bookmarkedHeadingIds}
+          jumpToHeading={jumpToHeading}
+          jumpBookmark={jumpBookmark}
+          searchResults={searchResults}
+          handleSearchJump={handleSearchJump}
+          clearSearchHighlights={clearSearchHighlights}
+          openNoteFileRef={openDesktopMarkdownPathRef}
+          handleReviewActiveChange={handleReviewActiveChange}
+          handleMergeFlashNote={handleMergeFlashNote}
+          handleSidebarResizeMouseDown={handleSidebarResizeMouseDown}
+          handleSidebarDoubleClick={handleSidebarDoubleClick}
+          backlinks={{
+            currentDocTitle,
+            currentLinkedReferences,
+            currentUnlinkedMentions,
+            handleJumpToBacklink,
+            handleConvertMention,
+            graphData,
+          }}
+        />
 
         <section className="reader-frame">
           {!isCanvasFullscreen && tabs.length > 0 && (
