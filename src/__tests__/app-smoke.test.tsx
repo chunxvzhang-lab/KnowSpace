@@ -152,6 +152,32 @@ describe("App - shell smoke tests", () => {
     expect(await screen.findByText("测试通知")).toBeTruthy();
   });
 
+  it("expires a notice by itself, 4500ms after it lands", async () => {
+    render(<App />);
+    await waitFor(() => {
+      expect(document.querySelector(".app-shell")).toBeTruthy();
+    });
+
+    // The lifetime belongs to the shell, not to whoever set the message - so it
+    // is one of the things that can silently disappear when wiring moves out of
+    // App.tsx (R1 batch B15 moved the timer into useShellSync). The clock is
+    // faked only after the mount has settled, and nothing below calls
+    // setNotice(null): only passing 4500ms may clear it.
+    vi.useFakeTimers();
+    try {
+      act(() => useUiStore.getState().setNotice("会自动消失"));
+      expect(screen.getByText("会自动消失")).toBeTruthy();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(4600);
+      });
+
+      expect(useUiStore.getState().notice).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("opens and closes the command palette through the store", async () => {
     render(<App />);
 

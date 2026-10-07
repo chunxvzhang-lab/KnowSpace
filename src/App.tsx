@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { scheduleMermaidWarmUp } from "./services/mermaid";
 
 import { AppOverlays } from "./components/AppOverlays";
 import { AppShellChrome } from "./components/AppShellChrome";
@@ -9,15 +8,13 @@ import { WorkspaceRouter } from "./components/WorkspaceRouter";
 import type { BookManifest, Bookmark, RenderedChapter, SearchResult } from "./core/types";
 import { EditorView } from "@codemirror/view";
 import { useCommandLayer } from "./hooks/useCommandLayer";
-import { useChapterLoading } from "./hooks/useChapterLoading";
 import { useChapterRename } from "./hooks/useChapterRename";
 import { useAutoSave, useAutoSaveEnabled } from "./hooks/useAutoSave";
 import { useActiveDocument } from "./hooks/useActiveDocument";
 import { useColumnResize } from "./hooks/useColumnResize";
-import { useDesktopBridgeSync } from "./hooks/useDesktopBridgeSync";
 import { useDocumentAuthoring } from "./hooks/useDocumentAuthoring";
-import { useFullscreenSync } from "./hooks/useFullscreenSync";
 import { useDocumentOpening } from "./hooks/useDocumentOpening";
+import { useShellSync } from "./hooks/useShellSync";
 import { useReadingSession } from "./hooks/useReadingSession";
 import { useBacklinkIndex } from "./hooks/useBacklinkIndex";
 import { useDocumentSession } from "./hooks/useDocumentSession";
@@ -160,13 +157,6 @@ export function App() {
     save: () => saveSession(),
   });
 
-  // Mermaid idle warm-up (profile finding: first render ~400ms of one-off
-  // API init vs ~50ms marginal): schedule once at mount so a diagram opened
-  // in the normal browsing rhythm never pays the cold path.
-  useEffect(() => {
-    scheduleMermaidWarmUp();
-  }, []);
-
   // ── Derived views of the open document (R1 batch B10-A) ───────────────────
   //
   // Five values the shell renders, all pure functions of the inputs below; the
@@ -183,12 +173,6 @@ export function App() {
       renderedChapter,
       activeHeadingId,
     });
-
-  // Recording a visit belongs to the store now, which owns the de-duplication
-  // and the cap as well.
-  useEffect(() => {
-    if (chapterId) rememberVisitedDoc(chapterId);
-  }, [chapterId, rememberVisitedDoc]);
 
   // ── Column dragging and fitting (R1 batch B3b) ────────────────────────────
   //
@@ -349,19 +333,20 @@ export function App() {
   // Bookmarks, the reading position and the scroll tracker moved up into
   // useReadingSession with the search helpers they all read (B13).
 
-  // ── Fullscreen state (R1 batch B8) ────────────────────────────────────────
+  // ── The shell's own synchronisation (R1 batch B15) ────────────────────────
   //
-  // Both directions of the sync live in one hook now - the document's own
-  // fullscreenchange, and the bridge's initial read (the window may already be
-  // fullscreen when the renderer mounts) plus its event.
-  useFullscreenSync();
-
-  // ── Chapter loading and view sync (R1 batch) ──────────────────────────────
-  //
-  // Turning "the active tab is chapter X" into "the session holds chapter X":
-  // the loader with its already-loaded short-circuits, the canvas-closes-panels
-  // rule, and the dual-split pane's independent load.
-  useChapterLoading({
+  // Fullscreen, "the active tab is chapter X" -> "the session holds chapter X",
+  // preferences pushed to the main process, the visit history, the notice
+  // expiry and the mermaid warm-up: the wiring that runs once per mount no
+  // matter what the reader does next. It sits here because the session values
+  // it feeds are ready by now, and every hook that consumes a loaded chapter is
+  // called below it.
+  useShellSync({
+    chapterId,
+    rememberVisitedDoc,
+    notice,
+    setNotice,
+    manifestRef,
     session,
     viewMode,
     openSession,
@@ -369,12 +354,6 @@ export function App() {
     activeLoadedChapterIdRef,
     setSecondaryRenderedChapter,
   });
-
-  // ── Preferences pushed to the main process (final trim) ──────────────────
-  //
-  // Native window-frame theme and the hidden-files scan setting (with the
-  // re-listing that makes it visible at once) — see useDesktopBridgeSync.
-  useDesktopBridgeSync({ manifestRef });
 
   // ── The command layer (R1 batch B14) ──────────────────────────────────────
   //
@@ -425,13 +404,8 @@ export function App() {
     handleCloseTab,
   });
 
-  useEffect(() => {
-    if (!notice) return;
-    const timer = setTimeout(() => {
-      setNotice(null);
-    }, 4500);
-    return () => clearTimeout(timer);
-  }, [notice]);
+  // The notice's own expiry moved up into useShellSync with the rest of the
+  // once-per-mount wiring (B15), where the dependency list is actually checked.
 
   // Backlink Index & Mentions
   // backlinkIndex and the vault search index live in useVaultStore alongside the
