@@ -1,7 +1,7 @@
 # KnowSpace · 质量棘轮基线
 
 > **文档性质**：代码质量债务的权威口径（与 `TEST_BASELINE.md` 同规格）
-> **生成时间**：2026-10-05
+> **生成时间**：2026-10-08
 > **应用版本**：`2.7.5`
 > **生成方式**：`node scripts/quality-ratchet.cjs`（自动生成，**禁止手工编辑**）
 > **判定规则**：CI 中 `--check` 比对，门控指标只许改善不许恶化；放宽基线必须走评审
@@ -13,13 +13,13 @@
 
 | 指标 | 基线值 | 规则 |
 | :--- | ---: | :--- |
-| `colon-any` | 30 | 只减不增（`: any`，含 `any[]`；不含 `Array<any>` 泛型） |
-| `as-any` | 10 | 只减不增（`as any`） |
+| `colon-any` | 22 | 只减不增（`: any`，含 `any[]`；不含 `Array<any>` 泛型） |
+| `as-any` | 6 | 只减不增（`as any`） |
 | `files-over-1000-lines` | 0 | 只减不增（src 非测试代码，> 1000 行） |
 | `max-file-lines` | 962 | 只减不增（最大单文件行数） |
 | `styles-css-lines` | 1669 | 只减不增（阶段 B：CSS 按**连续前缀**外迁到 src/styles/*.css；回升意味着有人手工折叠了切片，那会改级联） |
 | `undeclared-imports` | 0 | 必须为 0（src 中 import 的第三方包必须在 package.json 显式声明，防幽灵依赖） |
-| `src-lines` | 71387 | 记录趋势，不设闸 |
+| `src-lines` | 71249 | 记录趋势，不设闸 |
 | `test-cases` | 见 `TEST_BASELINE.md` | 只增不减——由测试基线守护，本文件不重复设闸 |
 
 ---
@@ -61,7 +61,7 @@ import 顺序 = 拆分前 styles.css 内的物理顺序；每批只切连续前�
 | `src/styles/review-panel.css`（切片） | 511 |
 | `src/styles/backlinks-panel.css`（切片） | 454 |
 | `src/styles/graph.css`（切片） | 893 |
-| `src/styles/graph-workspace.css`（切片） | 538 |
+| `src/styles/graph-workspace.css`（切片） | 552 |
 | `src/styles/mindmap.css`（切片） | 915 |
 | `src/styles/blocklink.css`（切片） | 198 |
 | `src/styles/editor-context-menu.css`（切片） | 720 |
@@ -85,14 +85,6 @@ import 顺序 = 拆分前 styles.css 内的物理顺序；每批只切连续前�
 | `src/components/EditorPane.tsx:590` | `: any, from: number, to: number) => {` |
 | `src/components/EditorPane.tsx:619` | `: any, from: number, to: number) => {` |
 | `src/components/EditorPane.tsx:656` | `: any, from: number, to: number) => {` |
-| `src/components/GlobalGraphDialog.tsx:248` | `: any) => {` |
-| `src/components/GlobalGraphDialog.tsx:252` | `: any) => {` |
-| `src/components/GlobalGraphDialog.tsx:256` | `: any) => {` |
-| `src/components/GlobalGraphDialog.tsx:364` | `: any) => positions.get(node.data("id"))` |
-| `src/components/GlobalGraphDialog.tsx:449` | `: any) => Boolean(e.data("isCrossFolder"` |
-| `src/components/GlobalGraphDialog.tsx:515` | `: any) => Boolean(e.data("isCrossFolder"` |
-| `src/components/GlobalGraphDialog.tsx:589` | `: any) => {` |
-| `src/components/GlobalGraphDialog.tsx:610` | `: any) => Boolean(e.data("isCrossFolder"` |
 | `src/components/graph/graphCytoscapeStyle.ts:69` | `: any) => {` |
 | `src/components/graph/graphCytoscapeStyle.ts:73` | `: any) => {` |
 | `src/components/graph/graphCytoscapeStyle.ts:77` | `: any) => {` |
@@ -115,10 +107,6 @@ import 顺序 = 拆分前 styles.css 内的物理顺序；每批只切连续前�
 
 | 位置 | 代码 |
 | :--- | :--- |
-| `src/components/GlobalGraphDialog.tsx:361` | `as any,` |
-| `src/components/GlobalGraphDialog.tsx:365` | `as any,` |
-| `src/components/GlobalGraphDialog.tsx:513` | `as any)` |
-| `src/components/GlobalGraphDialog.tsx:762` | `as any)}` |
 | `src/components/graph/graphCytoscapeStyle.ts:210` | `as any;` |
 | `src/components/graph/useCytoscapeGraph.ts:177` | `as any,` |
 | `src/components/graph/useCytoscapeGraph.ts:329` | `as any)` |

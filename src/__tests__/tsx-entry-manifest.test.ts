@@ -101,16 +101,16 @@ const rel = (p: string) => relative(ROOT, p).replace(/\\/g, "/");
  * 已知孤儿：**没有任何模块装载**它们，行为因此静默不存在。
  * 每条都必须带理由与规则号（踩坑实录 `844c0337`：无断言的清单约等于没有），
  * 并且下面有腐坏自检，防止它变成永久的遮羞布。
+ *
+ * 当前为空。历史上唯一一条豁免是 `src/components/GlobalGraphDialog.tsx`（928 行，
+ * 2026-10-07 由本守卫测出的既存孤儿）——关系图能力已整体由 `GraphViewPane` +
+ * `isGraphPaneOpen` 提供（`ActivityBar` 的"知识网络全景图谱"与 Ctrl+G 都走分栏），
+ * 对话框一份 Cytoscape 初始化、一份过滤状态、一份节点详情卡就是第二份真相源，
+ * 于是该文件被删除，豁免同时消失。**这条注释不是档案**：它记录的是判据——
+ * 孤儿要么接进装配、要么删掉，"点名豁免"只允许出现在"决定还没做"的窗口期，
+ * 决定一旦做完，豁免必须跟着离开这张表。
  */
-const ALLOW_UNREACHABLE = new Map<string, string>([
-  [
-    "src/components/GlobalGraphDialog.tsx",
-    "规则 9/10：2026-10-06 由本守卫一手测出的**既存**孤儿（全仓 0 处装载），是关系图浮层" +
-      "改走 `GraphViewPane` + `isGraphPaneOpen` 之后遗留的旧入口，与本轮下沉无关。" +
-      "删掉还是接回去是产品决定（要回答「全局关系图还该不该是独立对话框」），" +
-      "已登记为独立债务行，因此在此点名豁免。",
-  ],
-]);
+const ALLOW_UNREACHABLE = new Map<string, string>([]);
 
 describe("TSX 装载清单（下沉后不许出现孤儿模块）", () => {
   it("扫描器自身有效（否则本守卫会空转全绿）", () => {

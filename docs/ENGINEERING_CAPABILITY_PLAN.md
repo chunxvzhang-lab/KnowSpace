@@ -191,7 +191,7 @@ graph TD
 | Reader | L4 | 渲染、AST 同步滚动、公式图表 | `ReaderPane` `useSyncScroll` `markdown.ts` | 收敛 |
 | **Canvas** | L4 | 视口/节点/连线/路由/演播/导出 | `CanvasView`(6710) + `canvas/`(17) + 9 个 canvas* 服务 | **拆 5 子模块** |
 | **Mindmap** | L4 | 布局/样式/标注/关系线/增量同步 | `MindmapView`(3547) + 11 个组件 + 3 个 >1190 行服务 | **拆 4 子模块 + 服务收敛** |
-| Graph | L4 | 力导向、聚类、Hop 过滤 | `GraphViewPane` `GlobalGraphDialog` `graphService` | 仿真入 Worker |
+| Graph | L4 | 力导向、聚类、Hop 过滤 | `GraphViewPane` + `graph/`（5 个拆分件） `graphService` | 仿真入 Worker |
 | Review | L4 | FSRS 队列、评分、撤销、合并写回 | `DailyReviewPanel` `fsrsService` | UI 拆分 |
 | Space | L4 | 闪念微窗、时间线、待办回写 | `FlashCapsule` `SpaceTimelinePanel` | 收敛 |
 | Search | L4 | 倒排索引、结构化语法 | `SearchPanel` `searchIndexService` | 索引下沉 L2 |
