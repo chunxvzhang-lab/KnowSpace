@@ -1,7 +1,6 @@
 import type { ComponentProps } from "react";
 
 import { SidebarPanel } from "./SidebarPanel";
-import type { ChapterSource } from "../core/types";
 import { useUiStore } from "../store/useUiStore";
 import { useVaultStore } from "../store/useVaultStore";
 
@@ -16,41 +15,34 @@ import { useVaultStore } from "../store/useVaultStore";
  * shell when only the panel's tab changes, and the visibility rule lives in one
  * place instead of being spelled out in a ternary at the call site.
  *
- * What still arrives as props is what App owns and cannot share any other way:
- * the editing session, the derived document views, the reading helpers, the
+ * What still arrives as props is what the shell owns and cannot share any other
+ * way: the editing session, the derived document views, the reading helpers, the
  * backlinks bundle, and the two column-resize handlers (their hook keeps one
- * window-level drag listener, so it is called once, in App, and not a second
- * time here - two listeners would both answer the same drag).
+ * window-level drag listener, so it is called once in the controller and not a
+ * second time here - two listeners would both answer the same drag).
  *
- * `openNoteFileRef` is a ref rather than a callback on purpose: the panel may
- * open a note at any moment, and the ref is how the shell's latest
- * guard-wrapped open path reaches it without this region re-rendering or, worse,
- * holding a stale closure over the session.
+ * `onOpenNoteFile` arrives as a plain callback (B19). It used to be handed over
+ * as a ref for this region to read through, which made the panel reach into the
+ * controller's imperative plumbing; the callback the controller exposes still
+ * reads the latest guard-wrapped open path through that same ref, so nothing
+ * about which version of the handler runs changed - only who gets to know the
+ * ref exists.
  */
 type SidebarPanelProps = ComponentProps<typeof SidebarPanel>;
 
 type SidebarRegionProps = Omit<
   SidebarPanelProps,
-  "onQueryChange" | "onOpenNoteFile" | "theme" | "onOpenGlobalGraph"
+  "onQueryChange" | "theme" | "onOpenGlobalGraph"
 > & {
   /** The two shell states that hide the panel: split view and canvas fullscreen. */
   isDualSplitMode: boolean;
   isCanvasFullscreen: boolean;
   /** Emptying the query also drops the marks made in the document. */
   clearSearchHighlights: () => void;
-  openNoteFileRef: {
-    current: (absolutePath: string, preloadedSource?: ChapterSource | null) => void;
-  };
 };
 
 export function SidebarRegion(props: SidebarRegionProps) {
-  const {
-    isDualSplitMode,
-    isCanvasFullscreen,
-    clearSearchHighlights,
-    openNoteFileRef,
-    ...panelProps
-  } = props;
+  const { isDualSplitMode, isCanvasFullscreen, clearSearchHighlights, ...panelProps } = props;
 
   const sidebarOpen = useUiStore((s) => s.sidebarOpen);
   const sidebarTab = useUiStore((s) => s.sidebarTab);
@@ -77,7 +69,6 @@ export function SidebarRegion(props: SidebarRegionProps) {
           clearSearchHighlights();
         }
       }}
-      onOpenNoteFile={(filePath) => openNoteFileRef.current?.(filePath)}
       theme={theme}
       onOpenGlobalGraph={() => setGraphPaneOpen(true)}
     />

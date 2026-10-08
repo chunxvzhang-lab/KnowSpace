@@ -1,561 +1,185 @@
-import { useRef, useState } from "react";
-
 import { AppOverlays } from "./components/AppOverlays";
 import { AppShellChrome } from "./components/AppShellChrome";
 import { SidebarRegion } from "./components/SidebarRegion";
 import { TabBar } from "./components/TabBar";
 import { WorkspaceRouter } from "./components/WorkspaceRouter";
-import type { BookManifest, Bookmark, RenderedChapter, SearchResult } from "./core/types";
-import { EditorView } from "@codemirror/view";
-import { useCommandLayer } from "./hooks/useCommandLayer";
-import { useChapterRename } from "./hooks/useChapterRename";
-import { useChapterSelection } from "./hooks/useChapterSelection";
-import { useAutoSave, useAutoSaveEnabled } from "./hooks/useAutoSave";
-import { useActiveDocument } from "./hooks/useActiveDocument";
-import { useColumnResize } from "./hooks/useColumnResize";
-import { useDocumentAuthoring } from "./hooks/useDocumentAuthoring";
-import { useDocumentOpening } from "./hooks/useDocumentOpening";
-import { useShellSync } from "./hooks/useShellSync";
-import { useReadingSession } from "./hooks/useReadingSession";
-import { useBacklinkIndex } from "./hooks/useBacklinkIndex";
-import { useDocumentSession } from "./hooks/useDocumentSession";
-import { useTabActions } from "./hooks/useTabActions";
-import { useWikiLinkNavigation } from "./hooks/useWikiLinkNavigation";
+import { useWorkspaceController } from "./hooks/useWorkspaceController";
 
-import { useUiStore } from "./store/useUiStore";
-import { useTabStore, type TabMeta } from "./store/useTabStore";
-import { useVaultStore } from "./store/useVaultStore";
-
+/**
+ * The shell view (R1 batch B19).
+ *
+ * App.tsx is the reading application's outermost component, and after twenty-odd
+ * batches of extraction it had become a file that did two jobs at once: it
+ * orchestrated about a dozen hooks *and* assembled the four regions that render
+ * them. The orchestration moved into `useWorkspaceController` (one file, one job,
+ * hook order copied verbatim); what is left here is the assembly - which is what
+ * a component is supposed to be.
+ *
+ * `c` is read, never written. There is no state, no effect, no callback and no
+ * store subscription in this file: every value is either passed straight to the
+ * region that renders it or composed into the shell's class name. That is also
+ * what finally makes the `react-hooks/exhaustive-deps` exemption in
+ * eslint.config.mjs meaningless for App.tsx - there are no hooks left for it to
+ * look at. (Deleting that line is still a gate-config change and still needs its
+ * own decision.)
+ *
+ * The one thing here that is not pure wiring is the class name below: the shell's
+ * layout states are eight independent flags, and the CSS keys off their exact
+ * concatenation. It stayed a template for the same reason the regions keep their
+ * prop lists - moving it into a helper would only hide which flags the shell
+ * answers to.
+ */
 export function App() {
-  const readerRef = useRef<HTMLElement | null>(null);
-  const editorViewRef = useRef<EditorView | null>(null);
-  const pendingBookmarkRef = useRef<Bookmark | null>(null);
-  const pendingNavigationRef = useRef<{
-    headingId?: string;
-    lineNumber?: number;
-    highlight?: boolean;
-    searchResult?: SearchResult;
-  } | null>(null);
-  const activeLoadedChapterIdRef = useRef<string>("");
-  const restoredChapterIdRef = useRef<string | null>(null);
-  const navLockUntilRef = useRef<number>(0);
-
-  // ── Vault (useVaultStore) ─────────────────────────────────────────────────
-  //
-  // B7 moved the bookmark list and the read-only search fields out of here, B16
-  // followed with the panel's tab/theme reads and its query setters: each value
-  // now lives in the component that renders it (see SidebarRegion). What is left
-  // is the manifest, which the shell's own class name and the chapter lookup
-  // read. The migration rationale is written down once, in the store's header.
-  const manifest = useVaultStore((s) => s.manifest);
-
-  const manifestRef = useRef<BookManifest | null>(manifest);
-  manifestRef.current = manifest;
-
-  // ── Tabs (useTabStore) ────────────────────────────────────────────────────
-  //
-  // These selectors keep the identifiers the old useState calls used, which is
-  // what let the rest of the file stay as it was. A tab carries no dirty flag:
-  // only the active tab can be dirty, so it is derived at render (see
-  // tabsForDisplay) - both decisions are recorded in useTabStore's header.
-  const tabs = useTabStore((s) => s.tabs);
-  const ensureTab = useTabStore((s) => s.ensureTab);
-  const chapterId = useTabStore((s) => s.activeTabId);
-  const dualSplitTabId = useTabStore((s) => s.dualSplitTabId);
-  const rememberVisitedDoc = useTabStore((s) => s.rememberVisitedDoc);
-
-  const tabsRef = useRef<TabMeta[]>(tabs);
-  tabsRef.current = tabs;
-  // The comparison pane's rendered content stays here: it is a view artefact
-  // produced by loading a second document, not part of what tabs are.
-  const [secondaryRenderedChapter, setSecondaryRenderedChapter] = useState<RenderedChapter | null>(
-    null,
-  );
-  const secondaryReaderRef = useRef<HTMLElement | null>(null);
-  const isDualSplitMode = Boolean(dualSplitTabId && tabs.some((t) => t.id === dualSplitTabId));
-
-  // ── UI chrome (useUiStore) ────────────────────────────────────────────────
-  //
-  // Layout, overlays and appearance live in the store; only the fields this
-  // component actually renders or passes on are subscribed here, and the chrome
-  // setters that no shell logic reads were dropped in B0/B16 (see
-  // useUiStore's header for the migration and the localStorage it took over).
-  const sidebarOpen = useUiStore((s) => s.sidebarOpen);
-  const directoryOpen = useUiStore((s) => s.directoryOpen);
-  const isFullscreen = useUiStore((s) => s.isFullscreen);
-  const notice = useUiStore((s) => s.notice);
-  const preferences = useUiStore((s) => s.preferences);
-  const isGraphPaneOpen = useUiStore((s) => s.isGraphPaneOpen);
-  const isReviewFocus = useUiStore((s) => s.isReviewFocus);
-
-  const setSidebarOpen = useUiStore((s) => s.setSidebarOpen);
-  const setDirectoryOpen = useUiStore((s) => s.setDirectoryOpen);
-  const setSidebarTab = useUiStore((s) => s.setSidebarTab);
-  const setNotice = useUiStore((s) => s.setNotice);
-  // The chrome-side setters (themes, about, palette, history, typewriter,
-  // preferences) and the pane widths the chrome renders are no longer aliased
-  // here: AppShellChrome, useAppCommands and useAppActions read the same store
-  // fields directly.
-
-  // Where the reader has scrolled to. Stays here because it describes the
-  // rendered document, not the vault.
-  const [activeHeadingId, setActiveHeadingId] = useState<string | undefined>();
-
-  // Pane widths and the "a divider is being dragged" flag come from the store,
-  // which reads and writes the same localStorage keys as the initialisers that
-  // used to live here. Dragging them is useColumnResize's job.
-  const selectChapterRef = useRef<(id: string) => void>(() => {});
-
-  const {
-    session,
-    renderedChapter,
-    viewMode,
-    isDirty,
-    isSaving,
-    isLargeDocument,
-    autoPreviewPaused,
-    conflict,
-    openSession,
-    updateSource,
-    renderPreviewNow,
-    primeRenderedCache,
-    setViewMode,
-    saveSession,
-    saveSessionAs,
-    reloadFromDisk,
-    discardChanges,
-    clearConflict,
-    closeSession,
-  } = useDocumentSession();
-  const sessionRef = useRef(session);
-  sessionRef.current = session;
-
-  // Auto-save (2-7): the same saveSession a Ctrl+S runs, AUTOSAVE_DEBOUNCE_MS
-  // after the last keystroke. The switch itself - app settings (default ON) and
-  // the broadcast that makes the About dialog toggle apply without a restart -
-  // moved next to the scheduler in R1 batch B11; see useAutoSaveEnabled.
-  const autoSaveEnabled = useAutoSaveEnabled();
-  useAutoSave({
-    enabled: autoSaveEnabled,
-    isDirty,
-    isSaving,
-    conflictActive: conflict !== null,
-    sourceRevision: session?.sourceRevision ?? 0,
-    absolutePath: session?.absolutePath ?? null,
-    save: () => saveSession(),
-  });
-
-  // ── Derived views of the open document (R1 batch B10-A) ───────────────────
-  //
-  // Five pure functions of the inputs below; the reasoning about their
-  // dependency arrays - and why `activeTab` stays inside - lives with them in
-  // useActiveDocument.
-  const { tabsForDisplay, reviewableDocument, activeChapter, activeHeading, activeIndex } =
-    useActiveDocument({
-      tabs,
-      chapterId,
-      isDirty,
-      session,
-      manifest,
-      renderedChapter,
-      activeHeadingId,
-    });
-
-  // ── Column dragging and fitting (useColumnResize) ─────────────────────────
-  //
-  // The first hook out of App.tsx. Its handlers keep the names the JSX already
-  // bound; the width state and the drag/fit bounds live with the hook.
-  const {
-    handleDirResizeMouseDown,
-    handleSidebarResizeMouseDown,
-    handleDirDoubleClick,
-    handleSidebarDoubleClick,
-  } = useColumnResize();
-
-  // ── Opening documents, and the gate that stops it (R1 batch B12) ──────────
-  //
-  // The folder/file pickers, the three create entry points and the unsaved
-  // changes guard were wired in a row right here: one domain, because the guard
-  // exists precisely to stop those paths discarding edits. The raw do-open /
-  // do-create handlers no longer come back to App at all - only the gate, the
-  // two latest-value refs the keyboard and wiki links read, and the dialog's
-  // three answers.
-  const {
-    guardAction,
-    guardActionRef,
-    openDesktopMarkdownPathRef,
-    handleDialogSave,
-    handleDialogDiscard,
-    handleDialogCancel,
-  } = useDocumentOpening({
-    openSession,
-    pendingBookmarkRef,
-    activeLoadedChapterIdRef,
-    isDirty,
-    saveSession,
-    discardChanges,
-    setViewMode,
-    manifestRef,
-    tabsRef,
-    absolutePath: session?.absolutePath,
-  });
-
-  // ── Choosing a chapter, and the tab that follows (R1 batch B18) ───────────
-  //
-  // The last imperative wiring in this component: the callback every tab click,
-  // palette result and backlink jump funnels through, the ref that carries it to
-  // hooks registered earlier, and the effect that keeps the opened document in
-  // the tab strip. Its dependency array is complete in the new file - the one
-  // that is actually checked, rather than exempted.
-  const { selectChapter } = useChapterSelection({
-    chapterId,
-    activeChapter,
-    guardAction,
-    ensureTab,
-    manifestRef,
-    tabsRef,
-    setDirectoryOpen,
-    setSidebarOpen,
-    setViewMode,
-    selectChapterRef,
-  });
-
-  // openDesktopMarkdownPath itself moved into useDocumentOpening above (B12);
-  // the other guardAction wrappers and the command bindings that consume them
-  // live in the command layer below (useCommandLayer, which calls
-  // useAppCommands).
-
-  // ── Where the reader is, and every way to move it (R1 batch B13) ──────────
-  //
-  // Search, bookmarks, reading-position persistence and the scroll tracker were
-  // four calls in four places that feed each other: the bookmark jump uses the
-  // search module's jumpToHeading / jumpToRatio, the tracker's scroll idle is
-  // what drives the save, and the restore path picks up a queued bookmark or a
-  // cross-document navigation. The position saver itself stays inside - its only
-  // caller was the tracker.
-  const {
-    searchResults,
-    jumpToHeading,
-    clearSearchHighlights,
-    handleSearchJump,
-    bookmarkedHeadingIds,
-    jumpBookmark,
-    addBookmark,
-  } = useReadingSession({
-    session,
-    renderedChapter,
-    viewMode,
-    chapterId,
-    activeChapter,
-    activeHeading,
-    activeHeadingId,
-    selectChapter,
-    setActiveHeadingId,
-    readerRef,
-    editorViewRef,
-    selectChapterRef,
-    navLockUntilRef,
-    pendingBookmarkRef,
-    pendingNavigationRef,
-    restoredChapterIdRef,
-    primeRenderedCache,
-  });
-
-  // ── Tab-bar actions (R1 batch) ────────────────────────────────────────────
-  //
-  // The six handlers the tab bar binds: dual split open/close and the four
-  // kinds of close. What a close implies for the active tab and the editing
-  // session lives in the hook; the store owns the array transforms.
-  const {
-    handleOpenDualSplit,
-    handleCloseDualSplit,
-    handleCloseTab,
-    handleDetachTab,
-    handleCloseOtherTabs,
-    handleCloseRightTabs,
-  } = useTabActions({ selectChapter, closeSession, activeLoadedChapterIdRef });
-
-  // ── Wiki-link navigation (R1 batch) ──────────────────────────────────────
-  //
-  // Resolving a `[[wiki link]]` click and the completion list the editor offers
-  // — one navigation domain, one hook.
-  const { wikiLinkTargets, handleWikiLinkClick } = useWikiLinkNavigation({
-    selectChapter,
-    jumpToHeading,
-    openDesktopMarkdownPathRef,
-    pendingNavigationRef,
-  });
-
-  // ── Rename, and the features that produce a document (R1 batch) ──────────
-  const { handleRenameChapter } = useChapterRename({ session, updateSource, openSession });
-
-  const { handleCreateCanvasExtractNote, handleImportOutline } = useDocumentAuthoring({
-    openSession,
-    setViewMode,
-    activeLoadedChapterIdRef,
-  });
-
-  // Bookmarks, the reading position and the scroll tracker moved up into
-  // useReadingSession with the search helpers they all read (B13).
-
-  // ── The shell's own synchronisation (R1 batch B15) ────────────────────────
-  //
-  // Fullscreen, "the active tab is chapter X" -> "the session holds chapter X",
-  // preferences pushed to the main process, the visit history, the notice
-  // expiry and the mermaid warm-up: the wiring that runs once per mount no
-  // matter what the reader does next. It sits here because the session values
-  // it feeds are ready by now, and every hook that consumes a loaded chapter is
-  // called below it.
-  useShellSync({
-    chapterId,
-    rememberVisitedDoc,
-    notice,
-    setNotice,
-    manifestRef,
-    session,
-    viewMode,
-    openSession,
-    setViewMode,
-    activeLoadedChapterIdRef,
-    setSecondaryRenderedChapter,
-  });
-
-  // ── The command layer (R1 batch B14) ──────────────────────────────────────
-  //
-  // Session actions, the command registrations around them, and the keyboard
-  // that runs them through the bus: three calls in a row that were one layer.
-  // The launch-handled flag stays inside it, and so does the wiring that hands
-  // the print action to the command list - the chrome and the command can no
-  // longer be given different print handlers.
-  const {
-    handleReviewActiveChange,
-    handlePrintDocument,
-    handleExtractSelectionToNote,
-    handleSendSelectionToFlash,
-    handleToggleMindmap,
-    handleRevealInToc,
-    handleMergeFlashNote,
-    handleRevertToContent,
-    handleOpenCommandPalette,
-    handleToggleGraphPane,
-    handleCloseGraphPane,
-    openMarkdownFile,
-    openMarkdownDirectory,
-    createNewFile,
-    createNewMindmap,
-    createNewCanvas,
-    goPrevious,
-    goNext,
-    toggleTypewriterMode,
-    toggleFullscreen,
-    commandActions,
-  } = useCommandLayer({
-    session,
-    setViewMode,
-    updateSource,
-    renderPreviewNow,
-    saveSession,
-    activeChapter,
-    editorViewRef,
-    guardAction,
-    saveSessionAs,
-    addBookmark,
-    selectChapter,
-    manifest,
-    activeIndex,
-    openDesktopMarkdownPathRef,
-    guardActionRef,
-    handleCloseDualSplit,
-    handleCloseTab,
-  });
-
-  // The notice's own expiry moved up into useShellSync with the rest of the
-  // once-per-mount wiring (B15), where the dependency list is actually checked.
-
-  // Backlink Index & Mentions
-  // backlinkIndex and the vault search index live in useVaultStore alongside the
-  // manifest they are derived from.
-
-  // Cooperative idle background index scheduler
-  // Guarantees 0ms lag upon opening files or folders, with buttery-smooth 60/120fps UI responsiveness.
-  // ── Backlinks and the graph (R1 batch B3b-5) ─────────────────────────────
-  //
-  // Seven names come back out: the side panel and the graph pane read five of
-  // them, and two are needed again further down.
-  const {
-    currentLinkedReferences,
-    currentUnlinkedMentions,
-    graphData,
-    handleJumpToBacklink,
-    handleConvertMention,
-    currentActiveId,
-    currentDocTitle,
-  } = useBacklinkIndex({
-    session,
-    activeChapter,
-    selectChapter,
-    editorViewRef,
-    sessionRef,
-    openDesktopMarkdownPathRef,
-    updateSource,
-  });
-
-  const isCanvasActive = Boolean(
-    (viewMode === "canvas" || session?.fileName?.toLowerCase().endsWith(".canvas")) && session,
-  );
-  const isCanvasFullscreen = isCanvasActive && isFullscreen;
+  const c = useWorkspaceController();
 
   return (
     <div
-      className={`app-shell theme-${preferences.theme} ${sidebarOpen ? "sidebar-open" : "sidebar-closed"}${directoryOpen ? "" : " directory-closed"}${manifest ? "" : " empty-source"}${isFullscreen ? " is-fullscreen" : ""}${isCanvasFullscreen ? " is-canvas-fullscreen" : ""}${isDualSplitMode ? " is-dual-split-mode" : ""}${isReviewFocus ? " is-review-focus" : ""}`}
+      className={`app-shell theme-${c.preferences.theme} ${c.sidebarOpen ? "sidebar-open" : "sidebar-closed"}${c.directoryOpen ? "" : " directory-closed"}${c.manifest ? "" : " empty-source"}${c.isFullscreen ? " is-fullscreen" : ""}${c.isCanvasFullscreen ? " is-canvas-fullscreen" : ""}${c.isDualSplitMode ? " is-dual-split-mode" : ""}${c.isReviewFocus ? " is-review-focus" : ""}`}
     >
       {/* Shell chrome — dock, toolbar, directory, status bar. Everything the
           stores own is read inside AppShellChrome; children are the workspace's
           session-driven middle. */}
       <AppShellChrome
-        session={session}
-        viewMode={viewMode}
-        setViewMode={setViewMode}
-        isDirty={isDirty}
-        isLargeDocument={isLargeDocument}
-        activeChapter={activeChapter}
-        activeIndex={activeIndex}
-        backlinksCount={currentLinkedReferences.length}
-        selectChapter={selectChapter}
-        handleRenameChapter={handleRenameChapter}
-        handleImportOutline={handleImportOutline}
-        createNewFile={createNewFile}
-        createNewMindmap={createNewMindmap}
-        createNewCanvas={createNewCanvas}
-        openMarkdownFile={openMarkdownFile}
-        openMarkdownDirectory={openMarkdownDirectory}
-        toggleFullscreen={toggleFullscreen}
-        toggleTypewriterMode={toggleTypewriterMode}
-        goPrevious={goPrevious}
-        goNext={goNext}
-        addBookmark={addBookmark}
-        saveSession={saveSession}
-        handlePrintDocument={handlePrintDocument}
-        handleToggleGraphPane={handleToggleGraphPane}
-        handleOpenCommandPalette={handleOpenCommandPalette}
-        handleDirResizeMouseDown={handleDirResizeMouseDown}
-        handleDirDoubleClick={handleDirDoubleClick}
+        session={c.doc.session}
+        viewMode={c.doc.viewMode}
+        setViewMode={c.doc.setViewMode}
+        isDirty={c.doc.isDirty}
+        isLargeDocument={c.doc.isLargeDocument}
+        activeChapter={c.activeChapter}
+        activeIndex={c.activeIndex}
+        backlinksCount={c.currentLinkedReferences.length}
+        selectChapter={c.selectChapter}
+        handleRenameChapter={c.handleRenameChapter}
+        handleImportOutline={c.handleImportOutline}
+        createNewFile={c.createNewFile}
+        createNewMindmap={c.createNewMindmap}
+        createNewCanvas={c.createNewCanvas}
+        openMarkdownFile={c.openMarkdownFile}
+        openMarkdownDirectory={c.openMarkdownDirectory}
+        toggleFullscreen={c.toggleFullscreen}
+        toggleTypewriterMode={c.toggleTypewriterMode}
+        goPrevious={c.goPrevious}
+        goNext={c.goNext}
+        addBookmark={c.addBookmark}
+        saveSession={c.doc.saveSession}
+        handlePrintDocument={c.handlePrintDocument}
+        handleToggleGraphPane={c.handleToggleGraphPane}
+        handleOpenCommandPalette={c.handleOpenCommandPalette}
+        handleDirResizeMouseDown={c.handleDirResizeMouseDown}
+        handleDirDoubleClick={c.handleDirDoubleClick}
       >
         {/* The panel decides its own visibility, reads its own tab/theme and
             owns the search box - see SidebarRegion. */}
         <SidebarRegion
-          isDualSplitMode={isDualSplitMode}
-          isCanvasFullscreen={isCanvasFullscreen}
-          session={session}
-          renderedChapter={renderedChapter}
-          activeHeadingId={activeHeadingId}
-          reviewableDocument={reviewableDocument}
-          bookmarkedHeadingIds={bookmarkedHeadingIds}
-          jumpToHeading={jumpToHeading}
-          jumpBookmark={jumpBookmark}
-          searchResults={searchResults}
-          handleSearchJump={handleSearchJump}
-          clearSearchHighlights={clearSearchHighlights}
-          openNoteFileRef={openDesktopMarkdownPathRef}
-          handleReviewActiveChange={handleReviewActiveChange}
-          handleMergeFlashNote={handleMergeFlashNote}
-          handleSidebarResizeMouseDown={handleSidebarResizeMouseDown}
-          handleSidebarDoubleClick={handleSidebarDoubleClick}
+          isDualSplitMode={c.isDualSplitMode}
+          isCanvasFullscreen={c.isCanvasFullscreen}
+          session={c.doc.session}
+          renderedChapter={c.doc.renderedChapter}
+          activeHeadingId={c.activeHeadingId}
+          reviewableDocument={c.reviewableDocument}
+          bookmarkedHeadingIds={c.bookmarkedHeadingIds}
+          jumpToHeading={c.jumpToHeading}
+          jumpBookmark={c.jumpBookmark}
+          searchResults={c.searchResults}
+          handleSearchJump={c.handleSearchJump}
+          clearSearchHighlights={c.clearSearchHighlights}
+          onOpenNoteFile={c.openNoteFile}
+          handleReviewActiveChange={c.handleReviewActiveChange}
+          handleMergeFlashNote={c.handleMergeFlashNote}
+          handleSidebarResizeMouseDown={c.handleSidebarResizeMouseDown}
+          handleSidebarDoubleClick={c.handleSidebarDoubleClick}
           backlinks={{
-            currentDocTitle,
-            currentLinkedReferences,
-            currentUnlinkedMentions,
-            handleJumpToBacklink,
-            handleConvertMention,
-            graphData,
+            currentDocTitle: c.currentDocTitle,
+            currentLinkedReferences: c.currentLinkedReferences,
+            currentUnlinkedMentions: c.currentUnlinkedMentions,
+            handleJumpToBacklink: c.handleJumpToBacklink,
+            handleConvertMention: c.handleConvertMention,
+            graphData: c.graphData,
           }}
         />
 
         <section className="reader-frame">
-          {!isCanvasFullscreen && tabs.length > 0 && (
+          {!c.isCanvasFullscreen && c.tabs.length > 0 && (
             <TabBar
-              tabs={tabsForDisplay}
-              activeTabId={chapterId}
-              dualSplitTabId={dualSplitTabId}
-              onSelectTab={selectChapter}
-              onCloseTab={handleCloseTab}
-              onCloseOtherTabs={handleCloseOtherTabs}
-              onCloseRightTabs={handleCloseRightTabs}
-              onOpenDualSplit={handleOpenDualSplit}
-              onCloseDualSplit={handleCloseDualSplit}
-              onDetachTab={handleDetachTab}
-              isGraphPaneOpen={isGraphPaneOpen}
-              onToggleGraphPane={handleToggleGraphPane}
+              tabs={c.tabsForDisplay}
+              activeTabId={c.chapterId}
+              dualSplitTabId={c.dualSplitTabId}
+              onSelectTab={c.selectChapter}
+              onCloseTab={c.handleCloseTab}
+              onCloseOtherTabs={c.handleCloseOtherTabs}
+              onCloseRightTabs={c.handleCloseRightTabs}
+              onOpenDualSplit={c.handleOpenDualSplit}
+              onCloseDualSplit={c.handleCloseDualSplit}
+              onDetachTab={c.handleDetachTab}
+              isGraphPaneOpen={c.isGraphPaneOpen}
+              onToggleGraphPane={c.handleToggleGraphPane}
             />
           )}
           <WorkspaceRouter
-            session={session}
-            activeChapter={activeChapter}
-            renderedChapter={renderedChapter}
-            secondaryRenderedChapter={secondaryRenderedChapter}
-            viewMode={viewMode}
-            isDirty={isDirty}
-            isSaving={isSaving}
-            isLargeDocument={isLargeDocument}
-            autoPreviewPaused={autoPreviewPaused}
-            isDualSplitMode={isDualSplitMode}
-            readerRef={readerRef}
-            secondaryReaderRef={secondaryReaderRef}
-            editorViewRef={editorViewRef}
-            navLockUntilRef={navLockUntilRef}
-            updateSource={updateSource}
-            renderPreviewNow={renderPreviewNow}
-            saveSession={saveSession}
-            setViewMode={setViewMode}
-            toggleFullscreen={toggleFullscreen}
-            isFullscreen={isFullscreen}
-            handleCloseDualSplit={handleCloseDualSplit}
-            handlePrintDocument={handlePrintDocument}
-            handleExtractSelectionToNote={handleExtractSelectionToNote}
-            handleSendSelectionToFlash={handleSendSelectionToFlash}
-            handleCreateCanvasExtractNote={handleCreateCanvasExtractNote}
-            handleWikiLinkClick={handleWikiLinkClick}
-            handleJumpToBacklink={handleJumpToBacklink}
-            handleToggleMindmap={handleToggleMindmap}
-            handleRevealInToc={handleRevealInToc}
-            handleOpenBacklinks={() => {
-              setSidebarTab("backlinks");
-              setSidebarOpen(true);
-            }}
-            wikiLinkTargets={wikiLinkTargets}
-            backlinksCount={currentLinkedReferences.length}
-            graph={{ graphData, currentActiveId }}
-            handleCloseGraphPane={handleCloseGraphPane}
-            onOpenDesktopMarkdownPath={(p) => openDesktopMarkdownPathRef.current?.(p)}
-            jumpToHeading={jumpToHeading}
-            createNewFile={createNewFile}
-            createNewMindmap={createNewMindmap}
-            createNewCanvas={createNewCanvas}
-            openMarkdownDirectory={openMarkdownDirectory}
+            session={c.doc.session}
+            activeChapter={c.activeChapter}
+            renderedChapter={c.doc.renderedChapter}
+            secondaryRenderedChapter={c.secondaryRenderedChapter}
+            viewMode={c.doc.viewMode}
+            isDirty={c.doc.isDirty}
+            isSaving={c.doc.isSaving}
+            isLargeDocument={c.doc.isLargeDocument}
+            autoPreviewPaused={c.doc.autoPreviewPaused}
+            isDualSplitMode={c.isDualSplitMode}
+            readerRef={c.readerRef}
+            secondaryReaderRef={c.secondaryReaderRef}
+            editorViewRef={c.editorViewRef}
+            navLockUntilRef={c.navLockUntilRef}
+            updateSource={c.doc.updateSource}
+            renderPreviewNow={c.doc.renderPreviewNow}
+            saveSession={c.doc.saveSession}
+            setViewMode={c.doc.setViewMode}
+            toggleFullscreen={c.toggleFullscreen}
+            isFullscreen={c.isFullscreen}
+            handleCloseDualSplit={c.handleCloseDualSplit}
+            handlePrintDocument={c.handlePrintDocument}
+            handleExtractSelectionToNote={c.handleExtractSelectionToNote}
+            handleSendSelectionToFlash={c.handleSendSelectionToFlash}
+            handleCreateCanvasExtractNote={c.handleCreateCanvasExtractNote}
+            handleWikiLinkClick={c.handleWikiLinkClick}
+            handleJumpToBacklink={c.handleJumpToBacklink}
+            handleToggleMindmap={c.handleToggleMindmap}
+            handleRevealInToc={c.handleRevealInToc}
+            handleOpenBacklinks={c.handleOpenBacklinks}
+            wikiLinkTargets={c.wikiLinkTargets}
+            backlinksCount={c.currentLinkedReferences.length}
+            graph={{ graphData: c.graphData, currentActiveId: c.currentActiveId }}
+            handleCloseGraphPane={c.handleCloseGraphPane}
+            onOpenDesktopMarkdownPath={c.openNoteFile}
+            jumpToHeading={c.jumpToHeading}
+            createNewFile={c.createNewFile}
+            createNewMindmap={c.createNewMindmap}
+            createNewCanvas={c.createNewCanvas}
+            openMarkdownDirectory={c.openMarkdownDirectory}
           />
         </section>
       </AppShellChrome>
 
-      {/* Floating surfaces — lightbox, guard dialogs, palette, history, about, toast.
-          They read the lightbox, open flags, notice and preferences from the
-          stores themselves; only the editing session and the actions this
-          component orchestrates are passed in. */}
+      {/* Floating surfaces — lightbox, guard dialogs, palette, history, about,
+          toast. They read the lightbox, open flags, notice and preferences from
+          the stores themselves; only the editing session and the actions the
+          controller orchestrates are passed in. */}
       <AppOverlays
-        session={session}
-        conflict={conflict}
-        activeChapter={activeChapter}
-        renderedChapter={renderedChapter}
-        commandActions={commandActions}
-        onSelectChapter={selectChapter}
-        onJumpToHeading={(id) => jumpToHeading(id, "smooth", true)}
-        onSavePending={handleDialogSave}
-        onDiscardPending={handleDialogDiscard}
-        onCancelPending={handleDialogCancel}
-        onReloadFromDisk={reloadFromDisk}
-        onOverwrite={() => saveSession({ force: true })}
-        onSaveAs={saveSessionAs}
-        onClearConflict={clearConflict}
-        onRevertToContent={handleRevertToContent}
+        session={c.doc.session}
+        conflict={c.doc.conflict}
+        activeChapter={c.activeChapter}
+        renderedChapter={c.doc.renderedChapter}
+        commandActions={c.commandActions}
+        onSelectChapter={c.selectChapter}
+        onJumpToHeading={(id) => c.jumpToHeading(id, "smooth", true)}
+        onSavePending={c.handleDialogSave}
+        onDiscardPending={c.handleDialogDiscard}
+        onCancelPending={c.handleDialogCancel}
+        onReloadFromDisk={c.doc.reloadFromDisk}
+        onOverwrite={c.saveSessionOverwriting}
+        onSaveAs={c.doc.saveSessionAs}
+        onClearConflict={c.doc.clearConflict}
+        onRevertToContent={c.handleRevertToContent}
       />
     </div>
   );
