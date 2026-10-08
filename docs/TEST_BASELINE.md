@@ -11,9 +11,9 @@
 
 | 项目 | 数值 |
 | :--- | ---: |
-| 测试文件 | **133** |
-| 用例总数 | **1580** |
-| 通过 | 1578 |
+| 测试文件 | **134** |
+| 用例总数 | **1586** |
+| 通过 | 1584 |
 | 失败 | 0 |
 | 跳过 | 2 |
 | 通过率 | 99.9% |
@@ -101,6 +101,7 @@
 | `src/__tests__/mindmap-tags-ui.test.tsx` | 7 | ✅ |
 | `src/__tests__/review-focus.test.tsx` | 7 | ✅ |
 | `src/__tests__/review-source-reader.test.ts` | 7 | ✅ |
+| `src/__tests__/app-shell-boundary.test.ts` | 6 | ✅ |
 | `src/__tests__/css-accent-info.test.ts` | 6 | ✅ |
 | `src/__tests__/diff-service.test.ts` | 6 | ✅ |
 | `src/__tests__/editor-list-continue.test.ts` | 6 | ✅ |
@@ -185,7 +186,7 @@
 
 任何重构都必须满足：
 
-1. 用例总数 **不低于 1580**（删除测试需在 PR 说明中论证）
+1. 用例总数 **不低于 1586**（删除测试需在 PR 说明中论证）
 2. 通过率 **100%**
 3. 单文件用例数**不得下降**（防止测试被静默删除）
 
