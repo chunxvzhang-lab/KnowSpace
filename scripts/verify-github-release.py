@@ -27,6 +27,13 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+# Windows 控制台默认 GBK：脚本输出的 ✅ / 中文在 `print` 时会 UnicodeEncodeError，
+# 让一次完全成功的核验以退出码 1 告终。stdout 强制 UTF-8（调用方若需可读文本，
+# 由它自己设置 PYTHONIOENCODING）。
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
+
 DEFAULT_REPO = "chunxvzhang-lab/KnowSpace"
 
 # Every URL in this script is a hardcoded api.github.com literal; the allowlist
