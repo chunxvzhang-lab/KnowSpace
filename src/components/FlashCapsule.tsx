@@ -198,6 +198,14 @@ export const FlashCapsule: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- activeTab is read inside a one-time IPC handler on purpose (same stale-closure as before the split); adding it would tear down and re-subscribe the desktop listener whenever the tab changes
   }, [desktop, applyTheme, loadTargets, refreshSpaceConfig]);
 
+  // 「常驻模板」页在前台时，主进程失焦不隐藏（点旁边区域窗口不消失）。
+  // 用 effect 跟随 activeTab 同步而不是在切换函数里各写一次：页签状态是
+  // 单一事实来源，将来多一条切换路径也不会漏；挂载时同样汇报一次，窗口
+  // 重载后主进程状态与界面立即对齐。
+  useEffect(() => {
+    desktop?.capture.setFlashPersistentTab?.(activeTab === "persistent");
+  }, [desktop, activeTab]);
+
   const handleClose = () => {
     if (desktop?.capture.hideFlashCapsule) {
       desktop.capture.hideFlashCapsule();

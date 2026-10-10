@@ -3,7 +3,13 @@ import { loadBookmarks, loadReadingPosition } from "../services/storage";
 import { useTabStore } from "../store/useTabStore";
 import { useUiStore } from "../store/useUiStore";
 import { useVaultStore } from "../store/useVaultStore";
-import type { BookManifest, Bookmark, ChapterManifest, ChapterSource } from "../core/types";
+import type {
+  BookManifest,
+  Bookmark,
+  ChapterManifest,
+  ChapterSource,
+  EditorViewMode,
+} from "../core/types";
 import type { useDocumentSession } from "./useDocumentSession";
 
 /**
@@ -119,13 +125,19 @@ export function useVaultOpening({
     }
   };
 
+  /**
+   * A caller may pin the view the opened note lands in — the flash timeline's
+   * double click asks for the reader. Left unset, the file name keeps deciding
+   * (canvas files open as canvas, mindmaps as mindmaps, the rest stay put).
+   */
   const doOpenDesktopMarkdownPath = async (
     absolutePath: string,
     preloadedSource?: ChapterSource | null,
+    options?: { viewMode?: EditorViewMode },
   ) => {
     if (!window.bookMDDesktop) return;
-    if (!/\.(md|markdown|canvas)$/i.test(absolutePath)) {
-      setNotice("请选择 .md、.markdown 或 .canvas 文件。");
+    if (!/\.(md|markdown|canvas|mindmap)$/i.test(absolutePath)) {
+      setNotice("请选择 .md、.markdown、.canvas 或 .mindmap 文件。");
       return;
     }
 
@@ -215,8 +227,13 @@ export function useVaultOpening({
         setViewMode("canvas");
         setDirectoryOpen(false);
         setSidebarOpen(false);
-      } else if (fileName.toLowerCase().endsWith(".mindmap.md")) {
+      } else if (
+        fileName.toLowerCase().endsWith(".mindmap.md") ||
+        fileName.toLowerCase().endsWith(".mindmap")
+      ) {
         setViewMode("mindmap");
+      } else if (options?.viewMode) {
+        setViewMode(options.viewMode);
       }
 
       setTabs((prev) => {
@@ -247,10 +264,14 @@ export function useVaultOpening({
       if (isCanvas) {
         setDirectoryOpen(false);
         setSidebarOpen(false);
-      } else {
+      } else if (!isSpaceFile) {
         setSidebarOpen(true);
         setSidebarTab("toc");
       }
+      // A Space flash note is opened from its own timeline sitting in the
+      // sidebar. Forcing the sidebar back to the outline tab here is what made
+      // the timeline disappear the moment a card was opened — so the sidebar is
+      // left exactly as it is, and the note opens in the reader beside it.
       activeLoadedChapterIdRef.current = targetChapterId;
 
       openSession({

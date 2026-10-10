@@ -120,7 +120,22 @@ function resolveFlashSpaceDir() {
   return { dir: defaultDir, isCustom: false, defaultDir };
 }
 
+/**
+ * "新建文档"与"资源管理器右键新建"共用的初始内容。一个概念只有一处定义：
+ * 两处入口交给读者的第一份文件必须逐字节相同。
+ *
+ * mindmap 与渲染层 doCreateNewMindmap 的字面量保持一致（渲染层无法引用
+ * electron 侧模块，改动时两边一起改）。
+ */
+const NEW_FILE_DEFAULTS = {
+  document: "# 未命名\n\n",
+  canvas: '{\n  "nodes": [],\n  "edges": []\n}',
+  mindmap:
+    "# 中心主题\n\n- 主要分支 1\n  - 子主题 1.1\n  - 子主题 1.2\n- 主要分支 2\n  - 子主题 2.1\n- 主要分支 3\n",
+};
+
 module.exports = {
+  NEW_FILE_DEFAULTS,
   getAppConfig,
   saveAppConfig,
   getAutoLaunch,

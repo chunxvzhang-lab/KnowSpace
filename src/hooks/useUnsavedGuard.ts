@@ -17,7 +17,12 @@ import { useVaultStore } from "../store/useVaultStore";
 export type PendingAction =
   | { type: "select-chapter"; chapterId: string }
   | { type: "open-file"; file: File }
-  | { type: "open-desktop-file"; absolutePath: string; preloadedSource?: ChapterSource | null }
+  | {
+      type: "open-desktop-file";
+      absolutePath: string;
+      preloadedSource?: ChapterSource | null;
+      viewMode?: EditorViewMode;
+    }
   | { type: "open-directory" }
   | { type: "new-file" }
   | { type: "new-mindmap" }
@@ -38,6 +43,7 @@ type UseUnsavedGuardParams = {
   doOpenDesktopMarkdownPath: (
     absolutePath: string,
     preloadedSource?: ChapterSource | null,
+    options?: { viewMode?: EditorViewMode },
   ) => Promise<void>;
   doOpenMarkdownDirectory: () => Promise<void>;
   doCreateNewFile: () => Promise<void>;
@@ -101,7 +107,9 @@ export function useUnsavedGuard({
           break;
         }
         case "open-desktop-file": {
-          await doOpenDesktopMarkdownPath(action.absolutePath, action.preloadedSource);
+          await doOpenDesktopMarkdownPath(action.absolutePath, action.preloadedSource, {
+            viewMode: action.viewMode,
+          });
           break;
         }
         case "open-directory": {

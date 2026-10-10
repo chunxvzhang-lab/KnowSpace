@@ -27,6 +27,8 @@ const {
  *   setFlashShortcut,           (shortcut: string) => void
  *   getFlashPinned,             () => boolean
  *   setFlashPinned,             (pinned: boolean) => void
+ *   getFlashPersistentTabActive,() => boolean
+ *   setFlashPersistentTabActive,(active: boolean) => void
  *   getNativeDialogOpen,        () => boolean
  *   setNativeDialogOpen,        (open: boolean) => void
  * }
@@ -209,6 +211,13 @@ function registerCaptureHandlers(context) {
     context.setFlashPinned(nextPinned);
     saveAppConfig({ flashPinned: nextPinned });
     return { success: true, pinned: nextPinned };
+  });
+
+  // 「常驻模板」页在前台时失焦不隐藏（与图钉同一条 blur 判定）。页签状态
+  // 归渲染层所有，这里只接收同步、不落盘。
+  ipcMain.handle("bookmd:set-flash-persistent-tab", (_event, active) => {
+    context.setFlashPersistentTabActive(active);
+    return { success: true, active: Boolean(active) };
   });
 
   // Flash Space Directory Management IPC handlers
@@ -503,4 +512,9 @@ function registerCaptureHandlers(context) {
   });
 }
 
-module.exports = { registerCaptureHandlers };
+module.exports = {
+  registerCaptureHandlers,
+  // 正文侧保存闪念文件后要失效这份摘要缓存（files.cjs 在保存成功后调用），
+  // 否则时间线会一直读到"保存前"的缓存——目录 mtime 不因文件内容改写而变化。
+  invalidateFlashSummaryCache,
+};

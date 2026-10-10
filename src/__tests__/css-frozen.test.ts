@@ -29,8 +29,10 @@ import { loadAppCssBundle } from "./helpers/loadAppCss";
  * 的窗口。基线本身由本文件自己的代码路径产出，不是手抄的。
  */
 
-/** 基线：提交 757a349 状态下、由本文件的 normalize+digest 算出（不是手抄的）。 */
-const FROZEN_SHA256 = "ac96bb6b30019b2edc3ad12c884e512b5e92abff374eb271e249f5c2fd40bd4e";
+/** 基线：提交 757a349 状态下、由本文件的 normalize+digest 算出（不是手抄的）。
+ *  2026-10-09 更新：闪念时间线卡片新增"双击在阅览页打开"的可点提示样式
+ *  （space-timeline.css 的 .space-note-card：cursor / user-select / 悬浮上浮）。 */
+const FROZEN_SHA256 = "48fa134968a6314d2c76a56666e90290406645d9f8a66042a5134ee4ff900884";
 
 function normalize(css: string): string {
   return css

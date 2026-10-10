@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
-import type { ChapterSource } from "../core/types";
+import type { ChapterSource, EditorViewMode } from "../core/types";
 import { samePath } from "../core/paths";
 import { useDocumentCreation } from "./useDocumentCreation";
 import { useUnsavedGuard } from "./useUnsavedGuard";
@@ -82,11 +82,20 @@ export function useDocumentOpening(params: UseDocumentOpeningParams) {
     });
 
   const openDesktopMarkdownPath = useCallback(
-    (nextPath: string, preloadedSource?: ChapterSource | null) => {
+    (
+      nextPath: string,
+      preloadedSource?: ChapterSource | null,
+      options?: { viewMode?: EditorViewMode },
+    ) => {
       if (samePath(absolutePath, nextPath)) {
         return;
       }
-      guardAction({ type: "open-desktop-file", absolutePath: nextPath, preloadedSource });
+      guardAction({
+        type: "open-desktop-file",
+        absolutePath: nextPath,
+        preloadedSource,
+        viewMode: options?.viewMode,
+      });
     },
     [absolutePath, guardAction],
   );

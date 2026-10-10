@@ -56,7 +56,8 @@ export function useChapterLoading({
     const targetSrc = targetChapter?.src || targetTab?.relativePath || targetTitle;
     const fileName = targetSrc.split(/[\\/]/).pop() ?? targetTitle;
     const isCanvas = fileName.toLowerCase().endsWith(".canvas");
-    const isMindmap = fileName.toLowerCase().endsWith(".mindmap.md");
+    const isMindmap =
+      fileName.toLowerCase().endsWith(".mindmap.md") || fileName.toLowerCase().endsWith(".mindmap");
 
     if (isCanvas) {
       setViewMode("canvas");

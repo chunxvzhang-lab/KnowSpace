@@ -19,6 +19,23 @@ import { DailyReviewPanel } from "./DailyReviewPanel";
 
 type SpaceTimelinePanelProps = {
   onOpenNoteFile?: (filePath: string) => void;
+  /**
+   * Double-clicking a card asks for this: the note opens on the reader page.
+   *
+   * The timeline stays exactly where it is — the open path never touches the
+   * sidebar — so a browse-and-read flow keeps its place between reads.
+   */
+  onOpenNoteInReader?: (filePath: string) => void;
+  /**
+   * Fired after a todo toggle has been written to disk.
+   *
+   * The checkbox flips optimistically here, but the file on disk is the other
+   * half of the story: if this very note is open in the reader, its preview is
+   * now stale and needs a re-read. The parent knows which document is open —
+   * this panel does not — so the file path travels up rather than the refresh
+   * logic travelling down.
+   */
+  onNoteFileChanged?: (filePath: string) => void;
   onMergeIntoDocument?: (content: string, fileName: string) => void;
   /**
    * Fired when the review tab becomes active, and again when it stops being.
@@ -47,6 +64,8 @@ type SpaceTimelinePanelProps = {
 
 export const SpaceTimelinePanel: React.FC<SpaceTimelinePanelProps> = ({
   onOpenNoteFile,
+  onOpenNoteInReader,
+  onNoteFileChanged,
   onMergeIntoDocument,
   onReviewActiveChange,
   currentDocument = null,
@@ -148,7 +167,10 @@ export const SpaceTimelinePanel: React.FC<SpaceTimelinePanelProps> = ({
       if (!res.success) {
         // Rollback on failure
         loadSummary();
+        return;
       }
+      // Disk is updated; an open preview of this note has to hear about it.
+      onNoteFileChanged?.(filePath);
     } catch {
       loadSummary();
     }
@@ -180,6 +202,16 @@ export const SpaceTimelinePanel: React.FC<SpaceTimelinePanelProps> = ({
       onMergeIntoDocument(note.content, note.fileName);
       showToast(`✓ 已将 [ ${note.fileName} ] 并入正文`);
     }
+  };
+
+  // Double click opens the note on the reader page. The card is full of
+  // controls with their own jobs — action buttons, todo checkboxes, the tag
+  // pills are plain spans but the labels are clickable — and a double click
+  // that landed on one of them belongs to that control, not to reading.
+  const handleCardDoubleClick = (event: React.MouseEvent, filePath: string) => {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest("button, input, label")) return;
+    onOpenNoteInReader?.(filePath);
   };
 
   // Filter notes by search query
@@ -407,7 +439,12 @@ export const SpaceTimelinePanel: React.FC<SpaceTimelinePanelProps> = ({
 
                       <div className="space-group-cards">
                         {groupNotes.map((note) => (
-                          <div key={note.filePath} className="space-note-card">
+                          <div
+                            key={note.filePath}
+                            className="space-note-card"
+                            onDoubleClick={(e) => handleCardDoubleClick(e, note.filePath)}
+                            title="双击在阅览页打开详情（时间线保持不变）"
+                          >
                             <div className="space-card-top">
                               <span className="space-card-time" title={note.fileName}>
                                 <Clock size={11} />
@@ -422,7 +459,7 @@ export const SpaceTimelinePanel: React.FC<SpaceTimelinePanelProps> = ({
                                   type="button"
                                   className="space-card-btn"
                                   onClick={() => onOpenNoteFile?.(note.filePath)}
-                                  title="在编辑器标签页中打开"
+                                  title="打开此闪念（时间线保持不变）"
                                 >
                                   <FileText size={12} />
                                 </button>

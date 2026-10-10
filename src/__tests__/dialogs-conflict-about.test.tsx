@@ -114,7 +114,6 @@ describe("Dialogs Sub-function Tests", () => {
       // v2.4.0. Asserting against the injected value instead means the test
       // fails only if the dialog stops reading it.
       expect(screen.getAllByText(`v${__APP_VERSION__}`).length).toBeGreaterThan(0);
-      expect(screen.getAllByText(/v2\.0\./).length).toBeGreaterThan(0);
       expect(screen.getByText(/Personal Knowledge Workspace/)).toBeDefined();
 
       // Click Close button
@@ -139,16 +138,11 @@ describe("Dialogs Sub-function Tests", () => {
         container.querySelectorAll(".about-changelog-group-label span"),
       ).map((node) => node.textContent?.trim() ?? "");
 
-      expect(labels.length).toBeGreaterThan(0);
-
-      // Newest first, so the entry for this version has to lead the list.
+      // 2026-10-10 产品决定：只保留最新版本一节，历史条目移除 —— 恰好一组，
+      // 且它以当前版本号开头（发布时替换本节内容，漂移同样会被抓住）。
+      expect(labels.length).toBe(1);
       expect(labels[0].startsWith(`v${__APP_VERSION__} `)).toBe(true);
-
-      // And every entry has to be version-prefixed, so a label that lost its
-      // number is caught rather than silently skipped by the check above.
-      for (const label of labels) {
-        expect(label).toMatch(/^v\d+\.\d+\.\d+ /);
-      }
+      expect(labels[0]).toMatch(/^v\d+\.\d+\.\d+ /);
     });
   });
 });

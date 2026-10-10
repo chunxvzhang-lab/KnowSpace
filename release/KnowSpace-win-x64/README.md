@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-v2.6.5-1D9BF0?style=flat-square&logo=github" alt="Version 2.6.5" />
+  <img src="https://img.shields.io/badge/Version-v2.7.5-1D9BF0?style=flat-square&logo=github" alt="Version 2.7.5" />
   <img src="https://img.shields.io/badge/Presentation-Mode_2.3_Clockwise_Cycles-8B5CF6?style=flat-square" alt="Presentation Mode 2.3" />
   <img src="https://img.shields.io/badge/FSRS-5_Spaced_Repetition-F59E0B?style=flat-square" alt="FSRS-5 Spaced Repetition" />
   <img src="https://img.shields.io/badge/Mind_Map-Non--Destructive_Sync-00BA7C?style=flat-square" alt="Non-Destructive Mindmap Sync" />
@@ -18,7 +18,7 @@
   <img src="https://img.shields.io/badge/Multimodal-Canvas_Media_Cards-F59E0B?style=flat-square" alt="Multimodal Canvas" />
   <img src="https://img.shields.io/badge/Routing-AABB_Obstacle_Avoidance-00BA7C?style=flat-square" alt="AABB Obstacle Avoidance" />
   <img src="https://img.shields.io/badge/Performance-120FPS_Instant_Load-00BA7C?style=flat-square" alt="120FPS Instant Load" />
-  <img src="https://img.shields.io/badge/Tests-1276_Passing_100%25-00BA7C?style=flat-square" alt="1276 Passing Tests" />
+  <img src="https://img.shields.io/badge/Tests-1537_Passing-00BA7C?style=flat-square" alt="1537 Tests (see docs/TEST_BASELINE.md)" />
   <img src="https://img.shields.io/badge/Canvas-JSON_Canvas_1.0-00BA7C?style=flat-square" alt="Infinite Canvas" />
   <img src="https://img.shields.io/badge/Snapshots-Ctrl%2BShift%2BH-1D9BF0?style=flat-square" alt="Version History" />
   <img src="https://img.shields.io/badge/Search-Hybrid_Vault_Index-8B5CF6?style=flat-square" alt="Hybrid Vault Search" />
@@ -479,7 +479,7 @@ _打开包含海量笔记的文件夹、打开单个文件或软件冷启动实�
 
 ### 15. 🧪 交互子功能与端到端稳定性保障体系 (Sub-function Ecosystem & 100% Test Coverage)
 
-_高阶空间功能与底层每个交互细节并驾齐驱，构筑 1276 项全量自动化测试 100% 绿灯守卫的坚实壁垒。_
+_高阶空间功能与底层每个交互细节并驾齐驱，构筑全量自动化测试绿灯守卫的坚实壁垒（用例数以 `docs/TEST_BASELINE.md` 为唯一口径）。_
 
 <p align="center">
   <img src="docs/manual-images/22-backlinks-panel.png" alt="双向链接与未链接提及面板" width="48%" style="border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35); display: inline-block; margin-right: 2%;" />
@@ -496,7 +496,7 @@ _高阶空间功能与底层每个交互细节并驾齐驱，构筑 1276 项全�
 - **📁 知识库目录树与闪念速记物理隔离 (ChapterList)**：支持多级文件夹折叠/展开与记忆；`space/` 目录下的闪念速记卡片默认在主知识树中完全隐藏，仅在当前激活时智能局部展开，保持知识主干清爽干净。
 - **🌐 网页快照与容量淘汰服务 (WebSnapshotService)**：网页快照自动去重与时间戳刷新，严格执行 30 条上限 FIFO 自动淘汰机制，防止本地磁盘无限膨胀。
 - **📊 矢量 Mermaid 安全渲染引擎 (MermaidService)**：通过 `data-mermaid-src` Base64 编码从源头彻底杜绝 HTML 实体转义破损，具备 SVG 内存缓存与语法异常优雅降级保护 UI，绝不白屏。
-- **🧪 工业级 100% 自动化测试保障**：103 个测试套件，共 **1276** 项自动化测试（覆盖空间白板、脑图、图谱、编辑器、双链、检索、版本时光机及所有细化子功能组件）全量 100% 绿灯通过！权威口径见 [`docs/TEST_BASELINE.md`](docs/TEST_BASELINE.md)（由 `scripts/capture-test-baseline.cjs` 自动生成）。
+- **🧪 自动化测试基线守护**：全部功能域（空间白板、脑图、图谱、编辑器、双链、检索、版本时光机及细化子功能）由自动化套件覆盖；**套件数与用例数以 [`docs/TEST_BASELINE.md`](docs/TEST_BASELINE.md) 为唯一口径**（由 `scripts/capture-test-baseline.cjs` 自动生成，只增不减），本文件不再重复硬编码数字。
 
 ---
 
@@ -550,23 +550,26 @@ _高阶空间功能与底层每个交互细节并驾齐驱，构筑 1276 项全�
 
 ## 📦 安装程序与便携版下载 (Downloads & Release Assets)
 
-本项目为 Windows 64 位系统深度优化，提供图形化安装程序、标准 MSI 安装包与免安装便携版，最新 `v2.6.5` 资产已发布：
+本项目为 Windows 64 位系统深度优化，提供图形化安装程序、标准 MSI 安装包与免安装便携版。
 
-> 🌐 **GitHub 官方发布主页**：[GitHub Releases · v2.6.5](https://github.com/chunxvzhang-lab/KnowSpace/releases/tag/v2.6.5)
+> 🌐 **下载入口（永远指向最新版）**：[GitHub Releases](https://github.com/chunxvzhang-lab/KnowSpace/releases/latest)
+>
+> 当前版本 `v<!-- VERSION:BEGIN -->2.7.5<!-- VERSION:END -->`。资产命名规则（版本号即上表中的当前版本）：
+>
+> - 安装程序：`KnowSpace-Setup-<version>.exe`
+> - MSI 安装包：`KnowSpace-<version>.msi`
+> - 便携版：`KnowSpace-win-x64-portable.zip`（固定名称，始终来自最新 release）
 
 ### 1. Windows 图形化安装程序（推荐）
 
-- **安装文件**：[`KnowSpace-Setup-2.6.5.exe`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.6.5/KnowSpace-Setup-2.6.5.exe)
 - **特点**：双击即可向导式安装，支持自定义安装目录，自动创建桌面快捷方式与开始菜单官方品牌图标，深度集成系统级 `.md` 与 `.canvas` 文件关联，内置标准卸载程序。
 
 ### 2. Windows MSI 标准安装包
 
-- **安装文件**：[`KnowSpace-2.6.5.msi`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.6.5/KnowSpace-2.6.5.msi)
 - **特点**：Windows Installer 官方格式，适合企业批量部署、组策略分发与企业级静默安装，支持标准控制面板卸载。
 
 ### 3. Windows 绿色免安装便携版
 
-- **便携文件**：[`KnowSpace-win-x64-portable.zip`](https://github.com/chunxvzhang-lab/KnowSpace/releases/download/v2.6.5/KnowSpace-win-x64-portable.zip)
 - **直接运行**：解压后双击 `KnowSpace.exe` 即可直接使用完整功能。
 - **特点**：解压即用、随身携带（支持装入 U 盘或移动硬盘）；完全自包含 Electron 运行时与全套本地依赖，无需配置任何外部开发环境；支持右键「打开方式」关联 Markdown 与白板文档。
 
@@ -691,7 +694,7 @@ _高阶空间功能与底层每个交互细节并驾齐驱，构筑 1276 项全�
   - _Conflict Detection_: Automatic alert when files are modified externally.
 - **🧪 Sub-function Ecosystem & 100% Test Coverage**:
   - _Full Spectrum Granular Sub-functions_: Zoomable Media Lightbox (0.2×~6×, smooth pan, download, Esc), Typography Status Bar (word/char count, reading time estimation, dirty state, readonly lock), Backlinks & Unlinked Mentions with 1-click upgrade to `[[wikilinks]]`, External File Conflict Arbitrator (`FileConflictDialog`), Unsaved Changes Protector (`UnsavedChangesDialog`), Dynamic TOC & Cross-Chapter Bookmark Resolver, Space Flash Note Directory Isolation, Web Snapshot FIFO Pruning (30-cap), and Mermaid Base64 entity-safe SVG rendering with graceful error fallbacks.
-  - _Rock-Solid Reliability_: 103 test suites, **1276** automated unit and integration tests passing with a 100% success rate!
+  - _Rock-Solid Reliability_: automated unit and integration tests across every feature area, guarded by a ratcheted baseline — see `docs/TEST_BASELINE.md` for the authoritative suite/case counts (auto-generated, may only grow).
 
 ---
 

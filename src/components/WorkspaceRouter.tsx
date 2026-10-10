@@ -54,6 +54,8 @@ type WorkspaceRouterProps = {
   handleRevealInToc: () => void;
   handleOpenBacklinks: () => void;
   wikiLinkTargets: WikiLinkTarget[];
+  /** 阅读视图里点击任务复选框：块起始行 + 块内序号（见 ReaderPane）。 */
+  onToggleTask: (blockStartLine: number, withinBlockIndex: number) => void;
   backlinksCount: number;
   graph: GraphView;
   handleCloseGraphPane: () => void;
@@ -117,6 +119,7 @@ export function WorkspaceRouter({
   handleRevealInToc,
   handleOpenBacklinks,
   wikiLinkTargets,
+  onToggleTask,
   backlinksCount,
   graph,
   handleCloseGraphPane,
@@ -172,6 +175,7 @@ export function WorkspaceRouter({
         secondaryContainerRef={secondaryReaderRef}
         onCloseSecondary={handleCloseDualSplit}
         wikiLinkTargets={wikiLinkTargets}
+        onToggleTask={onToggleTask}
         onWikiLinkClick={handleWikiLinkClick}
         backlinksCount={backlinksCount}
         onOpenBacklinks={handleOpenBacklinks}
@@ -251,6 +255,7 @@ export function WorkspaceRouter({
         }}
         navLockUntilRef={navLockUntilRef}
         wikiLinkTargets={wikiLinkTargets}
+        onToggleTask={onToggleTask}
         onWikiLinkClick={handleWikiLinkClick}
         backlinksCount={backlinksCount}
         onOpenBacklinks={handleOpenBacklinks}

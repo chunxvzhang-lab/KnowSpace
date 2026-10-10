@@ -18,7 +18,39 @@ const {
   getLastActiveWorkspaceDir,
   setLastActiveWorkspaceDir,
   resolveFlashSpaceDir,
+  NEW_FILE_DEFAULTS,
 } = require("./shared.cjs");
+const { invalidateFlashSummaryCache } = require("./capture.cjs");
+
+/**
+ * 正文保存的是 Space 闪念文件时：失效摘要缓存，并广播与"闪念归档"同一个
+ * 事件 —— 时间线面板已在订阅 `bookmd:flash-note-saved`，勾选、取消勾选、
+ * 编辑、删除行，凡落盘一次就同步一次，两处状态不再分叉。
+ *
+ * 判定用"落在 Space 目录内"：时间线展示的就是该目录下的所有 .md，比按
+ * 文件名形状猜更准（自定义 Space 目录的用户文件名不一定是分钟命名）。
+ */
+function notifyFlashSpaceFileWritten(context, targetPath) {
+  try {
+    const { dir: spaceDir } = resolveFlashSpaceDir();
+    if (!spaceDir || typeof targetPath !== "string") return;
+    const normalizedDir = path.resolve(spaceDir).toLowerCase();
+    const normalizedTarget = path.resolve(targetPath).toLowerCase();
+    if (!normalizedTarget.startsWith(normalizedDir + path.sep)) return;
+
+    invalidateFlashSummaryCache();
+    const fileName = path.basename(targetPath);
+    for (const w of context.windows) {
+      try {
+        if (!w.isDestroyed()) {
+          w.webContents.send("bookmd:flash-note-saved", { filePath: targetPath, fileName });
+        }
+      } catch {}
+    }
+  } catch {
+    // 广播失败不影响保存本身——它只是同步的加速器。
+  }
+}
 
 /**
  * Directory and Markdown file CRUD handlers: opening/refreshing a vault,
@@ -199,7 +231,7 @@ function registerFilesHandlers(context) {
     if (!request || typeof request.absolutePath !== "string") {
       return { success: false, errorCode: "INVALID_PATH", message: "无效的文件路径。" };
     }
-    return await saveMarkdownFile({
+    const result = await saveMarkdownFile({
       absolutePath: request.absolutePath,
       content: request.content,
       expectedVersion: request.expectedVersion,
@@ -207,6 +239,10 @@ function registerFilesHandlers(context) {
       hasBom: request.hasBom,
       lineEnding: request.lineEnding,
     });
+    if (result.success) {
+      notifyFlashSpaceFileWritten(context, request.absolutePath);
+    }
+    return result;
   });
 
   // An outline file to import, written by another app — XMind, FreeMind or OPML.
@@ -244,6 +280,7 @@ function registerFilesHandlers(context) {
     const targetWin = context.getWindowFromEvent(event);
 
     const isCanvas = defaultName.endsWith(".canvas");
+    const isMindmap = defaultName.endsWith(".mindmap");
     const defaultTitle = isCanvas ? "新建空间白板文件" : "新建 Markdown 文件";
     const filters = isCanvas
       ? [
@@ -270,7 +307,11 @@ function registerFilesHandlers(context) {
       absolutePath: targetPath,
       content:
         options.initialContent ??
-        (isCanvas ? '{\n  "nodes": [],\n  "edges": []\n}' : "# 未命名\n\n"),
+        (isCanvas
+          ? NEW_FILE_DEFAULTS.canvas
+          : isMindmap
+            ? NEW_FILE_DEFAULTS.mindmap
+            : NEW_FILE_DEFAULTS.document),
       force: true,
     });
 
@@ -374,6 +415,7 @@ function registerFilesHandlers(context) {
     }
 
     registerPath(targetPath);
+    notifyFlashSpaceFileWritten(context, targetPath);
     const source = await readMarkdownSource(targetPath);
     return {
       canceled: false,

@@ -126,12 +126,28 @@ export function createDesktopMock() {
       onBeforeClose: vi.fn().mockReturnValue(() => {}),
 
       printToPdf: vi.fn().mockResolvedValue({ success: true }),
+
+      // ── Explorer "New" menu entries ───────────────────────────────────
+      getShellNewStatus: vi
+        .fn()
+        .mockResolvedValue({ supported: true, markdown: false, canvas: false, mindmap: false }),
+      setShellNewEntry: vi.fn().mockResolvedValue({
+        success: true,
+        status: { supported: true, markdown: false, canvas: false, mindmap: false },
+      }),
     },
 
     capture: {
       // ── Flash notes / export ────────────────────────────────────────────
       saveFlashNote: vi.fn().mockResolvedValue({ success: true }),
       onFlashNoteSaved: vi.fn().mockReturnValue(() => {}),
+      getFlashPin: vi.fn().mockResolvedValue({ pinned: false }),
+      setFlashPin: vi
+        .fn()
+        .mockImplementation((pinned: boolean) => Promise.resolve({ success: true, pinned })),
+      setFlashPersistentTab: vi
+        .fn()
+        .mockImplementation((active: boolean) => Promise.resolve({ success: true, active })),
       getFlashNotesSummary: vi.fn().mockResolvedValue({
         success: true,
         spaceDir: "C:/vault/Space",

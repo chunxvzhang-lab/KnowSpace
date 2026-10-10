@@ -32,6 +32,8 @@ type DualDocumentWorkspaceProps = {
   onOpenLightbox?: (media: LightboxMedia) => void;
   onEditorViewReady?: (view: any) => void;
   wikiLinkTargets?: WikiLinkTarget[];
+  /** Primary 视图的任务复选框回写（Secondary 为对照只读，不接）。 */
+  onToggleTask?: (blockStartLine: number, withinBlockIndex: number) => void;
   onWikiLinkClick?: (target: string) => void;
   backlinksCount?: number;
   onOpenBacklinks?: () => void;
@@ -70,6 +72,7 @@ export const DualDocumentWorkspace = memo(function DualDocumentWorkspace({
   onOpenLightbox,
   onEditorViewReady,
   wikiLinkTargets,
+  onToggleTask,
   onWikiLinkClick,
   backlinksCount,
   onOpenBacklinks,
@@ -178,6 +181,7 @@ export const DualDocumentWorkspace = memo(function DualDocumentWorkspace({
             onOpenLightbox={onOpenLightbox}
             onEditorViewReady={onEditorViewReady}
             wikiLinkTargets={wikiLinkTargets}
+            onToggleTask={onToggleTask}
             onWikiLinkClick={onWikiLinkClick}
             backlinksCount={backlinksCount}
             onOpenBacklinks={onOpenBacklinks}

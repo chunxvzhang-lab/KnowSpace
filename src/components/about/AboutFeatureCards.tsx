@@ -26,6 +26,13 @@ import {
  * as props. Extracted verbatim in the final trim wave to keep the dialog
  * shell a shell.
  */
+type ShellNewStatus = {
+  supported: boolean;
+  markdown: boolean;
+  canvas: boolean;
+  mindmap: boolean;
+};
+
 type AboutFeatureCardsProps = {
   autoLaunch: boolean;
   runInBackground: boolean;
@@ -33,6 +40,12 @@ type AboutFeatureCardsProps = {
   handleToggleAutoLaunch: (val: boolean) => void | Promise<void>;
   handleToggleRunInBackground: (val: boolean) => void | Promise<void>;
   handleToggleAutoSave: (val: boolean) => void | Promise<void>;
+  shellNewStatus: ShellNewStatus | null;
+  shellNewMessage: string | null;
+  handleToggleShellNew: (
+    kind: "markdown" | "canvas" | "mindmap",
+    enabled: boolean,
+  ) => void | Promise<void>;
   repoUrl: string;
   authorUrl: string;
   handleOpenExternal: (url: string) => void;
@@ -45,6 +58,9 @@ export function AboutFeatureCards({
   handleToggleAutoLaunch,
   handleToggleRunInBackground,
   handleToggleAutoSave,
+  shellNewStatus,
+  shellNewMessage,
+  handleToggleShellNew,
   repoUrl,
   authorUrl,
   handleOpenExternal,
@@ -173,6 +189,169 @@ export function AboutFeatureCards({
               </div>
             </div>
           </label>
+
+          <div
+            style={{
+              borderTop: "1px solid rgba(128, 128, 128, 0.25)",
+              margin: "4px 0",
+            }}
+          />
+
+          {/* 资源管理器右键"新建"入口。状态永远来自主进程的现查现答：
+              打不开状态（浏览器环境）时整组以禁用样式呈现并说明原因。 */}
+          <label
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 10,
+              cursor: shellNewStatus?.supported ? "pointer" : "default",
+              opacity: shellNewStatus ? 1 : 0.55,
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={shellNewStatus?.markdown ?? false}
+              disabled={!shellNewStatus?.supported}
+              onChange={(e) => {
+                // disabled 已挡住常规点击；再挡一道，环境不支持时事件不该出去。
+                if (!shellNewStatus?.supported) return;
+                handleToggleShellNew("markdown", e.target.checked);
+              }}
+              style={{
+                accentColor: "#f59e0b",
+                width: 16,
+                height: 16,
+                marginTop: 2,
+                cursor: shellNewStatus?.supported ? "pointer" : "default",
+              }}
+            />
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>
+                右键「新建」菜单中添加「Markdown 文档」
+              </div>
+              <div
+                style={{
+                  fontSize: 11,
+                  color: "var(--text-muted)",
+                  marginTop: 2,
+                  lineHeight: 1.4,
+                }}
+              >
+                在任意文件夹右键 → 新建，即可创建 KnowSpace Markdown
+                文档（含初始内容）；新建菜单的名称与图标将显示为 KnowSpace
+                （原先若被其他软件占用则由本项接管，取消勾选即还原）。写入用户级注册表，无需管理员权限；双击
+                .md 文件的打开方式保持你现有的选择不变。
+              </div>
+            </div>
+          </label>
+
+          <label
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 10,
+              cursor: shellNewStatus?.supported ? "pointer" : "default",
+              opacity: shellNewStatus ? 1 : 0.55,
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={shellNewStatus?.canvas ?? false}
+              disabled={!shellNewStatus?.supported}
+              onChange={(e) => {
+                if (!shellNewStatus?.supported) return;
+                handleToggleShellNew("canvas", e.target.checked);
+              }}
+              style={{
+                accentColor: "#f59e0b",
+                width: 16,
+                height: 16,
+                marginTop: 2,
+                cursor: shellNewStatus?.supported ? "pointer" : "default",
+              }}
+            />
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>
+                右键「新建」菜单中添加「空间白板」，并关联 .canvas 文件
+              </div>
+              <div
+                style={{
+                  fontSize: 11,
+                  color: "var(--text-muted)",
+                  marginTop: 2,
+                  lineHeight: 1.4,
+                }}
+              >
+                新建 KnowSpace 空间白板（JSON Canvas），并把
+                <code>.canvas</code>
+                设为默认用 KnowSpace 打开。取消勾选即从系统移除。
+              </div>
+            </div>
+          </label>
+
+          <label
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 10,
+              cursor: shellNewStatus?.supported ? "pointer" : "default",
+              opacity: shellNewStatus ? 1 : 0.55,
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={shellNewStatus?.mindmap ?? false}
+              disabled={!shellNewStatus?.supported}
+              onChange={(e) => {
+                if (!shellNewStatus?.supported) return;
+                handleToggleShellNew("mindmap", e.target.checked);
+              }}
+              style={{
+                accentColor: "#f59e0b",
+                width: 16,
+                height: 16,
+                marginTop: 2,
+                cursor: shellNewStatus?.supported ? "pointer" : "default",
+              }}
+            />
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>
+                右键「新建」菜单中添加「思维导图」，并关联 .mindmap 文件
+              </div>
+              <div
+                style={{
+                  fontSize: 11,
+                  color: "var(--text-muted)",
+                  marginTop: 2,
+                  lineHeight: 1.4,
+                }}
+              >
+                新建 KnowSpace 思维导图（Markdown 大纲，含中心主题与示例分支），并把
+                <code>.mindmap</code>
+                设为默认用 KnowSpace 打开。应用内原有的
+                <code>.mindmap.md</code>
+                导图不受影响。取消勾选即从系统移除。
+              </div>
+            </div>
+          </label>
+
+          {shellNewMessage && (
+            <div
+              style={{
+                fontSize: 11,
+                color: "#ef4444",
+                lineHeight: 1.4,
+              }}
+              role="alert"
+            >
+              {shellNewMessage}
+            </div>
+          )}
+          {shellNewStatus && !shellNewStatus.supported && (
+            <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+              右键新建菜单仅 Windows 桌面版支持。
+            </div>
+          )}
         </div>
       </div>
 

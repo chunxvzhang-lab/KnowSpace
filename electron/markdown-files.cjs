@@ -3,7 +3,7 @@ const fsSync = require("node:fs");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 
-const markdownExtensions = new Set([".md", ".markdown", ".canvas"]);
+const markdownExtensions = new Set([".md", ".markdown", ".canvas", ".mindmap"]);
 const ignoredDirectoryNames = new Set([
   "node_modules",
   ".git",
@@ -93,7 +93,7 @@ function generateStableChapterId(relativePath) {
 }
 
 function titleFromRelativePath(relativePath) {
-  const withoutExtension = relativePath.replace(/\.(md|markdown|canvas)$/i, "");
+  const withoutExtension = relativePath.replace(/\.(md|markdown|canvas|mindmap)$/i, "");
   return withoutExtension
     .split("/")
     .map((part) => part.trim())

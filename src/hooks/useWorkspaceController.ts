@@ -366,6 +366,29 @@ export function useWorkspaceController() {
   const openNoteFile = (filePath: string) => {
     openDesktopMarkdownPathRef.current?.(filePath);
   };
+  // A flash card's double click: the note opens on the reader page. The open
+  // path leaves the sidebar untouched, so the timeline the click came from
+  // stays exactly where it is.
+  const openNoteInReader = (filePath: string) => {
+    openDesktopMarkdownPathRef.current?.(filePath, null, { viewMode: "read" });
+  };
+  // The timeline just toggled a todo inside a flash note — the file on disk
+  // changed behind the reader's back. If that very note is open and has no
+  // unsaved edits, re-read it so the preview shows the new checkbox state;
+  // with unsaved edits the reader's text wins and the refresh is skipped
+  // rather than silently overwriting their work.
+  const handleFlashNoteFileChanged = (filePath: string) => {
+    const activePath = doc.session?.absolutePath;
+    if (!activePath) return;
+    if (activePath.toLowerCase() !== filePath.toLowerCase()) return;
+    if (doc.isDirty) return;
+    doc.reloadFromDisk();
+  };
+  // 阅读视图里点击任务复选框：定位与翻转在会话层完成（干净时立刻落盘，
+  // 磁盘随即经主进程广播回到闪念时间线）。
+  const handleToggleTaskInReader = (blockStartLine: number, withinBlockIndex: number) => {
+    void doc.toggleTaskAtSourceLine(blockStartLine, withinBlockIndex);
+  };
   const handleOpenBacklinks = () => {
     setSidebarTab("backlinks");
     setSidebarOpen(true);
@@ -408,6 +431,9 @@ export function useWorkspaceController() {
     handleSearchJump,
     clearSearchHighlights,
     openNoteFile,
+    openNoteInReader,
+    handleFlashNoteFileChanged,
+    handleToggleTaskInReader,
     selectChapter,
     // Tab actions.
     handleOpenDualSplit,

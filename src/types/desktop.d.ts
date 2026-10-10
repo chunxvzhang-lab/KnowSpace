@@ -307,6 +307,21 @@ export type KnowSpaceDesktopAPI = {
         flashShortcut: string;
       };
     }>;
+    /** Explorer "New" context-menu entries (Windows user-level registry). */
+    getShellNewStatus?: () => Promise<{
+      supported: boolean;
+      markdown: boolean;
+      canvas: boolean;
+      mindmap: boolean;
+    }>;
+    setShellNewEntry?: (request: {
+      kind: "markdown" | "canvas" | "mindmap";
+      enabled: boolean;
+    }) => Promise<{
+      success: boolean;
+      message?: string;
+      status?: { supported: boolean; markdown: boolean; canvas: boolean; mindmap: boolean };
+    }>;
     onOpenFilePath: (callback: (absolutePath: string) => void) => () => void;
     onMenuCommand: (callback: (command: string) => void) => () => void;
     onBeforeClose: (callback: (data: BeforeCloseData) => void) => () => void;
@@ -349,6 +364,8 @@ export type KnowSpaceDesktopAPI = {
     }>;
     getFlashPin?: () => Promise<{ pinned: boolean }>;
     setFlashPin?: (pinned: boolean) => Promise<{ success: boolean; pinned: boolean }>;
+    /** 「常驻模板」页在前台时失焦不隐藏；页签状态由渲染层同步。 */
+    setFlashPersistentTab?: (active: boolean) => Promise<{ success: boolean; active: boolean }>;
     getFlashSpaceConfig?: () => Promise<{
       currentDir: string;
       isCustom: boolean;

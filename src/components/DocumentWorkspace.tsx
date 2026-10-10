@@ -33,6 +33,8 @@ type DocumentWorkspaceProps = {
   onEditorViewReady?: (view: any) => void;
   navLockUntilRef?: React.MutableRefObject<number>;
   wikiLinkTargets?: WikiLinkTarget[];
+  /** 阅读视图里点击任务复选框（块起始行 + 块内序号），见 ReaderPane。 */
+  onToggleTask?: (blockStartLine: number, withinBlockIndex: number) => void;
   onWikiLinkClick?: (target: string) => void;
   backlinksCount?: number;
   onOpenBacklinks?: () => void;
@@ -65,6 +67,7 @@ export const DocumentWorkspace = memo(function DocumentWorkspace({
   onEditorViewReady,
   navLockUntilRef,
   wikiLinkTargets,
+  onToggleTask,
   onWikiLinkClick,
   backlinksCount,
   onOpenBacklinks,
@@ -265,6 +268,7 @@ export const DocumentWorkspace = memo(function DocumentWorkspace({
           showLineNumbers={showLineNumbers}
           onOpenLightbox={onOpenLightbox}
           wikiLinkTargets={wikiLinkTargets}
+          onToggleTask={onToggleTask}
           onWikiLinkClick={onWikiLinkClick}
           backlinksCount={backlinksCount}
           onOpenBacklinks={onOpenBacklinks}

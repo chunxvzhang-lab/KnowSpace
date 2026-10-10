@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DiskVersion, DocumentSession, EditorViewMode, RenderedChapter } from "../core/types";
 import { renderMarkdown } from "../services/markdown";
+import { findTaskLineIndex, toggleTaskLine } from "../services/taskListToggle";
 
 export type DocumentSessionState = {
   session: DocumentSession | null;
@@ -467,6 +468,40 @@ export function useDocumentSession() {
     setIsPreviewPending(false);
   }, []);
 
+  /**
+   * 阅读视图里点了一个任务复选框：把对应的源码行翻转。
+   *
+   * 「点击前文档是干净的」→ 立刻落盘（saveSession 走与 Ctrl+S 完全相同的
+   * 写盘/快照/冲突路径），磁盘随即更新，闪念时间线经主进程广播即时同步 ——
+   * 这是"点一下两处都变"的实时路径。
+   *
+   * 「点击前已有未保存改动」→ 只改内存并标脏：已有的编辑是正在进行的意图，
+   * 不能被一次复选框点击顺带提交；自动保存开启时它会在停顿后落盘，关闭时
+   * 等用户自己的保存动作。
+   *
+   * 返回 true 表示内容确实变化（行号越界或不是任务行时返回 false，调用方
+   * 忽略 —— 例如点到内联引用里别的文档的任务行）。
+   */
+  const toggleTaskAtSourceLine = useCallback(
+    async (blockStartLine: number, withinBlockIndex: number) => {
+      const currentSession = sessionRef.current ?? session;
+      if (!currentSession || !currentSession.writable) return false;
+      const lineIndex = findTaskLineIndex(currentSession.source, blockStartLine, withinBlockIndex);
+      if (lineIndex === -1) return false;
+      const next = toggleTaskLine(currentSession.source, lineIndex);
+      if (next === null || next === currentSession.source) return false;
+
+      const wasClean = !isDirty;
+      updateSource(next);
+      if (wasClean) {
+        // 失败不打扰：改动已在内存中并标脏，由既有保存路径兜底（不丢用户操作）。
+        await saveSession({ content: next });
+      }
+      return true;
+    },
+    [session, isDirty, updateSource, saveSession],
+  );
+
   return {
     session,
     renderedChapter,
@@ -489,5 +524,6 @@ export function useDocumentSession() {
     reloadFromDisk,
     discardChanges,
     clearConflict,
+    toggleTaskAtSourceLine,
   };
 }

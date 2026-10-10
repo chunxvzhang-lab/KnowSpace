@@ -82,6 +82,10 @@ const desktopApi = {
     getAppSettings: () => ipcRenderer.invoke("bookmd:get-app-settings"),
     setAppSettings: (settings) => ipcRenderer.invoke("bookmd:set-app-settings", settings),
 
+    // Explorer "New" context-menu entries (user-level registry, Windows only)
+    getShellNewStatus: () => ipcRenderer.invoke("bookmd:shell-new-get-status"),
+    setShellNewEntry: (request) => ipcRenderer.invoke("bookmd:shell-new-set-entry", request),
+
     onOpenFilePath: (callback) => {
       const listener = (_event, filePath) => callback(filePath);
       ipcRenderer.on("bookmd:open-file-path", listener);
@@ -125,6 +129,8 @@ const desktopApi = {
     saveFlashNote: (payload) => ipcRenderer.invoke("bookmd:save-flash-note", payload),
     getFlashPin: () => ipcRenderer.invoke("bookmd:get-flash-pin"),
     setFlashPin: (pinned) => ipcRenderer.invoke("bookmd:set-flash-pin", pinned),
+    setFlashPersistentTab: (active) =>
+      ipcRenderer.invoke("bookmd:set-flash-persistent-tab", active),
     getFlashSpaceConfig: () => ipcRenderer.invoke("bookmd:get-flash-space-config"),
     selectFlashSpaceDir: () => ipcRenderer.invoke("bookmd:select-flash-space-dir"),
     resetFlashSpaceDir: () => ipcRenderer.invoke("bookmd:reset-flash-space-dir"),

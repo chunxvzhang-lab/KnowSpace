@@ -84,6 +84,8 @@ export function App() {
           handleSearchJump={c.handleSearchJump}
           clearSearchHighlights={c.clearSearchHighlights}
           onOpenNoteFile={c.openNoteFile}
+          onOpenNoteInReader={c.openNoteInReader}
+          onFlashNoteFileChanged={c.handleFlashNoteFileChanged}
           handleReviewActiveChange={c.handleReviewActiveChange}
           handleMergeFlashNote={c.handleMergeFlashNote}
           handleSidebarResizeMouseDown={c.handleSidebarResizeMouseDown}
@@ -147,6 +149,7 @@ export function App() {
             handleRevealInToc={c.handleRevealInToc}
             handleOpenBacklinks={c.handleOpenBacklinks}
             wikiLinkTargets={c.wikiLinkTargets}
+            onToggleTask={c.handleToggleTaskInReader}
             backlinksCount={c.currentLinkedReferences.length}
             graph={{ graphData: c.graphData, currentActiveId: c.currentActiveId }}
             handleCloseGraphPane={c.handleCloseGraphPane}

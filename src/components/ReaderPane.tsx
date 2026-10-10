@@ -7,6 +7,7 @@ import {
   type MermaidRenderPool,
 } from "../services/mermaid";
 import { blockKeyOf, VIRTUAL_MIN_BLOCKS } from "../services/readerVirtual";
+import { resolveCheckboxTarget } from "../services/taskListToggle";
 import {
   ensureBlockVisible,
   registerVirtualController,
@@ -41,6 +42,12 @@ type ReaderPaneProps = {
   onWikiLinkClick?: (target: string) => void;
   backlinksCount?: number;
   onOpenBacklinks?: () => void;
+  /**
+   * 阅读视图里点了一个任务复选框。参数是它在源码中的位置（块起始行 +
+   * 块内序号），换算与翻转由上层（会话层）完成。不传时点击保持原状
+   * （只切 DOM 状态，不回写）。
+   */
+  onToggleTask?: (blockStartLine: number, withinBlockIndex: number) => void;
 };
 
 /*
@@ -195,6 +202,7 @@ export const ReaderPane = memo(function ReaderPane({
   onWikiLinkClick,
   backlinksCount,
   onOpenBacklinks,
+  onToggleTask,
 }: ReaderPaneProps) {
   const articleRef = useRef<HTMLElement | null>(null);
   // Identity of the Mermaid pool currently alive for this article, plus the
@@ -425,6 +433,19 @@ export const ReaderPane = memo(function ReaderPane({
       const target = e.target as HTMLElement | null;
       if (!target) return;
 
+      // 0. A task checkbox flips its own line in the document source. The
+      // native toggle is prevented so the DOM state never leads the source
+      // by a frame — the re-render after the write is what paints the new
+      // state, and a write that is refused leaves the box untouched.
+      if (target.tagName === "INPUT" && (target as HTMLInputElement).type === "checkbox") {
+        const spot = resolveCheckboxTarget(target);
+        if (spot && onToggleTask) {
+          e.preventDefault();
+          onToggleTask(spot.blockStartLine, spot.withinBlockIndex);
+        }
+        return;
+      }
+
       // 0. Check if clicking a WikiLink or an Embedded Link
       const wikiLink = target.closest<HTMLAnchorElement>("a.wikilink, a.embed-source-link");
       if (wikiLink) {
@@ -552,7 +573,7 @@ export const ReaderPane = memo(function ReaderPane({
         }
       }
     },
-    [containerRef, onOpenLightbox, onWikiLinkClick],
+    [containerRef, onOpenLightbox, onWikiLinkClick, onToggleTask],
   );
 
   const handleMouseUp = useCallback(

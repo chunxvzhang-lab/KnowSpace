@@ -46,6 +46,9 @@ type SidebarPanelProps = {
   handleSearchJump: (result: SearchResult) => void;
   reviewableDocument: { filePath: string; content: string; dirty: boolean } | null;
   onOpenNoteFile: (filePath: string) => void;
+  onOpenNoteInReader: (filePath: string) => void;
+  /** Fired after a timeline todo is toggled on disk, so an open reader can re-read. */
+  onFlashNoteFileChanged: (filePath: string) => void;
   handleReviewActiveChange: (active: boolean) => void;
   handleMergeFlashNote: (content: string, fileName: string) => void;
   handleSidebarResizeMouseDown: (event: React.MouseEvent) => void;
@@ -81,6 +84,8 @@ export function SidebarPanel({
   handleSearchJump,
   reviewableDocument,
   onOpenNoteFile,
+  onOpenNoteInReader,
+  onFlashNoteFileChanged,
   handleReviewActiveChange,
   handleMergeFlashNote,
   handleSidebarResizeMouseDown,
@@ -134,6 +139,8 @@ export function SidebarPanel({
             </div>
             <SpaceTimelinePanel
               onOpenNoteFile={onOpenNoteFile}
+              onOpenNoteInReader={onOpenNoteInReader}
+              onNoteFileChanged={onFlashNoteFileChanged}
               onReviewActiveChange={handleReviewActiveChange}
               onMergeIntoDocument={handleMergeFlashNote}
               currentDocument={reviewableDocument}

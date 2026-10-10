@@ -19,6 +19,7 @@ const { registerCaptureHandlers } = require("./capture.cjs");
 const { registerHistoryHandlers } = require("./history.cjs");
 const { registerMediaHandlers } = require("./media.cjs");
 const { registerSystemHandlers } = require("./system.cjs");
+const { registerShellNewHandlers } = require("./shell-new.cjs");
 
 // Hardware acceleration and performance optimization switches
 app.commandLine.appendSwitch("enable-gpu-rasterization");
@@ -47,6 +48,10 @@ let flashCapsuleWindow = null;
 let flashCapsuleLoadingPromise = null;
 let tray = null;
 let isFlashCapsulePinned = false;
+// 「常驻模板」页处于前台时，失焦同样不隐藏：切到该页就是要把窗口留在
+// 眼前对照着写，点一下别处就消失会把常驻两个字变成摆设。它是页签状态
+// 而不是窗口设置，所以不落盘、不显示在图钉上，窗口关闭即复位。
+let isFlashPersistentTabActive = false;
 let isNativeDialogOpen = false;
 
 isFlashCapsulePinned = Boolean(getAppConfig().flashPinned);
@@ -252,6 +257,9 @@ async function createFlashCapsuleWindow() {
     if (flashCapsuleWindow === win) {
       flashCapsuleWindow = null;
     }
+    // 页签状态随窗口走：窗口重建后回到「闪念速记」页，复位防止
+    // 一个已不存在的页面继续压住失焦隐藏。
+    isFlashPersistentTabActive = false;
   });
 
   win.on("resize", () => {
@@ -267,7 +275,13 @@ async function createFlashCapsuleWindow() {
 
   win.on("blur", () => {
     try {
-      if (!win.isDestroyed() && win.isVisible() && !isFlashCapsulePinned && !isNativeDialogOpen) {
+      if (
+        !win.isDestroyed() &&
+        win.isVisible() &&
+        !isFlashCapsulePinned &&
+        !isFlashPersistentTabActive &&
+        !isNativeDialogOpen
+      ) {
         win.hide();
       }
     } catch {}
@@ -858,6 +872,14 @@ function setFlashPinned(pinned) {
   isFlashCapsulePinned = pinned;
 }
 
+function getFlashPersistentTabActive() {
+  return isFlashPersistentTabActive;
+}
+
+function setFlashPersistentTabActive(active) {
+  isFlashPersistentTabActive = Boolean(active);
+}
+
 function getNativeDialogOpen() {
   return isNativeDialogOpen;
 }
@@ -887,6 +909,8 @@ const handlerContext = {
   setFlashShortcut,
   getFlashPinned,
   setFlashPinned,
+  getFlashPersistentTabActive,
+  setFlashPersistentTabActive,
   getNativeDialogOpen,
   setNativeDialogOpen,
   // Tray / settings side effects owned by the lifecycle
@@ -900,3 +924,5 @@ registerCaptureHandlers(handlerContext);
 registerHistoryHandlers();
 registerMediaHandlers(handlerContext);
 registerSystemHandlers(handlerContext);
+// Explorer "New" menu entries own no lifecycle state, so they get no context.
+registerShellNewHandlers();
