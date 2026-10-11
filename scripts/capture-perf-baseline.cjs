@@ -31,11 +31,22 @@
  * Any breach exits 1.
  *
  * Clean-window gate (2026-10-11): capture mode refuses to overwrite the
- * committed snapshot when the measurement window looks loaded, judged by the
- * SPREAD of each scenario's own samples (scripts/perf-window.cjs). Before this,
- * a capture on a busy machine succeeded with worse numbers and wrote them
- * straight into the baseline - a silent loosening of the ratchet, which is what
- * b816c06 threw away by eye. Pass --force-write to override deliberately.
+ * committed snapshot when EITHER (a) the measurement window looks loaded,
+ * judged by the SPREAD of each metric's own samples (scripts/perf-window.cjs),
+ * OR (b) the fresh numbers are worse than the committed ones beyond the same
+ * tolerance --check uses. Before this, a capture on a busy machine succeeded
+ * with worse numbers and wrote them straight into the baseline - a silent
+ * loosening of the ratchet, which is what b816c06 threw away by eye.
+ *
+ * Two checks because they catch different things: spread catches a window that
+ * is UNSTABLE (samples disagreeing with each other), which is what the two
+ * 2026-10-11 captures showed (dropped frames 25 vs 52 against a baseline of 13);
+ * the comparison catches a window that is uniformly SLOW, which the spread
+ * check passes by construction - a capture run while another checkout was
+ * building reported "PASS" with typing = 69ms against a committed 0. On this
+ * machine a uniformly slow window is the normal state, so (b) is not optional.
+ *
+ * Pass --force-write to override either refusal deliberately.
  *
  * NOT wired into CI/preflight on purpose: this harness launches a real browser
  * and costs minutes per run — the plan puts perf benchmarks on the nightly
@@ -54,7 +65,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { spawn, spawnSync } = require("node:child_process");
 const { chromium } = require("playwright");
-const { judgeWindow, describeVerdict } = require("./perf-window.cjs");
+const { judgeWindow, describeVerdict, compareToCommitted } = require("./perf-window.cjs");
 
 const root = path.resolve(__dirname, "..");
 const docPath = path.join(root, "docs", "PERF_BASELINE.md");
@@ -1592,37 +1603,36 @@ function writeDoc(values) {
  * --check
  * ------------------------------------------------------------------ */
 function readCommitted() {
-  if (!fs.existsSync(docPath)) {
-    console.error("[perf] docs/PERF_BASELINE.md not found — run the capture first.");
+  const metrics = readCommittedOrNull();
+  if (!metrics) {
+    console.error(
+      "[perf] docs/PERF_BASELINE.md not found or missing its metrics block — run the capture first.",
+    );
     process.exit(1);
   }
+  return metrics;
+}
+
+/**
+ * Same read, but returns null instead of exiting when there is nothing to
+ * compare against. Capture mode needs this: on the very first capture (or after
+ * the file is deleted on purpose) there IS no committed baseline, and exiting
+ * would make the harness unable to bootstrap its own baseline.
+ */
+function readCommittedOrNull() {
+  if (!fs.existsSync(docPath)) return null;
   const doc = fs.readFileSync(docPath, "utf8");
   const m = doc.match(/<!-- perf-baseline:metrics\n([\s\S]*?)\nend perf-baseline:metrics -->/);
-  if (!m) {
-    console.error("[perf] metrics JSON block missing from docs/PERF_BASELINE.md — regenerate it.");
-    process.exit(1);
+  if (!m) return null;
+  try {
+    return JSON.parse(m[1]).metrics;
+  } catch {
+    return null;
   }
-  return JSON.parse(m[1]).metrics;
 }
 
 function checkAgainst(committed, fresh) {
-  const problems = [];
-  for (const metric of METRICS) {
-    const c = committed[metric.key];
-    const f = fresh[metric.key];
-    if (typeof c !== "number" || typeof f !== "number") {
-      problems.push(`${metric.key}: committed=${c} fresh=${f} (non-numeric)`);
-      continue;
-    }
-    if (metric.kind === "exact") {
-      if (f !== c) problems.push(`${metric.key}: exact count changed ${c} -> ${f}`);
-      continue;
-    }
-    const limit = c < 20 ? c + 25 : c * 1.5;
-    if (f > limit) {
-      problems.push(`${metric.key}: ${f.toFixed(1)} > tolerance ${limit.toFixed(1)} (基线 ${c})`);
-    }
-  }
+  const problems = compareToCommitted(committed, fresh, METRICS);
   if (problems.length) {
     console.error(
       "[perf] REGRESSION against committed PERF_BASELINE.md (tolerance = committed×1.5, " +
@@ -1717,34 +1727,54 @@ async function main() {
       );
     }
 
-    // The clean-window verdict gates the WRITE, not the exit code: capture mode
-    // used to overwrite the committed baseline unconditionally, so a capture on
-    // a loaded machine silently loosened the ratchet (b816c06 records the author
-    // throwing one away by eye; 2026-10-11 produced two more). Refusing to write
-    // keeps the committed numbers honest, and the caller still gets the measured
-    // values on stdout for diagnosis. --check is unaffected: it compares against
-    // the committed file and never writes.
+    // Two independent questions, two checks - learned the hard way on
+    // 2026-10-11. The spread verdict catches a window that is UNSTABLE (samples
+    // disagreeing); it does NOT catch a window that is uniformly slow, which on
+    // this machine is the normal state. A capture run while another checkout was
+    // building reported "clean-window check: PASS" with typing = 69ms against a
+    // committed 0 - had it run in the main repo it would have written 69 over the
+    // baseline. So capture mode also refuses to write when the fresh numbers are
+    // worse than the committed ones beyond the same tolerance `--check` uses.
     const window = judgeWindow(samples);
     for (const line of describeVerdict(window)) console.log(line);
 
+    const committed = readCommittedOrNull();
+    const regressions = committed ? compareToCommitted(committed, values, METRICS) : [];
+    const wouldLoosen = regressions.length > 0;
+    if (!committed && !checkOnly) {
+      console.log("[perf] no committed baseline to compare against — first capture, writing.");
+    }
+
     if (checkOnly) {
-      checkAgainst(readCommitted(), values);
-    } else if (window.clean) {
+      checkAgainst(committed, values);
+    } else if (window.clean && !wouldLoosen) {
       writeDoc(values);
       console.log(`[perf] snapshot written to ${path.relative(root, docPath)}`);
     } else if (process.argv.includes("--force-write")) {
       writeDoc(values);
       console.log(
         `[perf] snapshot written to ${path.relative(root, docPath)} ` +
-          "(FORCED over a dirty window - the numbers are not trustworthy)",
+          "(FORCED over a window that failed a gate - the numbers are not trustworthy)",
       );
     } else {
-      console.error(
-        "[perf] REFUSING to write the snapshot: the measurement window is loaded " +
-          "(samples of one scenario disagree beyond the spread limit). Committed " +
-          "PERF_BASELINE.md is unchanged. Close CPU-hungry background programs and " +
-          "re-run on a quiet machine; --force-write overrides this deliberately.",
-      );
+      if (wouldLoosen) {
+        console.error(
+          "[perf] REFUSING to write the snapshot: these numbers are worse than the " +
+            "committed baseline beyond tolerance, so writing them would LOOSEN the " +
+            "ratchet rather than record progress (tolerance = committed×1.5, or " +
+            "committed+25 below 20; exact counts must match):\n  - " +
+            regressions.join("\n  - ") +
+            "\nA uniformly slow machine looks exactly like this. Re-run on a quiet " +
+            "one, or pass --force-write if the regression is real and intended.",
+        );
+      } else {
+        console.error(
+          "[perf] REFUSING to write the snapshot: the measurement window is loaded " +
+            "(samples of one scenario disagree beyond the spread limit). Committed " +
+            "PERF_BASELINE.md is unchanged. Close CPU-hungry background programs and " +
+            "re-run on a quiet machine; --force-write overrides this deliberately.",
+        );
+      }
       process.exitCode = 1;
     }
   } finally {

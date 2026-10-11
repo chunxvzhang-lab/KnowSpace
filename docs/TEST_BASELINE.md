@@ -12,8 +12,8 @@
 | 项目 | 数值 |
 | :--- | ---: |
 | 测试文件 | **143** |
-| 用例总数 | **1650** |
-| 通过 | 1648 |
+| 用例总数 | **1656** |
+| 通过 | 1654 |
 | 失败 | 0 |
 | 跳过 | 2 |
 | 通过率 | 99.9% |
@@ -43,6 +43,7 @@
 | `src/__tests__/flash-capsule-theme-contrast.test.ts` | 26 | ✅ |
 | `src/__tests__/mindmap-collapse-persistence.test.tsx` | 24 | ✅ |
 | `src/__tests__/mindmap.test.ts` | 23 | ✅ |
+| `src/__tests__/perf-window.test.ts` | 21 | ✅ |
 | `src/__tests__/reader-virtual.test.ts` | 21 | ✅ |
 | `src/__tests__/search-index-service.test.ts` | 20 | ✅ |
 | `src/__tests__/column-resize.test.tsx` | 19 | ✅ |
@@ -52,7 +53,6 @@
 | `src/__tests__/reader-pane-virtual.test.tsx` | 16 | ✅ |
 | `src/__tests__/canvas-card-interactions.test.tsx` | 15 | ✅ |
 | `src/__tests__/mindmap-svg-export.test.tsx` | 15 | ✅ |
-| `src/__tests__/perf-window.test.ts` | 15 | ✅ |
 | `src/__tests__/perf-regressions.test.ts` | 14 | ✅ |
 | `src/__tests__/table-generator.test.ts` | 14 | ✅ |
 | `src/__tests__/document-creation.test.ts` | 13 | ✅ |
@@ -195,7 +195,7 @@
 
 任何重构都必须满足：
 
-1. 用例总数 **不低于 1650**（删除测试需在 PR 说明中论证）
+1. 用例总数 **不低于 1656**（删除测试需在 PR 说明中论证）
 2. 通过率 **100%**
 3. 单文件用例数**不得下降**（防止测试被静默删除）
 

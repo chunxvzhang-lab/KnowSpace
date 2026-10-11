@@ -21,11 +21,16 @@ const perfWindow = require("../../scripts/perf-window.cjs") as {
     }>;
   };
   describeVerdict: (v: { clean: boolean; checks: unknown[] }) => string[];
+  compareToCommitted: (
+    committed: Record<string, number>,
+    fresh: Record<string, number>,
+    metrics: Array<{ key: string; kind: string }>,
+  ) => string[];
   DEFAULT_TOLERANCE: number;
   ABSOLUTE_ALLOWANCE: number;
 };
 
-const { judgeWindow, describeVerdict, DEFAULT_TOLERANCE } = perfWindow;
+const { judgeWindow, describeVerdict, compareToCommitted, DEFAULT_TOLERANCE } = perfWindow;
 
 /**
  * 这个判定的存在理由：忙机器上的性能捕获**不会失败**，它会成功地把更差的
@@ -176,5 +181,88 @@ describe("describeVerdict", () => {
   it("没有可判项时如实说跳过，不假装 PASS", () => {
     const lines = describeVerdict(judgeWindow({}));
     expect(lines.join("\n")).toContain("skipped");
+  });
+});
+
+/**
+ * 第二个检查：**整体都慢**的窗口。
+ *
+ * 散度判据只挡「抖动的窗口」——采样互相矛盾。它挡不住「整台机器一致地慢」，
+ * 而那正是这台机器的常态。2026-10-11 的 A/B 实验里真出现了：另一次检出在
+ * 构建时，某次捕获打印 `clean-window check: PASS`，而打字长任务是 69ms、
+ * 已提交基线是 0ms —— 若那次跑在主仓库，它会把 69 写进基线。
+ *
+ * 所以写入路径上还有第二道：新数字比已提交基线差出容差范围就拒绝写。
+ */
+const METRIC_SHAPE = [
+  { key: "typing_max_longtask_ms", kind: "timing" },
+  { key: "longdoc_dom_nodes", kind: "exact" },
+];
+
+describe("compareToCommitted", () => {
+  it("一致的数字不报问题（放行）", () => {
+    const problems = compareToCommitted(
+      { typing_max_longtask_ms: 0, longdoc_dom_nodes: 191 },
+      { typing_max_longtask_ms: 0, longdoc_dom_nodes: 191 },
+      METRIC_SHAPE,
+    );
+    expect(problems).toEqual([]);
+  });
+
+  it("整体变慢的窗口被拦住——这正是散度判据放行、而基线会被写坏的那一档", () => {
+    // 现场实测：散度 PASS，但打字 69ms 对基线 0ms（容差 0+25=25）。
+    const problems = compareToCommitted(
+      { typing_max_longtask_ms: 0, longdoc_dom_nodes: 191 },
+      { typing_max_longtask_ms: 69, longdoc_dom_nodes: 191 },
+      METRIC_SHAPE,
+    );
+    expect(problems.length).toBe(1);
+    expect(problems[0]).toContain("typing_max_longtask_ms");
+  });
+
+  it("容差之内的小幅波动不算回归（否则安静机器也会被误拦）", () => {
+    // 0 → 24 在 +25 的绝对容差内。
+    const problems = compareToCommitted(
+      { typing_max_longtask_ms: 0, longdoc_dom_nodes: 191 },
+      { typing_max_longtask_ms: 24, longdoc_dom_nodes: 191 },
+      METRIC_SHAPE,
+    );
+    expect(problems).toEqual([]);
+  });
+
+  it("大数值走 ×1.5 相对容差", () => {
+    const committed = { typing_max_longtask_ms: 100, longdoc_dom_nodes: 191 };
+    const within = compareToCommitted(
+      committed,
+      { typing_max_longtask_ms: 140, longdoc_dom_nodes: 191 },
+      METRIC_SHAPE,
+    );
+    expect(within).toEqual([]); // 140 < 150
+    const over = compareToCommitted(
+      committed,
+      { typing_max_longtask_ms: 160, longdoc_dom_nodes: 191 },
+      METRIC_SHAPE,
+    );
+    expect(over.length).toBe(1);
+  });
+
+  it("确定性计数必须逐字相等，差 1 就报", () => {
+    const problems = compareToCommitted(
+      { typing_max_longtask_ms: 0, longdoc_dom_nodes: 191 },
+      { typing_max_longtask_ms: 0, longdoc_dom_nodes: 192 },
+      METRIC_SHAPE,
+    );
+    expect(problems.length).toBe(1);
+    expect(problems[0]).toContain("exact count changed 191 -> 192");
+  });
+
+  it("数字缺失时报出来，不当成 0 放行", () => {
+    const problems = compareToCommitted(
+      { typing_max_longtask_ms: 0, longdoc_dom_nodes: 191 },
+      { typing_max_longtask_ms: 0, longdoc_dom_nodes: undefined as unknown as number },
+      METRIC_SHAPE,
+    );
+    expect(problems.length).toBe(1);
+    expect(problems[0]).toContain("non-numeric");
   });
 });

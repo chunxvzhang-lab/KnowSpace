@@ -142,9 +142,50 @@ function describeVerdict(verdict) {
   return lines;
 }
 
+/**
+ * Compare fresh numbers against the committed baseline, in the tolerance terms
+ * this harness has always used: exact counts must match, timings get
+ * `committed < 20 ? committed + 25 : committed × 1.5`.
+ *
+ * Extracted from `checkAgainst` so the SAME judgement can also gate the write in
+ * capture mode. Why that matters, learned the hard way on 2026-10-11: the
+ * clean-window verdict only catches a window that is *unstable* (samples
+ * disagreeing with each other). It does not catch a window that is *uniformly
+ * slow* — and on this machine that is the normal state. A capture taken while
+ * another checkout was building reported `clean-window check: PASS` with
+ * `typing_max_longtask_ms = 69` against a committed 0. Had it run in the main
+ * repo, it would have written 69 over the baseline: a uniformly-slow window
+ * silently loosening the ratchet, which is the exact failure the gate exists to
+ * prevent. Two different questions, two checks: spread catches noise, this
+ * catches "worse than what we committed".
+ *
+ * @returns {string[]} Human-readable problems; empty means within tolerance.
+ */
+function compareToCommitted(committed, fresh, metrics) {
+  const problems = [];
+  for (const metric of metrics) {
+    const c = committed[metric.key];
+    const f = fresh[metric.key];
+    if (typeof c !== "number" || typeof f !== "number") {
+      problems.push(`${metric.key}: committed=${c} fresh=${f} (non-numeric)`);
+      continue;
+    }
+    if (metric.kind === "exact") {
+      if (f !== c) problems.push(`${metric.key}: exact count changed ${c} -> ${f}`);
+      continue;
+    }
+    const limit = c < 20 ? c + 25 : c * 1.5;
+    if (f > limit) {
+      problems.push(`${metric.key}: ${f.toFixed(1)} > tolerance ${limit.toFixed(1)} (基线 ${c})`);
+    }
+  }
+  return problems;
+}
+
 module.exports = {
   judgeWindow,
   describeVerdict,
+  compareToCommitted,
   SPREAD_CHECKS,
   DEFAULT_TOLERANCE,
   ABSOLUTE_ALLOWANCE,
