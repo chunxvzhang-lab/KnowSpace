@@ -53,6 +53,20 @@ README_REGEX_PATTERNS = [
 ]
 
 
+def write_lf(path: Path, text: str) -> None:
+    """按仓库约定（.editorconfig `end_of_line = lf`、.prettierrc `endOfLine: "lf"`）写回 LF。
+
+    坑：`Path.write_text` 走文本模式，Windows 上会把 `\\n` 展开成 `\\r\\n`。于是这个脚本
+    每跑一次，就把一份 LF 文档在工作区改成 CRLF —— `prettier --check .` 随即报
+    `[warn] README.md` 退出 1，而 git 层因 `.gitattributes` 的 `* text=auto eol=lf`
+    看不见差异（`git diff` 只有那几行真改动）。2026-10-11 发版后刷新 README 徽章时踩到：
+    仓库里 README / USER_MANUAL / RELEASE_NOTES 三份文档全是 CRLF，源头就是这里。
+    必须显式 `newline="\\n"` 写入，别用 write_text。
+    """
+    with open(path, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write(text)
+
+
 def bump_readme(text: str, new: str) -> tuple[str, int]:
     """提升 README 里'当前版本'的三处口径：VERSION 标记、Version 徽章、徽章 alt。"""
     hits = 0
@@ -83,7 +97,7 @@ def main() -> int:
         if hits < len(README_MARKERS) + len(README_REGEX_PATTERNS):
             print(f"README 当前版本替换应命中 {len(README_MARKERS) + len(README_REGEX_PATTERNS)} 处，实际 {hits} 处；未写入。")
             return 1
-        path.write_text(text, encoding="utf-8")
+        write_lf(path, text)
         print(f"\n已写入 {path}：README 当前版本 → v{new}")
         return 0
 
@@ -111,7 +125,7 @@ def main() -> int:
             print(f"  未找到: {item[:80]}")
         return 1
 
-    path.write_text(text, encoding="utf-8")
+    write_lf(path, text)
     print(f"\n已写入 {path}：v{old} → v{new}")
     return 0
 
