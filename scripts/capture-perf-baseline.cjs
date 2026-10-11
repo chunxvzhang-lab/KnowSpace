@@ -30,12 +30,19 @@
  * Deterministic counts (DOM node count, block count) must match exactly.
  * Any breach exits 1.
  *
+ * Clean-window gate (2026-10-11): capture mode refuses to overwrite the
+ * committed snapshot when the measurement window looks loaded, judged by the
+ * SPREAD of each scenario's own samples (scripts/perf-window.cjs). Before this,
+ * a capture on a busy machine succeeded with worse numbers and wrote them
+ * straight into the baseline - a silent loosening of the ratchet, which is what
+ * b816c06 threw away by eye. Pass --force-write to override deliberately.
+ *
  * NOT wired into CI/preflight on purpose: this harness launches a real browser
  * and costs minutes per run — the plan puts perf benchmarks on the nightly
  * lane, not the PR gate. A regression in phase-2 perf work should fail the
  * nightly job that calls `npm run perf:baseline:check`.
  *
- * Usage:  node scripts/capture-perf-baseline.cjs
+ * Usage:  node scripts/capture-perf-baseline.cjs [--force-write]
  *         node scripts/capture-perf-baseline.cjs --check
  * Output: docs/PERF_BASELINE.md (capture mode only)
  */
@@ -47,6 +54,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { spawn, spawnSync } = require("node:child_process");
 const { chromium } = require("playwright");
+const { judgeWindow, describeVerdict } = require("./perf-window.cjs");
 
 const root = path.resolve(__dirname, "..");
 const docPath = path.join(root, "docs", "PERF_BASELINE.md");
@@ -1414,6 +1422,10 @@ const pickMin = (list, get) => Math.min(...list.map(get));
 
 async function runAll(browser, url, corpus) {
   const values = {};
+  // Raw per-scenario samples, kept so the clean-window verdict can look at the
+  // SPREAD of a scenario's own runs. Only the min reaches the snapshot, so a
+  // loaded machine is invisible in `values` — that is the whole problem.
+  const samples = {};
 
   const dom = await (async () => {
     console.log("[perf] scenario long-doc DOM (exact counts, single run) ...");
@@ -1428,24 +1440,31 @@ async function runAll(browser, url, corpus) {
   values.typing_parse_max_ms = pickMin(typing, (r) => r.parseMaxMs);
   values.typing_sanitize_max_ms = pickMin(typing, (r) => r.sanitizeMaxMs);
   values.typing_dom_max_ms = pickMin(typing, (r) => r.domMaxMs);
+  samples.typing_max_longtask_ms = typing.map((r) => r.maxMs);
 
   const scroll = await sample(() => scenarioScroll(browser, url, corpus), "scroll frames");
   values.scroll_p50_frame_ms = pickMin(scroll, (r) => r.p50);
   values.scroll_p95_frame_ms = pickMin(scroll, (r) => r.p95);
   values.scroll_dropped_frames = pickMin(scroll, (r) => r.drops);
+  // Per metric, not per scenario: p95 is milliseconds and drops is a count, so
+  // sharing one array would print milliseconds under a frame-count label.
+  samples.scroll_p95_frame_ms = scroll.map((r) => r.p95);
+  samples.scroll_dropped_frames = scroll.map((r) => r.drops);
 
   const mermaid = await sample(() => scenarioMermaid(browser, url, corpus), "mermaid first paint");
   values.mermaid_firstpaint_ms = pickMin(mermaid, (r) => r.paintMs);
   values.mermaid_flush_ms = pickMin(mermaid, (r) => r.flushMs);
   values.mermaid_longtask_sum_ms = pickMin(mermaid, (r) => r.longtaskSumMs);
+  samples.mermaid_firstpaint_ms = mermaid.map((r) => r.paintMs);
 
   const tabs = await sample(() => scenarioTabs(browser, url, corpus), "20-tab switch");
   values.tab_per_tab_heap_delta_mb = pickMin(tabs, (r) => r.perTabDeltaMB);
   values.tab_heap_after_cycle_mb = pickMin(tabs, (r) => r.heapCycleMB);
   values.tab_switch_max_longtask_ms = pickMin(tabs, (r) => r.maxSwitchLongtaskMs);
   values.tab_switch_avg_ms = pickMin(tabs, (r) => r.avgSwitchMs);
+  samples.tab_switch_max_longtask_ms = tabs.map((r) => r.maxSwitchLongtaskMs);
 
-  return values;
+  return { values, samples };
 }
 
 /* ------------------------------------------------------------------ *
@@ -1688,7 +1707,7 @@ async function main() {
       }
       return;
     }
-    const values = await runAll(browser, url, corpus);
+    const { values, samples } = await runAll(browser, url, corpus);
 
     for (const m of METRICS) {
       const v = values[m.key];
@@ -1698,11 +1717,35 @@ async function main() {
       );
     }
 
+    // The clean-window verdict gates the WRITE, not the exit code: capture mode
+    // used to overwrite the committed baseline unconditionally, so a capture on
+    // a loaded machine silently loosened the ratchet (b816c06 records the author
+    // throwing one away by eye; 2026-10-11 produced two more). Refusing to write
+    // keeps the committed numbers honest, and the caller still gets the measured
+    // values on stdout for diagnosis. --check is unaffected: it compares against
+    // the committed file and never writes.
+    const window = judgeWindow(samples);
+    for (const line of describeVerdict(window)) console.log(line);
+
     if (checkOnly) {
       checkAgainst(readCommitted(), values);
-    } else {
+    } else if (window.clean) {
       writeDoc(values);
       console.log(`[perf] snapshot written to ${path.relative(root, docPath)}`);
+    } else if (process.argv.includes("--force-write")) {
+      writeDoc(values);
+      console.log(
+        `[perf] snapshot written to ${path.relative(root, docPath)} ` +
+          "(FORCED over a dirty window - the numbers are not trustworthy)",
+      );
+    } else {
+      console.error(
+        "[perf] REFUSING to write the snapshot: the measurement window is loaded " +
+          "(samples of one scenario disagree beyond the spread limit). Committed " +
+          "PERF_BASELINE.md is unchanged. Close CPU-hungry background programs and " +
+          "re-run on a quiet machine; --force-write overrides this deliberately.",
+      );
+      process.exitCode = 1;
     }
   } finally {
     if (browser) await browser.close().catch(() => {});
