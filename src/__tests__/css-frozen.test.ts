@@ -37,8 +37,27 @@ import { loadAppCssBundle } from "./helpers/loadAppCss";
  *  永远匹配不上的规则——所以摘要变了、外观不该变，两者并不矛盾。证明方式：
  *  对代码里真实渲染得出的每个元素，比对删除前后**实际生效的声明**（按源码
  *  顺序），148 个候选元素零差异；同一次比对在选择器文字层面会报出 6 处差异，
- *  说明这个判据不是恒绿的空转。 */
-const FROZEN_SHA256 = "74adfcc41490d152bb6a2a67e58cab5c9b21f64e028c26ecb52972f566107d84";
+ *  2026-10-11 更新（第二笔，与本笔的 CSS 同提交）：幽灵令牌收口。`--surface-1` /
+ *  `--text-normal` / `--border-color` 三个**未定义**的名字改成既有令牌（命令面板 →
+ *  --surface-elevated / --text / --border / --border-subtle；分栏快捷条 →
+ *  --surface-elevated；graph-filters 分隔线 → --border-subtle）。styles.css 那 7 处
+ *  `fill` 属图内固定观感，把兜底写成显式字面量 #1e293b，一个像素都不动。
+ *  这一笔**确实改了外观**（深色下底色 #1e293b → #1a202c，通道差 15/255），所以逐条
+ *  算了对比度：14 项全过（正文 ≥4.5、非文字 ≥3），并**顺带修掉一个真 bug**——eink
+ *  主题下命令面板是白底，而 `.item-title` / `.command-palette-input` 读的
+ *  `--text-normal` 兜底是浅色 #f8fafc，即**白字压白底 1.00:1，完全看不见**；浅色主题
+ *  有专门覆盖救回，eink 只覆盖了选中项。改读 `--text` 后 eink 实测 17.40:1。
+ *  2026-10-11 更新（第三笔，与本笔的 CSS 同提交）：给 `.text-orange` / `.text-cyan`
+ *  补两条**工具类**。这两个类名在 23 个元素上是裸用的，而全仓只有复合规则
+ *  （`.about-icon.text-orange` 等），裸用从来匹配不上 ⇒ 那些图标一直拿继承色，
+ *  写代码的人以为它是橙/青。颜色走新令牌 `--icon-orange` / `--icon-cyan`，**按主题取值**：
+ *  照抄复合规则里的字面量（#f59e0b / #06b6d4）在浅色与墨屏底上只有 2.15:1 / 2.04:1，
+ *  低于图标 3:1 门槛（WCAG 1.4.11）——那会把"颜色不对"换成"颜色对了但看不清"。
+ *  实测最差面 ≥3.5:1。新增守卫 `css-color-classes.test.ts` 钉住这类空转（含变异断言）。
+ *  **作用域限定在 `.app-shell` 之下**：胶囊窗口也用这两个类名（4 处），但胶囊
+ *  **不消费任何全局变量**（规则 9），不加限定会被 `theme-mode` 守卫正确地判为
+ *  "胶囊引用了全局变量"——限定之后主窗口 23 处拿到颜色、胶囊 4 处保持原样。 */
+const FROZEN_SHA256 = "7998c1e8205f70e6bfae5ace4b52c6f9adcd1bc44dde82714b8a8c1fc513e3bf";
 
 function normalize(css: string): string {
   return css

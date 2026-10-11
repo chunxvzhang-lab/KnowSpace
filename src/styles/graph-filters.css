@@ -31,6 +31,6 @@
 .graph-filter-divider {
   width: 1px;
   height: 16px;
-  background: var(--border-color, rgba(148, 163, 184, 0.2));
+  background: var(--border-subtle);
   margin: 0 4px;
 }

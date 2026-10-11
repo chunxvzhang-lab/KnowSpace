@@ -11,9 +11,9 @@
 
 | 项目 | 数值 |
 | :--- | ---: |
-| 测试文件 | **143** |
-| 用例总数 | **1656** |
-| 通过 | 1654 |
+| 测试文件 | **144** |
+| 用例总数 | **1663** |
+| 通过 | 1661 |
 | 失败 | 0 |
 | 跳过 | 2 |
 | 通过率 | 99.9% |
@@ -88,6 +88,7 @@
 | `src/__tests__/theme-mode.test.ts` | 8 | ✅ |
 | `src/__tests__/backlink.test.ts` | 7 | ✅ |
 | `src/__tests__/boot-theme.test.ts` | 7 | ✅ |
+| `src/__tests__/css-color-classes.test.ts` | 7 | ✅ |
 | `src/__tests__/css-token-vocabulary.test.ts` | 7 | ✅ |
 | `src/__tests__/dialogs-conflict-about.test.tsx` | 7 | ✅ |
 | `src/__tests__/graph-and-directory.test.ts` | 7 | ✅ |
@@ -195,7 +196,7 @@
 
 任何重构都必须满足：
 
-1. 用例总数 **不低于 1656**（删除测试需在 PR 说明中论证）
+1. 用例总数 **不低于 1663**（删除测试需在 PR 说明中论证）
 2. 通过率 **100%**
 3. 单文件用例数**不得下降**（防止测试被静默删除）
 

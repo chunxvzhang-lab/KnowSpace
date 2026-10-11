@@ -212,33 +212,18 @@ function ghostDarkBackgrounds(
  */
 type AllowEntry = { why: string; sites: string[] };
 const ALLOW_UNDEFINED = new Map<string, AllowEntry>([
-  [
-    "--surface-1",
-    {
-      why:
-        "兜底 #1e293b 是自洽深色面板/深色徽章的一部分。命令面板与分栏快捷条由 " +
-        '`[data-theme="light"|"eink"]` 同名规则显式覆盖（快捷条的 eink 覆盖是 2026-10-05 补的）；' +
-        "styles.css 那 7 处是 `fill:` 的**图内固定观感**——同族描边与文字也写死（#f59e0b / #c084fc /" +
-        " #fcd34d），本来就不跟应用主题走，不适用「底色须有主题覆盖」那条判据。",
-      sites: ["styles/command-palette.css", "styles/graph-workspace.css", "styles.css"],
-    },
-  ],
-  [
-    "--text-normal",
-    {
-      why: "与 --surface-1 的深底配对（浅字压深底），命令面板的浅色/eink 由显式覆盖给出深色文字",
-      sites: ["styles/command-palette.css"],
-    },
-  ],
-  [
-    "--border-color",
-    {
-      why:
-        "命令面板边框色：浅色/eink 由显式覆盖给出；graph-filters 那 1 处是 rgba(148,163,184,.2)" +
-        " 的半透明分隔线，压深压浅都读得清，不依赖具体主题",
-      sites: ["styles/command-palette.css", "styles/graph-filters.css"],
-    },
-  ],
+  // 2026-10-11：`--surface-1` / `--text-normal` / `--border-color` 三条已从本清单移除。
+  // 它们的收口方式与阶段 C 那 8 个名字不同——不是"换个令牌名"，而是**看清这三处
+  // 本来就该用哪个既有令牌**：
+  //   · 命令面板：`--surface-1` 兜底 #1e293b → `--surface-elevated`（浮层面板的本义）；
+  //     `--text-normal` 兜底 #f8fafc → `--text`；`--border-color` → `--border` / `--border-subtle`
+  //     （与 `.graph-pane-divider` / `.mindmap-toolbar-divider` 同角色，它们本就用 `--border`）；
+  //   · 分栏快捷条：`--surface-1` → `--surface-elevated`；
+  //   · styles.css 那 7 处 `fill`：技术债表已判定为**图内固定观感**（同族描边与文字
+  //     也写死 #f59e0b / #c084fc / #fcd34d），所以**把兜底值写成显式字面量** #1e293b ——
+  //     消除悬空引用，同时一个像素都不动。
+  // 三条理由的旧文本在 git 历史里（`git log -S "--surface-1" -- src/__tests__`）。
+  // 清单里保留的这条性质不同：它的兜底是 `transparent`，是"就是要融进面板"，不是遗漏。
   [
     "--bg-sidebar",
     {
