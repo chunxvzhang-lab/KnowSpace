@@ -113,7 +113,33 @@ function consistencyGate() {
   if (!about.includes(`v${version} `)) {
     die(`no v${version} changelog group in AboutDialog/AboutChangelogRecent`);
   }
-  console.log("  package.json / preload / release notes / manual / AboutDialog all agree.");
+
+  // README's three version strings, checked here as well as in
+  // ipc-channel-contract.test.ts. The test is the long-term guard (it runs on
+  // every push); this check is here so a release stops BEFORE packing ~13
+  // minutes of artifacts and publishing them under a stale badge. The three
+  // must agree with each other too: a partial bump is what a drift looks like
+  // right before it ships.
+  const readme = fs.readFileSync(path.join(root, "README.md"), "utf8");
+  const badge = /badge\/Version-v(\d+\.\d+\.\d+)-/.exec(readme);
+  const alt = /alt="Version (\d+\.\d+\.\d+)"/.exec(readme);
+  const marker = /<!-- VERSION:BEGIN -->(\d+\.\d+\.\d+)<!-- VERSION:END -->/.exec(readme);
+  if (!badge || !alt || !marker) {
+    die(
+      "README.md is missing one of its three version markers " +
+        "(badge / alt / VERSION:BEGIN-END) — run scripts/bump-doc-version.py README.md <old> <new>",
+    );
+  }
+  const found = [badge[1], alt[1], marker[1]];
+  if (found.some((v) => v !== version)) {
+    die(
+      `README.md version strings are ${found.join(" / ")}, expected ${version} — ` +
+        "run scripts/bump-doc-version.py README.md <old> <new>",
+    );
+  }
+  console.log(
+    "  package.json / preload / release notes / manual / AboutDialog / README all agree.",
+  );
 }
 
 /* ── 2. preflight, two rounds ─────────────────────────────────────────── */
@@ -131,6 +157,14 @@ const VERSION_FILES = [
   `docs/RELEASE_NOTES_v${version}.md`,
   "src/components/AboutDialog.tsx",
   "electron/preload.cjs",
+  // README.md joins the list on 2026-10-11, and it is here because its absence
+  // shipped a stale badge: v2.7.6 went out advertising v2.7.5. Nothing caught it
+  // - this whitelist never staged the file, and the script that CAN rewrite it
+  // (bump-doc-version.py, which already owns the VERSION:BEGIN/END markers) had
+  // zero callers. Two halves of the same gap. The static guard in
+  // ipc-channel-contract.test.ts now fails on drift; this entry is what makes
+  // the release actually update the badge instead of just complaining about it.
+  "README.md",
 ];
 
 function commitVersionFiles() {

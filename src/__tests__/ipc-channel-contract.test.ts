@@ -277,6 +277,33 @@ describe("IPC channel contract (preload.cjs ↔ main.cjs ↔ desktop.d.ts)", () 
     expect(dts).toContain("apiVersion: string;");
   });
 
+  it("README's advertised version matches the app version (it had no guard at all)", () => {
+    // Why this lives here: the README badge was the one version string nothing
+    // checked. release.cjs stages exactly five files and README.md is not among
+    // them, so the badge only ever moved when a human remembered to run
+    // bump-doc-version.py - which had zero callers. v2.7.6 shipped with a v2.7.5
+    // badge, and it was found by reading the file, not by a gate.
+    //
+    // The check is static and lives with the other version consistency
+    // assertions rather than in the release script: the release script only runs
+    // during a release, so a drift introduced by any other commit would still go
+    // unseen. This one fails on every push.
+    const readme = read(join(repoRoot, "README.md"));
+    const badge = /badge\/Version-v(\d+\.\d+\.\d+)-/.exec(readme);
+    const alt = /alt="Version (\d+\.\d+\.\d+)"/.exec(readme);
+    const marker = /<!-- VERSION:BEGIN -->(\d+\.\d+\.\d+)<!-- VERSION:END -->/.exec(readme);
+    expect(badge, "README 的 Version 徽章没找到——格式变了？").toBeTruthy();
+    expect(alt, "README 的徽章 alt 文本没找到").toBeTruthy();
+    expect(marker, "README 的 VERSION 标记没找到").toBeTruthy();
+    // All three must agree with each other AND with package.json: a partial bump
+    // (two of three updated) is exactly how a drift looks right before it ships.
+    expect([badge![1], alt![1], marker![1]], "README 里三处版本号互不一致——只改了一部分").toEqual([
+      packageVersion,
+      packageVersion,
+      packageVersion,
+    ]);
+  });
+
   it("allowlist decay: every waiver is still a real mismatch with a real reason", () => {
     // Element ⑤. A waiver whose mismatch got fixed is hiding surface area
     // that should be asserted again; a short reason is a waiver nobody can
