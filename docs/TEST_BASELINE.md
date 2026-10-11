@@ -1,8 +1,8 @@
 # KnowSpace · 测试基线快照
 
 > **文档性质**：重构安全网的权威口径（release plan R3 交付物）
-> **生成时间**：2026-10-08
-> **应用版本**：`2.7.5`
+> **生成时间**：2026-10-11
+> **应用版本**：`2.7.6`
 > **生成方式**：`node scripts/capture-test-baseline.cjs`（自动生成，请勿手工编辑）
 
 ---
@@ -11,9 +11,9 @@
 
 | 项目 | 数值 |
 | :--- | ---: |
-| 测试文件 | **134** |
-| 用例总数 | **1586** |
-| 通过 | 1584 |
+| 测试文件 | **142** |
+| 用例总数 | **1635** |
+| 通过 | 1633 |
 | 失败 | 0 |
 | 跳过 | 2 |
 | 通过率 | 99.9% |
@@ -61,6 +61,7 @@
 | `src/__tests__/mindmap-relations.test.ts` | 12 | ✅ |
 | `src/__tests__/slash-command-trigger.test.ts` | 12 | ✅ |
 | `src/__tests__/scan-notice.test.ts` | 11 | ✅ |
+| `src/__tests__/task-list-toggle.test.ts` | 11 | ✅ |
 | `src/__tests__/chapter-list.test.tsx` | 10 | ✅ |
 | `src/__tests__/editor-context-menu.test.ts` | 10 | ✅ |
 | `src/__tests__/global-shortcuts-hook.test.ts` | 10 | ✅ |
@@ -73,6 +74,7 @@
 | `src/__tests__/flash-capsule.test.ts` | 9 | ✅ |
 | `src/__tests__/graph.test.ts` | 9 | ✅ |
 | `src/__tests__/inflate.test.ts` | 9 | ✅ |
+| `src/__tests__/shell-new-plan.test.ts` | 9 | ✅ |
 | `src/__tests__/zip.test.ts` | 9 | ✅ |
 | `src/__tests__/editor-line-prefix-transform.test.tsx` | 8 | ✅ |
 | `src/__tests__/fsrs-verification.test.ts` | 8 | ✅ |
@@ -118,21 +120,26 @@
 | `src/__tests__/status-bar.test.tsx` | 6 | ✅ |
 | `src/__tests__/sync-selection.test.ts` | 6 | ✅ |
 | `src/__tests__/use-auto-save.test.tsx` | 6 | ✅ |
+| `src/__tests__/about-shell-new-toggle.test.tsx` | 5 | ✅ |
 | `src/__tests__/blocklink.test.ts` | 5 | ✅ |
 | `src/__tests__/book-source.test.ts` | 5 | ✅ |
 | `src/__tests__/css-entry-manifest.test.ts` | 5 | ✅ |
+| `src/__tests__/document-session.test.ts` | 5 | ✅ |
 | `src/__tests__/media-lightbox.test.tsx` | 5 | ✅ |
 | `src/__tests__/mindmap-alignment.test.tsx` | 5 | ✅ |
 | `src/__tests__/mindmap-link-badge.test.tsx` | 5 | ✅ |
 | `src/__tests__/mindmap-numbering.test.ts` | 5 | ✅ |
 | `src/__tests__/mindmap-select-contrast.test.ts` | 5 | ✅ |
+| `src/__tests__/shell-new-parse.test.ts` | 5 | ✅ |
 | `src/__tests__/slash-commands.test.ts` | 5 | ✅ |
+| `src/__tests__/space-timeline-card-open.test.tsx` | 5 | ✅ |
 | `src/__tests__/svg-export.test.ts` | 5 | ✅ |
 | `src/__tests__/vault-opening.test.ts` | 5 | ✅ |
 | `src/__tests__/command-palette.test.ts` | 4 | ✅ |
 | `src/__tests__/css-theme-vocabulary.test.ts` | 4 | ✅ |
 | `src/__tests__/editor-context-menu-component.test.tsx` | 4 | ✅ |
 | `src/__tests__/file-download.test.ts` | 4 | ✅ |
+| `src/__tests__/flash-capsule-persistent-tab.test.tsx` | 4 | ✅ |
 | `src/__tests__/mermaid-service.test.ts` | 4 | ✅ |
 | `src/__tests__/mindmap-palette.test.ts` | 4 | ✅ |
 | `src/__tests__/mindmap-wheel-menu.test.tsx` | 4 | ✅ |
@@ -154,13 +161,14 @@
 | `src/__tests__/mindmap-shortcut-scope.test.tsx` | 3 | ✅ |
 | `src/__tests__/paths.test.ts` | 3 | ✅ |
 | `src/__tests__/search-panel.test.tsx` | 3 | ✅ |
+| `src/__tests__/space-timeline-todo-sync.test.tsx` | 3 | ✅ |
 | `src/__tests__/tab-bar-split.test.tsx` | 3 | ✅ |
 | `src/__tests__/theme-eink.test.ts` | 3 | ✅ |
+| `src/__tests__/vault-opening-space-note.test.ts` | 3 | ✅ |
 | `src/__tests__/mindmap-layout-performance.test.ts` | 2 | ✅ |
 | `src/__tests__/version-history-dialog.test.tsx` | 2 | ✅ |
 | `src/__tests__/bench-render-breakdown.test.ts` | 1 | ✅ |
 | `src/__tests__/bench-vault-parse.test.ts` | 1 | ✅ |
-| `src/__tests__/document-session.test.ts` | 1 | ✅ |
 
 ---
 
@@ -171,7 +179,7 @@
 | 文件 | 当前行数 | 目标 |
 | :--- | ---: | :--- |
 | `src/components/CanvasView.tsx` | 932 | R2 待拆分: 目标各模块 < 2500 行 |
-| `src/App.tsx` | 188 | R1: < 500 行 |
+| `src/App.tsx` | 191 | R1: < 500 行 |
 | `src/services/canvasGraph.ts` | 26 | R2 已拆分 ✅ |
 | `src/services/canvasExport.ts` | 598 | R2 已拆分 ✅ |
 | `src/services/canvasGeometry.ts` | 126 | R2 已拆分 ✅ |
@@ -186,7 +194,7 @@
 
 任何重构都必须满足：
 
-1. 用例总数 **不低于 1586**（删除测试需在 PR 说明中论证）
+1. 用例总数 **不低于 1635**（删除测试需在 PR 说明中论证）
 2. 通过率 **100%**
 3. 单文件用例数**不得下降**（防止测试被静默删除）
 

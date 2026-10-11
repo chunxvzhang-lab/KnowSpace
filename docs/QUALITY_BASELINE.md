@@ -1,8 +1,8 @@
 # KnowSpace · 质量棘轮基线
 
 > **文档性质**：代码质量债务的权威口径（与 `TEST_BASELINE.md` 同规格）
-> **生成时间**：2026-10-08
-> **应用版本**：`2.7.5`
+> **生成时间**：2026-10-11
+> **应用版本**：`2.7.6`
 > **生成方式**：`node scripts/quality-ratchet.cjs`（自动生成，**禁止手工编辑**）
 > **判定规则**：CI 中 `--check` 比对，门控指标只许改善不许恶化；放宽基线必须走评审
 > 并留下记录（改生成脚本的方法论，而不是改本文件）。
@@ -19,7 +19,7 @@
 | `max-file-lines` | 962 | 只减不增（最大单文件行数） |
 | `styles-css-lines` | 1669 | 只减不增（阶段 B：CSS 按**连续前缀**外迁到 src/styles/*.css；回升意味着有人手工折叠了切片，那会改级联） |
 | `undeclared-imports` | 0 | 必须为 0（src 中 import 的第三方包必须在 package.json 显式声明，防幽灵依赖） |
-| `src-lines` | 71249 | 记录趋势，不设闸 |
+| `src-lines` | 71052 | 记录趋势，不设闸 |
 | `test-cases` | 见 `TEST_BASELINE.md` | 只增不减——由测试基线守护，本文件不重复设闸 |
 
 ---
@@ -57,7 +57,7 @@ import 顺序 = 拆分前 styles.css 内的物理顺序；每批只切连续前�
 | `src/styles/dual-split.css`（切片） | 256 |
 | `src/styles/capsule.css`（切片） | 873 |
 | `src/styles/capsule-panel.css`（切片） | 618 |
-| `src/styles/space-timeline.css`（切片） | 658 |
+| `src/styles/space-timeline.css`（切片） | 662 |
 | `src/styles/review-panel.css`（切片） | 511 |
 | `src/styles/backlinks-panel.css`（切片） | 454 |
 | `src/styles/graph.css`（切片） | 893 |
