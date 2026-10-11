@@ -221,6 +221,14 @@ describe("CSS 动画名守卫", () => {
     // 这两个正是本次修的：它们跨区块共用、被 7 处引用，却从未定义过。
     expect(DEFINED.has("fadeIn"), "fadeIn 又没了").toBe(true);
     expect(DEFINED.has("fadeInScale"), "fadeInScale 又没了").toBe(true);
-    expect(REFS.filter((r) => r.name === "fadeIn").length).toBeGreaterThanOrEqual(5);
+    // 下限从 5 改成 4：2026-10-11 删掉了 graph.css 里孤儿弹窗的死规则
+    // `.global-graph-overlay`（它带着一处 `animation: fadeIn`）。那处引用属于
+    // 一个永远匹配不上的选择器，删它不减少任何真实动画——剩下 4 处分别落在
+    // about.css / capsule-panel.css / lightbox.css / mindmap-export.css，都是活规则。
+    //
+    // 这个数字的作用是"别把 fadeIn 整个弄丢"，不是"引用数只增不减"：它挡的是
+    // 锚点消失，不是合法删除。所以跟着事实改，并把为什么写在这里——把 5 硬留在
+    // 那儿只会逼下一个人去删掉这条断言。
+    expect(REFS.filter((r) => r.name === "fadeIn").length).toBeGreaterThanOrEqual(4);
   });
 });

@@ -31,8 +31,14 @@ import { loadAppCssBundle } from "./helpers/loadAppCss";
 
 /** 基线：提交 757a349 状态下、由本文件的 normalize+digest 算出（不是手抄的）。
  *  2026-10-09 更新：闪念时间线卡片新增"双击在阅览页打开"的可点提示样式
- *  （space-timeline.css 的 .space-note-card：cursor / user-select / 悬浮上浮）。 */
-const FROZEN_SHA256 = "48fa134968a6314d2c76a56666e90290406645d9f8a66042a5134ee4ff900884";
+ *  （space-timeline.css 的 .space-note-card：cursor / user-select / 悬浮上浮）。
+ *  2026-10-11 更新：删除关系图旧弹窗留下的死选择器（graph.css 890 → 468 行，
+ *  28 个类名在整个 src/electron 里无任何引用）。这不是"改了样式"，而是删掉
+ *  永远匹配不上的规则——所以摘要变了、外观不该变，两者并不矛盾。证明方式：
+ *  对代码里真实渲染得出的每个元素，比对删除前后**实际生效的声明**（按源码
+ *  顺序），148 个候选元素零差异；同一次比对在选择器文字层面会报出 6 处差异，
+ *  说明这个判据不是恒绿的空转。 */
+const FROZEN_SHA256 = "74adfcc41490d152bb6a2a67e58cab5c9b21f64e028c26ecb52972f566107d84";
 
 function normalize(css: string): string {
   return css
