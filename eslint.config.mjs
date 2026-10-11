@@ -101,15 +101,20 @@ export default tseslint.config(
   },
 
   // ---- Legacy exhaustive-deps whitelist (phase 1 reclaims these) --------
-  // Adding a dependency changes WHEN an effect runs, and in the four biggest
-  // files that timing is load-bearing canvas / review behaviour. Fixing 57
-  // effect declarations in one sweep is exactly the regression risk the plan
-  // forbids (R4), so they are disabled per FILE with a reclaim note: each
-  // extraction in phase 1 batches 1-3 re-enables the rule for its new modules.
-  // Do not add files here; do not extend these after their split lands.
+  // Adding a dependency changes WHEN an effect runs, and in the three remaining
+  // files that timing is load-bearing canvas / mindmap / review behaviour.
+  // Fixing their effect declarations in one sweep is exactly the regression risk
+  // the plan forbids (R4), so they are disabled per FILE with a reclaim note:
+  // each extraction in phase 1 batches 2-3 re-enables the rule for its new
+  // modules. Do not add files here; do not extend these after their split lands.
+  //
+  // `src/App.tsx` was reclaimed on 2026-10-11 (R1 batch B19 / B20 finished the
+  // job): the shell is 191 lines with zero hook calls, so the rule had nothing
+  // left to exempt. Verified before removing - a grep for use{State,Effect,Memo,
+  // Callback,Ref,Reducer,LayoutEffect} in that file returns nothing, and the
+  // shell-boundary guard (app-shell-boundary) fails if state/effects come back.
   {
     files: [
-      "src/App.tsx", // 待拆分: batch 1 (Command Bus + store extraction)
       "src/components/CanvasView.tsx", // 待拆分: batch 2
       "src/components/MindmapView.tsx", // 待拆分: batch 3
       "src/components/DailyReviewPanel.tsx", // 待拆分: batch 3 (review UI split)
