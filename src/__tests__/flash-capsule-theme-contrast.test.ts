@@ -514,10 +514,31 @@ describe("闪念胶囊配色令牌", () => {
     // 2026-10-12 逐主题实算后修掉：描边换成实色 `var(--flash-accent)`
     // （深色 8.19:1、浅色 5.02:1、墨屏 4.65:1）。
     //
+    // 同日第二段：上一笔只修了两个按钮，**同族四个控件漏在外面**——
+    // `.flash-starter-tag` / `.flash-shortcut-badge` / `.flash-tool-tag` 的 base+hover
+    // 淡描边实测 1.19~2.68:1，`.flash-mini-btn.secondary` 的淡白/灰描边同样不达标。
+    // 修法沿用先例（dark/light 实色 accent；eink 用压深的 #6b6152，因为 #b45309
+    // 压在 hover 实色底 #cfc7b5 上只有 2.99:1）。判据集合从 2 个扩到 **10 个**，
+    // 并把 **hover 态一并纳入**——盲区正是"只查基础态"造成的。
+    //
+    // CONTAINER_OF 里没有条目的选择器坐在胶囊面上（`backdropOf` 的默认），
+    // starter/badge/tool 三个标签确实如此——组件里它们不在目录卡内。
+    //
     // 判据是 WCAG 1.4.11 的 3:1：控件轮廓属"非文字内容"，不是正文。
     // 这里自带一个最小的边框取值器（`border` 简写与 `border-color` 都认），
     // 不去扩 `resolveProperty` 的签名——那条路径服务 26 条既有断言，改它风险更大。
-    const RING_SELECTORS = [".flash-mini-btn", ".flash-tool-insert-persistent"];
+    const RING_SELECTORS = [
+      ".flash-mini-btn",
+      ".flash-tool-insert-persistent",
+      ".flash-mini-btn.secondary",
+      ".flash-mini-btn.secondary:hover",
+      ".flash-starter-tag",
+      ".flash-starter-tag:hover",
+      ".flash-shortcut-badge",
+      ".flash-shortcut-badge:hover",
+      ".flash-tool-tag",
+      ".flash-tool-tag:hover",
+    ];
 
     /** 该选择器在某主题下的边框色（`border` 简写里取颜色那一段，或 `border-color`）。 */
     const borderColorOf = (selector: string, theme: ThemeKey): string | null => {
@@ -554,7 +575,7 @@ describe("闪念胶囊配色令牌", () => {
         expect(
           ratio,
           `${selector} 的描边在 ${theme} 下只有 ${ratio.toFixed(2)}:1（需 ≥3）——` +
-            `控件轮廓是"非文字内容"，淡琥珀压在胶囊面上够不到 3:1`,
+            `控件轮廓是"非文字内容"，淡琥珀/淡白压在胶囊面上够不到 3:1`,
         ).toBeGreaterThanOrEqual(3);
       }
     }

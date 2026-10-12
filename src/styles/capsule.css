@@ -223,7 +223,9 @@ body:has(.flash-capsule-overlay) {
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.12);
   color: #f1f5f9;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  /* 描边实色化（同 .flash-mini-btn 的先例）：淡白 0.2 压在胶囊面上深色实测
+     1.88:1，非文字 UI 要求 ≥3:1（WCAG 1.4.11）。 */
+  border: 1px solid var(--flash-accent);
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
@@ -234,14 +236,15 @@ body:has(.flash-capsule-overlay) {
 .flash-shortcut-badge:hover {
   background: rgba(245, 158, 11, 0.25);
   color: var(--flash-accent-on-tint);
-  border-color: rgba(245, 158, 11, 0.5);
+  /* 原 0.5 淡琥珀压在 0.25 琥珀底上实测 2.40:1；实色 accent 后 5.02:1。 */
+  border-color: var(--flash-accent);
 }
 
 .flash-capsule-overlay.theme-light .flash-shortcut-badge,
 [data-theme="light"] .flash-shortcut-badge {
   background: rgba(0, 0, 0, 0.06);
   color: #1e293b;
-  border-color: rgba(0, 0, 0, 0.15);
+  border-color: var(--flash-accent);
   font-weight: 600;
 }
 
@@ -255,7 +258,9 @@ body:has(.flash-capsule-overlay) {
 [data-theme="eink"] .flash-shortcut-badge {
   background: #ded9cd;
   color: #111111;
-  border-color: #8c8273;
+  /* eink 不用 --flash-accent：#b45309 压在浅档 hover 底只有 2.99:1（差 0.01
+     不及格），取同色系压深的 #6b6152 → ded9cd 4.31:1。 */
+  border-color: #6b6152;
   font-weight: 700;
 }
 
@@ -391,7 +396,9 @@ body:has(.flash-capsule-overlay) {
   padding: 3px 8px;
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  /* 描边实色化（同 .flash-mini-btn 的先例）：淡白 0.14 压在胶囊面上深色实测
+     1.56:1，非文字 UI 要求 ≥3:1（WCAG 1.4.11）。 */
+  border: 1px solid var(--flash-accent);
   color: #f1f5f9;
   cursor: pointer;
   white-space: nowrap;
@@ -402,13 +409,14 @@ body:has(.flash-capsule-overlay) {
 .flash-tool-tag:hover {
   background: rgba(255, 255, 255, 0.18);
   color: #ffffff;
-  border-color: rgba(255, 255, 255, 0.28);
+  /* 原 0.28 淡白压在 0.18 白底上实测 2.24:1；实色 accent 后 4.66:1。 */
+  border-color: var(--flash-accent);
 }
 
 .flash-capsule-overlay.theme-light .flash-tool-tag,
 [data-theme="light"] .flash-tool-tag {
   background: rgba(0, 0, 0, 0.05);
-  border-color: rgba(0, 0, 0, 0.12);
+  border-color: var(--flash-accent);
   color: #0f172a;
 }
 
@@ -416,13 +424,15 @@ body:has(.flash-capsule-overlay) {
 [data-theme="light"] .flash-tool-tag:hover {
   background: rgba(0, 0, 0, 0.1);
   color: #000000;
-  border-color: rgba(0, 0, 0, 0.2);
+  border-color: var(--flash-accent);
 }
 
 .flash-capsule-overlay.theme-eink .flash-tool-tag,
 [data-theme="eink"] .flash-tool-tag {
   background: #ded9cd;
-  border-color: #8c8273;
+  /* eink 不用 --flash-accent：#b45309 压在 hover 实色底 #cfc7b5 上只有
+     2.99:1（差 0.01 就是不及格），取同色系压深的 #6b6152 → 3.61:1。 */
+  border-color: #6b6152;
   color: #111111;
   font-weight: 700;
 }

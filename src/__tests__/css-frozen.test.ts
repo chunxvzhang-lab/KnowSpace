@@ -63,8 +63,14 @@ import { loadAppCssBundle } from "./helpers/loadAppCss";
  *  浅色 1.31/1.26、墨屏 1.28/1.23，WCAG 1.4.11 要求 ≥3）——技术债表只算了
  *  浅色/墨屏，误以为深色没问题。换成实色 `var(--flash-accent)` 后
  *  8.19 / 5.02 / 4.65:1。守卫此前只测文字色（`resolveProperty` 只认
- *  color/background），已补一条测描边的。 */
-const FROZEN_SHA256 = "8dff310ac371c648c49dd189e3a806e3de1705c1f241e024e7d1d480318ef300";
+ *  color/background），已补一条测描边的。
+ *  2026-10-12 更新（第五笔，与本笔的 CSS 同提交）：第四笔漏掉的同族描边全部收口。
+ *  `.flash-starter-tag` / `.flash-shortcut-badge` / `.flash-tool-tag`（base+hover）
+ *  与 `.flash-mini-btn.secondary` 的淡描边实测 1.19~2.68:1，同样三主题不达标；
+ *  dark/light 换实色 `var(--flash-accent)`，eink 取压深一档的 `#6b6152`
+ *  （#b45309 压在 hover 实色底 #cfc7b5 上只有 2.99:1）。修后最差面 3.61:1。
+ *  守卫的 RING_SELECTORS 从 2 个扩到 10 个并纳入 hover 态——盲区正是"只查基础态"。 */
+const FROZEN_SHA256 = "1be780a1b19232bf63337f96801d08941605c4d0b4de5df978f1656f4501d303";
 
 function normalize(css: string): string {
   return css

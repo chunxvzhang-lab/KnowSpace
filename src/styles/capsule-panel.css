@@ -234,7 +234,9 @@
 
 .flash-mini-btn.secondary {
   background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.1);
+  /* 同族漏网：上一笔只修了 .flash-mini-btn 主态，secondary 的淡白 0.1 压在
+     目录卡黑洗底上实测 1.30:1，与非文字 UI 的 3:1（WCAG 1.4.11）同样不达标。 */
+  border-color: var(--flash-accent);
   color: var(--flash-hint);
 }
 
@@ -247,7 +249,7 @@
 .flash-capsule-overlay.theme-light .flash-mini-btn.secondary,
 [data-theme="light"] .flash-mini-btn.secondary {
   background: rgba(0, 0, 0, 0.04);
-  border-color: rgba(0, 0, 0, 0.12);
+  border-color: var(--flash-accent);
 }
 
 .flash-capsule-overlay.theme-light .flash-mini-btn.secondary:hover,
@@ -259,7 +261,9 @@
 .flash-capsule-overlay.theme-eink .flash-mini-btn.secondary,
 [data-theme="eink"] .flash-mini-btn.secondary {
   background: #ded9cd;
-  border-color: #8c8273;
+  /* eink 不用 --flash-accent：#b45309 压在 hover 实色底 #cfc7b5 上只有
+     2.99:1（差 0.01 就是不及格），取同色系压深的 #6b6152 → 3.61:1。 */
+  border-color: #6b6152;
 }
 
 .flash-capsule-overlay.theme-eink .flash-mini-btn.secondary:hover,
@@ -348,7 +352,9 @@
   padding: 2px 8px;
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  /* 描边实色化（同 .flash-mini-btn 的先例）：淡白 0.08 压在胶囊面上深色实测
+     1.28:1，非文字 UI 要求 ≥3:1（WCAG 1.4.11）。 */
+  border: 1px solid var(--flash-accent);
   color: #cbd5e1;
   cursor: pointer;
   white-space: nowrap;
@@ -357,13 +363,15 @@
 
 .flash-starter-tag:hover {
   background: rgba(245, 158, 11, 0.18);
-  border-color: rgba(245, 158, 11, 0.35);
+  /* 原 0.35 淡琥珀压在 0.18 琥珀底上实测 2.01:1——三主题全不达标的一族里
+     这一档是 hover 态；实色 accent 后 6.32:1。 */
+  border-color: var(--flash-accent);
   color: var(--flash-accent-on-tint);
 }
 
 [data-theme="light"] .flash-starter-tag {
   background: rgba(0, 0, 0, 0.04);
-  border-color: rgba(0, 0, 0, 0.08);
+  border-color: var(--flash-accent);
   color: #475569;
 }
 
@@ -376,14 +384,16 @@
 .flash-capsule-overlay.theme-eink .flash-starter-tag,
 [data-theme="eink"] .flash-starter-tag {
   background: #ded9cd;
-  border-color: #8c8273;
+  /* eink 不用 --flash-accent：#b45309 压在 hover 实色底 #cfc7b5 上只有
+     2.99:1（差 0.01 就是不及格），取同色系压深的 #6b6152 → ded9cd 4.31 / cfc7b5 3.61。 */
+  border-color: #6b6152;
   color: #111111;
 }
 
 .flash-capsule-overlay.theme-eink .flash-starter-tag:hover,
 [data-theme="eink"] .flash-starter-tag:hover {
   background: #cfc7b5;
-  border-color: #8c8273;
+  border-color: #6b6152;
   color: var(--flash-accent-on-tint);
 }
 
