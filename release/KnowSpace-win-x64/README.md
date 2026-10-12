@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-v2.7.5-1D9BF0?style=flat-square&logo=github" alt="Version 2.7.5" />
+  <img src="https://img.shields.io/badge/Version-v2.7.7-1D9BF0?style=flat-square&logo=github" alt="Version 2.7.7" />
   <img src="https://img.shields.io/badge/Presentation-Mode_2.3_Clockwise_Cycles-8B5CF6?style=flat-square" alt="Presentation Mode 2.3" />
   <img src="https://img.shields.io/badge/FSRS-5_Spaced_Repetition-F59E0B?style=flat-square" alt="FSRS-5 Spaced Repetition" />
   <img src="https://img.shields.io/badge/Mind_Map-Non--Destructive_Sync-00BA7C?style=flat-square" alt="Non-Destructive Mindmap Sync" />
@@ -554,7 +554,7 @@ _高阶空间功能与底层每个交互细节并驾齐驱，构筑全量自动�
 
 > 🌐 **下载入口（永远指向最新版）**：[GitHub Releases](https://github.com/chunxvzhang-lab/KnowSpace/releases/latest)
 >
-> 当前版本 `v<!-- VERSION:BEGIN -->2.7.5<!-- VERSION:END -->`。资产命名规则（版本号即上表中的当前版本）：
+> 当前版本 `v<!-- VERSION:BEGIN -->2.7.7<!-- VERSION:END -->`。资产命名规则（版本号即上表中的当前版本）：
 >
 > - 安装程序：`KnowSpace-Setup-<version>.exe`
 > - MSI 安装包：`KnowSpace-<version>.msi`
