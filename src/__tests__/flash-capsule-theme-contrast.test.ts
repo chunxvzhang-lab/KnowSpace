@@ -502,6 +502,64 @@ describe("闪念胶囊配色令牌", () => {
     }
   });
 
+  it("控件轮廓（border）在三个主题下都达到非文字 UI 的 3:1", () => {
+    // 这一维此前**从未被这条守卫测过**：26 条断言里测的全是**文字色**
+    // （--flash-hint / --flash-accent-on-tint 落在各种底上），而 `resolveProperty`
+    // 本身也只认 `color` / `background`。于是 `.flash-mini-btn` 与
+    // `.flash-tool-insert-persistent` 的描边一直是 `rgba(245,158,11,0.35 / 0.30)`
+    // ——淡琥珀压在胶囊面上，实测深色 2.07 / 1.84、浅色 1.31 / 1.26、
+    // 墨屏 1.28 / 1.23，**三个主题全部低于 3:1**，而守卫全绿。
+    //
+    // 技术债表登记过这一条，但只算了浅色/墨屏，结论是"深色没问题、改轮廓要设计定"。
+    // 2026-10-12 逐主题实算后修掉：描边换成实色 `var(--flash-accent)`
+    // （深色 8.19:1、浅色 5.02:1、墨屏 4.65:1）。
+    //
+    // 判据是 WCAG 1.4.11 的 3:1：控件轮廓属"非文字内容"，不是正文。
+    // 这里自带一个最小的边框取值器（`border` 简写与 `border-color` 都认），
+    // 不去扩 `resolveProperty` 的签名——那条路径服务 26 条既有断言，改它风险更大。
+    const RING_SELECTORS = [".flash-mini-btn", ".flash-tool-insert-persistent"];
+
+    /** 该选择器在某主题下的边框色（`border` 简写里取颜色那一段，或 `border-color`）。 */
+    const borderColorOf = (selector: string, theme: ThemeKey): string | null => {
+      let best: { value: string; weight: number; order: number } | null = null;
+      for (const rule of RULES) {
+        if (!ruleAppliesToTheme(rule.selector, theme)) continue;
+        if (!matchesElement(rule.selector, selector)) continue;
+        const short = declaredValue(rule.body, "border");
+        const long = declaredValue(rule.body, "border-color");
+        // `border: 1px solid <color>` → 取最后一段；`border-color` 直接用。
+        const value =
+          long ?? (short ? short.replace("!important", "").trim().split(/\s+/).pop()! : null);
+        if (value === null) continue;
+        const weight = specificity(rule.selector);
+        if (!best || weight > best.weight || (weight === best.weight && rule.order >= best.order)) {
+          best = { value, weight, order: rule.order };
+        }
+      }
+      return best ? best.value : null;
+    };
+
+    for (const theme of THEME_KEYS) {
+      for (const selector of RING_SELECTORS) {
+        const raw = borderColorOf(selector, theme);
+        expect(
+          raw,
+          `${theme} 解析不到 ${selector} 的边框色（border / border-color）`,
+        ).not.toBeNull();
+        const expanded = expandFlashTokens(raw!.replace("!important", "").trim(), theme);
+        const backdrop = backdropOf(selector, theme);
+        const ring = toRgb(expanded, backdrop);
+        expect(ring, `${selector} 的边框色解析不出颜色: ${raw}`).not.toBeNull();
+        const ratio = contrast(ring!, backdrop);
+        expect(
+          ratio,
+          `${selector} 的描边在 ${theme} 下只有 ${ratio.toFixed(2)}:1（需 ≥3）——` +
+            `控件轮廓是"非文字内容"，淡琥珀压在胶囊面上够不到 3:1`,
+        ).toBeGreaterThanOrEqual(3);
+      }
+    }
+  });
+
   it("每个令牌都是合法的颜色写法（hex 或通道三元组）", () => {
     // 少一个 `#`、写成 `rgb(...)`、或漏了分号，都会让上面的对比度计算悄悄算错。
     // `-rgb` 后缀的令牌是**通道三元组**（供 `rgba(var(--flash-x-rgb), a)` 合成淡底/

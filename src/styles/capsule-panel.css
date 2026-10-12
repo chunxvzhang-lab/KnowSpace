@@ -98,7 +98,9 @@
 
 .flash-tool-insert-persistent {
   background: rgba(245, 158, 11, 0.12) !important;
-  border-color: rgba(245, 158, 11, 0.3) !important;
+  /* 同 .flash-mini-btn：描边换实色。0.30 的淡琥珀三主题实测 1.84 / 1.26 / 1.23:1，
+     全部低于非文字 UI 的 3:1；实色后 8.19 / 5.02 / 4.65:1。 */
+  border-color: var(--flash-accent) !important;
   color: var(--flash-accent-on-tint) !important;
 }
 
@@ -215,7 +217,12 @@
   padding: 3px 8px;
   border-radius: 5px;
   background: rgba(245, 158, 11, 0.18);
-  border: 1px solid rgba(245, 158, 11, 0.35);
+  /* 描边用实色 `--flash-accent`，不用 0.35 的淡琥珀。淡琥珀压在**任何**主题的
+     胶囊面板上都够不到 WCAG 1.4.11 的 3:1（实测深色 2.07:1、浅色 1.31:1、
+     墨屏 1.28:1）——技术债表此前只算了浅色/墨屏，实际三个主题都不达标。
+     换成实色后实测 8.19 / 5.02 / 4.65:1，三主题全过。底保持 0.18：
+     它的角色是"淡琥珀提示"，且文字色本来已达标。 */
+  border: 1px solid var(--flash-accent);
   color: var(--flash-accent-on-tint);
   cursor: pointer;
   transition: all 0.15s ease;

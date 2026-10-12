@@ -56,8 +56,15 @@ import { loadAppCssBundle } from "./helpers/loadAppCss";
  *  实测最差面 ≥3.5:1。新增守卫 `css-color-classes.test.ts` 钉住这类空转（含变异断言）。
  *  **作用域限定在 `.app-shell` 之下**：胶囊窗口也用这两个类名（4 处），但胶囊
  *  **不消费任何全局变量**（规则 9），不加限定会被 `theme-mode` 守卫正确地判为
- *  "胶囊引用了全局变量"——限定之后主窗口 23 处拿到颜色、胶囊 4 处保持原样。 */
-const FROZEN_SHA256 = "7998c1e8205f70e6bfae5ace4b52c6f9adcd1bc44dde82714b8a8c1fc513e3bf";
+ *  "胶囊引用了全局变量"——限定之后主窗口 23 处拿到颜色、胶囊 4 处保持原样。
+ *  2026-10-12 更新（第四笔，与本笔的 CSS 同提交）：胶囊控件轮廓改实色。
+ *  `.flash-mini-btn` 与 `.flash-tool-insert-persistent` 的描边原为
+ *  `rgba(245,158,11,0.35 / 0.30)`，实测**三个主题全不达标**（深色 2.07/1.84、
+ *  浅色 1.31/1.26、墨屏 1.28/1.23，WCAG 1.4.11 要求 ≥3）——技术债表只算了
+ *  浅色/墨屏，误以为深色没问题。换成实色 `var(--flash-accent)` 后
+ *  8.19 / 5.02 / 4.65:1。守卫此前只测文字色（`resolveProperty` 只认
+ *  color/background），已补一条测描边的。 */
+const FROZEN_SHA256 = "8dff310ac371c648c49dd189e3a806e3de1705c1f241e024e7d1d480318ef300";
 
 function normalize(css: string): string {
   return css

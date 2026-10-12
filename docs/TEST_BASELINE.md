@@ -1,7 +1,7 @@
 # KnowSpace · 测试基线快照
 
 > **文档性质**：重构安全网的权威口径（release plan R3 交付物）
-> **生成时间**：2026-10-11
+> **生成时间**：2026-10-12
 > **应用版本**：`2.7.6`
 > **生成方式**：`node scripts/capture-test-baseline.cjs`（自动生成，请勿手工编辑）
 
@@ -12,8 +12,8 @@
 | 项目 | 数值 |
 | :--- | ---: |
 | 测试文件 | **144** |
-| 用例总数 | **1664** |
-| 通过 | 1662 |
+| 用例总数 | **1665** |
+| 通过 | 1663 |
 | 失败 | 0 |
 | 跳过 | 2 |
 | 通过率 | 99.9% |
@@ -40,7 +40,7 @@
 | `src/__tests__/mindmap-reparent.test.ts` | 32 | ✅ |
 | `src/__tests__/review-sources.test.tsx` | 29 | ✅ |
 | `src/__tests__/mindmap-themes.test.ts` | 28 | ✅ |
-| `src/__tests__/flash-capsule-theme-contrast.test.ts` | 26 | ✅ |
+| `src/__tests__/flash-capsule-theme-contrast.test.ts` | 27 | ✅ |
 | `src/__tests__/mindmap-collapse-persistence.test.tsx` | 24 | ✅ |
 | `src/__tests__/mindmap.test.ts` | 23 | ✅ |
 | `src/__tests__/perf-window.test.ts` | 21 | ✅ |
@@ -196,7 +196,7 @@
 
 任何重构都必须满足：
 
-1. 用例总数 **不低于 1664**（删除测试需在 PR 说明中论证）
+1. 用例总数 **不低于 1665**（删除测试需在 PR 说明中论证）
 2. 通过率 **100%**
 3. 单文件用例数**不得下降**（防止测试被静默删除）
 
