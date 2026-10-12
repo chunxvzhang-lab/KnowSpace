@@ -87,7 +87,11 @@ export function FlashHeader(props: {
               : "固定窗口：开启后鼠标点击外部不退出微窗"
           }
         >
-          {isPinned ? <Pin size={15} className="text-orange" /> : <PinOff size={15} />}
+          {/* 图钉不要 `text-orange`：那个类名在胶囊里没有规则（工具类是 `.app-shell`
+              作用域的，而胶囊不消费全局变量——规则 9）。按下时的琥珀色由宿主
+              `.flash-icon-btn.active` 给出，本来就到位；类名留着只会让下一个读代码的
+              人以为它在着色。详见技术债表「闪念胶囊里的死类名」。 */}
+          {isPinned ? <Pin size={15} /> : <PinOff size={15} />}
         </button>
 
         {/* Hotkey Badge */}

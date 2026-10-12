@@ -70,7 +70,9 @@ export function FlashSettingsDrawer(props: {
         <div className="flash-dir-settings-card">
           <div className="flash-dir-settings-top">
             <span className="flash-dir-label">
-              <Folder size={13} className="text-orange" />
+              {/* 不要 `text-orange`：胶囊里没有这个类名的规则，图标与标签文字同色
+                  （宿主 `.flash-dir-label` 的 `#cbd5e1`）是这里的既有设计。 */}
+              <Folder size={13} />
               <strong>Space 存储目录：</strong>
             </span>
             <span

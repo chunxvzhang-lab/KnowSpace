@@ -120,15 +120,24 @@ function sitesIn(text: string, file: string): Site[] {
 }
 
 /**
- * 已知的**刻意不覆盖**站点：闪念胶囊窗口。
+ * 闪念胶囊窗口：**一个都不该有**着色类名。
  *
- * 胶囊也用这两个类名（图钉 / 模板 / 链接 / 文件夹，共 4 处），但胶囊
- * **不消费任何全局变量**（规则 9：它把 data-theme 写到 documentElement，
- * 读全局令牌会让解析前后外观不一致——`theme-mode.test.ts` 会拦）。所以工具类
- * 限定在 `.app-shell` 之下，胶囊这 4 处保持继承色。
+ * 历史：胶囊曾有 4 处裸用（图钉 / 模板 / 链接 / 文件夹），工具类限定在
+ * `.app-shell` 之下（因为胶囊**不消费任何全局变量**——规则 9，它把 data-theme
+ * 写到 documentElement，读全局令牌会让解析前后外观不一致，`theme-mode.test.ts` 会拦），
+ * 所以那 4 处在胶囊里**永远拿不到颜色**。
  *
- * 列出来而不是"反正扫不到"：这份名单是**账**，胶囊哪天要着色就得在这里加令牌、
- * 而不是悄悄放宽判据。
+ * 2026-10-12 逐处核实后**删掉**，而不是给胶囊补令牌——因为查下来那 4 处要的颜色
+ * 本来就已经到位（或者本就不该有）：
+ *   · FlashHeader 的图钉：只在固定时渲染，而那时按钮必有 `.flash-icon-btn.active`
+ *     ⇒ 琥珀色已经由宿主给出；
+ *   · FlashNoteTab 的模板图标：宿主 `.flash-tool-insert-persistent` 就是
+ *     `--flash-accent-on-tint` 琥珀（`!important`）；
+ *   · FlashNoteTab 的链接图标与 FlashSettingsDrawer 的文件夹：图标与相邻文字**同色**
+ *     是这两处的既有设计（标签组合），不是缺色。
+ * 所以"删掉空转类名"是零视觉变化的正确解；加颜色反而会改变观感。
+ *
+ * 这条判据现在是**禁止**而不是**豁免**：胶囊里再出现这两个类名就是新的静默失效。
  */
 const CAPSULE_FILES = [
   "components/FlashHeader.tsx",
@@ -149,15 +158,10 @@ describe("着色类名守卫（用到的类名必须有规则）", () => {
       ALL_SITES.some((s) => s.siblings.length > 0),
       "扫到的用法全都没有伴随类——扫描器可能只匹配了一种形状",
     ).toBe(true);
-    // 两条边界的反向对照：主窗口站点与胶囊站点都必须被扫到，否则下面的
-    // "胶囊被排除"只是碰巧——范围静默缩小照样全绿。
+    // 主窗口侧必须非空，否则下面的"裸用可兜住"判据在测空气。
     expect(
       ALL_SITES.some((s) => !isCapsuleSite(s.file)),
-      "没扫到任何主窗口站点——排除胶囊后判据会变成空集",
-    ).toBe(true);
-    expect(
-      ALL_SITES.some((s) => isCapsuleSite(s.file)),
-      "没扫到任何胶囊站点——那这条边界就不存在，判据在测空气",
+      "没扫到任何主窗口站点——判据会变成空集",
     ).toBe(true);
   });
 
@@ -183,13 +187,14 @@ describe("着色类名守卫（用到的类名必须有规则）", () => {
     );
   });
 
-  it("胶囊站点确实被排除，且数量对得上（4 处，是账不是漏网）", () => {
+  it("胶囊里一个着色类名都不该有（2026-10-12 清掉 4 处，且不许回来）", () => {
     const capsuleSites = ALL_SITES.filter((s) => isCapsuleSite(s.file));
     expect(
-      capsuleSites.length,
-      `胶囊站点数变了（现在 ${capsuleSites.length} 处）。它刻意不覆盖（规则 9：胶囊不消费全局变量）；` +
-        `若新增了用法，要么同样列进这份账，要么为胶囊自己的 --flash-* 体系补对应令牌`,
-    ).toBe(4);
+      capsuleSites.map((s) => `${s.file}:${s.line} className="${s.cls}"`),
+      "胶囊窗口不消费全局变量（规则 9），工具类又是 .app-shell 作用域的，" +
+        "所以这两个类名在胶囊里永远拿不到颜色——加它就是新的静默失效。" +
+        "要着色请用胶囊自己的 --flash-* 令牌写规则，别写这两个类名",
+    ).toEqual([]);
   });
 
   it("宿主类 + 着色类名的复合用法仍然算生效（不误报）", () => {

@@ -93,7 +93,9 @@ export function FlashNoteTab(props: {
             onClick={onInsertPersistentToNote}
             title="一键插入常驻便签/提示模板内容"
           >
-            <Sparkles size={13} className="text-orange" /> 引用常驻模板
+            {/* 不要 `text-orange`：胶囊里没有这个类名的规则，琥珀色来自宿主
+                `.flash-tool-insert-persistent`（`--flash-accent-on-tint`）。 */}
+            <Sparkles size={13} /> 引用常驻模板
           </button>
         )}
       </div>
@@ -128,7 +130,9 @@ export function FlashNoteTab(props: {
                     onInsertWikiSuggestion(item);
                   }}
                 >
-                  <Link size={12} className="text-cyan" />
+                  {/* 不要 `text-cyan`：胶囊里没有这个类名的规则，图标与相邻文字同色
+                  （宿主 `.flash-wikilink-item` 的 `#f1f5f9`）是这里的既有设计。 */}
+                  <Link size={12} />
                   <span>{item}</span>
                 </button>
               ))}
