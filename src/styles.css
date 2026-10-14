@@ -109,11 +109,19 @@
 
 .canvas-card-markdown blockquote {
   margin: 0.5em 0;
-  padding: 0.25em 0.8em;
-  border-left: 3px solid var(--accent, var(--accent-info));
-  background: rgba(var(--accent-info-rgb), 0.06);
-  border-radius: 0 4px 4px 0;
-  opacity: 0.9;
+  padding: 0 0 0 10px;
+  border-left: 2px solid color-mix(in srgb, var(--accent, var(--accent-info)) 45%, transparent);
+  background: transparent;
+  border-radius: 0;
+  font-family: inherit;
+}
+
+.canvas-card-markdown blockquote > :first-child {
+  margin-top: 0;
+}
+
+.canvas-card-markdown blockquote > :last-child {
+  margin-bottom: 0;
 }
 
 .canvas-card-markdown code {

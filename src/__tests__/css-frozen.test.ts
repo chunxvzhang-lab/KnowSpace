@@ -79,8 +79,11 @@ import { loadAppCssBundle } from "./helpers/loadAppCss";
  *  （`--accent-hover` / `--accent` / `--accent-info`），不写死颜色，深/浅/墨屏
  *  三套自动跟随。**没有改动任何既有选择器**：本批的图谱观感改动全部在
  *  `graphCytoscapeStyle.ts`（Cytoscape 内联样式表，不进 CSS 冻结口径）。
- *  摘要变更 = 新增两条规则，`git diff -- src/styles/graph.css` 可逐行核对。 */
-const FROZEN_SHA256 = "cd5ed64364cfb36ec7dcd31c05cbf71a764c7ceff3a98206a1d871f307a13dae";
+ *  摘要变更 = 新增两条规则，`git diff -- src/styles/graph.css` 可逐行核对。
+ *  v2.7.8+ 块引用样式优化批：`.markdown-body blockquote`（reader.css）与
+ *  `.canvas-card-markdown blockquote`（styles.css）改为标准文本引用形态——细柔
+ *  左竖线、去圆角容器底、锁定正文字体，移除代码块化视觉特征。摘要随之更新。 */
+const FROZEN_SHA256 = "490ba6065a6fa877b959770ccd0f5fda2cb94bede995603c47c84edc38402db6";
 
 function normalize(css: string): string {
   return css
