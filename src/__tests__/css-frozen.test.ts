@@ -69,8 +69,18 @@ import { loadAppCssBundle } from "./helpers/loadAppCss";
  *  与 `.flash-mini-btn.secondary` 的淡描边实测 1.19~2.68:1，同样三主题不达标；
  *  dark/light 换实色 `var(--flash-accent)`，eink 取压深一档的 `#6b6152`
  *  （#b45309 压在 hover 实色底 #cfc7b5 上只有 2.99:1）。修后最差面 3.61:1。
- *  守卫的 RING_SELECTORS 从 2 个扩到 10 个并纳入 hover 态——盲区正是"只查基础态"。 */
-const FROZEN_SHA256 = "1be780a1b19232bf63337f96801d08941605c4d0b4de5df978f1656f4501d303";
+ *  守卫的 RING_SELECTORS 从 2 个扩到 10 个并纳入 hover 态——盲区正是"只查基础态"。
+ *  2026-10-14 更新（图谱性能与可读性批次，与本笔的 CSS 同提交）：新增两条图谱
+ *  头部徽标样式 `.graph-stat-badge-omitted` / `.graph-stat-badge-pending`，配合
+ *  节点上限与搜索防抖两项改动。**为什么必须改 CSS**：节点上限是降级行为，而
+ *  降级如果和普通计数长得一样，用户会以为"这就是全部节点"——那比慢更糟。所以
+ *  省略提示需要一个区别于普通灰色的淡底；搜索防抖同理，需要一个"正在筛选"的
+ *  瞬时提示，否则输入框和画布不一致的那 180ms 看起来像卡住。两条都读主题令牌
+ *  （`--accent-hover` / `--accent` / `--accent-info`），不写死颜色，深/浅/墨屏
+ *  三套自动跟随。**没有改动任何既有选择器**：本批的图谱观感改动全部在
+ *  `graphCytoscapeStyle.ts`（Cytoscape 内联样式表，不进 CSS 冻结口径）。
+ *  摘要变更 = 新增两条规则，`git diff -- src/styles/graph.css` 可逐行核对。 */
+const FROZEN_SHA256 = "cd5ed64364cfb36ec7dcd31c05cbf71a764c7ceff3a98206a1d871f307a13dae";
 
 function normalize(css: string): string {
   return css

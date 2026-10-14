@@ -161,6 +161,25 @@
   border-radius: 0;
 }
 
+/* 节点上限生效时的"已省略 N"提示。
+   它不是普通计数——普通计数是"你看到的就是全部"，这一条是"还有东西没显示"，
+   两者用同一个灰色会让降级看起来像正常状态。所以加一个淡底把它区分开，
+   颜色读主题令牌（`--accent-hover` 是 `--accent` 的加深档，三套主题都定义了），
+   不写死颜色。 */
+.graph-stat-badge-omitted {
+  color: var(--accent-hover);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  padding: 1px 6px;
+  border-radius: 8px;
+}
+
+/* 搜索防抖期间的状态提示：只在输入与画布不一致的那一瞬出现，
+   弱化处理即可——它的职责是"解释刚才那一下为什么还没动"。 */
+.graph-stat-badge-pending {
+  color: var(--accent-info);
+  opacity: 0.85;
+}
+
 /* Toolbar */
 .graph-search-input {
   border: none;

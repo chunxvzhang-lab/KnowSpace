@@ -65,6 +65,9 @@ export function GraphViewPane({
     setClusterByFolder,
     crossFolderOnly,
     setCrossFolderOnly,
+    limitNodes,
+    setLimitNodes,
+    isSearchPending,
     filteredData,
     clearForFocus,
   } = useGraphFilters({ graphData, currentDocId });
@@ -114,6 +117,7 @@ export function GraphViewPane({
     <div className="graph-view-pane" role="region" aria-label="知识网络图谱分栏">
       <GraphPaneHeader
         filteredData={filteredData}
+        isSearchPending={isSearchPending}
         showFilterDrawer={showFilterDrawer}
         setShowFilterDrawer={setShowFilterDrawer}
         handleFocusActive={handleFocusActive}
@@ -148,6 +152,9 @@ export function GraphViewPane({
           setCrossFolderOnly={setCrossFolderOnly}
           hideIsolates={hideIsolates}
           setHideIsolates={setHideIsolates}
+          limitNodes={limitNodes}
+          setLimitNodes={setLimitNodes}
+          omittedNodeCount={filteredData.omittedNodeCount}
         />
       )}
 

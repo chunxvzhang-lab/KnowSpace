@@ -17,6 +17,13 @@ type LocalGraphViewProps = {
   onOpenGlobalGraph?: () => void;
 };
 
+/**
+ * Above this many elements the local graph skips edge drawing while the user
+ * pans or zooms — same rule and same reason as the main pane: below it the skip
+ * is a visible flicker that buys nothing.
+ */
+const HIDE_EDGES_ELEMENT_THRESHOLD = 900;
+
 export function LocalGraphView({
   graphData,
   currentDocId,
@@ -33,6 +40,22 @@ export function LocalGraphView({
     isCurrent: boolean;
     folderGroup?: string;
   } | null>(null);
+
+  /**
+   * The tap handler is read through a ref, not through the effect's dependency
+   * array.
+   *
+   * `onSelectNode` arrives as an inline arrow from `BacklinksPanel`
+   * (`onSelectNode={(docId) => onJumpToSource(docId)}`), so its identity changes
+   * on every render of that panel. It used to sit in the effect's deps, which
+   * meant any panel re-render — a backlink list refresh, a sidebar state change,
+   * the panel's own sub-tab switch — tore down the Cytoscape instance, rebuilt
+   * every element and re-ran the concentric layout. The handler is only ever
+   * called from a tap, long after the effect has run, so reading it through a
+   * ref gives the same behaviour without the rebuild.
+   */
+  const onSelectNodeRef = useRef(onSelectNode);
+  onSelectNodeRef.current = onSelectNode;
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -73,6 +96,7 @@ export function LocalGraphView({
       pixelRatio: "auto",
       boxSelectionEnabled: false,
       autounselectify: true,
+      hideEdgesOnViewport: elements.length > HIDE_EDGES_ELEMENT_THRESHOLD,
       style: [
         {
           selector: "core",
@@ -157,7 +181,7 @@ export function LocalGraphView({
       const node = evt.target;
       const targetId = node.data("id");
       if (targetId) {
-        onSelectNode(targetId);
+        onSelectNodeRef.current(targetId);
       }
     });
 
@@ -201,7 +225,7 @@ export function LocalGraphView({
       cy.destroy();
       cyRef.current = null;
     };
-  }, [graphData, currentDocId, theme, onSelectNode]);
+  }, [graphData, currentDocId, theme]);
 
   const handleResetFit = () => {
     if (cyRef.current) {

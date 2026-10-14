@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo } from "react";
 
 import {
   convertUnlinkedMentionInText,
@@ -289,12 +289,35 @@ export function useBacklinkIndex({
   const isGraphVisible = isGraphPaneOpen || isBacklinksVisible;
   const currentActiveId =
     chapterId || session?.chapterId || session?.absolutePath || session?.fileName;
+
+  /**
+   * The graph is only built while something is actually looking at it.
+   *
+   * `isGraphVisible` already gates this, but the gate was not enough on its own:
+   * `backlinkIndex` is a new object identity on every chunk of the background
+   * vault indexing (`setBacklinkIndex({ ...backlinkIndex })` per chunk in the
+   * effect above), so with the pane open during a large vault's first index the
+   * whole graph was rebuilt — and the whole Cytoscape instance with it — once
+   * per chunk. On a 3,000-note vault that is ~375 rebuilds of an
+   * O(n²)-to-O(n)-per-build structure while the user watches.
+   *
+   * The graph does not need every intermediate state: it needs the current one.
+   * `useDeferredValue` lets React keep the canvas on the previous dataset while
+   * the newer one is being computed, which is the right trade for a background
+   * process the user did not ask for — the pane stays interactive and settles on
+   * the final state. React 19's implementation discards superseded deferred
+   * renders rather than queueing them, so the burst collapses instead of
+   * replaying.
+   */
+  const deferredIndex = useDeferredValue(backlinkIndex);
+  const deferredActiveId = useDeferredValue(currentActiveId);
+
   const graphData = useMemo(() => {
     if (!isGraphVisible) {
       return { nodes: [], edges: [] };
     }
-    return buildGraphDataFromIndex(manifest, backlinkIndex, currentActiveId);
-  }, [isGraphVisible, manifest, backlinkIndex, currentActiveId]);
+    return buildGraphDataFromIndex(manifest, deferredIndex, deferredActiveId);
+  }, [isGraphVisible, manifest, deferredIndex, deferredActiveId]);
 
   const handleJumpToBacklink = useCallback(
     (sourceId: string, line?: number) => {

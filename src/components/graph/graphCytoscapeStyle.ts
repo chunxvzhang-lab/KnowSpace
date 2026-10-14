@@ -24,10 +24,32 @@ export function graphCytoscapeStyle(theme: ThemeMode, clusterByFolder: boolean) 
   // 青色族走 --accent-info 的 TS 镜像表（阶段 C1）；#0284c7 白底不达正文阈值。
   const accentInfo = getAccentInfo(theme, isDark);
 
-  // Obsidian style colors: clean solid nodes without outer border circles
+  /**
+   * Node palette, re-derived 2026-10-14 against measured contrast.
+   *
+   * The previous values were tuned for looks and were never measured against the
+   * canvas. Auditing them (`contrast-audit` probe, same machine) showed the
+   * LIGHT theme's two most common node kinds failing the 3:1 non-text threshold
+   * (WCAG 1.4.11) on the white canvas the pane actually paints:
+   *
+   *     normalBg #94a3b8 on #ffffff = 2.56:1   FAIL
+   *     spaceBg  #f59e0b on #ffffff = 2.15:1   FAIL
+   *
+   * so a plain note's dot and a flash-note's dot were both washing out — the
+   * flash notes (the ones the user is meant to spot) worst of all. The dark and
+   * eink palettes passed and are untouched.
+   *
+   * The replacements keep the same hue family and the same visual weight while
+   * clearing the threshold on white:
+   *   - normalBg: slate-500 instead of slate-400 → 4.76:1 (was 2.56:1)
+   *   - spaceBg:  amber-600 instead of amber-500 → 3.19:1 (was 2.15:1)
+   * `currentBg` (the active document, violet-600) already cleared it at 5.70:1
+   * and is unchanged, so the "active node is the most prominent" hierarchy the
+   * palette is built around still holds: 5.70 > 4.76 > 3.19.
+   */
   const currentBg = isEink ? "#000000" : isDark ? "#8b5cf6" : "#7c3aed"; // Obsidian vivid purple for active node
-  const normalBg = isEink ? "#444444" : isDark ? "#64748b" : "#94a3b8"; // Slate grey for regular notes
-  const spaceBg = isEink ? "#777777" : "#f59e0b"; // Warm amber for space notes
+  const normalBg = isEink ? "#444444" : "#64748b"; // Slate-500: 4.76:1 on white, 3.89:1 on dark
+  const spaceBg = isEink ? "#777777" : isDark ? "#f59e0b" : "#d97706"; // Amber-600 on light: 3.19:1 on white
   const edgeColor = isEink
     ? "rgba(0, 0, 0, 0.4)"
     : isDark
@@ -64,6 +86,19 @@ export function graphCytoscapeStyle(theme: ThemeMode, clusterByFolder: boolean) 
         "text-outline-color": textOutlineColor,
         "text-outline-width": 2,
         "text-outline-opacity": 0.9,
+        /**
+         * Hide labels that would render smaller than this.
+         *
+         * Zoomed out on a large vault every label is a few pixels tall, and
+         * drawing them costs a text layout per node per frame while producing
+         * an illegible smear over the nodes. Cytoscape skips the text draw
+         * entirely below the threshold, which is both faster and clearer —
+         * the shape and colour of the graph are what is readable at that zoom
+         * anyway. Hovering a node and the highlighted neighbourhood still show
+         * their labels, and the threshold is low enough that the default
+         * fitted view of a small graph is unaffected.
+         */
+        "min-zoomed-font-size": 7,
         // 节点必须为标准圆形（Ellipse），尺寸随引用权重适度缩放
         shape: "ellipse",
         width: (ele: any) => {
@@ -132,6 +167,19 @@ export function graphCytoscapeStyle(theme: ThemeMode, clusterByFolder: boolean) 
         "border-width": 2,
         "border-color": isEink ? "#000000" : accentInfo.accent,
         "border-opacity": 0.85,
+        /**
+         * The hovered node keeps its label even when the graph is zoomed out
+         * past `min-zoomed-font-size`.
+         *
+         * Without this the zoom threshold would be a one-way door: at the zoom
+         * levels where labels are suppressed, pointing at a dot would tell the
+         * user nothing about which note it is — the single interaction the
+         * threshold makes most necessary. `min-zoomed-font-size: 0` is
+         * Cytoscape's "never suppress this element" value.
+         */
+        "min-zoomed-font-size": 0,
+        "font-size": "12px",
+        "text-outline-width": 3,
       },
     },
     {
@@ -175,6 +223,10 @@ export function graphCytoscapeStyle(theme: ThemeMode, clusterByFolder: boolean) 
         "background-opacity": 1,
         "border-width": 0,
         "z-index": 999,
+        // The selected node and its neighbourhood are the answer to "what is
+        // this connected to", so their labels must survive the zoom threshold
+        // even when the surrounding labels are suppressed.
+        "min-zoomed-font-size": 0,
       },
     },
     {

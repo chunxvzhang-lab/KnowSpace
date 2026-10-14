@@ -12,11 +12,13 @@ import {
   ZoomOut,
 } from "lucide-react";
 import type { Dispatch, SetStateAction } from "react";
-import type { GraphData } from "../../services/graphService";
+import type { FilteredGraphData } from "../../services/graphService";
 
 type GraphPaneHeaderProps = {
-  /** The filtered dataset; only its node/edge counts are shown as badges. */
-  filteredData: GraphData;
+  /** The filtered dataset; its counts are shown as badges. */
+  filteredData: FilteredGraphData;
+  /** True while the search box holds a value the canvas has not rebuilt for yet. */
+  isSearchPending?: boolean;
   showFilterDrawer: boolean;
   setShowFilterDrawer: Dispatch<SetStateAction<boolean>>;
   /** Refocus the active document (GraphViewPane owns the filter-rollback flow). */
@@ -46,6 +48,7 @@ type GraphPaneHeaderProps = {
  */
 export function GraphPaneHeader({
   filteredData,
+  isSearchPending = false,
   showFilterDrawer,
   setShowFilterDrawer,
   handleFocusActive,
@@ -70,6 +73,26 @@ export function GraphPaneHeader({
         <span className="graph-pane-title">Graph view · 知识网络</span>
         <span className="graph-stat-badge">{filteredData.nodes.length} 节点</span>
         <span className="graph-stat-badge">{filteredData.edges.length} 关联</span>
+        {/*
+          The cap is a degradation, so it is stated rather than hidden. A graph
+          that silently showed 1,500 of 4,000 notes would look like a broken
+          vault, and the number is also the only cue that the "显示全部节点"
+          toggle in the filter drawer has something to reveal.
+        */}
+        {filteredData.omittedNodeCount > 0 && (
+          <span
+            className="graph-stat-badge graph-stat-badge-omitted"
+            title={`为保证交互流畅，已省略 ${filteredData.omittedNodeCount} 个连接较少的节点；可在筛选面板关闭节点上限`}
+          >
+            已省略 {filteredData.omittedNodeCount}
+          </span>
+        )}
+        {/* The search debounce is invisible by design; this is the honest cue. */}
+        {isSearchPending && (
+          <span className="graph-stat-badge graph-stat-badge-pending" title="正在筛选…">
+            筛选中…
+          </span>
+        )}
       </div>
 
       {/* Action Controls */}

@@ -1,5 +1,6 @@
 import type { BookManifest } from "../core/types";
 import type { BacklinkIndexData } from "./backlinkIndex";
+import { applyRepulsion, createRepulsionTree } from "./graphLayout";
 
 export type GraphNodeType = "chapter" | "space";
 
@@ -41,6 +42,26 @@ export type GraphData = {
   edges: GraphEdgeData[];
 };
 
+/**
+ * `GraphData` plus what a filter did to it.
+ *
+ * `filterGraphData` returns this instead of a bare `GraphData` so the pane can
+ * tell the user when it is showing a subset — the node cap is a degradation, and
+ * a silent one would be indistinguishable from a bug. Every existing consumer
+ * reads `.nodes`/`.edges` and is unaffected; the two counts are additive.
+ *
+ * `totalNodeCount` is the size of the base set the filters ran on (after any
+ * hop-depth extraction, before the cap), so `totalNodeCount - nodes.length` is
+ * the number the filters excluded and `omittedNodeCount` is specifically the
+ * number the cap dropped. The header reports the latter.
+ */
+export type FilteredGraphData = GraphData & {
+  /** Size of the pre-cap candidate set. */
+  totalNodeCount: number;
+  /** Nodes the cap excluded. 0 when the cap did not bind. */
+  omittedNodeCount: number;
+};
+
 const stripDocExt = (str: string): string => str.replace(/\.(md|markdown|canvas)$/i, "");
 
 export function extractFolderGroup(path?: string, type?: GraphNodeType): string {
@@ -63,6 +84,86 @@ export function buildGraphDataFromIndex(
   const normTitleToId = new Map<string, string>();
   const normPathToId = new Map<string, string>();
 
+  /**
+   * The path-alias map's "is there already a node whose path is a suffix of
+   * this one, or that this one is a suffix of?" question, answered by index
+   * instead of by a scan.
+   *
+   * `getExistingCanonicalId` used to answer it with
+   * `for (const [np, existingId] of normPathToId.entries())` — one walk of the
+   * whole alias map per candidate node, i.e. O(n²) per build. A CPU profile of
+   * an 8,000-node vault attributed 94.8% of the build's self time (3.5 s of
+   * 3.5 s) to that single loop, because it is reached on every manifest chapter
+   * whose id is not yet known — which is all of them.
+   *
+   * The predicate is a pair of raw `endsWith` tests, and both directions are
+   * answerable from an index built once, in O(path length) per lookup:
+   *   - old `p.endsWith(np)` — np is a suffix of p. Enumerate p's suffixes and
+   *     ask which of them are registered keys (`pathKeyOrder`).
+   *   - old `np.endsWith(p)` — p is a suffix of np. Ask `suffixOrder`, which
+   *     maps every suffix of every registered key to the earliest key having it.
+   *
+   * Equivalence, not just similarity: the old loop returned the FIRST match in
+   * `Map` insertion order, so the lookup resolves the smallest-order candidate
+   * across both directions. An alias key keeps its original order when a later
+   * `set` overwrites its value (which is what `Map.set` does to the map this
+   * mirrors), and the id is re-read from `normPathToId` at lookup time rather
+   * than captured, so an overwritten value is seen exactly as the scan saw it.
+   * Suffixes are enumerated per character, not per `/`-aligned segment, because
+   * the old test was a raw `endsWith` and narrowing it would silently change
+   * which documents deduplicate. `graph-canonical-index.test.ts` pins this
+   * against a reference implementation of the original scan.
+   */
+  const pathKeyOrder = new Map<string, number>();
+  const orderToKey = new Map<number, string>();
+  const suffixOrder = new Map<string, number>();
+  let pathKeyCounter = 0;
+
+  /** Every non-empty suffix of `path`, including `path` itself, shortest last. */
+  const allSuffixes = (path: string): string[] => {
+    const out: string[] = [];
+    for (let i = 0; i < path.length; i++) out.push(path.slice(i));
+    return out;
+  };
+
+  /** Mirrors one `normPathToId.set` into the order map and the suffix index. */
+  const registerPathAlias = (key: string) => {
+    let order = pathKeyOrder.get(key);
+    if (order === undefined) {
+      order = pathKeyCounter++;
+      pathKeyOrder.set(key, order);
+      orderToKey.set(order, key);
+    }
+    for (const suffix of allSuffixes(key)) {
+      const current = suffixOrder.get(suffix);
+      if (current === undefined || order < current) {
+        suffixOrder.set(suffix, order);
+      }
+    }
+  };
+
+  const findAliasByPathSuffix = (p: string): string | null => {
+    let bestOrder = Infinity;
+
+    // (A) a registered alias that is a suffix of p.
+    for (const suffix of allSuffixes(p)) {
+      const order = pathKeyOrder.get(suffix);
+      if (order !== undefined && order < bestOrder) {
+        bestOrder = order;
+      }
+    }
+
+    // (B) a registered alias that has p as a suffix.
+    const orderB = suffixOrder.get(p);
+    if (orderB !== undefined && orderB < bestOrder) {
+      bestOrder = orderB;
+    }
+
+    if (bestOrder === Infinity) return null;
+    const key = orderToKey.get(bestOrder);
+    return key === undefined ? null : (normPathToId.get(key) ?? null);
+  };
+
   const registerNode = (node: GraphNodeData) => {
     nodesMap.set(node.id, node);
     normTitleToId.set(node.id, node.id);
@@ -72,10 +173,12 @@ export function buildGraphDataFromIndex(
     if (node.path) {
       const p = node.path.trim().toLowerCase().replace(/\\/g, "/");
       normPathToId.set(p, node.id);
+      registerPathAlias(p);
       const filename = stripDocExt(p.split("/").pop() || "");
       if (filename) {
         normTitleToId.set(filename, node.id);
         normPathToId.set(filename, node.id);
+        registerPathAlias(filename);
       }
     }
   };
@@ -118,11 +221,11 @@ export function buildGraphDataFromIndex(
       if (filename && normTitleToId.has(filename)) {
         return normTitleToId.get(filename)!;
       }
-      for (const [np, existingId] of normPathToId.entries()) {
-        if (p.endsWith(np) || np.endsWith(p)) {
-          return existingId;
-        }
-      }
+      // Both directions of the old `p.endsWith(np) || np.endsWith(p)` scan,
+      // answered from the suffix index in O(path segments) and still returning
+      // the earliest-registered match the scan would have returned.
+      const aliased = findAliasByPathSuffix(p);
+      if (aliased) return aliased;
     }
     return null;
   };
@@ -354,8 +457,13 @@ export function filterGraphData(
     viewFilter?: "all" | "hubs" | "orphans";
     clusterByFolder?: boolean;
     crossFolderOnly?: boolean;
+    /**
+     * Ceiling on rendered nodes. Omit (or pass `undefined`) for no cap — the
+     * default, so every existing caller keeps its exact previous behaviour.
+     */
+    maxNodes?: number;
   },
-): GraphData {
+): FilteredGraphData {
   const {
     hideIsolates = false,
     query = "",
@@ -405,6 +513,59 @@ export function filterGraphData(
     });
   }
 
+  // ── Node cap ──────────────────────────────────────────────────────────────
+  // A graph the user cannot interact with is worse than a graph that says what
+  // it left out, so above `maxNodes` the pane renders the most connected nodes
+  // and reports the omission in the header rather than hanging.
+  //
+  // The order is deterministic and total: degree descending, then id ascending.
+  // Degree is the informative ranking (a hub is what a map is for), and the id
+  // tiebreak means the same vault always yields the same subset — a cap that
+  // reshuffles on every rebuild would be indistinguishable from a rendering bug.
+  // The active document is always kept, because every filter path in this
+  // function already treats it as pinned and dropping it would break "focus the
+  // current document".
+  let omittedNodeCount = 0;
+  if (typeof options.maxNodes === "number" && filteredNodes.length > options.maxNodes) {
+    const cap = Math.max(1, Math.floor(options.maxNodes));
+    const ranked = filteredNodes
+      .map((node, index) => ({ node, index }))
+      .sort((a, b) => {
+        const da = a.node.inDegree + a.node.outDegree;
+        const db = b.node.inDegree + b.node.outDegree;
+        if (da !== db) return db - da;
+        const ia = a.node.id;
+        const ib = b.node.id;
+        if (ia !== ib) return ia < ib ? -1 : 1;
+        return a.index - b.index;
+      });
+
+    const kept: { node: GraphNodeData; index: number }[] = [];
+    const keptIds = new Set<string>();
+    for (const entry of ranked) {
+      if (kept.length >= cap) break;
+      kept.push(entry);
+      keptIds.add(entry.node.id);
+    }
+    // Pin the active document even if it did not make the cut, displacing the
+    // lowest-ranked kept node so the cap is still honoured exactly.
+    for (let i = 0; i < filteredNodes.length; i++) {
+      const node = filteredNodes[i];
+      if (node.isCurrent && !keptIds.has(node.id)) {
+        const displaced = kept.pop();
+        if (displaced) keptIds.delete(displaced.node.id);
+        kept.push({ node, index: i });
+        keptIds.add(node.id);
+      }
+    }
+
+    omittedNodeCount = filteredNodes.length - kept.length;
+    // Restore the original order by the recorded index — a stable, O(k log k)
+    // sort, not an `indexOf` lookup per comparison (which would be O(k² log k)).
+    kept.sort((a, b) => a.index - b.index);
+    filteredNodes = kept.map((entry) => entry.node);
+  }
+
   const allowedIds = new Set(filteredNodes.map((n) => n.id));
   let filteredEdges = baseData.edges.filter(
     (e) => allowedIds.has(e.source) && allowedIds.has(e.target),
@@ -423,6 +584,8 @@ export function filterGraphData(
   return {
     nodes: filteredNodes,
     edges: filteredEdges,
+    totalNodeCount: baseData.nodes.length,
+    omittedNodeCount,
   };
 }
 
@@ -447,15 +610,79 @@ export function toCytoscapeElements(graphData: GraphData): CytoscapeElement[] {
 }
 
 /**
+ * How many solver iterations a graph of `nodeCount` gets.
+ *
+ * The rule used to be `min(80, max(45, n * 2))`, which is 80 for every graph of
+ * 40 or more nodes — i.e. 80 for every graph the pane ever renders. With the
+ * Barnes-Hut repulsion that is now affordable, but not free: at 3,200 nodes one
+ * layout is still ~1.1 s, and the layout runs synchronously inside the
+ * Cytoscape init effect, so a filter change freezes the app for that long.
+ *
+ * The large-graph budget is therefore spent where it buys something. Small
+ * graphs keep the original 80 — their layout is a couple of milliseconds and
+ * there is no reason to change what users already see. Above
+ * `LARGE_GRAPH_NODE_COUNT` the count tapers to `MIN_LARGE_GRAPH_ITERATIONS`,
+ * which the layout-quality measurement in `graph-performance.test.ts` shows is
+ * where the mean edge-length deviation stops improving materially.
+ */
+export function layoutIterationsFor(nodeCount: number): number {
+  if (nodeCount <= LARGE_GRAPH_NODE_COUNT) {
+    return Math.min(80, Math.max(45, nodeCount * 2));
+  }
+  // Linear taper from 80 down to the floor as the graph grows past the knee.
+  const t = Math.min(1, (nodeCount - LARGE_GRAPH_NODE_COUNT) / (LARGE_GRAPH_NODE_COUNT * 2));
+  return Math.round(80 - t * (80 - MIN_LARGE_GRAPH_ITERATIONS));
+}
+
+/**
+ * Above this node count the iteration budget starts tapering.
+ *
+ * 400 is where the layout first becomes noticeable (77.9 ms measured, i.e.
+ * several dropped frames) while still being small enough that the taper's
+ * quality cost is invisible — a 400-node graph is close to settled well before
+ * 80 iterations.
+ */
+export const LARGE_GRAPH_NODE_COUNT = 400;
+
+/**
+ * The floor the taper approaches.
+ *
+ * Measured (`iter-quality` probe, same machine) on the mean edge-length
+ * deviation from the ideal 110px, and on the minimum node separation — the
+ * layout's legibility contract, since a node's dot is up to 18px across:
+ *
+ *     n=1500   80 iters  246 ms   dev 5.94   minSep 47.4
+ *              60 iters  191 ms   dev 6.21   minSep 33.5   (+4.6% dev)
+ *              45 iters  141 ms   dev 6.48   minSep 30.9   (+9.1% dev)
+ *              30 iters   91 ms   dev 6.98   minSep 23.5   (+17.7% dev)
+ *              12 iters   37 ms   dev 8.51   minSep  3.2   (+43.4% dev, overlapping)
+ *
+ * 45 is the knee: it halves the layout time against 80 while keeping the
+ * separation comfortably above the ~20px where dots start touching. Below it
+ * the deviation climbs steeply for the time it buys, and at 12 the nodes
+ * visibly overlap — a faster layout that produces an unreadable graph is not an
+ * optimisation. `graph-performance.test.ts` pins the separation floor.
+ */
+export const MIN_LARGE_GRAPH_ITERATIONS = 45;
+
+/**
  * Computes an organic, collision-free 2D force layout for knowledge graph nodes.
  * Guarantees that:
  * 1. Linked nodes cluster together naturally.
  * 2. Isolated/sparse nodes spread evenly in a balanced 2D cloud rather than stacking in a 1D column.
  * 3. Bounding boxes are spaced with adequate margin to prevent text label overlap.
- * 4. Runs synchronously in < 3ms for zero-latency, buttery-smooth initialization.
+ * 4. Is deterministic: the same graph lays out the same way on every call.
+ *
+ * Repulsion is exact below `EXACT_REPULSION_MAX_NODES` and Barnes-Hut above it;
+ * the iteration budget tapers for large graphs. See `graphLayout.ts` for the
+ * solver and the measurements behind both thresholds.
+ *
+ * @param iterationsOverride Test-only: run exactly this many iterations. Omit in
+ *   product code so the size-derived budget applies.
  */
 export function computeOrganicGraphPositions(
   graphData: GraphData,
+  iterationsOverride?: number,
 ): Map<string, { x: number; y: number }> {
   const positions = new Map<string, { x: number; y: number }>();
   const n = graphData.nodes.length;
@@ -490,10 +717,18 @@ export function computeOrganicGraphPositions(
   const idealEdgeLength = 110;
   const kGravity = 0.005;
   const minDistance = 95;
-  const minDistanceSq = minDistance * minDistance;
+
+  // The quadtree is allocated once for the whole layout, not once per iteration:
+  // 80 iterations × 3,200 nodes would otherwise hand the GC ~10⁵ short-lived
+  // typed arrays. It is null (and never touched) for graphs small enough to
+  // evaluate repulsion exactly.
+  const repulsionTree = createRepulsionTree(n);
 
   // 3. Fast iterative simulation
-  const iterations = Math.min(80, Math.max(45, n * 2));
+  const iterations =
+    iterationsOverride !== undefined
+      ? Math.max(1, Math.floor(iterationsOverride))
+      : layoutIterationsFor(n);
   for (let step = 0; step < iterations; step++) {
     const progress = step / iterations;
     const alpha = Math.pow(1 - progress, 1.2);
@@ -503,34 +738,12 @@ export function computeOrganicGraphPositions(
       const na = nodes[i];
       na.vx -= na.x * kGravity;
       na.vy -= na.y * kGravity;
-
-      // Coulomb Repulsion between all node pairs
-      for (let j = i + 1; j < n; j++) {
-        const nb = nodes[j];
-        let dx = nb.x - na.x;
-        let dy = nb.y - na.y;
-        let distSq = dx * dx + dy * dy;
-        if (distSq < 1) {
-          dx = (Math.random() - 0.5) * 8;
-          dy = (Math.random() - 0.5) * 8;
-          distSq = dx * dx + dy * dy;
-        }
-
-        const dist = Math.sqrt(distSq);
-        let repForce = (kRepulsion / (distSq + 200)) * alpha;
-        if (distSq < minDistanceSq) {
-          repForce += (minDistance - dist) * 0.8 * alpha;
-        }
-
-        const fx = (dx / dist) * repForce;
-        const fy = (dy / dist) * repForce;
-
-        na.vx -= fx;
-        na.vy -= fy;
-        nb.vx += fx;
-        nb.vy += fy;
-      }
     }
+
+    // Coulomb repulsion. Brute force below EXACT_REPULSION_MAX_NODES (the
+    // original O(n²) loop, unchanged); Barnes-Hut quadtree above it, which is
+    // what keeps a 3,200-node vault from freezing the app for ten seconds.
+    applyRepulsion(nodes, alpha, kRepulsion, minDistance, repulsionTree);
 
     // Hooke Springs pulling along edges
     for (const edge of graphData.edges) {

@@ -1,5 +1,6 @@
 import { Search, X } from "lucide-react";
 import type { Dispatch, SetStateAction } from "react";
+import { DEFAULT_MAX_GRAPH_NODES } from "./useGraphFilters";
 
 type GraphFilterDrawerProps = {
   searchQuery: string;
@@ -16,6 +17,11 @@ type GraphFilterDrawerProps = {
   setCrossFolderOnly: Dispatch<SetStateAction<boolean>>;
   hideIsolates: boolean;
   setHideIsolates: Dispatch<SetStateAction<boolean>>;
+  /** Whether the node cap is applied. */
+  limitNodes: boolean;
+  setLimitNodes: Dispatch<SetStateAction<boolean>>;
+  /** How many nodes the cap dropped in the current view; 0 when it did not bind. */
+  omittedNodeCount: number;
 };
 
 /**
@@ -43,6 +49,9 @@ export function GraphFilterDrawer({
   setCrossFolderOnly,
   hideIsolates,
   setHideIsolates,
+  limitNodes,
+  setLimitNodes,
+  omittedNodeCount,
 }: GraphFilterDrawerProps) {
   return (
     <div className="graph-filter-drawer">
@@ -167,6 +176,24 @@ export function GraphFilterDrawer({
             title="隐藏没有双链关系的独立孤岛节点"
           >
             隐藏孤岛
+          </button>
+          {/*
+            The escape hatch for the node cap. It is a filter-drawer control and
+            not a header button because turning it off is the "show me
+            everything and accept the cost" choice, which is a filtering
+            decision — and the header already states the consequence in nodes.
+          */}
+          <button
+            type="button"
+            className={`graph-filter-pill ${!limitNodes ? "is-active" : ""}`}
+            onClick={() => setLimitNodes(!limitNodes)}
+            title={
+              limitNodes
+                ? `为保证交互流畅，最多渲染 ${DEFAULT_MAX_GRAPH_NODES} 个连接最多的节点（当前已省略 ${omittedNodeCount} 个）；点击显示全部节点`
+                : `已关闭节点上限，全部节点都会渲染；大图谱可能变慢`
+            }
+          >
+            {limitNodes ? "⚡ 节点上限" : "⚡ 全部节点"}
           </button>
         </div>
       </div>
