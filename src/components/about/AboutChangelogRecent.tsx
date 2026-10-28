@@ -12,7 +12,7 @@ export function AboutChangelogRecent() {
     <div className="about-changelog-group">
       <div className="about-changelog-group-label">
         <Sparkles size={12} className="text-cyan" />
-        <span>v2.7.8 知识图谱提速 · 四个实测瓶颈逐个拆掉</span>
+        <span>v2.7.9 文档编辑右键「段落居中」· 选中段落一键居中</span>
       </div>
       <ul className="about-changelog-items">
         <li>
