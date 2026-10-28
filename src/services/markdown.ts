@@ -23,6 +23,7 @@ import {
   rewriteRelativeUrls,
 } from "./markdownDom";
 import { mathPlugin } from "./markdownMath";
+import { alignCenterPlugin } from "./markdownAlign";
 import { blockAnchorPlugin, sourceLineMappingPlugin, wikiLinkPlugin } from "./markdownPlugins";
 import {
   buildBlockPlan,
@@ -110,6 +111,7 @@ export function buildMarkdownIt(onFrontMatter: (frontMatter: string) => void): M
   })
     .use(sourceLineMappingPlugin)
     .use(mathPlugin)
+    .use(alignCenterPlugin)
     .use(blockAnchorPlugin)
     .use(wikiLinkPlugin)
     .use(footnotePlugin)
@@ -335,6 +337,11 @@ function isMermaidFence(language: string): boolean {
   );
 }
 
+export {
+  ALIGN_CENTER_MARKER,
+  hasTrailingAlignMarker,
+  stripTrailingAlignMarker,
+} from "./markdownAlign";
 export { extractExcerpt, findInChapter } from "./markdownSearch";
 export { extractHeadingsFromSource, findHeadingLineInSource } from "./markdownDom";
 export {

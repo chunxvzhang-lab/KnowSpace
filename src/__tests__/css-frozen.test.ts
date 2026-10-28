@@ -82,8 +82,14 @@ import { loadAppCssBundle } from "./helpers/loadAppCss";
  *  摘要变更 = 新增两条规则，`git diff -- src/styles/graph.css` 可逐行核对。
  *  v2.7.8+ 块引用样式优化批：`.markdown-body blockquote`（reader.css）与
  *  `.canvas-card-markdown blockquote`（styles.css）改为标准文本引用形态——细柔
- *  左竖线、去圆角容器底、锁定正文字体，移除代码块化视觉特征。摘要随之更新。 */
-const FROZEN_SHA256 = "490ba6065a6fa877b959770ccd0f5fda2cb94bede995603c47c84edc38402db6";
+ *  左竖线、去圆角容器底、锁定正文字体，移除代码块化视觉特征。摘要随之更新。
+ *  2026-10-28 更新（编辑器右键「段落居中」批，与本笔的 CSS 同提交）：reader.css
+ *  新增一条兜底规则 `.markdown-body [data-align-center="true"] { text-align:center }`。
+ *  为什么必须改 CSS：正文段落靠插件写内联 `style="text-align:center"` 居中，但列表项、
+ *  blockquote 这类容器没有插件渲染器可挂，只能靠这个属性选择器兜底；段落头上这条规则
+ *  也无害（内联 style 已经赢）。**未改动任何既有选择器**——本次样式改动就是新增这一条，
+ *  `git diff -- src/styles/reader.css` 可逐行核对。 */
+const FROZEN_SHA256 = "c8a0d24fe3e5c9090b787cae2c0ced60a0df4b1a29532b7b5a384acca69a15c5";
 
 function normalize(css: string): string {
   return css

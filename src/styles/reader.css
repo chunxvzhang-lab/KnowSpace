@@ -192,6 +192,16 @@
   word-break: normal;
 }
 
+/* Paragraph centering (services/markdownAlign, right-click 段落居中): blocks
+   whose source carried the trailing align marker. The plugin sets
+   `text-align:center` inline for paragraphs/headings/tables; this attribute
+   selector is the fallback for every other container a marker can close
+   (list item, blockquote, etc.) and is harmless where the inline style
+   already won. */
+.markdown-body [data-align-center="true"] {
+  text-align: center;
+}
+
 /* Footnotes (services/markdownFootnotes): superscript references in the
    body and the collected definition list at the document end. */
 .markdown-body .footnote-ref {

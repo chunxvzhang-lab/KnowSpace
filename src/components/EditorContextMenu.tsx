@@ -68,6 +68,7 @@ export const EditorContextMenu = memo(function EditorContextMenu({
     wrapSelection,
     transformLinePrefix,
     insertAtCursor,
+    toggleCenterAlign,
     handleInsertTableDimensions,
     handleCut,
     handleCopy,
@@ -141,6 +142,7 @@ export const EditorContextMenu = memo(function EditorContextMenu({
         handleScheduleClose={handleScheduleClose}
         transformLinePrefix={transformLinePrefix}
         insertAtCursor={insertAtCursor}
+        toggleCenterAlign={toggleCenterAlign}
         handleInsertTableDimensions={handleInsertTableDimensions}
       />
     </>

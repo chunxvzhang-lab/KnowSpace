@@ -12,6 +12,8 @@ import {
   Code,
   Sigma,
   GitFork,
+  AlignCenter,
+  AlignLeft,
 } from "lucide-react";
 import type { SubmenuType } from "./useSubmenuController";
 import { TablePickerPanel } from "./TablePickerPanel";
@@ -28,6 +30,7 @@ type SubmenuPortalsProps = {
     newPrefix: string | ((indent: string, ordinal: number) => string),
   ) => void;
   insertAtCursor: (text: string, cursorRelativeOffset?: number) => void;
+  toggleCenterAlign: () => void;
   handleInsertTableDimensions: (r: number, c: number) => void;
 };
 
@@ -51,6 +54,7 @@ export function SubmenuPortals({
   handleScheduleClose,
   transformLinePrefix,
   insertAtCursor,
+  toggleCenterAlign,
   handleInsertTableDimensions,
 }: SubmenuPortalsProps) {
   return (
@@ -154,6 +158,26 @@ export function SubmenuPortals({
               <Quote size={14} className="menu-icon" />
               <span className="menu-label">转为引用块</span>
               <span className="menu-shortcut">&gt;</span>
+            </button>
+            <button
+              type="button"
+              className="context-menu-item"
+              onClick={toggleCenterAlign}
+              title="将选中段落居中显示"
+            >
+              <AlignCenter size={14} className="menu-icon" />
+              <span className="menu-label">段落居中</span>
+              <span className="menu-shortcut">居中对齐</span>
+            </button>
+            <button
+              type="button"
+              className="context-menu-item"
+              onClick={toggleCenterAlign}
+              title="取消选中段落的居中显示"
+            >
+              <AlignLeft size={14} className="menu-icon" />
+              <span className="menu-label">取消居中</span>
+              <span className="menu-shortcut">左对齐</span>
             </button>
             {/* The cancel the family never had: strip every marker this
                 submenu (and 转为标题) can put on a line. */}

@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import type { EditorView } from "@codemirror/view";
 import { generateMarkdownTable } from "../../services/tableGenerator";
+import { ALIGN_CENTER_MARKER, stripTrailingAlignMarker } from "../../services/markdownAlign";
 
 type UseEditorEditActionsParams = {
   /** The CodeMirror editor the menu was opened on; every action dispatches into it. */
@@ -183,6 +184,55 @@ export function useEditorEditActions({
     [onClose, selection.from, selection.to, view],
   );
 
+  // Toggle paragraph centering over the selected lines (the whole paragraphs
+  // that the selection touches, blank lines skipped). Centering is a
+  // paragraph property, so the marker rides the LAST non-blank line of the
+  // selection's span — exactly where the markdown service's alignCenterPlugin
+  // looks for it (see services/markdownAlign.ts: one shared rule, two sides).
+  // Toggle is a whole-span decision: if the span is already centered, remove
+  // every trailing marker in it; otherwise center it (clearing a stale marker
+  // on the last line first so we never double-append).
+  const toggleCenterAlign = useCallback(() => {
+    const doc = view.state.doc;
+    const startLine = doc.lineAt(selection.from);
+    const endLine = doc.lineAt(selection.to);
+    const changes: { from: number; to: number; insert: string }[] = [];
+
+    // Collect the non-blank lines of the span, in document order.
+    const lines: ReturnType<typeof doc.line>[] = [];
+    for (let l = startLine.number; l <= endLine.number; l++) {
+      const line = doc.line(l);
+      if (line.text.trim() !== "") lines.push(line);
+    }
+    if (lines.length === 0) {
+      onClose();
+      return;
+    }
+
+    const isCentered = lines.some((line) => stripTrailingAlignMarker(line.text) !== line.text);
+    if (isCentered) {
+      // Remove every trailing marker in the span.
+      for (const line of lines) {
+        const stripped = stripTrailingAlignMarker(line.text);
+        if (stripped !== line.text) {
+          changes.push({ from: line.from, to: line.to, insert: stripped });
+        }
+      }
+    } else {
+      // Center: append the marker to the last non-blank line, trimming any
+      // stale marker first (defensive — isCentered already covers this).
+      const last = lines[lines.length - 1];
+      const base = stripTrailingAlignMarker(last.text);
+      changes.push({ from: last.from, to: last.to, insert: `${base} ${ALIGN_CENTER_MARKER}` });
+    }
+
+    if (changes.length > 0) {
+      view.dispatch({ changes });
+      view.focus();
+    }
+    onClose();
+  }, [onClose, selection.from, selection.to, view]);
+
   // Helper: Insert text at current cursor
   const insertAtCursor = useCallback(
     (text: string, cursorRelativeOffset?: number) => {
@@ -313,6 +363,7 @@ export function useEditorEditActions({
     wrapSelection,
     transformLinePrefix,
     insertAtCursor,
+    toggleCenterAlign,
     // Actions
     handleInsertTableDimensions,
     handleCut,
