@@ -15,6 +15,8 @@ import "./styles/reader.css";
 import "./styles/code.css";
 import "./styles/statusbar.css";
 import "./styles/dialogs.css";
+import "./styles/templates.css";
+import "./styles/ai.css";
 import "./styles/search-nav.css";
 import "./styles/gutter.css";
 import "./styles/about.css";

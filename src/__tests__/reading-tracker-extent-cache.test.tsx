@@ -11,7 +11,9 @@
  * getter stubs - the same technique the virtualization DOM tests use.
  */
 import { renderHook } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { EditorState } from "@codemirror/state";
+import type { EditorView } from "@codemirror/view";
 import type { MutableRefObject, RefObject } from "react";
 import { useReadingTracker } from "../hooks/useReadingTracker";
 
@@ -62,6 +64,44 @@ async function actFrame(): Promise<void> {
 }
 
 describe("useReadingTracker extent cache", () => {
+  it("tracks the live editor instead of treating its hidden reader as the document end", async () => {
+    const hiddenReader = document.createElement("div");
+    const scrollDOM = document.createElement("div");
+    Object.defineProperty(scrollDOM, "scrollHeight", { value: 2000 });
+    Object.defineProperty(scrollDOM, "clientHeight", { value: 500 });
+    const state = EditorState.create({ doc: "# first\n\ntext\n\n## second" });
+    const editor = {
+      state,
+      scrollDOM,
+      lineBlockAtHeight: (height: number) => ({ from: height < 900 ? 0 : state.doc.line(5).from }),
+    } as unknown as EditorView;
+    const activeHeadingRef = { current: undefined as string | undefined };
+    const scrollRatioRef = { current: 0 };
+    const onActiveHeadingChange = vi.fn();
+    const { unmount } = renderHook(() =>
+      useReadingTracker({
+        containerRef: { current: hiddenReader },
+        viewMode: "live",
+        editorViewRef: { current: editor },
+        headings: [
+          { id: "first", text: "first", level: 1, line: 1 },
+          { id: "second", text: "second", level: 2, line: 5 },
+        ],
+        activeHeadingRef,
+        scrollRatioRef,
+        onActiveHeadingChange,
+      }),
+    );
+    await actFrame();
+    expect(activeHeadingRef.current).toBe("first");
+    hiddenReader.dispatchEvent(new Event("scroll"));
+    scrollDOM.scrollTop = 1000;
+    scrollDOM.dispatchEvent(new Event("scroll"));
+    await actFrame();
+    expect(activeHeadingRef.current).toBe("second");
+    expect(scrollRatioRef.current).toBeCloseTo(2 / 3);
+    unmount();
+  });
   it("uses the live extent on the first read", async () => {
     const { scroll, scrollRatioRef, unmount } = setup();
     await scroll(450);

@@ -1,5 +1,6 @@
 import { keymap } from "@codemirror/view";
-import type { EditorState } from "@codemirror/state";
+import { Prec, type EditorState } from "@codemirror/state";
+import { syntaxTree } from "@codemirror/language";
 
 /*
  * Enter on a list line continues the list: bullets repeat, ordered numbers
@@ -76,42 +77,48 @@ function parseListLine(line: string): ListLineParts | null {
 }
 
 export function listContinueEdit(state: EditorState): ListContinueEdit | null {
+  if (state.readOnly || state.selection.ranges.length !== 1) return null;
   const selection = state.selection.main;
   if (!selection.empty) return null;
   const from = selection.from;
   const line = state.doc.lineAt(from);
   if (from !== line.to) return null; // mid-line: keep the default split
+  let node = syntaxTree(state).resolveInner(from, -1);
+  for (;;) {
+    if (["FencedCode", "CodeBlock", "HTMLBlock"].includes(node.name)) return null;
+    if (!node.parent) break;
+    node = node.parent;
+  }
   const parts = parseListLine(line.text);
   if (!parts) return null;
   if (parts.content.trim() === "") return { kind: "exit" };
 
-  const ordered = /^\d+[.)]$/.test(parts.marker)
-    ? { digits: parts.marker.slice(0, -1), delim: parts.marker.slice(-1) }
-    : null;
-  const nextMarker = ordered
-    ? `${Number(ordered.digits) + 1}${ordered.delim}`
-    : parts.marker.replace("x", " ").replace("X", " ");
+  const nextMarker = parts.marker
+    .replace(/^\d+(?=[.)])/, (digits) => String(Number(digits) + 1))
+    .replace(/\[[xX]\]/, "[ ]");
   const prefix = `${parts.indent}${nextMarker} `;
   return { kind: "continue", insert: `\n${prefix}`, cursorOffset: 1 + prefix.length };
 }
 
-export const listContinueKeymap = keymap.of([
-  {
-    key: "Enter",
-    run: (view) => {
-      const edit = listContinueEdit(view.state);
-      if (!edit) return false;
-      if (edit.kind === "exit") {
-        const line = view.state.doc.lineAt(view.state.selection.main.from);
-        view.dispatch({ changes: { from: line.from, to: line.to, insert: "" } });
+export const listContinueKeymap = Prec.highest(
+  keymap.of([
+    {
+      key: "Enter",
+      run: (view) => {
+        const edit = listContinueEdit(view.state);
+        if (!edit) return false;
+        if (edit.kind === "exit") {
+          const line = view.state.doc.lineAt(view.state.selection.main.from);
+          view.dispatch({ changes: { from: line.from, to: line.to, insert: "" } });
+          return true;
+        }
+        const from = view.state.selection.main.from;
+        view.dispatch({
+          changes: { from, insert: edit.insert },
+          selection: { anchor: from + edit.cursorOffset },
+        });
         return true;
-      }
-      const from = view.state.selection.main.from;
-      view.dispatch({
-        changes: { from, insert: edit.insert },
-        selection: { anchor: from + edit.cursorOffset },
-      });
-      return true;
+      },
     },
-  },
-]);
+  ]),
+);

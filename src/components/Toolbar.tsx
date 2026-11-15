@@ -15,6 +15,9 @@ import {
   Printer,
   Command,
   History,
+  Files,
+  MoreHorizontal,
+  X,
 } from "lucide-react";
 import type { EditorViewMode, ThemeMode } from "../core/types";
 import { ViewModeControl } from "./ViewModeControl";
@@ -53,6 +56,7 @@ type ToolbarProps = {
   onToggleDirectory?: () => void;
   onAddBookmark: () => void;
   onNewFile?: () => void;
+  onOpenTemplates?: () => void;
   onSave?: () => void;
   canSave?: boolean;
   onOpenMarkdown: (file: File) => void;
@@ -66,6 +70,12 @@ type ToolbarProps = {
 
 export function Toolbar(props: ToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const toolsRef = useRef<HTMLDialogElement | null>(null);
+
+  function toolAction(action: () => void) {
+    toolsRef.current?.close();
+    action();
+  }
 
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.currentTarget.files?.[0];
@@ -93,11 +103,13 @@ export function Toolbar(props: ToolbarProps) {
         {props.onOpenCommandPalette && (
           <button
             aria-label="全局命令面板 (Ctrl+K)"
-            className="icon-button"
+            className="command-button toolbar-command"
             onClick={props.onOpenCommandPalette}
             title="全局命令面板 (Ctrl+K)"
           >
             <Command size={16} />
+            <span className="toolbar-command-label">搜索与命令</span>
+            <kbd className="toolbar-command-key">Ctrl K</kbd>
           </button>
         )}
 
@@ -112,6 +124,18 @@ export function Toolbar(props: ToolbarProps) {
           </button>
         )}
 
+        {props.onOpenTemplates && (
+          <button
+            type="button"
+            aria-label="从模板新建"
+            title="从模板新建"
+            className="icon-button"
+            onClick={props.onOpenTemplates}
+          >
+            <Files size={17} />
+          </button>
+        )}
+
         <button
           aria-label="保存当前文件"
           className={`icon-button ${props.isDirty ? "active highlight" : ""}`}
@@ -122,36 +146,28 @@ export function Toolbar(props: ToolbarProps) {
           <Save size={17} />
         </button>
 
-        {props.onOpenVersionHistory && (
+        <div className="toolbar-navigation" role="group" aria-label="文档导航">
           <button
-            aria-label="版本快照与历史比对 (Ctrl+Shift+H)"
+            type="button"
+            aria-label="上一章"
             className="icon-button"
-            onClick={props.onOpenVersionHistory}
-            title="版本快照与历史比对 (Ctrl+Shift+H)"
+            onClick={props.onPrevious}
+            disabled={!props.canGoPrevious}
+            title="上一篇 (Alt+Left)"
           >
-            <History size={17} />
+            <ChevronLeft size={18} />
           </button>
-        )}
-
-        <button
-          aria-label="上一章"
-          className="icon-button"
-          onClick={props.onPrevious}
-          disabled={!props.canGoPrevious}
-          title="上一篇 (Alt+Left)"
-        >
-          <ChevronLeft size={18} />
-        </button>
-        <button
-          aria-label="下一章"
-          className="icon-button"
-          onClick={props.onNext}
-          disabled={!props.canGoNext}
-          title="下一篇 (Alt+Right)"
-        >
-          <ChevronRight size={18} />
-        </button>
-
+          <button
+            type="button"
+            aria-label="下一章"
+            className="icon-button"
+            onClick={props.onNext}
+            disabled={!props.canGoNext}
+            title="下一篇 (Alt+Right)"
+          >
+            <ChevronRight size={18} />
+          </button>
+        </div>
         <input
           ref={fileInputRef}
           className="visually-hidden"
@@ -159,83 +175,9 @@ export function Toolbar(props: ToolbarProps) {
           accept=".md,.markdown,.canvas,text/markdown,application/json"
           onChange={handleFileChange}
         />
-        <button
-          aria-label="打开文件"
-          className="icon-button"
-          onClick={() => fileInputRef.current?.click()}
-          title="打开单个文件 (Ctrl+O)"
-        >
-          <FileUp size={17} />
-        </button>
-
-        {props.onOpenDirectory ? (
-          <button
-            aria-label="打开 Markdown 目录"
-            className="icon-button"
-            onClick={props.onOpenDirectory}
-            title="打开文档文件夹 (Ctrl+Shift+O)"
-          >
-            <FolderOpen size={17} />
-          </button>
-        ) : null}
-
-        <button
-          aria-label="添加书签"
-          className="icon-button"
-          onClick={props.onAddBookmark}
-          title="添加书签 (Ctrl+B)"
-        >
-          <BookmarkPlus size={17} />
-        </button>
-
-        {props.onToggleTypewriterMode && (
-          <button
-            className={`icon-button ${props.typewriterMode ? "active" : ""}`}
-            onClick={props.onToggleTypewriterMode}
-            aria-label={props.typewriterMode ? "关闭打字机居中滚动" : "开启打字机居中滚动"}
-            title={
-              props.typewriterMode ? "打字机模式：已开启（Alt+T）" : "打字机模式：已关闭（Alt+T）"
-            }
-          >
-            <Eye size={17} />
-          </button>
-        )}
-
-        {props.onToggleLineNumbers && (
-          <button
-            className={`icon-button ${props.showLineNumbers ? "active" : ""}`}
-            onClick={props.onToggleLineNumbers}
-            aria-label={props.showLineNumbers ? "隐藏正文预览行号" : "显示正文预览行号"}
-            title={
-              props.showLineNumbers
-                ? "正文行号：已开启（点击隐藏）"
-                : "正文行号：已隐藏（点击开启）"
-            }
-          >
-            <Hash size={17} />
-          </button>
-        )}
-
-        {/* Only worth offering when there is a folder to apply it to. The
-            preference is stored either way, so a single document opened by
-            itself does not need the control. */}
-        {props.onToggleHiddenFiles && props.hasDirectory && (
-          <button
-            className={`icon-button ${props.showHiddenFiles ? "active" : ""}`}
-            onClick={props.onToggleHiddenFiles}
-            aria-label={props.showHiddenFiles ? "隐藏点开头的文件" : "显示点开头的文件"}
-            title={
-              props.showHiddenFiles
-                ? "隐藏文件：已显示（点击隐藏）"
-                : "隐藏文件：已隐藏（点击显示点开头的文件与文件夹）"
-            }
-          >
-            <Eye size={17} />
-          </button>
-        )}
-
         {props.onToggleFullscreen && (
           <button
+            type="button"
             className={`icon-button ${props.isFullscreen ? "active" : ""}`}
             onClick={props.onToggleFullscreen}
             aria-label={props.isFullscreen ? "退出全屏" : "全屏模式"}
@@ -244,30 +186,116 @@ export function Toolbar(props: ToolbarProps) {
             {props.isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
           </button>
         )}
-
-        {props.onPrint && (
-          <button
-            className="icon-button"
-            onClick={props.onPrint}
-            aria-label="打印与导出高保真 PDF"
-            title="打印与导出高保真 PDF (Ctrl+P)"
-          >
-            <Printer size={17} />
-          </button>
-        )}
-
-        <label className="font-control" title="阅读字号">
-          <Type size={16} />
-          <input
-            aria-label="阅读字号"
-            type="range"
-            min="0.85"
-            max="1.35"
-            step="0.05"
-            value={props.fontScale}
-            onChange={(event) => props.onFontScaleChange(Number(event.currentTarget.value))}
-          />
-        </label>
+        <button
+          type="button"
+          className="icon-button"
+          aria-label="文档工具"
+          title="文档工具：打开、历史、书签与阅读设置"
+          aria-haspopup="dialog"
+          onClick={() => toolsRef.current?.showModal()}
+        >
+          <MoreHorizontal size={19} />
+        </button>
+        <dialog
+          ref={toolsRef}
+          className="toolbar-tools-dialog"
+          aria-labelledby="toolbar-tools-title"
+          onKeyDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) toolsRef.current?.close();
+          }}
+        >
+          <div className="toolbar-tools-heading">
+            <h2 id="toolbar-tools-title">文档工具</h2>
+            <button
+              type="button"
+              className="icon-button"
+              aria-label="关闭文档工具"
+              onClick={() => toolsRef.current?.close()}
+            >
+              <X size={18} />
+            </button>
+          </div>
+          <div className="toolbar-tool-list">
+            <button type="button" onClick={() => toolAction(() => fileInputRef.current?.click())}>
+              <FileUp size={17} />
+              <span>打开文件</span>
+              <kbd>Ctrl+O</kbd>
+            </button>
+            {props.onOpenDirectory && (
+              <button type="button" onClick={() => toolAction(props.onOpenDirectory!)}>
+                <FolderOpen size={17} />
+                <span>打开 Markdown 目录</span>
+              </button>
+            )}
+            {props.onOpenVersionHistory && (
+              <button type="button" onClick={() => toolAction(props.onOpenVersionHistory!)}>
+                <History size={17} />
+                <span>版本快照与历史比对 (Ctrl+Shift+H)</span>
+              </button>
+            )}
+            <button type="button" onClick={() => toolAction(props.onAddBookmark)}>
+              <BookmarkPlus size={17} />
+              <span>添加书签</span>
+              <kbd>Ctrl+B</kbd>
+            </button>
+            {props.onPrint && (
+              <button type="button" onClick={() => toolAction(props.onPrint!)}>
+                <Printer size={17} />
+                <span>打印与导出高保真 PDF</span>
+                <kbd>Ctrl+P</kbd>
+              </button>
+            )}
+          </div>
+          <h3>阅读设置</h3>
+          <div className="toolbar-tool-list">
+            {props.onToggleTypewriterMode && (
+              <button
+                type="button"
+                aria-pressed={Boolean(props.typewriterMode)}
+                onClick={props.onToggleTypewriterMode}
+              >
+                <Eye size={17} />
+                <span>{props.typewriterMode ? "关闭打字机居中滚动" : "开启打字机居中滚动"}</span>
+                <kbd>Alt+T</kbd>
+              </button>
+            )}
+            {props.onToggleLineNumbers && (
+              <button
+                type="button"
+                aria-pressed={Boolean(props.showLineNumbers)}
+                onClick={props.onToggleLineNumbers}
+              >
+                <Hash size={17} />
+                <span>{props.showLineNumbers ? "隐藏正文预览行号" : "显示正文预览行号"}</span>
+              </button>
+            )}
+            {props.onToggleHiddenFiles && props.hasDirectory && (
+              <button
+                type="button"
+                aria-pressed={Boolean(props.showHiddenFiles)}
+                onClick={props.onToggleHiddenFiles}
+              >
+                <Eye size={17} />
+                <span>{props.showHiddenFiles ? "隐藏点开头的文件" : "显示点开头的文件"}</span>
+              </button>
+            )}
+          </div>
+          <label className="font-control" title="阅读字号">
+            <Type size={16} />
+            <span>阅读字号</span>
+            <input
+              aria-label="阅读字号"
+              type="range"
+              min="0.85"
+              max="1.35"
+              step="0.05"
+              value={props.fontScale}
+              onChange={(event) => props.onFontScaleChange(Number(event.currentTarget.value))}
+            />
+            <output>{Math.round(props.fontScale * 100)}%</output>
+          </label>
+        </dialog>
       </div>
     </header>
   );

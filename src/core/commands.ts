@@ -35,7 +35,7 @@ export interface CommandDescriptor {
   category: CommandCategory;
   /**
    * Display metadata only. The actual key binding lives in useGlobalShortcuts;
-   * this string is what the palette shows. Alt+1/2/3 are displayed but not
+   * this string is what the palette shows. Alt+1 is displayed but not
    * bound anywhere yet (pre-existing state, kept honest by this comment).
    */
   shortcut?: string;
@@ -45,24 +45,29 @@ export interface CommandDescriptor {
 
 export const COMMANDS: readonly CommandDescriptor[] = [
   {
+    id: "ai.open",
+    title: "AI 助理",
+    description: "文档问答、选区写作、带来源的资料汇总",
+    category: "写作辅助",
+  },
+  {
+    id: "view.live",
+    title: "切换视图: 实时预览",
+    description: "直接编辑排版后的正文，当前行显示 Markdown 标记",
+    category: "视图与排版",
+  },
+  {
+    id: "view.toggleEditing",
+    title: "切换阅读 / 编辑模式",
+    description: "在阅读视图与实时预览编辑之间切换",
+    shortcut: "Ctrl+E",
+    category: "视图与排版",
+  },
+  {
     id: "view.read",
     title: "切换视图: 阅读模式",
     description: "沉浸式无干扰文档阅读模式",
     shortcut: "Alt+1",
-    category: "视图与排版",
-  },
-  {
-    id: "view.split",
-    title: "切换视图: 双栏实时预览",
-    description: "左侧编辑器，右侧实时渲染与同步滚动",
-    shortcut: "Alt+2",
-    category: "视图与排版",
-  },
-  {
-    id: "view.source",
-    title: "切换视图: 源码编辑",
-    description: "全宽纯净 Markdown 源码编辑模式",
-    shortcut: "Alt+3",
     category: "视图与排版",
   },
   {
@@ -110,6 +115,12 @@ export const COMMANDS: readonly CommandDescriptor[] = [
     title: "新建 Markdown 笔记",
     description: "在当前知识库中创建一个全新空白笔记",
     shortcut: "Ctrl+N",
+    category: "文档操作",
+  },
+  {
+    id: "document.newFromTemplate",
+    title: "从模板新建",
+    description: "浏览 20 个文档模板，预览后新建笔记",
     category: "文档操作",
   },
   {
@@ -206,12 +217,6 @@ export const COMMANDS: readonly CommandDescriptor[] = [
     id: "ui.themeLight",
     title: "视觉主题: 极简纯白 (Light)",
     description: "高对比度纸张级明亮主题",
-    category: "个性化外观",
-  },
-  {
-    id: "ui.themeEink",
-    title: "视觉主题: 电子墨水屏 (E-ink)",
-    description: "纯黑白极简无色差墨水屏质感",
     category: "个性化外观",
   },
   {

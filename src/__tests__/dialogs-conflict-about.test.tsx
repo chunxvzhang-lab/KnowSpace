@@ -122,27 +122,12 @@ describe("Dialogs Sub-function Tests", () => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    /**
-     * The changelog is hand-written, so nothing ties it to the version except a
-     * check like this one — and the badge above it is injected from
-     * package.json. The two drifted: the dialog showed "v2.6.5" next to a
-     * changelog whose newest entry was v2.6.4, and every test still passed,
-     * because the only assertion about the version was that the badge renders
-     * it. Shipping a release whose own "What's New" stops one version short is
-     * invisible from the outside, which is what makes it worth a guard.
-     */
-    it("has a changelog entry for the version being shipped", () => {
+    it("replaces release notes with current product information and model settings", () => {
       const { container } = render(<AboutDialog isOpen={true} onClose={vi.fn()} />);
-
-      const labels = Array.from(
-        container.querySelectorAll(".about-changelog-group-label span"),
-      ).map((node) => node.textContent?.trim() ?? "");
-
-      // 2026-10-10 产品决定：只保留最新版本一节，历史条目移除 —— 恰好一组，
-      // 且它以当前版本号开头（发布时替换本节内容，漂移同样会被抓住）。
-      expect(labels.length).toBe(1);
-      expect(labels[0].startsWith(`v${__APP_VERSION__} `)).toBe(true);
-      expect(labels[0]).toMatch(/^v\d+\.\d+\.\d+ /);
+      expect(container.querySelector(".about-changelog-card")).toBeNull();
+      expect(screen.queryByText(/版本更新日志/)).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "模型接口" }));
+      expect(screen.getByText("请在桌面版中配置模型接口。")).toBeDefined();
     });
   });
 });

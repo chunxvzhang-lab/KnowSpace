@@ -149,6 +149,18 @@ describe("useGlobalShortcuts - desktop wiring", () => {
 });
 
 describe("useGlobalShortcuts - keyboard bindings", () => {
+  it("does not save again when the editor already handled the same key event", () => {
+    const execute = vi.spyOn(commandBus, "execute").mockImplementation(() => {});
+    view = renderHook(() => useGlobalShortcuts(makeParams()));
+    const handled = new KeyboardEvent("keydown", { key: "s", ctrlKey: true, cancelable: true });
+    handled.preventDefault();
+    window.dispatchEvent(handled);
+    expect(execute).not.toHaveBeenCalled();
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "s", ctrlKey: true, cancelable: true }),
+    );
+    expect(execute).toHaveBeenCalledExactlyOnceWith("document.save");
+  });
   let view: View | null = null;
 
   beforeEach(() => {
@@ -169,6 +181,21 @@ describe("useGlobalShortcuts - keyboard bindings", () => {
   }
 
   const press = (options: KeyboardEventInit) => fireEvent.keyDown(window, options);
+
+  it("toggles reading / editing with Ctrl+E and Cmd+E even inside CodeMirror", () => {
+    const execute = renderAndSpy();
+    const editor = document.createElement("div");
+    editor.className = "cm-editor";
+    document.body.append(editor);
+    try {
+      fireEvent.keyDown(editor, { key: "e", ctrlKey: true });
+      fireEvent.keyDown(editor, { key: "e", metaKey: true });
+      expect(execute).toHaveBeenNthCalledWith(1, "view.toggleEditing");
+      expect(execute).toHaveBeenNthCalledWith(2, "view.toggleEditing");
+    } finally {
+      editor.remove();
+    }
+  });
 
   it("saves with Ctrl+S and save-as with Ctrl+Shift+S", () => {
     const execute = renderAndSpy();

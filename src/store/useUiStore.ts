@@ -1,6 +1,8 @@
+import { normalizeThemeMode } from "../services/themeMode";
 import { create } from "zustand";
 import type { LightboxMedia, SidebarTab } from "../core/types";
 import { loadPreferences, savePreferences, type Preferences } from "../services/storage";
+import type { AiMode } from "../types/ai";
 
 /**
  * UI chrome: layout, appearance, modal visibility and transient notices.
@@ -134,8 +136,13 @@ type UiState = {
   lightboxMedia: LightboxMedia | null;
   unsavedDialogOpen: boolean;
   aboutOpen: boolean;
+  aboutTab: "overview" | "model";
   commandPaletteOpen: boolean;
+  templateDialogOpen: boolean;
   versionHistoryOpen: boolean;
+  aiOpen: boolean;
+  aiMode: AiMode;
+  aiPendingDocument: string | null;
 
   // ── Transient feedback ──────────────────────────────────────────────────
   notice: string | null;
@@ -180,8 +187,12 @@ type UiActions = {
   setLightboxMedia: (media: LightboxMedia | null) => void;
   setUnsavedDialogOpen: (open: boolean) => void;
   setAboutOpen: (open: boolean) => void;
+  openModelSettings: () => void;
   setCommandPaletteOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
   setVersionHistoryOpen: (open: boolean) => void;
+  setTemplateDialogOpen: (open: boolean) => void;
+  openAi: (mode?: AiMode) => void;
+  closeAi: () => void;
 
   /**
    * Sets the notice without scheduling anything.
@@ -231,8 +242,13 @@ export const useUiStore = create<UiStore>()((set, get) => ({
   lightboxMedia: null,
   unsavedDialogOpen: false,
   aboutOpen: false,
+  aboutTab: "overview",
   commandPaletteOpen: false,
+  templateDialogOpen: false,
   versionHistoryOpen: false,
+  aiOpen: false,
+  aiMode: "question",
+  aiPendingDocument: null,
 
   notice: null,
 
@@ -276,15 +292,14 @@ export const useUiStore = create<UiStore>()((set, get) => ({
   // side effects is legal but surprising, and it would also make the write run
   // twice when a caller passes one that saves on its own.
   setPreferences: (preferences) => {
-    const next = typeof preferences === "function" ? preferences(get().preferences) : preferences;
+    const value = typeof preferences === "function" ? preferences(get().preferences) : preferences;
+    const next = { ...value, theme: normalizeThemeMode(value.theme) };
     persistPreferences(next);
     set({ preferences: next });
   },
 
   patchPreferences: (patch) => {
-    const next = { ...get().preferences, ...patch };
-    persistPreferences(next);
-    set({ preferences: next });
+    get().setPreferences({ ...get().preferences, ...patch });
   },
 
   toggleTheme: () => {
@@ -312,7 +327,8 @@ export const useUiStore = create<UiStore>()((set, get) => ({
 
   setLightboxMedia: (media) => set({ lightboxMedia: media }),
   setUnsavedDialogOpen: (open) => set({ unsavedDialogOpen: open }),
-  setAboutOpen: (open) => set({ aboutOpen: open }),
+  setAboutOpen: (open) => set({ aboutOpen: open, aboutTab: "overview" }),
+  openModelSettings: () => set({ aboutOpen: true, aboutTab: "model" }),
 
   setCommandPaletteOpen: (open) =>
     set((state) => ({
@@ -320,6 +336,9 @@ export const useUiStore = create<UiStore>()((set, get) => ({
     })),
 
   setVersionHistoryOpen: (open) => set({ versionHistoryOpen: open }),
+  setTemplateDialogOpen: (open) => set({ templateDialogOpen: open }),
+  openAi: (mode = "create") => set({ aiOpen: true, aiMode: mode }),
+  closeAi: () => set({ aiOpen: false }),
 
   setNotice: (message) => set({ notice: message }),
 
@@ -344,6 +363,8 @@ export const useUiStore = create<UiStore>()((set, get) => ({
       unsavedDialogOpen: false,
       aboutOpen: false,
       commandPaletteOpen: false,
+      templateDialogOpen: false,
       versionHistoryOpen: false,
+      aiOpen: false,
     }),
 }));

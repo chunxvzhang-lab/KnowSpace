@@ -40,8 +40,7 @@ export const StatusBar = memo(function StatusBar({
 
   const viewModeLabel: Record<EditorViewMode, string> = {
     read: "阅读视图",
-    split: "分屏协作",
-    source: "源码编辑",
+    live: "实时预览",
     mindmap: "思维导图",
     canvas: "空间白板",
   };

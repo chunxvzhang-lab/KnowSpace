@@ -142,6 +142,8 @@ export function useGlobalShortcuts({
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      // CodeMirror already handles Mod-s; do not dispatch a second disk write.
+      if (event.defaultPrevented) return;
       const target = event.target;
       // For synthetic events dispatched on window/document, target is not an
       // Element and has no closest() — it simply counts as "not editing"
@@ -191,6 +193,18 @@ export function useGlobalShortcuts({
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
         setCommandPaletteOpen((prev) => !prev);
+        return;
+      }
+
+      // Obsidian-style reading / editing toggle, including while the editor has focus.
+      if (
+        (event.ctrlKey || event.metaKey) &&
+        !event.shiftKey &&
+        !event.altKey &&
+        event.key.toLowerCase() === "e"
+      ) {
+        event.preventDefault();
+        commandBus.execute("view.toggleEditing");
         return;
       }
 

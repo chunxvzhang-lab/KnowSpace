@@ -3,6 +3,7 @@
 
 # Build and release outputs
 /dist
+/output/
 /release/*
 # electron-builder's alternate output, used when a file under release/ is held
 # open by something that permits writes but not deletion — the normal pipeline

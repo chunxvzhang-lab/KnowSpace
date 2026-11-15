@@ -6,6 +6,7 @@ import type {
   ManifestScanTruncation,
   ManifestScanUnreadable,
 } from "../core/types";
+import type { AiDesktopAPI } from "./ai";
 
 export type DirectoryOpenResult =
   | { canceled: true }
@@ -105,6 +106,17 @@ export type BeforeCloseData = {
 export type KnowSpaceDesktopAPI = {
   /** Bridge contract version; kept in sync with package.json "version". */
   apiVersion: string;
+
+  ai?: {
+    getSettings: AiDesktopAPI["getSettings"];
+    saveSettings: AiDesktopAPI["saveSettings"];
+    testConnection: AiDesktopAPI["testConnection"];
+    generate: AiDesktopAPI["generate"];
+    cancel: AiDesktopAPI["cancel"];
+    onEvent: AiDesktopAPI["onEvent"];
+    getHistory: AiDesktopAPI["getHistory"];
+    clearHistory: AiDesktopAPI["clearHistory"];
+  };
 
   /** Document and vault IO — channels registered in electron/files.cjs. */
   files: {

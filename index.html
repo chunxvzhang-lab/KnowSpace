@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
     <link rel="icon" type="image/png" href="./icon.png" />
-    <title>KnowSpace · 个人知识工作台</title>
+    <title>KnowSpace · Personal Knowledge Workspace</title>
     <script>
       // 挂载前把主题落到 <html>。
       //
@@ -25,7 +25,7 @@
           var stored = raw && raw.theme;
           if (stored !== null && stored !== undefined) {
             // "dark" 是深色项改名成 "twitter" 之前的旧值（ThemeMode 已不含 "dark"）。
-            theme = stored === "dark" ? "twitter" : stored;
+            theme = stored === "dark" ? "twitter" : stored === "eink" ? "light" : stored;
           }
         } catch (e) {
           // 没有偏好或存储坏了：与 loadPreferences() 的兜底一致，不猜主题。

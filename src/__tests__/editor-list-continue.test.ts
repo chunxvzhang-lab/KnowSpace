@@ -7,6 +7,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { EditorState } from "@codemirror/state";
+import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { listContinueEdit } from "../components/editorListContinue";
 
 function editAt(doc: string, pos: number, selTo = pos) {
@@ -63,5 +64,25 @@ describe("Enter list continuation", () => {
     expect(editAt(doc, 2)).toBeNull(); // mid-line
     expect(editAt("普通段落", 4)).toBeNull(); // not a list
     expect(editAt("- 选区情况", 2, 4)).toBeNull(); // non-empty selection
+  });
+
+  it("does not continue list-shaped text inside fenced or indented code", () => {
+    for (const doc of ["```md\n- code", "    - code"]) {
+      const state = EditorState.create({
+        doc,
+        selection: { anchor: doc.length },
+        extensions: [markdown({ base: markdownLanguage })],
+      });
+      expect(listContinueEdit(state)).toBeNull();
+    }
+  });
+
+  it("increments ordered tasks and resets their checked state", () => {
+    const doc = "9. [X] completed";
+    expect(editAt(doc, doc.length)).toEqual({
+      kind: "continue",
+      insert: "\n10. [ ] ",
+      cursorOffset: 9,
+    });
   });
 });

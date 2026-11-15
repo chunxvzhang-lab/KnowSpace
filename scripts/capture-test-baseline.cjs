@@ -8,6 +8,7 @@
  * the machine-readable result and a human-readable table.
  *
  * Usage:  node scripts/capture-test-baseline.cjs
+ *         node scripts/capture-test-baseline.cjs --report test-baseline.json
  *         node scripts/capture-test-baseline.cjs --check [--report test-baseline.json]
  * Output: test-baseline.json          (raw vitest report, git-ignored)
  *         docs/TEST_BASELINE.md       (committed snapshot)
@@ -29,19 +30,26 @@ const jsonPath = path.join(root, "test-baseline.json");
 const docPath = path.join(root, "docs", "TEST_BASELINE.md");
 
 function runVitest() {
-  const isWin = process.platform === "win32";
+  // A failed launch must never reuse an earlier successful report.
+  fs.rmSync(jsonPath, { force: true });
   const result = spawnSync(
-    isWin ? "npx.cmd" : "npx",
-    ["vitest", "run", "--reporter=json", `--outputFile=${jsonPath}`],
-    { cwd: root, stdio: "inherit", shell: isWin },
+    process.execPath,
+    [
+      path.join(root, "node_modules", "vitest", "vitest.mjs"),
+      "run",
+      "--reporter=json",
+      `--outputFile=${jsonPath}`,
+    ],
+    { cwd: root, stdio: "inherit" },
   );
 
-  if (!fs.existsSync(jsonPath)) {
-    console.error(
-      "\n[baseline] vitest did not produce a JSON report.\n" +
-        "Re-run with:  npx vitest run --reporter=json --outputFile=test-baseline.json",
+  if (result.error || result.status !== 0) {
+    throw new Error(
+      `vitest failed (${result.error?.message ?? `exit ${result.status}`}); baseline unchanged.`,
     );
-    process.exit(result.status ?? 1);
+  }
+  if (!fs.existsSync(jsonPath)) {
+    throw new Error("vitest did not produce a JSON report; baseline unchanged.");
   }
 }
 
@@ -110,7 +118,7 @@ function writeDoc({ rows, totals }) {
     `| 跳过 | ${totals.skipped} |`,
     `| 通过率 | ${totals.tests ? ((totals.passed / totals.tests) * 100).toFixed(1) : "0.0"}% |`,
     "",
-    "> ✅ **口径确认**：`vitest.config.ts` **未配置任何 `exclude`**，因此上述数字是全量真实口径。",
+    "> ✅ **口径确认**：测试收集范围由 `vitest.config.ts` 的 `include` 定义，仅统计项目源码测试；输出目录、发布产物和独立官网不纳入本应用的测试基线。",
     "> 此前文档中出现过的 299 / 379 均为**历史阶段的过时数字**，不是被排除的测试。",
     "",
     "---",
@@ -135,12 +143,12 @@ function writeDoc({ rows, totals }) {
   ];
 
   const targets = [
-    ["src/components/CanvasView.tsx", "R2 待拆分: 目标各模块 < 2500 行"],
+    ["src/components/CanvasView.tsx", "R2: 各模块 < 2500 行"],
     ["src/App.tsx", "R1: < 500 行"],
     ["src/services/canvasGraph.ts", "R2 已拆分 ✅"],
     ["src/services/canvasExport.ts", "R2 已拆分 ✅"],
     ["src/services/canvasGeometry.ts", "R2 已拆分 ✅"],
-    ["src/services/canvasService.ts", "R2 门面（127 行）✅"],
+    ["src/services/canvasService.ts", "R2 门面 ✅"],
     ["src/services/fsrsService.ts", "F1 新增 · 观察项"],
     ["src/components/MindmapView.tsx", "观察项（已达标）"],
     ["src/services/mindmapService.ts", "观察项"],
@@ -160,7 +168,7 @@ function writeDoc({ rows, totals }) {
     "任何重构都必须满足：",
     "",
     `1. 用例总数 **不低于 ${totals.tests}**（删除测试需在 PR 说明中论证）`,
-    "2. 通过率 **100%**",
+    "2. 失败用例 **0**（跳过用例单独记录）",
     "3. 单文件用例数**不得下降**（防止测试被静默删除）",
     "",
     "> 复核方式：改动前后各跑一次 `node scripts/capture-test-baseline.cjs`，对比本文档「按文件分布」表。",
@@ -174,24 +182,28 @@ function writeDoc({ rows, totals }) {
 function main() {
   const checkOnly = process.argv.includes("--check");
   const reportArgIdx = process.argv.indexOf("--report");
-  const reportPath =
-    reportArgIdx !== -1 ? path.resolve(root, process.argv[reportArgIdx + 1]) : null;
-
-  if (checkOnly && reportPath && fs.existsSync(reportPath)) {
-    checkAgainstDoc(JSON.parse(fs.readFileSync(reportPath, "utf8")));
-    return;
+  const reportArg = process.argv[reportArgIdx + 1];
+  if (reportArgIdx !== -1 && (!reportArg || reportArg.startsWith("--"))) {
+    throw new Error("--report requires a file path.");
   }
-  if (checkOnly && reportPath) {
-    console.error(`[baseline] --report file not found: ${reportPath}`);
-    process.exit(1);
-  }
+  const reportPath = reportArgIdx !== -1 ? path.resolve(root, reportArg) : jsonPath;
 
-  if (!checkOnly || !reportPath) {
+  if (reportArgIdx === -1) {
     console.log("[baseline] running the full suite ...\n");
     runVitest();
   }
 
-  const report = JSON.parse(fs.readFileSync(jsonPath, "utf8"));
+  const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+  if (
+    report.success !== true ||
+    !(report.numTotalTests > 0) ||
+    report.numFailedTests !== 0 ||
+    !Array.isArray(report.testResults) ||
+    report.testResults.length === 0 ||
+    report.testResults.some((suite) => suite.status === "failed")
+  ) {
+    throw new Error("report is unsuccessful, empty or contains failed suites; baseline unchanged.");
+  }
   const built = buildReport(report);
 
   if (checkOnly) {
@@ -199,6 +211,7 @@ function main() {
     return;
   }
 
+  if (fs.existsSync(docPath)) checkAgainstDoc(report);
   writeDoc(built);
 
   console.log(
@@ -265,4 +278,9 @@ function checkAgainstDoc(report) {
   );
 }
 
-main();
+try {
+  main();
+} catch (error) {
+  console.error(`[baseline] ${error.message}`);
+  process.exitCode = 1;
+}

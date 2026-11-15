@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
-import { ExternalLink, Github, Check, Copy, X, History } from "lucide-react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { ExternalLink, Github, Check, Copy, X, SlidersHorizontal, Info } from "lucide-react";
 import appLogo from "../assets/icon.png";
 import { AboutFeatureCards } from "./about/AboutFeatureCards";
-import { AboutChangelogRecent } from "./about/AboutChangelogRecent";
+import { AboutModelSettings } from "./about/AboutModelSettings";
+import { useUiStore } from "../store/useUiStore";
 
 type AboutDialogProps = {
   isOpen: boolean;
@@ -10,6 +11,9 @@ type AboutDialogProps = {
 };
 
 export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const tab = useUiStore((s) => s.aboutTab);
+  const setTab = (aboutTab: "overview" | "model") => useUiStore.setState({ aboutTab });
   const [copied, setCopied] = useState(false);
   const [autoLaunch, setAutoLaunch] = useState(false);
   const [runInBackground, setRunInBackground] = useState(true);
@@ -121,13 +125,33 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
 
   useEffect(() => {
     if (!isOpen) return undefined;
+    const previousFocus = document.activeElement;
+    dialogRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         onClose();
       }
+      if (e.key === "Tab") {
+        const controls = dialogRef.current?.querySelectorAll<HTMLElement>(
+          "button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href]",
+        );
+        if (!controls?.length) return;
+        const first = controls[0],
+          last = controls[controls.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      if (previousFocus instanceof HTMLElement) previousFocus.focus();
+    };
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
@@ -140,7 +164,7 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
       aria-modal="true"
       aria-labelledby="about-dialog-title"
     >
-      <div className="about-dialog-card" onClick={(e) => e.stopPropagation()}>
+      <div ref={dialogRef} className="about-dialog-card" onClick={(e) => e.stopPropagation()}>
         {/* Header with Close button */}
         <div className="about-header">
           <div className="about-brand-section">
@@ -149,7 +173,9 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
             </div>
             <div>
               <div className="about-header-title-row">
-                <span className="about-app-name">KnowSpace</span>
+                <span className="about-app-name" id="about-dialog-title">
+                  KnowSpace
+                </span>
                 <span className="about-version-badge">v{__APP_VERSION__}</span>
               </div>
               <p className="about-tagline">Personal Knowledge Workspace · 个人知识工作台</p>
@@ -166,50 +192,59 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
           </button>
         </div>
 
-        {/* Content sections */}
+        <nav className="about-nav" aria-label="关于页签">
+          <button
+            type="button"
+            aria-current={tab === "overview" ? "page" : undefined}
+            onClick={() => setTab("overview")}
+          >
+            <Info size={16} />
+            关于软件
+          </button>
+          <button
+            type="button"
+            aria-current={tab === "model" ? "page" : undefined}
+            onClick={() => setTab("model")}
+          >
+            <SlidersHorizontal size={16} />
+            模型接口
+          </button>
+        </nav>
         <div className="about-body">
-          {/* 1. 品牌 Slogan 与理念 */}
-          <div className="about-card about-slogan-card">
-            <div className="about-slogan-title">Write. Read. Connect. Know.</div>
-            <div className="about-slogan-sub">记录 · 阅读 · 连接 · 认知</div>
-            <p className="about-description" style={{ marginTop: 6 }}>
-              <strong>KnowSpace</strong>{" "}
-              是一款本地优先（Local-First）、现代化高颜值的个人知识工作台。以私密、高效、纯粹为核心，融汇思维导图双端非破坏性同步体系、全景知识图谱与单双击解耦、多模态空间白板、AABB
-              绕障避障寻路算法、F5
-              分镜全屏演示、时间旅行版本快照、毫秒混合检索与块级双向链接，助你构建立体多维的结构化思维空间。
-            </p>
-          </div>
-
-          {/* 2. 版本更新日志 */}
-          <div className="about-card about-changelog-card">
-            <div className="about-card-title">
-              <History size={16} className="about-icon text-blue" />
-              <span>版本更新日志 · What&apos;s New</span>
-              <span className="about-changelog-version-badge">v{__APP_VERSION__}</span>
-            </div>
-            <div className="about-changelog-list">
-              <AboutChangelogRecent />
-            </div>
-          </div>
-
-          {/* 闪念胶囊速记 / 系统偏好 / 视觉构型 / 能力体系 / 仓库 / 作者 / 许可 —
-              the content cards between the changelog and the footer, verbatim
-              into their own component (final trim wave); the settings card's
-              state and bridge writers stay here and arrive as props. */}
-          <AboutFeatureCards
-            autoLaunch={autoLaunch}
-            runInBackground={runInBackground}
-            autoSaveEnabled={autoSaveEnabled}
-            handleToggleAutoLaunch={handleToggleAutoLaunch}
-            handleToggleRunInBackground={handleToggleRunInBackground}
-            handleToggleAutoSave={handleToggleAutoSave}
-            shellNewStatus={shellNewStatus}
-            shellNewMessage={shellNewMessage}
-            handleToggleShellNew={handleToggleShellNew}
-            repoUrl={repoUrl}
-            authorUrl={authorUrl}
-            handleOpenExternal={handleOpenExternal}
-          />
+          {tab === "model" ? (
+            <AboutModelSettings />
+          ) : (
+            <>
+              <section className="about-intro">
+                <p className="about-eyebrow">你的本地知识工作台</p>
+                <h2>记录想法，连接知识。</h2>
+                <p>
+                  用 Markdown 写作，以思维导图整理脉络，在白板上展开想法。AI
+                  助理与你一起阅读、创作与修改。
+                </p>
+                <div className="about-capabilities">
+                  <span>Markdown 写作</span>
+                  <span>思维导图</span>
+                  <span>空间白板</span>
+                  <span>AI 助理</span>
+                </div>
+              </section>
+              <AboutFeatureCards
+                autoLaunch={autoLaunch}
+                runInBackground={runInBackground}
+                autoSaveEnabled={autoSaveEnabled}
+                handleToggleAutoLaunch={handleToggleAutoLaunch}
+                handleToggleRunInBackground={handleToggleRunInBackground}
+                handleToggleAutoSave={handleToggleAutoSave}
+                shellNewStatus={shellNewStatus}
+                shellNewMessage={shellNewMessage}
+                handleToggleShellNew={handleToggleShellNew}
+                repoUrl={repoUrl}
+                authorUrl={authorUrl}
+                handleOpenExternal={handleOpenExternal}
+              />
+            </>
+          )}
         </div>
 
         {/* Footer actions */}
@@ -219,14 +254,7 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps) {
               {copied ? <Check size={14} className="text-green" /> : <Copy size={14} />}
               <span>{copied ? "已复制链接" : "复制仓库地址"}</span>
             </button>
-            <button
-              type="button"
-              className="about-action-btn secondary"
-              onClick={() => handleOpenExternal(`${repoUrl}/releases`)}
-            >
-              <ExternalLink size={14} />
-              <span>版本发布 (Releases)</span>
-            </button>
+
             <button
               type="button"
               className="about-action-btn secondary"

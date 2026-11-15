@@ -205,7 +205,7 @@ describe("App - shell smoke tests", () => {
     // App subscribes to the store and syncs the theme attribute, so changing it
     // from outside the component tree must be reflected.
     await waitFor(() => {
-      expect(document.documentElement.dataset.theme).toBe("eink");
+      expect(document.documentElement.dataset.theme).toBe("light");
     });
   });
 

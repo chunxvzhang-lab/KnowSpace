@@ -9,6 +9,37 @@ const mockTabs: TabItem[] = [
 ];
 
 describe("TabBar Dual Split Context Menu & Indicators", () => {
+  it("switches and focuses tabs with arrows, Home and End without consuming close-button keys", () => {
+    const onSelectTab = vi.fn();
+    render(
+      <TabBar
+        tabs={mockTabs}
+        activeTabId="doc-1"
+        onSelectTab={onSelectTab}
+        onCloseTab={vi.fn()}
+        onCloseOtherTabs={vi.fn()}
+        onCloseRightTabs={vi.fn()}
+      />,
+    );
+    const tabs = screen.getAllByRole("tab");
+    expect(tabs.map((tab) => tab.tabIndex)).toEqual([0, -1, -1]);
+    fireEvent.keyDown(tabs[0], { key: "ArrowLeft" });
+    expect(onSelectTab).toHaveBeenLastCalledWith("doc-3");
+    expect(document.activeElement).toBe(tabs[2]);
+    fireEvent.keyDown(tabs[2], { key: "ArrowRight" });
+    expect(onSelectTab).toHaveBeenLastCalledWith("doc-1");
+    fireEvent.keyDown(tabs[0], { key: "End" });
+    expect(document.activeElement).toBe(tabs[2]);
+    fireEvent.keyDown(tabs[2], { key: "Home" });
+    expect(document.activeElement).toBe(tabs[0]);
+    onSelectTab.mockClear();
+    fireEvent.keyDown(screen.getByRole("button", { name: "关闭 Chapter 1" }), {
+      key: "ArrowRight",
+    });
+    fireEvent.keyDown(tabs[0], { key: "ArrowRight", ctrlKey: true });
+    expect(onSelectTab).not.toHaveBeenCalled();
+  });
+
   it("renders tabs correctly and opens split context menu on right click", () => {
     const onSelectTab = vi.fn();
     const onCloseTab = vi.fn();

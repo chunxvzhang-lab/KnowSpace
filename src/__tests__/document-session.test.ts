@@ -3,6 +3,97 @@ import { renderHook, act } from "@testing-library/react";
 import { useDocumentSession } from "../hooks/useDocumentSession";
 
 describe("src/hooks/useDocumentSession.ts", () => {
+  it.each(["disk failure", "conflict"])("retains unsaved text after %s", async (kind) => {
+    const oldBridge = window.bookMDDesktop;
+    const saveMarkdownFile =
+      kind === "conflict"
+        ? vi.fn().mockResolvedValue({
+            success: false,
+            errorCode: "FILE_CONFLICT",
+            message: "changed on disk",
+            diskVersion: { size: 4, mtimeMs: 2 },
+          })
+        : vi.fn().mockRejectedValue(new Error("disk failure"));
+    Object.assign(window, { bookMDDesktop: { files: { saveMarkdownFile }, system: {} } });
+    try {
+      const { result } = renderHook(() => useDocumentSession());
+      act(() =>
+        result.current.openSession({
+          chapterId: "note",
+          absolutePath: "C:/note.md",
+          fileName: "note.md",
+          baseUrl: "",
+          source: "old",
+          diskVersion: null,
+          writable: true,
+        }),
+      );
+      act(() => result.current.updateSource("unsaved text"));
+      await act(async () => {
+        expect((await result.current.saveSession()).success).toBe(false);
+      });
+      expect(result.current.session?.source).toBe("unsaved text");
+      expect(result.current.session?.savedSource).toBe("old");
+      expect(result.current.isDirty).toBe(true);
+      expect(Boolean(result.current.conflict)).toBe(kind === "conflict");
+    } finally {
+      Object.assign(window, { bookMDDesktop: oldBridge });
+    }
+  });
+
+  it("preserves edits made while saving and does not apply a finished save to another file", async () => {
+    let finishSave!: (value: unknown) => void;
+    const saveMarkdownFile = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          finishSave = resolve;
+        }),
+    );
+    const oldBridge = window.bookMDDesktop;
+    Object.assign(window, { bookMDDesktop: { files: { saveMarkdownFile }, system: {} } });
+    try {
+      const { result } = renderHook(() => useDocumentSession());
+      const open = (id: string) =>
+        result.current.openSession({
+          chapterId: id,
+          absolutePath: `C:/${id}.md`,
+          fileName: `${id}.md`,
+          baseUrl: "",
+          source: id,
+          diskVersion: { size: 1, mtimeMs: 1 },
+          writable: true,
+        });
+      act(() => open("first"));
+      act(() => result.current.updateSource("saved snapshot"));
+      let saving!: ReturnType<typeof result.current.saveSession>;
+      act(() => {
+        saving = result.current.saveSession();
+      });
+      act(() => result.current.updateSource("newer edits"));
+      await act(async () => {
+        finishSave({ success: true, diskVersion: { size: 14, mtimeMs: 2 } });
+        await saving;
+      });
+      expect(result.current.session?.source).toBe("newer edits");
+      expect(result.current.session?.savedSource).toBe("saved snapshot");
+      expect(result.current.isDirty).toBe(true);
+
+      act(() => {
+        saving = result.current.saveSession();
+      });
+      act(() => open("second"));
+      await act(async () => {
+        finishSave({ success: true, diskVersion: { size: 11, mtimeMs: 3 } });
+        await saving;
+      });
+      expect(result.current.session?.source).toBe("second");
+      expect(result.current.session?.savedSource).toBe("second");
+      expect(result.current.isDirty).toBe(false);
+    } finally {
+      Object.assign(window, { bookMDDesktop: oldBridge });
+    }
+  });
+
   it("initializes empty and manages session updates with dirty tracking", async () => {
     const { result } = renderHook(() => useDocumentSession());
 

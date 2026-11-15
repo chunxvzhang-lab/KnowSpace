@@ -156,7 +156,7 @@ export function useMindmapTreeOps({
   setContextMenu,
   editInputRef,
 }: UseMindmapTreeOpsParams) {
-  const lastEmittedSourceRef = useRef<string>("");
+  const lastEmittedSourceRef = useRef<string | undefined>(source);
 
   /**
    * Which side of the root a first-level branch hangs on, in the two-sided layout.
@@ -183,8 +183,9 @@ export function useMindmapTreeOps({
 
   // Keep tree in sync if external document structure changes, while protecting active unsynced mindmap edits
   useEffect(() => {
-    if (source && source.trim() && source !== lastEmittedSourceRef.current) {
+    if (source !== undefined && source !== lastEmittedSourceRef.current) {
       if (!hasUnsyncedChanges) {
+        lastEmittedSourceRef.current = source;
         setTree(parseMarkdownToMindmapTree(source, title));
       }
     }

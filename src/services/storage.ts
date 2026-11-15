@@ -1,3 +1,4 @@
+import { normalizeThemeMode } from "./themeMode";
 import type { Bookmark, ChapterManifest, ReadingPosition, ThemeMode } from "../core/types";
 
 const BOOKMARKS_V1_KEY = "bookmd.bookmarks.v1";
@@ -19,7 +20,10 @@ export const DEFAULT_THEME: ThemeMode = "system";
  * 用 `Map` 而不是对象：存储里的键是用户给的任意字符串，对象查表会摸到
  * `Object.prototype` 上的东西（`"constructor"` 这类），Map 不会。
  */
-export const THEME_ALIASES = new Map<string, ThemeMode>([["dark", "twitter"]]);
+export const THEME_ALIASES = new Map<string, ThemeMode>([
+  ["dark", "twitter"],
+  ["eink", "light"],
+]);
 const MINDMAP_COLLAPSED_KEY = "bookmd.mindmap.collapsed.v1";
 const MINDMAP_THEME_KEY = "bookmd.mindmap.theme.v1";
 const MINDMAP_LAYOUT_KEY = "bookmd.mindmap.layout.v1";
@@ -137,7 +141,10 @@ export function loadPreferences(): Preferences {
 }
 
 export function savePreferences(preferences: Preferences): void {
-  localStorage.setItem(PREFS_KEY, JSON.stringify(preferences));
+  localStorage.setItem(
+    PREFS_KEY,
+    JSON.stringify({ ...preferences, theme: normalizeThemeMode(preferences.theme) }),
+  );
 }
 
 /**

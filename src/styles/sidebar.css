@@ -22,8 +22,8 @@
   min-width: 160px;
   max-width: 480px;
   overflow: auto;
-  padding: 10px 8px;
-  background: var(--surface-2);
+  padding: 18px 10px;
+  background: var(--activity-bg);
   flex-shrink: 0;
 }
 
@@ -73,7 +73,7 @@
   width: 3px;
   left: 1.5px;
   background: var(--accent);
-  box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 70%, transparent);
+  box-shadow: none;
 }
 
 body.is-resizing-col,
@@ -86,10 +86,10 @@ body.is-resizing-col * {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 8px 10px;
+  padding: 2px 10px 16px;
   color: var(--text-muted);
-  font-size: 10.5px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 650;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -155,7 +155,7 @@ body.is-resizing-col * {
   align-items: center;
   gap: 6px;
   width: 100%;
-  min-height: 27px;
+  min-height: 34px;
   margin: 1px 0;
   padding: 4px 8px 4px calc(8px + var(--tree-depth, 0) * 12px);
   border: 0;
@@ -255,7 +255,8 @@ body.is-resizing-col * {
   transition: all 0.15s ease;
 }
 
-.tree-row-wrapper:hover .tree-rename-btn {
+.tree-row-wrapper:hover .tree-rename-btn,
+.tree-row-wrapper:focus-within .tree-rename-btn {
   opacity: 1;
   pointer-events: auto;
 }
@@ -424,7 +425,7 @@ body.is-resizing-col * {
 
 .bookmark-item:hover {
   border-color: var(--border-hover);
-  transform: translateY(-1px);
+  transform: none;
 }
 
 .bookmark-main {
@@ -550,7 +551,7 @@ body.is-resizing-col * {
 .search-result:hover {
   border-color: var(--accent);
   background: var(--surface-2);
-  transform: translateY(-1px);
+  transform: none;
 }
 
 .search-result.active {
@@ -558,7 +559,7 @@ body.is-resizing-col * {
   background: color-mix(in srgb, var(--accent) 12%, var(--surface)) !important;
   box-shadow:
     0 0 0 1.5px var(--accent),
-    0 4px 14px rgba(29, 155, 240, 0.25) !important;
+    0 2px 6px color-mix(in srgb, var(--accent) 10%, transparent) !important;
 }
 
 .search-result-header {
@@ -605,8 +606,8 @@ body.is-resizing-col * {
 .search-line-tag {
   display: inline-flex;
   align-items: center;
-  font-size: 10.5px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 650;
   color: var(--text-muted);
   background: var(--surface-sunken);
   padding: 1px 5px;
@@ -723,7 +724,7 @@ body.is-resizing-col * {
   background: var(--surface-sunken);
   color: var(--accent);
   border-color: var(--accent);
-  transform: translateY(-1px);
+  transform: none;
 }
 
 /* Chapter & Tag Badges in Search Results */
@@ -782,4 +783,42 @@ body.is-resizing-col * {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+/* On narrow windows navigation gets a bounded row above the document.
+   Saved desktop column widths must not squeeze the reader to a few pixels. */
+@media (max-width: 720px) {
+  .workspace:not(:has(> .ai-workspace)) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .workspace:not(:has(> .ai-workspace)) > .chapter-list-container,
+  .workspace:not(:has(> .ai-workspace)) > .chapter-list,
+  .workspace:not(:has(> .ai-workspace)) > .side-panel {
+    grid-row: 1;
+    width: auto !important;
+    min-width: 0;
+    max-width: none;
+    height: min(25dvh, 180px);
+    overflow: auto;
+    border-bottom: 1px solid var(--border);
+  }
+  .workspace:not(:has(> .ai-workspace)) > .layout-resizer {
+    display: none;
+  }
+  .workspace:not(:has(> .ai-workspace)) > .reader-frame {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    min-height: 0;
+  }
+  .workspace:not(:has(> .ai-workspace)):not(:has(> .side-panel)) > .chapter-list-container,
+  .workspace:not(:has(> .ai-workspace)):not(:has(> .side-panel)) > .chapter-list,
+  .workspace:not(:has(> .ai-workspace)):not(:has(> .chapter-list-container, > .chapter-list))
+    > .side-panel {
+    grid-column: 1 / -1;
+  }
+  .workspace:not(:has(> .ai-workspace)) .chapter-list {
+    min-width: 0;
+  }
 }

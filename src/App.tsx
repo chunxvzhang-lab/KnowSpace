@@ -4,6 +4,7 @@ import { SidebarRegion } from "./components/SidebarRegion";
 import { TabBar } from "./components/TabBar";
 import { WorkspaceRouter } from "./components/WorkspaceRouter";
 import { useWorkspaceController } from "./hooks/useWorkspaceController";
+import { AiEntry } from "./components/ai/AiEntry";
 
 /**
  * The shell view (R1 batch B19).
@@ -161,6 +162,15 @@ export function App() {
             openMarkdownDirectory={c.openMarkdownDirectory}
           />
         </section>
+        <AiEntry
+          session={c.doc.session}
+          editorViewRef={c.editorViewRef}
+          onEditDocument={() => c.doc.setViewMode("live")}
+          onUpdateSource={c.doc.updateSource}
+          onViewModeChange={c.doc.setViewMode}
+          onCreateFromTemplate={c.createFromTemplate}
+          onSearchJump={c.handleSearchJump}
+        />
       </AppShellChrome>
 
       {/* Floating surfaces — lightbox, guard dialogs, palette, history, about,
@@ -173,6 +183,7 @@ export function App() {
         activeChapter={c.activeChapter}
         renderedChapter={c.doc.renderedChapter}
         commandActions={c.commandActions}
+        onCreateFromTemplate={c.createFromTemplate}
         onSelectChapter={c.selectChapter}
         onJumpToHeading={(id) => c.jumpToHeading(id, "smooth", true)}
         onSavePending={c.handleDialogSave}

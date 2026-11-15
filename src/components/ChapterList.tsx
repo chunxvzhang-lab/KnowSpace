@@ -116,7 +116,7 @@ export const ChapterList = memo(function ChapterList({
   return (
     <aside className="chapter-list file-tree" aria-label="文档目录">
       <div className="tree-heading">
-        <span>DOCUMENT</span>
+        <span>文档库</span>
         <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
           {onNewMindmap && (
             <button

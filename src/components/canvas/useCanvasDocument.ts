@@ -64,7 +64,7 @@ export function useCanvasDocument({
   // Initialize canvas data
   const [data, setData] = useState<CanvasData>(() => {
     const parsed = parseCanvasData(source);
-    if (parsed.nodes.length > 0) return parsed;
+    if (source.trim()) return parsed;
     return createDefaultCanvas(title);
   });
 
@@ -74,9 +74,7 @@ export function useCanvasDocument({
   useEffect(() => {
     if (source && source !== lastEmittedSourceRef.current) {
       const parsed = parseCanvasData(source);
-      if (parsed.nodes.length > 0 || parsed.edges.length > 0) {
-        setData(parsed);
-      }
+      setData(parsed);
       lastEmittedSourceRef.current = source;
     }
   }, [source]);

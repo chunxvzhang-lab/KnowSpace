@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState } from "react";
-import { EditorState, Compartment, type Extension } from "@codemirror/state";
+import { EditorState, Compartment, Annotation, Prec, type Extension } from "@codemirror/state";
 import {
   EditorView,
   keymap,
@@ -23,25 +23,24 @@ import {
   foldKeymap,
 } from "@codemirror/language";
 import { tags } from "@lezer/highlight";
-import { markdown } from "@codemirror/lang-markdown";
+import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { oneDark } from "@codemirror/theme-one-dark";
 import {
   autocompletion,
   closeBrackets,
   closeBracketsKeymap,
-  startCompletion,
   type CompletionContext,
   type CompletionResult,
 } from "@codemirror/autocomplete";
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
 import type { ThemeMode } from "../core/types";
-import {
-  matchSlashCommands,
-  getCommandTemplate,
-  detectSlashTrigger,
-} from "../services/slashCommands";
+import { slashCommandCompletionSource } from "./editorSlashCommands";
 import { EditorContextMenu } from "./EditorContextMenu";
 import { listContinueKeymap } from "./editorListContinue";
+import { livePreview, livePreviewTheme } from "./editorLivePreview";
+import { useUiStore } from "../store/useUiStore";
+
+const externalDocumentUpdate = Annotation.define<boolean>();
 
 export type WikiLinkTarget = {
   id?: string;
@@ -56,6 +55,7 @@ type EditorPaneProps = {
   theme: ThemeMode;
   fontScale?: number;
   readOnly?: boolean;
+  livePreviewMode?: boolean;
   typewriterMode?: boolean;
   currentFilePath?: string;
   wikiLinkTargets?: WikiLinkTarget[];
@@ -189,49 +189,19 @@ function buildCustomTheme(theme: ThemeMode, fontScale: number, typewriterMode = 
     (theme === "system" &&
       typeof window !== "undefined" &&
       window.matchMedia?.("(prefers-color-scheme: dark)").matches);
-  const isEink = theme === "eink";
-
-  const accentColor = isDarkMode ? "#1d9bf0" : isEink ? "#1a1a1a" : "#d97706";
-  const activeLineIndicator = isDarkMode ? "#1d9bf0" : isEink ? "#9c9586" : "#d97706";
-  const bgColor = isDarkMode ? "#000000" : isEink ? "#f8f6f0" : "#ffffff";
-  const textColor = isDarkMode ? "#f1f5f9" : isEink ? "#1a1a1a" : "#1f2328";
-  const gutterBg = isDarkMode ? "#0a0d12" : isEink ? "#ede8df" : "#ffffff";
-  const gutterColor = isDarkMode ? "#71767b" : isEink ? "#7c776e" : "#64748b";
-  const gutterBorder = isDarkMode
-    ? "1px solid rgba(255, 255, 255, 0.08)"
-    : isEink
-      ? "1px solid #d5cfc0"
-      : "1px solid #e2e8f0";
-  const activeLineBg = isDarkMode
-    ? "rgba(29, 155, 240, 0.16) !important"
-    : isEink
-      ? "#ded9cd !important"
-      : "rgba(245, 158, 11, 0.10) !important";
-  const activeGutterBg = isDarkMode
-    ? "rgba(29, 155, 240, 0.22) !important"
-    : isEink
-      ? "#ded9cd !important"
-      : "rgba(245, 158, 11, 0.16) !important";
-  const activeGutterColor = isDarkMode
-    ? "#1d9bf0 !important"
-    : isEink
-      ? "#1a1a1a !important"
-      : "#d97706 !important";
-  const selectionBg = isDarkMode
-    ? "rgba(29, 155, 240, 0.35) !important"
-    : isEink
-      ? "rgba(0, 0, 0, 0.10) !important"
-      : "rgba(245, 158, 11, 0.25) !important";
-  const matchBg = isDarkMode
-    ? "rgba(29, 155, 240, 0.25) !important"
-    : isEink
-      ? "#d5cebf !important"
-      : "rgba(245, 158, 11, 0.18) !important";
-  const matchOutline = isDarkMode
-    ? "1px solid rgba(29, 155, 240, 0.6) !important"
-    : isEink
-      ? "1px solid #a8a090 !important"
-      : "1px solid rgba(217, 119, 6, 0.45) !important";
+  const accentColor = "var(--accent)";
+  const activeLineIndicator = "var(--border-hover)";
+  const bgColor = "var(--surface)";
+  const textColor = "var(--text)";
+  const gutterBg = "var(--surface)";
+  const gutterColor = "var(--text-muted)";
+  const gutterBorder = "1px solid var(--border)";
+  const activeLineBg = "var(--surface-2) !important";
+  const activeGutterBg = "var(--surface-2) !important";
+  const activeGutterColor = "var(--text) !important";
+  const selectionBg = "color-mix(in srgb, var(--accent) 18%, transparent) !important";
+  const matchBg = "color-mix(in srgb, var(--accent) 12%, transparent) !important";
+  const matchOutline = "1px solid var(--border-hover) !important";
 
   return EditorView.theme(
     {
@@ -313,6 +283,7 @@ export const EditorPane = memo(function EditorPane({
   theme,
   fontScale = 1,
   readOnly = false,
+  livePreviewMode = false,
   typewriterMode = false,
   currentFilePath,
   wikiLinkTargets,
@@ -332,6 +303,7 @@ export const EditorPane = memo(function EditorPane({
   const themeCompartment = useRef(new Compartment());
   const readOnlyCompartment = useRef(new Compartment());
   const fontSizeCompartment = useRef(new Compartment());
+  const editingModeCompartment = useRef(new Compartment());
   const typewriterRafRef = useRef<number | null>(null);
   const currentFilePathRef = useRef(currentFilePath);
   currentFilePathRef.current = currentFilePath;
@@ -349,43 +321,76 @@ export const EditorPane = memo(function EditorPane({
   onEditorViewReadyRef.current = onEditorViewReady;
   const typewriterModeRef = useRef(typewriterMode);
   typewriterModeRef.current = typewriterMode;
+  const pendingImageRanges = useRef(new Set<{ from: number; to: number }>());
 
   const saveAndInsertImage = (file: File, view: EditorView) => {
+    if (view.state.readOnly) return;
     const desktop = typeof window !== "undefined" ? window.knowSpaceDesktop : undefined;
     if (!desktop?.capture.savePastedImage) return;
+    const filePath = currentFilePathRef.current;
+    const range = { from: view.state.selection.main.from, to: view.state.selection.main.to };
+    pendingImageRanges.current.add(range);
+    const reportFailure = () => useUiStore.getState().notify("图片插入失败，请重试。");
 
     try {
       const reader = new FileReader();
       reader.onload = async () => {
+        if (viewRef.current !== view || view.state.readOnly) {
+          pendingImageRanges.current.delete(range);
+          return;
+        }
         const base64 = reader.result as string;
-        if (!base64) return;
+        if (!base64) {
+          pendingImageRanges.current.delete(range);
+          reportFailure();
+          return;
+        }
 
         const originalName = file.name || "pasted_image";
         const ext = file.type ? file.type.replace("image/", "") : "png";
 
-        const res = await desktop.capture.savePastedImage?.({
-          currentFilePath: currentFilePathRef.current,
-          bufferBase64: base64,
-          originalName,
-          ext,
-        });
-
-        if (res?.success && res.relativePath) {
-          const insertText = `![${res.fileName || "image"}](${res.relativePath})\n`;
-          const selection = view.state.selection.main;
-          view.dispatch({
-            changes: {
-              from: selection.from,
-              to: selection.to,
-              insert: insertText,
-            },
-            selection: { anchor: selection.from + insertText.length },
+        try {
+          const res = await desktop.capture.savePastedImage?.({
+            currentFilePath: filePath,
+            bufferBase64: base64,
+            originalName,
+            ext,
           });
+
+          if (
+            viewRef.current !== view ||
+            view.state.readOnly ||
+            currentFilePathRef.current !== filePath
+          )
+            return;
+          if (res?.success && res.relativePath) {
+            const insertText = `![${res.fileName || "image"}](${res.relativePath})\n`;
+            pendingImageRanges.current.delete(range);
+            view.dispatch({
+              changes: {
+                from: range.from,
+                to: range.to,
+                insert: insertText,
+              },
+              userEvent: "input.paste",
+            });
+          } else reportFailure();
+        } catch (error) {
+          console.error("Failed to save pasted image:", error);
+          if (viewRef.current === view) reportFailure();
+        } finally {
+          pendingImageRanges.current.delete(range);
         }
+      };
+      reader.onerror = () => {
+        pendingImageRanges.current.delete(range);
+        reportFailure();
       };
       reader.readAsDataURL(file);
     } catch (err) {
       console.error("Failed to process pasted image:", err);
+      pendingImageRanges.current.delete(range);
+      reportFailure();
     }
   };
 
@@ -440,6 +445,7 @@ export const EditorPane = memo(function EditorPane({
     // Helper: toggle an inline markdown marker (e.g. ** for bold, * for italic)
     const toggleInlineFormat = (view: EditorView, marker: string): boolean => {
       const state = view.state;
+      if (state.readOnly) return true;
       const sel = state.selection.main;
       const doc = state.doc;
 
@@ -449,10 +455,14 @@ export const EditorPane = memo(function EditorPane({
         if (
           selectedText.startsWith(marker) &&
           selectedText.endsWith(marker) &&
+          (marker !== "*" ||
+            ((selectedText.match(/^\*+/)?.[0].length ?? 0) % 2 === 1 &&
+              (selectedText.match(/\*+$/)?.[0].length ?? 0) % 2 === 1)) &&
           selectedText.length >= marker.length * 2
         ) {
           const inner = selectedText.slice(marker.length, selectedText.length - marker.length);
           view.dispatch({
+            userEvent: "input.format",
             changes: { from: sel.from, to: sel.to, insert: inner },
             selection: { anchor: sel.from, head: sel.from + inner.length },
           });
@@ -463,9 +473,13 @@ export const EditorPane = memo(function EditorPane({
         const postTo = Math.min(doc.length, sel.to + marker.length);
         if (
           doc.sliceString(preFrom, sel.from) === marker &&
-          doc.sliceString(sel.to, postTo) === marker
+          doc.sliceString(sel.to, postTo) === marker &&
+          (marker !== "*" ||
+            ((state.sliceDoc(0, sel.from).match(/\*+$/)?.[0].length ?? 0) % 2 === 1 &&
+              (state.sliceDoc(sel.to).match(/^\*+/)?.[0].length ?? 0) % 2 === 1))
         ) {
           view.dispatch({
+            userEvent: "input.format",
             changes: [
               { from: preFrom, to: sel.from, insert: "" },
               { from: sel.to, to: postTo, insert: "" },
@@ -477,6 +491,7 @@ export const EditorPane = memo(function EditorPane({
         // Case 3: wrap selection
         const wrapped = `${marker}${selectedText}${marker}`;
         view.dispatch({
+          userEvent: "input.format",
           changes: { from: sel.from, to: sel.to, insert: wrapped },
           selection: {
             anchor: sel.from + marker.length,
@@ -502,6 +517,7 @@ export const EditorPane = memo(function EditorPane({
           const absEnd = line.from + mEnd;
           const inner = m[1];
           view.dispatch({
+            userEvent: "input.format",
             changes: { from: absStart, to: absEnd, insert: inner },
             selection: { anchor: absStart, head: absStart + inner.length },
           });
@@ -513,6 +529,7 @@ export const EditorPane = memo(function EditorPane({
       const placeholder = "文字";
       const insert = `${marker}${placeholder}${marker}`;
       view.dispatch({
+        userEvent: "input.format",
         changes: { from: sel.from, to: sel.to, insert },
         selection: {
           anchor: sel.from + marker.length,
@@ -555,6 +572,7 @@ export const EditorPane = memo(function EditorPane({
     const initialCursorPos = 0;
 
     const wikiLinkCompletionSource = (context: CompletionContext): CompletionResult | null => {
+      if (context.state.readOnly) return null;
       const word = context.matchBefore(/(!?\[\[)([^\]\n|]*)/);
       if (!word) return null;
 
@@ -630,58 +648,25 @@ export const EditorPane = memo(function EditorPane({
       };
     };
 
-    const slashCommandCompletionSource = (context: CompletionContext): CompletionResult | null => {
-      // One rule, both editors: the canvas card's textarea asks the same function,
-      // so `/` cannot come to mean two different things in the two places a note
-      // gets written. It fires only at a line start or after whitespace, which is
-      // what keeps `https://…`, `a//b` and paths like `notes/a.md` out of it.
-      const line = context.state.doc.lineAt(context.pos);
-      const trigger = detectSlashTrigger(line.text, context.pos - line.from);
-      if (!trigger) return null;
-
-      const matchedCommands = matchSlashCommands(trigger.query);
-      if (matchedCommands.length === 0) return null;
-
-      return {
-        from: line.from + trigger.startIndex,
-        to: context.pos,
-        options: matchedCommands.map((cmd) => {
-          const { text, cursorOffset } = getCommandTemplate(cmd);
-          return {
-            label: `/${cmd.keywords[0] || cmd.id}`,
-            displayLabel: `${cmd.icon} ${cmd.title}`,
-            detail: cmd.description,
-            type: "keyword",
-            boost: cmd.category === "排版与标题" ? 99 : 50,
-            apply: (view: EditorView, _completion: any, from: number, to: number) => {
-              view.dispatch({
-                changes: { from, to, insert: text },
-                selection: { anchor: from + cursorOffset },
-              });
-              if (cmd.id === "wikilink") {
-                // Instantly popup wikilink completion popup for seamless note selection
-                window.setTimeout(() => {
-                  try {
-                    startCompletion(view);
-                  } catch {}
-                }, 25);
-              }
-            },
-          };
-        }),
-        filter: false,
-      };
-    };
-
     const state = EditorState.create({
       doc: value,
       selection: { anchor: initialCursorPos, head: initialCursorPos },
       extensions: [
-        lineNumbers(),
-        highlightActiveLineGutter(),
+        // CodeMirror readOnly is advisory; custom commands can still dispatch changes.
+        EditorState.transactionFilter.of((transaction) =>
+          transaction.startState.readOnly &&
+          transaction.docChanged &&
+          !transaction.annotation(externalDocumentUpdate)
+            ? []
+            : transaction,
+        ),
+        editingModeCompartment.current.of(
+          livePreviewMode
+            ? [livePreview, livePreviewTheme(typewriterMode)]
+            : [lineNumbers(), highlightActiveLineGutter(), foldGutter()],
+        ),
         highlightSpecialChars(),
         history(),
-        foldGutter(),
         drawSelection(),
         dropCursor(),
         EditorState.allowMultipleSelections.of(true),
@@ -696,7 +681,7 @@ export const EditorPane = memo(function EditorPane({
         crosshairCursor(),
         highlightActiveLine(),
         highlightSelectionMatches(),
-        markdown(),
+        markdown({ base: markdownLanguage }),
         EditorView.lineWrapping,
         keymap.of([
           ...closeBracketsKeymap,
@@ -705,16 +690,20 @@ export const EditorPane = memo(function EditorPane({
           ...historyKeymap,
           ...foldKeymap,
         ]),
-        saveKeyBinding,
+        Prec.high(saveKeyBinding),
         themeCompartment.current.of(resolveHighlightExtensions(theme, customBaseTheme)),
         readOnlyCompartment.current.of(EditorState.readOnly.of(readOnly)),
         fontSizeCompartment.current.of(
           EditorView.theme({
-            "&": { fontSize: `${14 * fontScale}px` },
+            "&": { fontSize: `${(livePreviewMode ? 16 : 14) * fontScale}px` },
           }),
         ),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
+            for (const range of pendingImageRanges.current) {
+              range.from = update.changes.mapPos(range.from, 1);
+              range.to = Math.max(range.from, update.changes.mapPos(range.to, -1));
+            }
             const docString = update.state.doc.toString();
             lastInternalValueRef.current = docString;
             onChangeRef.current(docString);
@@ -729,6 +718,7 @@ export const EditorPane = memo(function EditorPane({
         }),
         EditorView.domEventHandlers({
           paste(event, view) {
+            if (view.state.readOnly) return false;
             const clipboardData = event.clipboardData;
             if (!clipboardData) return false;
             const items = clipboardData.items;
@@ -748,6 +738,7 @@ export const EditorPane = memo(function EditorPane({
             return false;
           },
           drop(event, view) {
+            if (view.state.readOnly) return false;
             const dataTransfer = event.dataTransfer;
             if (!dataTransfer || !dataTransfer.files || dataTransfer.files.length === 0) {
               return false;
@@ -810,6 +801,7 @@ export const EditorPane = memo(function EditorPane({
       view.dispatch({
         changes: { from: 0, to: currentDoc.length, insert: value },
         selection: { anchor: targetPos, head: targetPos },
+        annotations: externalDocumentUpdate.of(true),
       });
     }
   }, [value]);
@@ -836,11 +828,11 @@ export const EditorPane = memo(function EditorPane({
     view.dispatch({
       effects: fontSizeCompartment.current.reconfigure(
         EditorView.theme({
-          "&": { fontSize: `${14 * fontScale}px` },
+          "&": { fontSize: `${(livePreviewMode ? 16 : 14) * fontScale}px` },
         }),
       ),
     });
-  }, [fontScale]);
+  }, [fontScale, livePreviewMode]);
 
   // Update readonly state
   useEffect(() => {
@@ -851,10 +843,20 @@ export const EditorPane = memo(function EditorPane({
     });
   }, [readOnly]);
 
+  useEffect(() => {
+    viewRef.current?.dispatch({
+      effects: editingModeCompartment.current.reconfigure(
+        livePreviewMode
+          ? [livePreview, livePreviewTheme(typewriterMode)]
+          : [lineNumbers(), highlightActiveLineGutter(), foldGutter()],
+      ),
+    });
+  }, [livePreviewMode, typewriterMode]);
+
   return (
     <div
       ref={containerRef}
-      className="editor-pane-container"
+      className={`editor-pane-container ${livePreviewMode ? "is-live-preview" : ""}`}
       data-testid="codemirror-editor"
       style={{ width: "100%", height: "100%", overflow: "hidden", position: "relative" }}
       onContextMenu={(e) => {

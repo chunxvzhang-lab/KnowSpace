@@ -23,6 +23,9 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["src/__tests__/setup.ts"],
+    // Generated browser profiles contain third-party tests that require Jest.
+    // Discover only this application's source tests, including future spec files.
+    include: ["src/**/*.{test,spec}.{ts,tsx}"],
     pool: "forks",
     forks: {
       singleFork: true,

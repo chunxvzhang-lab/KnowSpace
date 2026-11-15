@@ -137,8 +137,6 @@ export function useDocumentSession() {
     },
     [rememberRendered],
   );
-  const viewModeRef = useRef<EditorViewMode>("read");
-  viewModeRef.current = viewMode;
   const sessionRef = useRef<DocumentSession | null>(null);
   sessionRef.current = session;
   const pendingRenderRef = useRef(false);
@@ -158,13 +156,13 @@ export function useDocumentSession() {
 
   // Execute rendering with revision tracking
   const triggerRender = useCallback(
-    async (sourceText: string, baseUrl: string, revision: number, cacheKey?: string) => {
-      currentRenderRevisionRef.current = revision;
+    async (sourceText: string, baseUrl: string, cacheKey?: string) => {
+      const renderRequest = ++currentRenderRevisionRef.current;
       setIsPreviewPending(true);
 
       if (cacheKey && renderedCacheRef.current.has(cacheKey)) {
         const cached = renderedCacheRef.current.get(cacheKey)!;
-        if (currentRenderRevisionRef.current === revision) {
+        if (currentRenderRevisionRef.current === renderRequest) {
           setRenderedChapter(cached);
           setIsPreviewPending(false);
         }
@@ -173,7 +171,7 @@ export function useDocumentSession() {
 
       try {
         const rendered = await renderMarkdown(sourceText, baseUrl);
-        if (currentRenderRevisionRef.current === revision) {
+        if (currentRenderRevisionRef.current === renderRequest) {
           setRenderedChapter(rendered);
           if (cacheKey && sourceText.length <= LARGE_DOC_THRESHOLD) {
             rememberRendered(cacheKey, rendered);
@@ -183,7 +181,7 @@ export function useDocumentSession() {
       } catch {
         // Keep previous rendered chapter on error
       } finally {
-        if (currentRenderRevisionRef.current === revision) {
+        if (currentRenderRevisionRef.current === renderRequest) {
           setIsPreviewPending(false);
         }
       }
@@ -214,6 +212,7 @@ export function useDocumentSession() {
       };
 
       setSession(initialSession);
+      pendingRenderRef.current = false;
       setConflict(null);
       const isLarge = params.source.length > LARGE_DOC_THRESHOLD;
       setAutoPreviewPaused(isLarge);
@@ -236,7 +235,7 @@ export function useDocumentSession() {
       // them together, so there is no such frame at all.
       const cached = renderedCacheRef.current.get(cacheKey);
       if (cached) {
-        currentRenderRevisionRef.current = 1;
+        currentRenderRevisionRef.current += 1;
         renderedCacheRef.current.delete(cacheKey);
         renderedCacheRef.current.set(cacheKey, cached);
         setRenderedChapter(cached);
@@ -244,7 +243,7 @@ export function useDocumentSession() {
         return;
       }
 
-      triggerRender(params.source, params.baseUrl, 1, cacheKey);
+      triggerRender(params.source, params.baseUrl, cacheKey);
     },
     [triggerRender],
   );
@@ -267,40 +266,23 @@ export function useDocumentSession() {
           previewTimerRef.current = null;
         }
 
+        // Invalidate work already running for the previous source, before the debounce fires.
+        currentRenderRevisionRef.current += 1;
+
         const isLarge = newSource.length > LARGE_DOC_THRESHOLD;
         if (isLarge) {
           setAutoPreviewPaused(true);
-        } else if (viewModeRef.current === "source") {
-          // In pure source edit mode, preview is hidden; skip rendering on keystrokes to save CPU
           pendingRenderRef.current = true;
         } else {
+          pendingRenderRef.current = false;
           setAutoPreviewPaused(false);
           previewTimerRef.current = window.setTimeout(() => {
-            triggerRender(nextSession.source, nextSession.baseUrl, nextRevision);
+            triggerRender(nextSession.source, nextSession.baseUrl);
           }, PREVIEW_DEBOUNCE_MS);
         }
 
         sessionRef.current = nextSession;
         return nextSession;
-      });
-    },
-    [triggerRender],
-  );
-
-  const handleSetViewMode = useCallback(
-    (modeOrUpdater: EditorViewMode | ((prev: EditorViewMode) => EditorViewMode)) => {
-      setViewMode((prev) => {
-        const nextMode = typeof modeOrUpdater === "function" ? modeOrUpdater(prev) : modeOrUpdater;
-        viewModeRef.current = nextMode;
-        if (nextMode !== "source" && pendingRenderRef.current && sessionRef.current) {
-          pendingRenderRef.current = false;
-          triggerRender(
-            sessionRef.current.source,
-            sessionRef.current.baseUrl,
-            sessionRef.current.sourceRevision,
-          );
-        }
-        return nextMode;
       });
     },
     [triggerRender],
@@ -313,8 +295,12 @@ export function useDocumentSession() {
       previewTimerRef.current = null;
     }
     pendingRenderRef.current = false;
-    triggerRender(session.source, session.baseUrl, session.sourceRevision);
+    return triggerRender(session.source, session.baseUrl);
   }, [session, triggerRender]);
+
+  useEffect(() => {
+    if (viewMode === "read" && pendingRenderRef.current) renderPreviewNow();
+  }, [viewMode, renderPreviewNow]);
 
   const saveSession = useCallback(
     async (options: { force?: boolean; content?: string } = {}) => {
@@ -342,22 +328,23 @@ export function useDocumentSession() {
 
         if (result.success) {
           setSession((prev) => {
-            if (!prev) return null;
+            if (
+              !prev ||
+              prev.absolutePath !== currentSession.absolutePath ||
+              prev.chapterId !== currentSession.chapterId
+            )
+              return prev;
             const updated: DocumentSession = {
               ...prev,
-              source: contentToSave,
               savedSource: contentToSave,
-              savedRevision: prev.sourceRevision,
+              savedRevision:
+                prev.source === contentToSave ? prev.sourceRevision : currentSession.sourceRevision,
               diskVersion: result.diskVersion,
             };
             sessionRef.current = updated;
             return updated;
           });
           setConflict(null);
-          // Invalidate and update cache with new disk version key
-          if (renderedChapter) {
-            renderedCacheRef.current.set(result.cacheKey, renderedChapter);
-          }
           return { success: true };
         } else {
           if (result.errorCode === "FILE_CONFLICT" && result.diskVersion) {
@@ -374,7 +361,7 @@ export function useDocumentSession() {
         setIsSaving(false);
       }
     },
-    [session, renderedChapter],
+    [session],
   );
 
   const saveSessionAs = useCallback(async () => {
@@ -441,6 +428,11 @@ export function useDocumentSession() {
 
   const discardChanges = useCallback(() => {
     if (!session) return;
+    if (previewTimerRef.current !== null) {
+      window.clearTimeout(previewTimerRef.current);
+      previewTimerRef.current = null;
+    }
+    pendingRenderRef.current = false;
     setSession((prev) => {
       if (!prev) return null;
       return {
@@ -450,7 +442,7 @@ export function useDocumentSession() {
       };
     });
     setConflict(null);
-    triggerRender(session.savedSource, session.baseUrl, session.savedRevision);
+    triggerRender(session.savedSource, session.baseUrl);
   }, [session, triggerRender]);
 
   const clearConflict = useCallback(() => {
@@ -458,6 +450,7 @@ export function useDocumentSession() {
   }, []);
 
   const closeSession = useCallback(() => {
+    currentRenderRevisionRef.current += 1;
     if (previewTimerRef.current !== null) {
       window.clearTimeout(previewTimerRef.current);
       previewTimerRef.current = null;
@@ -518,7 +511,7 @@ export function useDocumentSession() {
     renderPreviewNow,
     /** Fills the render cache from outside — how the pre-loader makes a jump instant. */
     primeRenderedCache,
-    setViewMode: handleSetViewMode,
+    setViewMode,
     saveSession,
     saveSessionAs,
     reloadFromDisk,

@@ -37,6 +37,7 @@ import { useCanvasPresentation } from "./canvas/useCanvasPresentation";
 import type { CanvasContextMenuState } from "./canvas/CanvasOverlayMenus";
 import { CanvasChrome } from "./canvas/CanvasChrome";
 import type { CanvasViewProps } from "./canvas/canvasViewProps";
+import { useAiPendingEdits } from "../hooks/useAiPendingEdits";
 
 export type { CanvasViewProps };
 
@@ -77,6 +78,7 @@ export const CanvasView = memo(function CanvasView({
   // document hook's save paths can commit it without re-subscribing on
   // every keystroke.
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
+  useAiPendingEdits(currentFilePath, editingNodeId !== null);
   const [editingText, setEditingText] = useState("");
   const editingNodeIdRef = useRef<string | null>(null);
   editingNodeIdRef.current = editingNodeId;

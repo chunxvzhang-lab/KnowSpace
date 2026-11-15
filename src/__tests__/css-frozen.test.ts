@@ -89,7 +89,23 @@ import { loadAppCssBundle } from "./helpers/loadAppCss";
  *  blockquote 这类容器没有插件渲染器可挂，只能靠这个属性选择器兜底；段落头上这条规则
  *  也无害（内联 style 已经赢）。**未改动任何既有选择器**——本次样式改动就是新增这一条，
  *  `git diff -- src/styles/reader.css` 可逐行核对。 */
-const FROZEN_SHA256 = "c8a0d24fe3e5c9090b787cae2c0ced60a0df4b1a29532b7b5a384acca69a15c5";
+// 2026-11-09: review-panel.css mirrors light overrides for the default system
+// theme. Browser regression verifies light, dark and live OS preference changes.
+// 2026-11-14: add templates.css for the requested built-in template picker;
+// all new rules are scoped to the dialog and reuse existing theme tokens.
+// 2026-11-14: requested continuous reading gutter, including blank spacing,
+// without its former vertical separator; source-location attributes stay intact.
+// 2026-11-14: center reading numbers on measured text rows, preserving blank rows.
+// 2026-11-15：新增独立作用域的 AI 工作台样式，原有样式顺序保持。
+// 2026-11-15：按用户要求将 AI 浮窗改为参与工作区布局的侧栏，并优化滚动与窄屏样式。
+// 2026-11-15：按用户要求增加大纲写作方式、大纲列表及全文替换二次确认样式。
+// 2026-11-15: user-authorized workspace UI renewal; native tools, responsive shell and theme palette.
+// 2026-11-15: intentional neutral-white theme refresh; flash/mindmap palettes unchanged.
+// 2026-11-15: restore amber/cyan halos to the two requested activity icons.
+// 2026-11-15: requested conversation-creation controls and editable result drafts.
+// 2026-11-15: requested About/model-settings redesign and quieter AI assistant sidebar.
+// 2026-11-16: restore missing no-document welcome styles; desktop layout regression added.
+const FROZEN_SHA256 = "eea6b623bbc81b3d61b386b944b1dfa8730eabf840b7a1ca99ed2ff0c7802dcb";
 
 function normalize(css: string): string {
   return css

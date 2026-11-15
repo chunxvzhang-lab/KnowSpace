@@ -3,6 +3,7 @@ import type { ChapterSource, EditorViewMode } from "../core/types";
 import { useUiStore } from "../store/useUiStore";
 import { useTabStore, tabsWithNewDocument } from "../store/useTabStore";
 import { useVaultStore } from "../store/useVaultStore";
+import type { CreateMarkdownOptions } from "../types/desktop";
 
 /**
  * The unsaved-changes guard and the action it protects.
@@ -24,7 +25,7 @@ export type PendingAction =
       viewMode?: EditorViewMode;
     }
   | { type: "open-directory" }
-  | { type: "new-file" }
+  | { type: "new-file"; options?: Pick<CreateMarkdownOptions, "defaultName" | "initialContent"> }
   | { type: "new-mindmap" }
   | { type: "new-canvas" }
   | { type: "close-window"; requestId: number };
@@ -46,7 +47,9 @@ type UseUnsavedGuardParams = {
     options?: { viewMode?: EditorViewMode },
   ) => Promise<void>;
   doOpenMarkdownDirectory: () => Promise<void>;
-  doCreateNewFile: () => Promise<void>;
+  doCreateNewFile: (
+    options?: Pick<CreateMarkdownOptions, "defaultName" | "initialContent">,
+  ) => Promise<void>;
   doCreateNewMindmap: () => Promise<void>;
   doCreateNewCanvas: () => Promise<void>;
 };
@@ -117,7 +120,8 @@ export function useUnsavedGuard({
           break;
         }
         case "new-file": {
-          await doCreateNewFile();
+          if (action.options) await doCreateNewFile(action.options);
+          else await doCreateNewFile();
           break;
         }
         case "new-mindmap": {

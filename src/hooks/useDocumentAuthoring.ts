@@ -17,8 +17,8 @@ import type { OpenSessionParams } from "./useDocumentSession";
 
 type UseDocumentAuthoringParams = {
   openSession: (params: OpenSessionParams) => void;
-  /** The hook only ever leaves the special views, so only "split" is sent. */
-  setViewMode: (mode: "split") => void;
+  /** The hook only ever leaves the special views, so only "live" is sent. */
+  setViewMode: (mode: "live") => void;
   activeLoadedChapterIdRef: { current: string };
 };
 
@@ -89,7 +89,7 @@ export function useDocumentAuthoring({
         // a second tab for it — see tabsWithNewDocument, which is also where the file
         // that a command palette jump opens goes through.
         setTabs((prev) => tabsWithNewDocument(prev, activeChap, result.absolutePath));
-        setViewMode("split");
+        setViewMode("live");
         activeLoadedChapterIdRef.current = activeChap.id;
 
         openSession({

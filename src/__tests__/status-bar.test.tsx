@@ -30,14 +30,14 @@ describe("StatusBar Component Sub-function Tests", () => {
         source="这是第一章的内容。测试字数统计与状态栏。"
         isDirty={false}
         writable={true}
-        viewMode="split"
+        viewMode="live"
         lineEnding="LF"
       />,
     );
 
     expect(screen.getByText("已保存")).toBeDefined();
     expect(screen.getByText("chapter-1.md")).toBeDefined();
-    expect(screen.getByText("分屏协作")).toBeDefined();
+    expect(screen.getByText("实时预览")).toBeDefined();
     expect(screen.getByText("LF")).toBeDefined();
     expect(screen.getByText("UTF-8")).toBeDefined();
     expect(screen.getByText("KnowSpace")).toBeDefined();
@@ -50,13 +50,13 @@ describe("StatusBar Component Sub-function Tests", () => {
         source="未保存的修改内容"
         isDirty={true}
         writable={true}
-        viewMode="source"
+        viewMode="live"
       />,
     );
 
     expect(screen.getByText("未保存")).toBeDefined();
     expect(screen.getByText("draft.md")).toBeDefined();
-    expect(screen.getByText("源码编辑")).toBeDefined();
+    expect(screen.getByText("实时预览")).toBeDefined();
   });
 
   it("renders readonly badge when writable is false", () => {
@@ -86,7 +86,7 @@ describe("StatusBar Component Sub-function Tests", () => {
   });
 
   it("shows large document optimization warning badge", () => {
-    render(<StatusBar fileName="big.md" source="大文档" viewMode="split" isLargeDocument={true} />);
+    render(<StatusBar fileName="big.md" source="大文档" viewMode="live" isLargeDocument={true} />);
 
     expect(screen.getByText("大文档优化")).toBeDefined();
   });
@@ -99,7 +99,7 @@ describe("StatusBar Component Sub-function Tests", () => {
       return (
         <div>
           <button onClick={() => setTick(tick + 1)}>tick</button>
-          <StatusBar fileName="memo.md" source="固定内容" viewMode="split" />
+          <StatusBar fileName="memo.md" source="固定内容" viewMode="live" />
           <span>commit {tick}</span>
         </div>
       );
@@ -114,11 +114,9 @@ describe("StatusBar Component Sub-function Tests", () => {
     expect(spy.renders).toBe(afterMount); // ...StatusBar did not
 
     // Negative pair: the same component WITH a changed prop must render.
-    const { rerender } = render(
-      <StatusBar fileName="memo.md" source="固定内容" viewMode="split" />,
-    );
+    const { rerender } = render(<StatusBar fileName="memo.md" source="固定内容" viewMode="live" />);
     const before = spy.renders;
-    rerender(<StatusBar fileName="memo.md" source="内容变了" viewMode="split" />);
+    rerender(<StatusBar fileName="memo.md" source="内容变了" viewMode="live" />);
     expect(spy.renders).toBeGreaterThan(before);
   });
 });

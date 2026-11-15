@@ -1,6 +1,7 @@
 export type SidebarTab = "toc" | "bookmarks" | "search" | "space" | "backlinks";
+/** eink is retained only for legacy document compatibility; app preferences migrate it to light. */
 export type ThemeMode = "system" | "light" | "twitter" | "eink";
-export type EditorViewMode = "read" | "split" | "source" | "mindmap" | "canvas";
+export type EditorViewMode = "read" | "live" | "mindmap" | "canvas";
 
 export type MindmapNodeShape = "rounded" | "capsule" | "rect" | "underline";
 export type MindmapLineStyle = "bezier" | "step" | "straight";

@@ -11,43 +11,35 @@
   position: relative;
 }
 
-/* Subtle vertical guide line separating line numbers from content */
-.markdown-body.show-line-numbers::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 46px;
-  width: 1px;
-  background: var(--border);
-  opacity: 0.8;
-  pointer-events: none;
-}
-
-.markdown-body.show-line-numbers > [data-source-line] {
+.reader-pane {
   position: relative;
 }
 
-.markdown-body.show-line-numbers > [data-source-line]::before {
-  content: attr(data-source-line);
+.reader-line-numbers {
   position: absolute;
-  left: -52px;
-  width: 36px;
+  top: 0;
+  width: 46px;
+  user-select: none;
+  pointer-events: none;
+}
+
+.reader-line-numbers span {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  left: 0;
+  width: 100%;
   text-align: right;
   font-family: var(--font-mono, "JetBrains Mono", Consolas, "Fira Code", monospace);
   font-size: 11.5px;
-  line-height: inherit;
+  line-height: 1;
   color: var(--text-muted);
   opacity: 0.65;
-  user-select: none;
-  pointer-events: none;
-  transition:
-    opacity 0.15s ease,
-    color 0.15s ease;
 }
 
-.markdown-body.show-line-numbers > [data-source-line]:hover::before {
-  opacity: 1;
-  color: var(--accent);
-  font-weight: 700;
+@media print {
+  .reader-line-numbers {
+    display: none;
+  }
 }

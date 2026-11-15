@@ -18,6 +18,21 @@ try {
 const desktopApi = {
   apiVersion: API_VERSION,
 
+  ai: {
+    getSettings: () => ipcRenderer.invoke("bookmd:ai-get-settings"),
+    saveSettings: (request) => ipcRenderer.invoke("bookmd:ai-save-settings", request),
+    testConnection: (requestId) => ipcRenderer.invoke("bookmd:ai-test", requestId),
+    generate: (request) => ipcRenderer.invoke("bookmd:ai-generate", request),
+    cancel: (requestId) => ipcRenderer.invoke("bookmd:ai-cancel", requestId),
+    getHistory: (workspaceId) => ipcRenderer.invoke("bookmd:ai-get-history", workspaceId),
+    clearHistory: (workspaceId) => ipcRenderer.invoke("bookmd:ai-clear-history", workspaceId),
+    onEvent: (callback) => {
+      const listener = (_event, data) => callback(data);
+      ipcRenderer.on("bookmd:ai-event", listener);
+      return () => ipcRenderer.removeListener("bookmd:ai-event", listener);
+    },
+  },
+
   files: {
     openDirectory: () => ipcRenderer.invoke("bookmd:open-directory"),
     refreshDirectory: (rootPath) => ipcRenderer.invoke("bookmd:refresh-directory", rootPath),

@@ -8,20 +8,20 @@
   color-scheme: light;
   --bg: #ffffff;
   --surface: #ffffff;
-  --surface-2: #f4f4f6;
-  --surface-sunken: #f1f1f4;
+  --surface-2: #f7f7f8;
+  --surface-sunken: #eeeeef;
   --surface-elevated: #ffffff;
-  --activity-bg: #ffffff;
-  --text: #18181b;
-  --text-muted: #71717a;
-  --border: #e4e4e7;
-  --border-subtle: #f4f4f5;
-  --border-hover: #d4d4d8;
-  --accent: #d97706;
-  --accent-hover: #b45309;
-  --accent-surface: rgba(245, 158, 11, 0.12);
-  --accent-cyan: #f59e0b;
-  --accent-blue: #d97706;
+  --activity-bg: #f8f8f8;
+  --text: #202123;
+  --text-muted: #65676b;
+  --border: #e5e5e7;
+  --border-subtle: #f0f0f1;
+  --border-hover: #c4c5c7;
+  --accent: #303236;
+  --accent-hover: #17181a;
+  --accent-surface: #ebebed;
+  --accent-cyan: #303236;
+  --accent-blue: #303236;
 
   /* ── 图标着色工具类的两个颜色（`--icon-orange` / `--icon-cyan`）──────────
      `.text-orange` / `.text-cyan` 这两个类名在 23 个元素上是**裸用**的（没有
@@ -63,9 +63,9 @@
   --accent-info: #0369a1;
   --accent-info-rgb: 3, 105, 161;
   --danger: #ef4444;
-  --status-bar-bg: #18181b;
-  --status-bar-text: #e4e4e7;
-  --status-bar-muted: #a1a1aa;
+  --status-bar-bg: #f7f7f8;
+  --status-bar-text: #35373a;
+  --status-bar-muted: #65676b;
   --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
   --shadow-card: 0 12px 36px -4px rgba(0, 0, 0, 0.08), 0 4px 12px -2px rgba(0, 0, 0, 0.04);
   --shadow-modal: 0 24px 64px -12px rgba(0, 0, 0, 0.25), 0 4px 16px rgba(0, 0, 0, 0.08);
@@ -104,12 +104,7 @@
     "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
   font-family:
-    Inter,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    Roboto,
-    sans-serif;
+    "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", "PingFang SC", sans-serif;
 }
 
 :root[data-theme="light"] {
@@ -117,7 +112,7 @@
   --bg: #ffffff;
   --surface: #ffffff;
   --surface-elevated: #ffffff;
-  --activity-bg: #ffffff;
+  --activity-bg: #f8f8f8;
 }
 
 :root[data-theme="eink"] {
@@ -155,15 +150,15 @@
 
 :root[data-theme="twitter"] {
   color-scheme: dark;
-  --bg: #000000;
-  --surface: #0f1419;
-  --surface-2: #16181c;
-  --surface-sunken: #0b0e14;
-  --surface-elevated: #1a202c;
-  --activity-bg: #000000;
+  --bg: #111619;
+  --surface: #192024;
+  --surface-2: #222b30;
+  --surface-sunken: #121a1e;
+  --surface-elevated: #273238;
+  --activity-bg: #141b1e;
   --text: #e7e9ea;
-  --text-muted: #71767b;
-  --border: #2f3336;
+  --text-muted: #a2adaf;
+  --border: #344147;
   --border-subtle: rgba(255, 255, 255, 0.06);
   --border-hover: rgba(255, 255, 255, 0.2);
   --accent: #1d9bf0;
@@ -178,9 +173,9 @@
   --accent-info: #38bdf8;
   --accent-info-rgb: 56, 189, 248;
   --danger: #f87171;
-  --status-bar-bg: #000000;
+  --status-bar-bg: #141b1e;
   --status-bar-text: #e7e9ea;
-  --status-bar-muted: #71767b;
+  --status-bar-muted: #a2adaf;
   --shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   --shadow-card: 0 16px 44px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   --shadow-modal: 0 32px 80px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(255, 255, 255, 0.12);
@@ -189,15 +184,15 @@
 @media (prefers-color-scheme: dark) {
   :root[data-theme="system"] {
     color-scheme: dark;
-    --bg: #000000;
-    --surface: #0f1419;
-    --surface-2: #16181c;
-    --surface-sunken: #0b0e14;
-    --surface-elevated: #1a202c;
-    --activity-bg: #000000;
+    --bg: #111619;
+    --surface: #192024;
+    --surface-2: #222b30;
+    --surface-sunken: #121a1e;
+    --surface-elevated: #273238;
+    --activity-bg: #141b1e;
     --text: #e7e9ea;
-    --text-muted: #71767b;
-    --border: #2f3336;
+    --text-muted: #a2adaf;
+    --border: #344147;
     --border-subtle: rgba(255, 255, 255, 0.06);
     --border-hover: rgba(255, 255, 255, 0.2);
     --accent: #1d9bf0;
@@ -209,9 +204,9 @@
     --accent-info: #38bdf8;
     --accent-info-rgb: 56, 189, 248;
     --danger: #f87171;
-    --status-bar-bg: #000000;
+    --status-bar-bg: #141b1e;
     --status-bar-text: #e7e9ea;
-    --status-bar-muted: #71767b;
+    --status-bar-muted: #a2adaf;
     --shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.05);
     --shadow-card: 0 16px 44px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.08);
     --shadow-modal: 0 32px 80px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(255, 255, 255, 0.12);

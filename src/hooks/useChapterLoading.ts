@@ -101,7 +101,7 @@ export function useChapterLoading({
         } else if (isMindmap) {
           setViewMode("mindmap");
         } else {
-          setViewMode((prev) => (prev === "canvas" || prev === "mindmap" ? "split" : prev));
+          setViewMode((prev) => (prev === "canvas" || prev === "mindmap" ? "live" : prev));
         }
 
         openSession({

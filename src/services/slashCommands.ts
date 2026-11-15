@@ -1,3 +1,5 @@
+import type { AiMode } from "../types/ai";
+
 export type SlashCommandCategory =
   | "排版与标题"
   | "列表与任务"
@@ -18,9 +20,30 @@ export interface SlashCommand {
   keywords: string[];
   template: string;
   cursorOffset?: number; // Cursor offset relative to start of inserted template
+  aiMode?: AiMode;
 }
 
 export const SLASH_COMMANDS: SlashCommand[] = [
+  {
+    id: "ai-summary",
+    title: "AI 摘要",
+    description: "在AI 助理中汇总当前文档",
+    icon: "✦",
+    category: "知识连接",
+    keywords: ["AI摘要", "ai-summary", "aizy"],
+    template: "",
+    aiMode: "summary",
+  },
+  {
+    id: "ai-question",
+    title: "AI 问答",
+    description: "打开带来源的文档问答",
+    icon: "✦",
+    category: "知识连接",
+    keywords: ["AI问答", "ai-question", "aiwd"],
+    template: "",
+    aiMode: "question",
+  },
   // 1. 排版与标题
   {
     id: "h1",

@@ -255,7 +255,7 @@ describe("useUiStore - UI chrome store", () => {
       useUiStore.getState().setPreferences({ theme: "eink", fontScale: 1.4 });
 
       const reloaded = loadPreferences();
-      expect(reloaded.theme).toBe("eink");
+      expect(reloaded.theme).toBe("light");
       expect(reloaded.fontScale).toBe(1.4);
     });
 

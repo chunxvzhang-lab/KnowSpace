@@ -53,7 +53,7 @@ const parsePreloadListeners = (text: string) =>
   matchChannels(text, /ipcRenderer\.on\(\s*["']([^"']+)["']/g);
 
 /** The five namespaces of the bridge, in both preload.cjs and desktop.d.ts. */
-const NAMESPACE_KEYS = ["files", "history", "media", "system", "capture"] as const;
+const NAMESPACE_KEYS = ["files", "history", "media", "system", "capture", "ai"] as const;
 
 /**
  * Methods inside the namespace blocks of the bridge shape. A namespace opens
@@ -63,7 +63,7 @@ const NAMESPACE_KEYS = ["files", "history", "media", "system", "capture"] as con
  */
 function parseBridgeNamespaces(text: string) {
   const namespaces = new Map<string, Map<string, { line: number }>>();
-  const opener = new RegExp(`^ {2}(${NAMESPACE_KEYS.join("|")}): \\{$`);
+  const opener = new RegExp(`^ {2}(${NAMESPACE_KEYS.join("|")})\\??: \\{$`);
   const closer = /^ {2}[},][,;]?$/;
   const member = /^ {4}([A-Za-z_$][\w$]*)\??:/;
   let current: string | null = null;
@@ -302,6 +302,17 @@ describe("IPC channel contract (preload.cjs ↔ main.cjs ↔ desktop.d.ts)", () 
       packageVersion,
       packageVersion,
     ]);
+  });
+
+  it("README and the manual refer to the generated baseline instead of repeating current counts", () => {
+    const readme = read(join(repoRoot, "README.md"));
+    const manual = read(join(repoRoot, "docs/USER_MANUAL.md"));
+    const qualitySection = manual.split("### 1.5 质量基线")[1]?.split("---")[0];
+    expect(readme).not.toMatch(/badge\/Tests-\d/);
+    expect(readme).toContain('href="docs/TEST_BASELINE.md"');
+    expect(qualitySection).toBeTruthy();
+    expect(qualitySection).toContain("TEST_BASELINE.md");
+    expect(qualitySection).not.toMatch(/\d+\s*个测试套件\s*\/\s*\d+/);
   });
 
   it("allowlist decay: every waiver is still a real mismatch with a real reason", () => {

@@ -22,7 +22,9 @@ import {
   Printer,
   FileText,
   ChevronRight,
+  Sparkles,
 } from "lucide-react";
+import { useUiStore } from "../../store/useUiStore";
 import type { SubmenuType } from "./useSubmenuController";
 
 type ContextMenuPortalProps = {
@@ -102,6 +104,20 @@ export function ContextMenuPortal({
     >
       {/* Scrollable Body: Prevents clipping on any screen or window height */}
       <div className="editor-context-menu-scroll">
+        <div className="menu-group">
+          <button
+            type="button"
+            className="context-menu-item"
+            disabled={!hasSelection || view.state.readOnly}
+            onClick={() => {
+              onClose();
+              useUiStore.getState().openAi("rewrite");
+            }}
+          >
+            <Sparkles size={14} className="menu-icon" />
+            <span className="menu-label">AI 润色与改写选区</span>
+          </button>
+        </div>
         {/* Group 1: Knowledge Operations (Obsidian Powered) */}
         <div className="menu-group" onMouseEnter={handleImmediateCloseSubmenu}>
           <button

@@ -31,7 +31,7 @@ describe("resolveThemeMode", () => {
   });
 
   it("具体主题原样返回", () => {
-    for (const t of ["light", "twitter", "eink"] as const) {
+    for (const t of ["light", "twitter"] as const) {
       expect(resolveThemeMode(t, true)).toBe(t);
       expect(resolveThemeMode(t, false)).toBe(t);
     }

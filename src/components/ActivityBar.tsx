@@ -3,15 +3,13 @@ import { createPortal } from "react-dom";
 import {
   BookOpen,
   Bookmark,
-  Code2,
-  Columns,
+  PencilLine,
   FilePlus2,
   FolderOpen,
   ListTree,
   Search,
   Sun,
   Sparkles,
-  Feather,
   FileText,
   Info,
   Maximize2,
@@ -21,9 +19,11 @@ import {
   Network,
   Command,
   Boxes,
+  Files,
 } from "lucide-react";
 import appLogo from "../assets/icon.png";
 import type { EditorViewMode, ThemeMode, SidebarTab } from "../core/types";
+import { useUiStore } from "../store/useUiStore";
 
 type ActivityBarProps = {
   directoryOpen: boolean;
@@ -38,6 +38,7 @@ type ActivityBarProps = {
   isFullscreen?: boolean;
   onToggleFullscreen?: () => void;
   onNewFile?: () => void;
+  onOpenTemplates?: () => void;
   onOpenDirectory?: () => void;
   onOpenAbout?: () => void;
   isDirty?: boolean;
@@ -60,6 +61,7 @@ export function ActivityBar({
   isFullscreen = false,
   onToggleFullscreen,
   onNewFile,
+  onOpenTemplates,
   onOpenDirectory,
   onOpenAbout,
   isDirty = false,
@@ -68,6 +70,9 @@ export function ActivityBar({
   isGraphOpen = false,
   onOpenCommandPalette,
 }: ActivityBarProps) {
+  const aiOpen = useUiStore((s) => s.aiOpen);
+  const openAi = useUiStore((s) => s.openAi);
+  const closeAi = useUiStore((s) => s.closeAi);
   // Tooltips are rendered through a portal rather than with CSS ::after
   // pseudo-elements: the dock scrolls on short windows, and a scroll container
   // would clip a tooltip that extends past its right edge.
@@ -113,6 +118,7 @@ export function ActivityBar({
             onClick={onToggleDirectory}
             data-tooltip="文档目录 (Ctrl+\)"
             aria-label="文档目录"
+            aria-pressed={directoryOpen}
           >
             <FolderOpen size={18} />
             {isDirty && <span className="activity-dot" />}
@@ -132,10 +138,24 @@ export function ActivityBar({
 
           <button
             type="button"
+            className={`activity-btn ${aiOpen ? "active" : ""}`}
+            onClick={() => (aiOpen ? closeAi() : openAi())}
+            data-tooltip="AI 助理"
+            aria-label="AI 助理"
+            aria-pressed={aiOpen}
+            aria-expanded={aiOpen}
+            aria-controls={aiOpen ? "ai-workspace" : undefined}
+          >
+            <Sparkles size={18} />
+          </button>
+
+          <button
+            type="button"
             className={`activity-btn ${sidebarOpen && activeSidebarTab === "toc" ? "active" : ""}`}
             onClick={() => onSelectSidebarTab("toc")}
             data-tooltip="大纲目录"
             aria-label="大纲目录"
+            aria-pressed={sidebarOpen && activeSidebarTab === "toc"}
           >
             <ListTree size={18} />
           </button>
@@ -146,6 +166,7 @@ export function ActivityBar({
             onClick={() => onSelectSidebarTab("bookmarks")}
             data-tooltip="精选书签 (Ctrl+B)"
             aria-label="书签列表"
+            aria-pressed={sidebarOpen && activeSidebarTab === "bookmarks"}
           >
             <Bookmark size={18} />
           </button>
@@ -156,6 +177,7 @@ export function ActivityBar({
             onClick={() => onSelectSidebarTab("search")}
             data-tooltip="全文搜索 (Ctrl+F)"
             aria-label="全文搜索"
+            aria-pressed={sidebarOpen && activeSidebarTab === "search"}
           >
             <Search size={18} />
           </button>
@@ -167,7 +189,7 @@ export function ActivityBar({
             data-tooltip="闪念 Space 时间线"
             aria-label="闪念 Space 时间线看板"
           >
-            <Zap size={18} style={{ color: "#f59e0b" }} />
+            <Zap size={18} className="activity-neon-amber" />
           </button>
 
           <button
@@ -177,7 +199,7 @@ export function ActivityBar({
             data-tooltip="反向链接与引用"
             aria-label="反向链接与引用"
           >
-            <GitFork size={18} style={{ color: "var(--accent-info)" }} />
+            <GitFork size={18} className="activity-neon-cyan" />
             {backlinksCount > 0 && <span className="activity-badge">{backlinksCount}</span>}
           </button>
         </div>
@@ -194,6 +216,18 @@ export function ActivityBar({
               aria-label="新建文件"
             >
               <FilePlus2 size={18} />
+            </button>
+          )}
+
+          {onOpenTemplates && (
+            <button
+              type="button"
+              className="activity-btn"
+              onClick={onOpenTemplates}
+              data-tooltip="从模板新建"
+              aria-label="从模板新建"
+            >
+              <Files size={18} />
             </button>
           )}
 
@@ -221,7 +255,7 @@ export function ActivityBar({
             data-tooltip="闪念胶囊 (全局热键唤起)"
             aria-label="闪念胶囊速记"
           >
-            <Zap size={18} style={{ color: "#f59e0b" }} />
+            <Zap size={18} className="activity-neon-amber" />
           </button>
 
           {onOpenGlobalGraph && (
@@ -232,7 +266,7 @@ export function ActivityBar({
               data-tooltip="知识网络全景图谱 (Ctrl+G)"
               aria-label="知识网络全景图谱"
             >
-              <Network size={18} style={{ color: "var(--accent-info)" }} />
+              <Network size={18} className="activity-neon-cyan" />
             </button>
           )}
         </div>
@@ -242,41 +276,40 @@ export function ActivityBar({
           <div className="activity-viewmodes" role="group" aria-label="视图模式">
             <button
               type="button"
+              className={`activity-btn mini ${viewMode === "live" ? "active" : ""}`}
+              onClick={() => onViewModeChange("live")}
+              data-tooltip="实时预览 (Ctrl+E)"
+              aria-label="实时预览"
+            >
+              <PencilLine size={16} />
+            </button>
+            <button
+              type="button"
               className={`activity-btn mini ${viewMode === "read" ? "active" : ""}`}
               onClick={() => onViewModeChange("read")}
               data-tooltip="阅读模式"
+              aria-label="阅读模式"
+              aria-pressed={viewMode === "read"}
             >
               <BookOpen size={16} />
-            </button>
-            <button
-              type="button"
-              className={`activity-btn mini ${viewMode === "split" ? "active" : ""}`}
-              onClick={() => onViewModeChange("split")}
-              data-tooltip="分屏模式"
-            >
-              <Columns size={16} />
-            </button>
-            <button
-              type="button"
-              className={`activity-btn mini ${viewMode === "source" ? "active" : ""}`}
-              onClick={() => onViewModeChange("source")}
-              data-tooltip="源码模式"
-            >
-              <Code2 size={16} />
             </button>
             <button
               type="button"
               className={`activity-btn mini ${viewMode === "mindmap" ? "active" : ""}`}
               onClick={() => onViewModeChange("mindmap")}
               data-tooltip="思维导图模式 (Ctrl+M)"
+              aria-label="思维导图模式"
+              aria-pressed={viewMode === "mindmap"}
             >
-              <ListTree size={16} />
+              <ListTree size={16} className="activity-neon-cyan" />
             </button>
             <button
               type="button"
               className={`activity-btn mini ${viewMode === "canvas" ? "active" : ""}`}
               onClick={() => onViewModeChange("canvas")}
               data-tooltip="空间白板模式"
+              aria-label="空间白板模式"
+              aria-pressed={viewMode === "canvas"}
             >
               <Boxes size={16} />
             </button>
@@ -317,17 +350,9 @@ export function ActivityBar({
               onClick={() => onThemeChange("light")}
               data-tooltip="日光浅色 (Light)"
               aria-label="日光浅色"
+              aria-pressed={theme === "light"}
             >
               <Sun size={15} />
-            </button>
-            <button
-              type="button"
-              className={`activity-btn mini ${theme === "eink" ? "active theme-eink-active" : ""}`}
-              onClick={() => onThemeChange("eink")}
-              data-tooltip="仿电子墨水屏 (E-ink Paper)"
-              aria-label="仿电子墨水屏"
-            >
-              <Feather size={15} />
             </button>
             <button
               type="button"
@@ -335,6 +360,7 @@ export function ActivityBar({
               onClick={() => onThemeChange("twitter")}
               data-tooltip="极客暗黑 (Geek Dark)"
               aria-label="极客暗黑"
+              aria-pressed={theme === "twitter"}
             >
               <Sparkles size={15} />
             </button>

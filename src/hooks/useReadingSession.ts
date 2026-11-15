@@ -101,6 +101,8 @@ export function useReadingSession(params: UseReadingSessionParams) {
 
   useReadingTracker({
     containerRef: readerRef,
+    viewMode,
+    editorViewRef,
     headings: renderedChapter?.headings ?? [],
     activeHeadingRef,
     scrollRatioRef,

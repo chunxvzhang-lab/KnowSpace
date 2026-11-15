@@ -1,4 +1,4 @@
-import { BookOpen, Columns, Code2, ListTree, Boxes } from "lucide-react";
+import { BookOpen, PencilLine, ListTree, Boxes } from "lucide-react";
 import type { EditorViewMode } from "../core/types";
 
 type ViewModeControlProps = {
@@ -15,7 +15,7 @@ export function ViewModeControl({ mode, onChange, disabled = false }: ViewModeCo
         className={`view-mode-btn ${mode === "read" ? "active" : ""}`}
         onClick={() => onChange("read")}
         disabled={disabled}
-        title="阅读模式"
+        title="阅读模式（Ctrl+E 切换编辑）"
         aria-pressed={mode === "read"}
       >
         <BookOpen size={15} />
@@ -23,25 +23,14 @@ export function ViewModeControl({ mode, onChange, disabled = false }: ViewModeCo
       </button>
       <button
         type="button"
-        className={`view-mode-btn ${mode === "split" ? "active" : ""}`}
-        onClick={() => onChange("split")}
+        className={`view-mode-btn ${mode === "live" ? "active" : ""}`}
+        onClick={() => onChange("live")}
         disabled={disabled}
-        title="分屏模式（边写边看）"
-        aria-pressed={mode === "split"}
+        title="实时预览（直接编辑正文，当前行显示 Markdown 标记）"
+        aria-pressed={mode === "live"}
       >
-        <Columns size={15} />
-        <span>分屏</span>
-      </button>
-      <button
-        type="button"
-        className={`view-mode-btn ${mode === "source" ? "active" : ""}`}
-        onClick={() => onChange("source")}
-        disabled={disabled}
-        title="源码模式"
-        aria-pressed={mode === "source"}
-      >
-        <Code2 size={15} />
-        <span>源码</span>
+        <PencilLine size={15} />
+        <span>实时预览</span>
       </button>
       <button
         type="button"

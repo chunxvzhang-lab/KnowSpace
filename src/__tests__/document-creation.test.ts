@@ -67,6 +67,38 @@ describe("useDocumentCreation", () => {
   });
 
   describe("creating a Markdown file", () => {
+    it("passes template content and the suggested name to the existing desktop creation flow", async () => {
+      const content = "# 模板笔记\n\n- [ ] 待办\n";
+      desktop.files.createMarkdownFile.mockResolvedValue({
+        ...createdAt("C:/vault/模板笔记.md"),
+        source: { ...createdAt("C:/vault/模板笔记.md").source, markdown: content },
+      });
+
+      await mount().result.current.doCreateNewFile({
+        defaultName: "模板笔记.md",
+        initialContent: content,
+      });
+
+      expect(desktop.files.createMarkdownFile).toHaveBeenCalledWith({
+        rootPath: undefined,
+        defaultName: "模板笔记.md",
+        initialContent: content,
+      });
+      expect(openSession).toHaveBeenCalledWith(
+        expect.objectContaining({ source: content, writable: true }),
+      );
+      expect(setViewMode).toHaveBeenCalledWith("live");
+    });
+
+    it("keeps the existing session and tabs when template creation is cancelled", async () => {
+      const before = useTabStore.getState().tabs;
+      await mount().result.current.doCreateNewFile({
+        defaultName: "模板笔记.md",
+        initialContent: "# 模板\n",
+      });
+      expect(useTabStore.getState().tabs).toBe(before);
+      expect(openSession).not.toHaveBeenCalled();
+    });
     it("does nothing at all when the dialog is cancelled", async () => {
       // The mock's default is a cancellation, which is what a user closing the
       // save dialog produces.
@@ -112,7 +144,7 @@ describe("useDocumentCreation", () => {
       expect(useTabStore.getState().tabs.map((t) => t.id)).toEqual(["new-chapter"]);
       expect(useUiStore.getState().sidebarOpen).toBe(true);
       expect(useUiStore.getState().sidebarTab).toBe("toc");
-      expect(setViewMode).toHaveBeenCalledWith("split");
+      expect(setViewMode).toHaveBeenCalledWith("live");
       expect(activeLoadedChapterIdRef.current).toBe("new-chapter");
 
       expect(openSession).toHaveBeenCalledWith(

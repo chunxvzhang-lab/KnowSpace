@@ -509,3 +509,44 @@
 [data-theme="eink"] .dr-summary-row strong {
   color: #1a1a1a;
 }
+
+/* The default theme keeps data-theme="system" so it can follow OS changes. */
+@media (prefers-color-scheme: light) {
+  [data-theme="system"] .dr-progress-track {
+    background: rgba(0, 0, 0, 0.07);
+  }
+
+  [data-theme="system"] .dr-folder-count.is-truncated {
+    color: #b45309;
+  }
+
+  [data-theme="system"] .dr-question,
+  [data-theme="system"] .dr-summary-row strong {
+    color: #18181b;
+  }
+
+  [data-theme="system"] .dr-answer {
+    border-top-color: rgba(0, 0, 0, 0.1);
+  }
+
+  [data-theme="system"] .dr-rate-btn {
+    border-color: rgba(0, 0, 0, 0.1);
+    background: rgba(0, 0, 0, 0.03);
+    color: #18181b;
+  }
+
+  [data-theme="system"] .dr-hint-bar kbd,
+  [data-theme="system"] .dr-reveal-hint kbd {
+    border-color: rgba(0, 0, 0, 0.14);
+    background: rgba(0, 0, 0, 0.04);
+  }
+
+  [data-theme="system"] .dr-empty-hint code {
+    background: rgba(0, 0, 0, 0.06);
+  }
+
+  [data-theme="system"] .dr-session-summary {
+    background: rgba(0, 0, 0, 0.02);
+    border-color: rgba(0, 0, 0, 0.07);
+  }
+}

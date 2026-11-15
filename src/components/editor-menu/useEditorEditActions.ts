@@ -50,6 +50,10 @@ export function useEditorEditActions({
   // Helper: Toggle wrapping
   const wrapSelection = useCallback(
     (prefix: string, suffix: string = prefix, defaultContent = "文字") => {
+      if (view.state.readOnly) {
+        onClose();
+        return;
+      }
       const from = selection.from;
       const to = selection.to;
       const doc = view.state.doc;
@@ -153,6 +157,10 @@ export function useEditorEditActions({
   // dangling bullet in the preview and splits the list apart.
   const transformLinePrefix = useCallback(
     (prefixPattern: RegExp, newPrefix: string | ((indent: string, ordinal: number) => string)) => {
+      if (view.state.readOnly) {
+        onClose();
+        return;
+      }
       const doc = view.state.doc;
       const startLine = doc.lineAt(selection.from);
       const endLine = doc.lineAt(selection.to);
@@ -193,6 +201,10 @@ export function useEditorEditActions({
   // every trailing marker in it; otherwise center it (clearing a stale marker
   // on the last line first so we never double-append).
   const toggleCenterAlign = useCallback(() => {
+    if (view.state.readOnly) {
+      onClose();
+      return;
+    }
     const doc = view.state.doc;
     const startLine = doc.lineAt(selection.from);
     const endLine = doc.lineAt(selection.to);
@@ -236,6 +248,10 @@ export function useEditorEditActions({
   // Helper: Insert text at current cursor
   const insertAtCursor = useCallback(
     (text: string, cursorRelativeOffset?: number) => {
+      if (view.state.readOnly) {
+        onClose();
+        return;
+      }
       const from = selection.from;
       const to = selection.to;
       view.dispatch({
@@ -261,6 +277,10 @@ export function useEditorEditActions({
 
   // Action: Clipboard Cut
   const handleCut = useCallback(() => {
+    if (view.state.readOnly) {
+      onClose();
+      return;
+    }
     if (hasSelection) {
       navigator.clipboard.writeText(selectedText);
       view.dispatch({
@@ -282,9 +302,13 @@ export function useEditorEditActions({
 
   // Action: Clipboard Paste
   const handlePaste = useCallback(async () => {
+    if (view.state.readOnly) {
+      onClose();
+      return;
+    }
     try {
       const clip = await navigator.clipboard.readText();
-      if (clip) {
+      if (clip && view.dom?.isConnected !== false && !view.state.readOnly) {
         view.dispatch({
           changes: { from: selection.from, to: selection.to, insert: clip },
           selection: { anchor: selection.from + clip.length },
@@ -316,6 +340,10 @@ export function useEditorEditActions({
 
   // Action: Create Block Reference (Obsidian style ^block)
   const handleCreateBlockRef = useCallback(() => {
+    if (view.state.readOnly) {
+      onClose();
+      return;
+    }
     const doc = view.state.doc;
     const line = doc.lineAt(selection.from);
     const lineText = line.text;

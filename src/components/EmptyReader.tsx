@@ -1,4 +1,5 @@
-import { FilePlus2, FileText, FolderOpen, ListTree, Boxes } from "lucide-react";
+import { FilePlus2, FileText, FolderOpen, ListTree, Boxes, Files } from "lucide-react";
+import { useUiStore } from "../store/useUiStore";
 
 type EmptyReaderProps = {
   /** The shell's reader container ref — the empty state IS the reader viewport. */
@@ -21,19 +22,30 @@ export function EmptyReader({
   createNewCanvas,
   openMarkdownDirectory,
 }: EmptyReaderProps) {
+  const setTemplateDialogOpen = useUiStore((s) => s.setTemplateDialogOpen);
   return (
     <main className="empty-reader" ref={readerRef}>
       <div className="empty-reader-card">
+        <div className="empty-reader-eyebrow">KNOWSPACE · 个人知识工作台</div>
         <h1 className="empty-reader-title">选择或新建 Markdown 文档</h1>
         <p className="empty-reader-desc">
-          体验现代化本地优先的 Markdown
-          阅读与极客编辑。支持双向同步滚动、选择联动高亮、多级大纲与原子物理落盘。
+          从一篇笔记开始，让知识逐渐相连。阅读与写作、思维导图、空间白板和AI 助理，都在这里。
         </p>
         <div className="empty-actions-grid">
           {window.bookMDDesktop ? (
             <button type="button" className="empty-action-card" onClick={createNewFile}>
               <FilePlus2 size={22} className="about-icon text-orange" />
               <span>新建 Markdown</span>
+            </button>
+          ) : null}
+          {window.bookMDDesktop ? (
+            <button
+              type="button"
+              className="empty-action-card"
+              onClick={() => setTemplateDialogOpen(true)}
+            >
+              <Files size={22} className="about-icon text-blue" />
+              <span>从模板新建</span>
             </button>
           ) : null}
           {window.bookMDDesktop ? (

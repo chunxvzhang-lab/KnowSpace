@@ -118,6 +118,7 @@ export function AppShellChrome({
   const setSidebarTab = useUiStore((s) => s.setSidebarTab);
   const setAboutOpen = useUiStore((s) => s.setAboutOpen);
   const setVersionHistoryOpen = useUiStore((s) => s.setVersionHistoryOpen);
+  const setTemplateDialogOpen = useUiStore((s) => s.setTemplateDialogOpen);
   const patchPreferences = useUiStore((s) => s.patchPreferences);
   const setPreferences = useUiStore((s) => s.setPreferences);
 
@@ -158,6 +159,7 @@ export function AppShellChrome({
           isFullscreen={isFullscreen}
           onToggleFullscreen={toggleFullscreen}
           onNewFile={window.bookMDDesktop ? createNewFile : undefined}
+          onOpenTemplates={window.bookMDDesktop ? () => setTemplateDialogOpen(true) : undefined}
           onOpenDirectory={window.bookMDDesktop ? openMarkdownDirectory : undefined}
           onOpenAbout={() => setAboutOpen(true)}
           isDirty={isDirty}
@@ -203,6 +205,7 @@ export function AppShellChrome({
             onToggleDirectory={() => setDirectoryOpen((open) => !open)}
             onAddBookmark={addBookmark}
             onNewFile={window.bookMDDesktop ? createNewFile : undefined}
+            onOpenTemplates={window.bookMDDesktop ? () => setTemplateDialogOpen(true) : undefined}
             onSave={() => saveSession()}
             canSave={Boolean(session?.writable)}
             onOpenMarkdown={openMarkdownFile}
@@ -240,7 +243,7 @@ export function AppShellChrome({
                 style={{ width: directoryWidth, flex: `0 0 ${directoryWidth}px` }}
                 aria-label="文档目录"
               >
-                <div className="tree-heading">DOCUMENT</div>
+                <div className="tree-heading">文档库</div>
                 <p>打开一个 Markdown 文件，新建文件，或在桌面版中打开文件目录。</p>
               </aside>
             )

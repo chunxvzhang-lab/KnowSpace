@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import type { Heading } from "../core/types";
+import type { EditorView } from "@codemirror/view";
 
 export function useReadingTracker(input: {
   containerRef: React.RefObject<HTMLElement | null>;
@@ -9,6 +10,8 @@ export function useReadingTracker(input: {
   onActiveHeadingChange: (headingId: string | undefined) => void;
   onScrollIdle?: () => void;
   navLockUntilRef?: React.MutableRefObject<number>;
+  viewMode?: string;
+  editorViewRef?: React.RefObject<EditorView | null>;
 }) {
   const {
     activeHeadingRef,
@@ -18,10 +21,13 @@ export function useReadingTracker(input: {
     onScrollIdle,
     scrollRatioRef,
     navLockUntilRef,
+    viewMode = "read",
+    editorViewRef,
   } = input;
 
   useEffect(() => {
-    const container = containerRef.current;
+    const editor = viewMode === "live" ? editorViewRef?.current : undefined;
+    const container = viewMode === "live" ? editor?.scrollDOM : containerRef.current;
     if (!container) return;
     let frame = 0;
     let idleTimer = 0;
@@ -67,7 +73,14 @@ export function useReadingTracker(input: {
         const max = box.scrollHeight - box.clientHeight;
         scrollRatioRef.current = max > 0 ? Math.min(1, scrollTop / max) : 0;
         if (!navLockUntilRef?.current || Date.now() >= navLockUntilRef.current) {
-          updateActiveHeading(container, headings, activeHeadingRef, onActiveHeadingChange, box);
+          updateActiveHeading(
+            container,
+            headings,
+            activeHeadingRef,
+            onActiveHeadingChange,
+            box,
+            editor,
+          );
         }
         if (onScrollIdle) {
           window.clearTimeout(idleTimer);
@@ -94,20 +107,38 @@ export function useReadingTracker(input: {
     onActiveHeadingChange,
     onScrollIdle,
     scrollRatioRef,
+    viewMode,
+    editorViewRef,
   ]);
 
   useEffect(() => {
-    const container = containerRef.current;
+    const editor = viewMode === "live" ? editorViewRef?.current : undefined;
+    const container = viewMode === "live" ? editor?.scrollDOM : containerRef.current;
     if (!container) return;
     if (!navLockUntilRef?.current || Date.now() >= navLockUntilRef.current) {
       // Content-driven refresh (headings changed): read the extent live here -
       // this runs on document/headings change, not on the per-frame path.
-      updateActiveHeading(container, headings, activeHeadingRef, onActiveHeadingChange, {
-        scrollHeight: container.scrollHeight,
-        clientHeight: container.clientHeight,
-      });
+      updateActiveHeading(
+        container,
+        headings,
+        activeHeadingRef,
+        onActiveHeadingChange,
+        {
+          scrollHeight: container.scrollHeight,
+          clientHeight: container.clientHeight,
+        },
+        editor,
+      );
     }
-  }, [activeHeadingRef, containerRef, headings, navLockUntilRef, onActiveHeadingChange]);
+  }, [
+    activeHeadingRef,
+    containerRef,
+    headings,
+    navLockUntilRef,
+    onActiveHeadingChange,
+    viewMode,
+    editorViewRef,
+  ]);
 }
 
 function updateActiveHeading(
@@ -116,6 +147,7 @@ function updateActiveHeading(
   activeHeadingRef: React.MutableRefObject<string | undefined>,
   onActiveHeadingChange: (headingId: string | undefined) => void,
   extent: { scrollHeight: number; clientHeight: number },
+  editor?: EditorView | null,
 ): void {
   if (headings.length === 0) {
     if (activeHeadingRef.current !== undefined) {
@@ -126,12 +158,29 @@ function updateActiveHeading(
   }
 
   // If scrolled to the bottom of the container, highlight the final heading
-  const isAtBottom = extent.scrollHeight - container.scrollTop - extent.clientHeight <= 20;
+  const isAtBottom =
+    (!editor || extent.scrollHeight > extent.clientHeight + 20) &&
+    extent.scrollHeight - container.scrollTop - extent.clientHeight <= 20;
   if (isAtBottom && headings.length > 0) {
     const lastId = headings[headings.length - 1].id;
     if (activeHeadingRef.current !== lastId) {
       activeHeadingRef.current = lastId;
       onActiveHeadingChange(lastId);
+    }
+    return;
+  }
+
+  if (editor) {
+    const block = editor.lineBlockAtHeight(container.scrollTop + 100);
+    const lineNumber = editor.state.doc.lineAt(block.from).number;
+    let selectedId = headings[0].id;
+    for (const heading of headings) {
+      if (heading.line && heading.line <= lineNumber) selectedId = heading.id;
+      else if (heading.line) break;
+    }
+    if (activeHeadingRef.current !== selectedId) {
+      activeHeadingRef.current = selectedId;
+      onActiveHeadingChange(selectedId);
     }
     return;
   }

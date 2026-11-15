@@ -3,6 +3,7 @@ import { useTabStore } from "../store/useTabStore";
 import { useUiStore } from "../store/useUiStore";
 import { useVaultStore } from "../store/useVaultStore";
 import type { useDocumentSession } from "./useDocumentSession";
+import type { CreateMarkdownOptions } from "../types/desktop";
 
 /**
  * Creating a new document — a Markdown file, a mind map or a space canvas.
@@ -50,7 +51,9 @@ export function useDocumentCreation({
   const setChapterId = useTabStore((s) => s.setActiveTabId);
   const setTabs = useTabStore((s) => s.setTabs);
 
-  const doCreateNewFile = async () => {
+  const doCreateNewFile = async (
+    options?: Pick<CreateMarkdownOptions, "defaultName" | "initialContent">,
+  ) => {
     if (!window.bookMDDesktop) {
       setNotice("新建文件功能仅在桌面版可用。");
       return;
@@ -58,7 +61,7 @@ export function useDocumentCreation({
 
     try {
       const rootPath = manifest?.rootPath;
-      const result = await window.bookMDDesktop.files.createMarkdownFile({ rootPath });
+      const result = await window.bookMDDesktop.files.createMarkdownFile({ ...options, rootPath });
       if (result.canceled || !result.success) {
         if (!result.canceled && result.message) setNotice(result.message);
         return;
@@ -106,7 +109,13 @@ export function useDocumentCreation({
       });
       setSidebarOpen(true);
       setSidebarTab("toc");
-      setViewMode("split");
+      setViewMode(
+        /\.canvas$/i.test(result.absolutePath)
+          ? "canvas"
+          : /\.mindmap\.md$/i.test(result.absolutePath)
+            ? "mindmap"
+            : "live",
+      );
       activeLoadedChapterIdRef.current = activeChap.id;
 
       openSession({

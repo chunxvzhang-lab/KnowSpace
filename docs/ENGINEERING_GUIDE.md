@@ -470,13 +470,17 @@ git diff --stat docs/TEST_BASELINE.md             # 4. 确认用例数没有下�
   体量只减不增）→ 全量测试 → **基线比对**（`capture-test-baseline.cjs --check`：用例数
   只增不减，含单文件口径）。
 
+测试发现由 `vitest.config.ts` 的 `include` 限定在应用源码树。`output/` 中的临时浏览器配置可能自带第三方测试，不能交给应用的 Vitest 执行；该目录也不纳入 Git 和 Prettier。新增测试应放在 `src/` 内，独立官网使用自己的工程入口。
+
+测试数量只在自动生成的 `docs/TEST_BASELINE.md` 维护，README 和手册引用它。已有成功报告可用 `node scripts/capture-test-baseline.cjs --report test-baseline.json` 刷新，无需重复跑测试；脚本拒绝失败或空报告，测试进程失败也不会写基线。
+
 人的职责只剩一个：**理解失败原因并修掉它**。「忘了跑」从此不是可能的失败模式——
 这条规则的来历正是 `TEST_BASELINE.md` 在 v2.6.5 发布后停留在 v2.6.4 那次无声漂移。
 
 **回归判定基线**（摘自 `docs/TEST_BASELINE.md`）：
 
 1. 用例总数**不得低于**当前基线（删除测试必须在 PR 里论证）
-2. 通过率 **100%**
+2. 失败用例 **0**（跳过用例单独记录）
 3. 单个文件的用例数**不得下降**——这一条是为了防止测试被静默删除
 
 ---

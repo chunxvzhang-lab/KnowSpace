@@ -1,6 +1,10 @@
 import { readFileSync } from "node:fs";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
+const { localizeSource } = require("./scripts/localize-english.cjs");
 
 /**
  * The app's own version, injected at build time.
@@ -16,7 +20,21 @@ const { version } = JSON.parse(
 
 export default defineConfig({
   base: "./",
-  plugins: [react()],
+  plugins: [
+    {
+      name: "knowspace-english",
+      enforce: "pre",
+      transform(source, id) {
+        if (
+          process.env.KNOWSPACE_LANGUAGE === "zh" ||
+          !/\/src\/.*\.tsx?$/.test(id.replace(/\\/g, "/"))
+        )
+          return;
+        return { code: localizeSource(source, id), map: null };
+      },
+    },
+    react(),
+  ],
   define: {
     __APP_VERSION__: JSON.stringify(version),
   },

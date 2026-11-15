@@ -12,6 +12,8 @@ node_modules/
 web/
 docs/
 coverage/
+# Generated deliverables and browser profiles are not project source.
+/output/
 
 # Generated raw reports (git-ignored anyway, but keep --check from scanning)
 test-baseline.json

@@ -29,6 +29,7 @@ import { MindmapCanvasLayers } from "./mindmap/MindmapCanvasLayers";
 import { MindmapNodeLayer } from "./mindmap/MindmapNodeLayer";
 import { MindmapMenus } from "./mindmap/MindmapMenus";
 import { MindmapToolbarMount } from "./mindmap/MindmapToolbarMount";
+import { useAiPendingEdits } from "../hooks/useAiPendingEdits";
 
 /**
  * A node's icon, drawn on its leading edge and outside its box.
@@ -220,6 +221,7 @@ export const MindmapView = memo(function MindmapView({
   // Selected node(s), inline editing, and context menu states
   const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set([tree.id]));
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
+  useAiPendingEdits(documentKey, hasUnsyncedChanges || editingNodeId !== null);
   const [editingText, setEditingText] = useState<string>("");
   /**
    * The open context menu, and what it is about.

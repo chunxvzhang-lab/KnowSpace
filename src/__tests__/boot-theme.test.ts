@@ -138,6 +138,6 @@ describe("占位层不再引用悬空令牌", () => {
   it("首装时偏好为缺省主题（脚本的 system 与 App 的初值一致）", () => {
     expect(loadPreferences().theme).toBe(DEFAULT_THEME);
     savePreferences({ ...loadPreferences(), theme: "eink" });
-    expect(loadPreferences().theme).toBe("eink");
+    expect(loadPreferences().theme).toBe("light");
   });
 });

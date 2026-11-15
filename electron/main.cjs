@@ -20,6 +20,7 @@ const { registerHistoryHandlers } = require("./history.cjs");
 const { registerMediaHandlers } = require("./media.cjs");
 const { registerSystemHandlers } = require("./system.cjs");
 const { registerShellNewHandlers } = require("./shell-new.cjs");
+const { registerAiHandlers } = require("./ai.cjs");
 
 // Hardware acceleration and performance optimization switches
 app.commandLine.appendSwitch("enable-gpu-rasterization");
@@ -81,6 +82,7 @@ function broadcastSettings() {
   const settings = {
     autoLaunch: getAutoLaunch(),
     runInBackground: getAppConfig().runInBackground !== false,
+    autoSaveEnabled: getAppConfig().autoSaveEnabled !== false,
     flashShortcut: getAppConfig().flashShortcut || "Alt+Space",
   };
   for (const w of windows) {
@@ -512,7 +514,7 @@ async function createWindow(initialFilePath = null) {
     title: "KnowSpace",
     icon: windowIcon,
     autoHideMenuBar: true,
-    backgroundColor: nativeTheme.shouldUseDarkColors ? "#000000" : "#f6f7f4",
+    backgroundColor: nativeTheme.shouldUseDarkColors ? "#111619" : "#ffffff",
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
@@ -926,3 +928,4 @@ registerMediaHandlers(handlerContext);
 registerSystemHandlers(handlerContext);
 // Explorer "New" menu entries own no lifecycle state, so they get no context.
 registerShellNewHandlers();
+registerAiHandlers(handlerContext);

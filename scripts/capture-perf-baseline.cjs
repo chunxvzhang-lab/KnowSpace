@@ -193,7 +193,7 @@ const METRICS = [
     digits: 1,
     budget: "≤ 16.7（恒定 60FPS）",
     pass: (v) => v <= 16.7,
-    desc: "分屏模式下 rAF 循环逐帧 scrollBy(420px) 共 120 帧，rAF 时间戳差的分位数（in-page performance.now，非 CDP 往返）。分屏是同步滚动工作唯一存在的模式——阅读模式下 useSyncScroll 本就惰性，量它等于没量。",
+    desc: "实时预览模式下 rAF 循环逐帧 scrollBy(420px) 共 120 帧，rAF 时间戳差的分位数（in-page performance.now，非 CDP 往返）。已移除旧分屏模式，结果不能与旧版同步滚动口径直接对比。",
   },
   {
     key: "scroll_p95_frame_ms",
@@ -493,12 +493,18 @@ function buildCorpus() {
  * the benchmark does not exercise is a resolved-Promise no-op.
  * ------------------------------------------------------------------ */
 function installMockBridge(payload) {
-  const { apiVersion, longDoc, mermaidDoc, vault } = payload;
+  const { apiVersion, longDoc, mermaidDoc, vault, fixtureUrl } = payload;
 
   const byPath = new Map();
-  byPath.set(longDoc.path, longDoc.markdown);
-  byPath.set(mermaidDoc.path, mermaidDoc.markdown);
-  for (const ch of vault.chapters) byPath.set(ch.absolutePath, ch.markdown);
+  // Large source literals stall Edge before navigation; load the same fixed
+  // corpus as data, outside every measured scenario's timing window.
+  const ready = fetch(fixtureUrl).then(async (response) => {
+    if (!response.ok) throw new Error(`fixture load failed: ${response.status}`);
+    const corpus = await response.json();
+    byPath.set(longDoc.path, corpus.longDoc.markdown);
+    byPath.set(mermaidDoc.path, corpus.mermaidDoc.markdown);
+    for (const chapter of corpus.vault.chapters) byPath.set(chapter.absolutePath, chapter.markdown);
+  });
 
   const manifest = {
     id: "perf-vault",
@@ -513,7 +519,8 @@ function installMockBridge(payload) {
     })),
   };
 
-  const sourceFor = (absolutePath) => {
+  const sourceFor = async (absolutePath) => {
+    await ready;
     const markdown = byPath.get(absolutePath);
     if (markdown === undefined) {
       throw new Error("mock bridge: unknown path " + absolutePath);
@@ -538,7 +545,7 @@ function installMockBridge(payload) {
       openDirectory: async () => ({ canceled: false, directory: manifest }),
       refreshDirectory: async () => manifest,
       readMarkdownFile: async (p) => sourceFor(p),
-      readMarkdownBatch: async (ps) => ps.map(sourceFor),
+      readMarkdownBatch: async (ps) => Promise.all(ps.map(sourceFor)),
       getDirectoryForFile: async (p) => ({
         directory: manifest,
         activeChapterId: (
@@ -765,11 +772,17 @@ async function newSeededPage(browser, url, corpus, opts = {}) {
     deviceScaleFactor: 1,
   });
   const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
+  const fixtureUrl = new URL("/__knowspace_perf_fixture.json", url).href;
+  await context.route(fixtureUrl, (route) => route.fulfill({ json: corpus }));
   await context.addInitScript(installMockBridge, {
     apiVersion: pkg.version,
-    longDoc: corpus.longDoc,
-    mermaidDoc: corpus.mermaidDoc,
-    vault: corpus.vault,
+    longDoc: { path: corpus.longDoc.path },
+    mermaidDoc: { path: corpus.mermaidDoc.path },
+    vault: {
+      ...corpus.vault,
+      chapters: corpus.vault.chapters.map(({ markdown, ...metadata }) => metadata),
+    },
+    fixtureUrl,
   });
   // In-page event timestamps for the mermaid scenario. Needed because a
   // polling/evaluate measurement anchor is born LATE — by the time CDP
@@ -888,8 +901,8 @@ async function scenarioTyping(browser, url, corpus) {
   const { context, page } = await newSeededPage(browser, url, corpus);
   try {
     await openFileAndWait(page, corpus.longDoc.path, "长文基准 分节 001");
-    if (!(await clickIfPresent(page, ".view-mode-btn[title^='分屏']"))) {
-      throw new Error("split-mode button not found");
+    if (!(await clickIfPresent(page, ".view-mode-btn[title^='实时预览']"))) {
+      throw new Error("live-preview button not found");
     }
     await page.waitForSelector(".cm-content", { timeout: 15000 });
     await page.click(".cm-content");
@@ -963,7 +976,9 @@ async function scenarioTyping(browser, url, corpus) {
  * once; see scenarioScroll for the mode/split rationale.
  */
 async function scrollPageLoop([frames, step]) {
-  const el = document.querySelector(".reader-pane");
+  const el =
+    document.querySelector(".document-workspace.view-live .cm-scroller") ||
+    document.querySelector(".reader-pane");
   const internal = Boolean(el) && el.scrollHeight > el.clientHeight + 200;
   const target = internal ? el : document.scrollingElement || document.documentElement;
   const isWin = !internal;
@@ -1014,9 +1029,8 @@ async function scenarioScroll(browser, url, corpus) {
   const { context, page } = await newSeededPage(browser, url, corpus);
   try {
     await openFileAndWait(page, corpus.longDoc.path, "长文基准 分节 001");
-    // 分屏，不是阅读：同步滚动的逐帧工作只在 split 下存在，阅读模式下
-    // useSyncScroll 本就惰性——用错了模式，2-4 的收益会被口径整体吞掉。
-    await clickIfPresent(page, ".view-mode-btn[title='分屏模式（边写边看）']");
+    // Measure the active live editor; split/source modes have been removed.
+    await clickIfPresent(page, ".view-mode-btn[title^='实时预览']");
     return await page.evaluate(scrollPageLoop, [SCROLL_FRAMES, 420]);
   } finally {
     await context.close();
@@ -1033,13 +1047,15 @@ async function profileScroll(browser, url, corpus) {
   const { context, page } = await newSeededPage(browser, url, corpus);
   try {
     await openFileAndWait(page, corpus.longDoc.path, "长文基准 分节 001");
-    await clickIfPresent(page, ".view-mode-btn[title='分屏模式（边写边看）']");
+    await clickIfPresent(page, ".view-mode-btn[title^='实时预览']");
     // Warm-up: JIT-compile the hot path so the profiled pass shows steady
     // state, not first-run compile noise.
     await page.evaluate(scrollPageLoop, [SCROLL_FRAMES, 420]);
     const rewind = async () => {
       await page.evaluate(() => {
-        const el = document.querySelector(".reader-pane");
+        const el =
+          document.querySelector(".document-workspace.view-live .cm-scroller") ||
+          document.querySelector(".reader-pane");
         if (el) el.scrollTop = 0;
         window.scrollTo(0, 0);
       });

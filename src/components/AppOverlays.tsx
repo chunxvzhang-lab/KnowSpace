@@ -1,5 +1,6 @@
 import type { ComponentProps } from "react";
 import { AboutDialog } from "./AboutDialog";
+import { TemplateDialog } from "./TemplateDialog";
 import { CommandPalette } from "./CommandPalette";
 import { FileConflictDialog } from "./FileConflictDialog";
 import { MediaLightbox } from "./MediaLightbox";
@@ -53,6 +54,7 @@ type AppOverlaysProps = {
   onSaveAs: ComponentProps<typeof FileConflictDialog>["onSaveAs"];
   onClearConflict: ComponentProps<typeof FileConflictDialog>["onCancel"];
   onRevertToContent: ComponentProps<typeof VersionHistoryDialog>["onRevertToContent"];
+  onCreateFromTemplate: ComponentProps<typeof TemplateDialog>["onCreate"];
 };
 
 export function AppOverlays({
@@ -71,6 +73,7 @@ export function AppOverlays({
   onSaveAs,
   onClearConflict,
   onRevertToContent,
+  onCreateFromTemplate,
 }: AppOverlaysProps) {
   const lightboxMedia = useUiStore((s) => s.lightboxMedia);
   const setLightboxMedia = useUiStore((s) => s.setLightboxMedia);
@@ -82,6 +85,8 @@ export function AppOverlays({
   const aboutOpen = useUiStore((s) => s.aboutOpen);
   const setAboutOpen = useUiStore((s) => s.setAboutOpen);
   const notice = useUiStore((s) => s.notice);
+  const templateDialogOpen = useUiStore((s) => s.templateDialogOpen);
+  const setTemplateDialogOpen = useUiStore((s) => s.setTemplateDialogOpen);
   const preferences = useUiStore((s) => s.preferences);
 
   const manifest = useVaultStore((s) => s.manifest);
@@ -93,6 +98,13 @@ export function AppOverlays({
   return (
     <>
       <MediaLightbox media={lightboxMedia} onClose={() => setLightboxMedia(null)} />
+
+      {templateDialogOpen && (
+        <TemplateDialog
+          onClose={() => setTemplateDialogOpen(false)}
+          onCreate={onCreateFromTemplate}
+        />
+      )}
 
       <UnsavedChangesDialog
         isOpen={unsavedDialogOpen}

@@ -139,9 +139,9 @@ export function useSearch({
       );
       const cleanBlockId = headingId.replace(/^[#^]+/, "");
 
-      // 1. If Reader pane is present (read or split mode), scroll preview accurately and scoped
+      // Scroll the visible reading surface; a retained hidden reader is not a navigation target.
       const container = readerRef.current;
-      if (container) {
+      if (container && viewMode !== "live") {
         // Virtualized reader (2-2): the target block may be outside the current
         // window, so materialize it before reaching for its element. A no-op
         // when the scroller is not virtualized (short docs keep today's path).
@@ -248,9 +248,9 @@ export function useSearch({
         }
       }
 
-      // 2. If Editor pane is present (source or split mode), scroll editor directly to heading or block line
+      // In live preview, scroll the editor to the heading or block source line.
       const editor = editorViewRef.current;
-      if (editor && session?.source) {
+      if (editor && viewMode === "live" && session?.source) {
         if (headingId.startsWith("^") || headingId.includes("^")) {
           const cleanBlockId = headingId.replace(/^[#^]+/, "");
           const content = editor.state.doc.toString();
@@ -261,7 +261,7 @@ export function useSearch({
               selection: { anchor: line.from, head: line.to },
               effects: EditorView.scrollIntoView(line.from, { y: "center", yMargin: 40 }),
             });
-            if (viewMode === "source") {
+            if (viewMode === "live") {
               editor.focus();
             }
           }
@@ -275,7 +275,7 @@ export function useSearch({
               selection: { anchor: line.from, head: line.from },
               effects: EditorView.scrollIntoView(line.from, { y: "start", yMargin: 40 }),
             });
-            if (viewMode === "source") {
+            if (viewMode === "live") {
               editor.focus();
             }
           }
@@ -295,12 +295,15 @@ export function useSearch({
 
   const jumpToRatio = useCallback(
     (ratio: number) => {
-      const container = readerRef.current;
+      const container = viewMode === "live" ? editorViewRef.current?.scrollDOM : readerRef.current;
       if (!container) return;
       const max = container.scrollHeight - container.clientHeight;
-      container.scrollTo({ top: Math.max(0, max * ratio), behavior: "smooth" });
+      container.scrollTo({
+        top: Math.max(0, max * Math.min(1, Math.max(0, ratio))),
+        behavior: "smooth",
+      });
     },
-    [readerRef],
+    [readerRef, editorViewRef, viewMode],
   );
 
   const clearSearchHighlights = useCallback(() => {
@@ -389,7 +392,7 @@ export function useSearch({
       }
 
       // If editor is active, scroll editor to matching line
-      if (editorViewRef.current && result.lineNumber) {
+      if (viewMode === "live" && editorViewRef.current && result.lineNumber) {
         const editor = editorViewRef.current;
         const totalLines = editor.state.doc.lines;
         const safeLineNum = Math.min(Math.max(1, result.lineNumber), totalLines);
@@ -398,11 +401,12 @@ export function useSearch({
           selection: { anchor: line.from, head: line.from },
           effects: EditorView.scrollIntoView(line.from, { y: "start", yMargin: 40 }),
         });
-        if (viewMode === "source") {
+        if (viewMode === "live") {
           editor.focus();
         }
       }
 
+      if (viewMode === "live") return;
       const container = readerRef.current;
       if (!container) return;
 

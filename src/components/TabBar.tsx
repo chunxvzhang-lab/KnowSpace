@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import { Network } from "lucide-react";
+import { FileText, Network, X } from "lucide-react";
 
 export type TabItem = {
   id: string;
@@ -106,13 +106,42 @@ export const TabBar = memo(function TabBar({
               key={tab.id}
               role="tab"
               aria-selected={isActive}
+              tabIndex={isActive ? 0 : -1}
               className={`tab-item ${isActive ? "is-active" : ""} ${isSplitSecondary ? "is-split-secondary" : ""} ${tab.isDirty ? "is-dirty" : ""}`}
               onClick={() => onSelectTab(tab.id)}
               onMouseDown={(e) => handleMouseDown(e, tab.id)}
               onContextMenu={(e) => handleContextMenu(e, tab.id)}
+              onKeyDown={(event) => {
+                if (
+                  event.target !== event.currentTarget ||
+                  event.ctrlKey ||
+                  event.metaKey ||
+                  event.altKey
+                )
+                  return;
+                const index = tabs.findIndex((item) => item.id === tab.id);
+                const next =
+                  event.key === "ArrowRight"
+                    ? (index + 1) % tabs.length
+                    : event.key === "ArrowLeft"
+                      ? (index + tabs.length - 1) % tabs.length
+                      : event.key === "Home"
+                        ? 0
+                        : event.key === "End"
+                          ? tabs.length - 1
+                          : -1;
+                if (next >= 0) {
+                  event.preventDefault();
+                  onSelectTab(tabs[next].id);
+                  tabListRef.current?.querySelectorAll<HTMLElement>('[role="tab"]')[next]?.focus();
+                } else if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  onSelectTab(tab.id);
+                }
+              }}
               title={`${tab.title} (${tab.relativePath})${isSplitSecondary ? " • 当前在右侧分屏对比中" : ""}`}
             >
-              <span className="tab-icon">📄</span>
+              <FileText size={14} className="tab-icon" aria-hidden="true" />
               <span className="tab-title">{tab.title}</span>
               {isSplitSecondary ? (
                 <span className="tab-split-badge" title="右侧分屏对比中">
@@ -130,7 +159,7 @@ export const TabBar = memo(function TabBar({
                 title="关闭标签页 (Ctrl+W)"
                 aria-label={`关闭 ${tab.title}`}
               >
-                ✕
+                <X size={13} aria-hidden="true" />
               </button>
             </div>
           );

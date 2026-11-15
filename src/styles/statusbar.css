@@ -11,7 +11,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  height: 28px;
+  height: 30px;
   padding: 0 14px;
   background: var(--status-bar-bg);
   color: var(--status-bar-text);
@@ -41,17 +41,17 @@
 
 .status-badge.saved {
   background: rgba(16, 185, 129, 0.18);
-  color: #34d399;
+  color: var(--status-bar-text);
 }
 
 .status-badge.dirty {
   background: rgba(255, 77, 0, 0.2);
-  color: #ff8552;
+  color: var(--status-bar-text);
 }
 
 .status-badge.readonly {
   background: rgba(6, 182, 212, 0.18);
-  color: #22d3ee;
+  color: var(--status-bar-text);
 }
 
 .status-filename {
@@ -71,7 +71,7 @@
 }
 
 .status-metric.warning {
-  color: #fbbf24;
+  color: var(--accent);
 }
 
 .status-separator {
@@ -87,7 +87,7 @@
 .status-pill {
   padding: 1px 5px;
   border-radius: 3px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--surface);
   color: var(--status-bar-muted);
   font-size: 10px;
   font-weight: 600;
@@ -101,4 +101,24 @@
   font-weight: 700;
   font-size: 10.5px;
   margin-left: 4px;
+}
+
+@media (max-width: 720px) {
+  .status-bar {
+    gap: 8px;
+    padding-inline: 10px;
+  }
+  .status-tech {
+    display: none;
+  }
+  .status-file {
+    width: 100%;
+  }
+  .status-filename {
+    max-width: none;
+    flex: 1;
+  }
+  .status-badge {
+    flex-shrink: 0;
+  }
 }

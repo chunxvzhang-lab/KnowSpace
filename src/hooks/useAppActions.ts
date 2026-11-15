@@ -144,7 +144,7 @@ export function useAppActions({
   }, []);
 
   const handleToggleMindmap = useCallback(() => {
-    setViewMode((prev) => (prev === "mindmap" ? "split" : "mindmap"));
+    setViewMode((prev) => (prev === "mindmap" ? "live" : "mindmap"));
   }, [setViewMode]);
 
   const handleRevealInToc = useCallback(() => {

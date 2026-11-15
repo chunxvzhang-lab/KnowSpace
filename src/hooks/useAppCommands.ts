@@ -8,6 +8,7 @@ import { useUiStore } from "../store/useUiStore";
 import { useReviewStore } from "../store/useReviewStore";
 import { useCommandRegistrations } from "./useCommandRegistrations";
 import type { PendingAction } from "./useUnsavedGuard";
+import type { DocumentTemplate } from "../services/documentTemplates";
 
 type UseAppCommandsParams = {
   /** The unsaved-changes guard every mutating command funnels through. */
@@ -65,6 +66,7 @@ export function useAppCommands({
   const setAboutOpen = useUiStore((s) => s.setAboutOpen);
   const setCommandPaletteOpen = useUiStore((s) => s.setCommandPaletteOpen);
   const setVersionHistoryOpen = useUiStore((s) => s.setVersionHistoryOpen);
+  const setTemplateDialogOpen = useUiStore((s) => s.setTemplateDialogOpen);
   const setIsGraphPaneOpen = useUiStore((s) => s.setGraphPaneOpen);
   const requestReview = useReviewStore((s) => s.requestReview);
 
@@ -101,6 +103,20 @@ export function useAppCommands({
   const createNewFile = useCallback(() => {
     guardAction({ type: "new-file" });
   }, [guardAction]);
+
+  const createFromTemplate = useCallback(
+    (template: DocumentTemplate) => {
+      setTemplateDialogOpen(false);
+      guardAction({
+        type: "new-file",
+        options: {
+          defaultName: `${template.title}${template.extension || ".md"}`,
+          initialContent: template.content,
+        },
+      });
+    },
+    [guardAction, setTemplateDialogOpen],
+  );
 
   const createNewMindmap = useCallback(() => {
     guardAction({ type: "new-mindmap" });
@@ -150,13 +166,14 @@ export function useAppCommands({
   // per entry point (that duplication is how the mindmap toggle grew two
   // verbatim copies and the typewriter toggle two divergent ones).
   useCommandRegistrations({
+    "ai.open": () => useUiStore.getState().openAi(),
     "view.read": () => setViewMode("read"),
-    "view.split": () => setViewMode("split"),
-    "view.source": () => setViewMode("source"),
-    "view.toggleMindmap": () => setViewMode((m) => (m === "mindmap" ? "split" : "mindmap")),
+    "view.live": () => setViewMode("live"),
+    "view.toggleEditing": () => setViewMode((mode) => (mode === "read" ? "live" : "read")),
+    "view.toggleMindmap": () => setViewMode((m) => (m === "mindmap" ? "live" : "mindmap")),
     "view.toggleCanvas": () =>
       setViewMode((m) => {
-        const next = m === "canvas" ? "split" : "canvas";
+        const next = m === "canvas" ? "live" : "canvas";
         if (next === "canvas") {
           setDirectoryOpen(false);
           setSidebarOpen(false);
@@ -175,6 +192,7 @@ export function useAppCommands({
     },
     "document.print": handlePrintDocument,
     "document.newFile": createNewFile,
+    "document.newFromTemplate": () => setTemplateDialogOpen(true),
     "document.newCanvas": createNewCanvas,
     "document.save": saveSession,
     "document.saveAs": saveSessionAs,
@@ -193,7 +211,6 @@ export function useAppCommands({
     "ui.toggleFullscreen": toggleFullscreen,
     "ui.themeTwitter": () => setPreferences((p) => ({ ...p, theme: "twitter" })),
     "ui.themeLight": () => setPreferences((p) => ({ ...p, theme: "light" })),
-    "ui.themeEink": () => setPreferences((p) => ({ ...p, theme: "eink" })),
     "ui.about": () => setAboutOpen(true),
   });
 
@@ -217,6 +234,7 @@ export function useAppCommands({
     openMarkdownFile,
     openMarkdownDirectory,
     createNewFile,
+    createFromTemplate,
     createNewMindmap,
     createNewCanvas,
     goPrevious,

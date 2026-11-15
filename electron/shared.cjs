@@ -19,6 +19,7 @@ function getAppConfig() {
       return {
         flashShortcut: parsed.flashShortcut || "Alt+Space",
         runInBackground: parsed.runInBackground !== false,
+        autoSaveEnabled: parsed.autoSaveEnabled !== false,
         autoLaunch: Boolean(parsed.autoLaunch),
         flashPinned: Boolean(parsed.flashPinned),
         flashSpaceDir: typeof parsed.flashSpaceDir === "string" ? parsed.flashSpaceDir : "",
@@ -31,6 +32,7 @@ function getAppConfig() {
   return {
     flashShortcut: "Alt+Space",
     runInBackground: true,
+    autoSaveEnabled: true,
     autoLaunch: false,
     flashPinned: false,
     flashSpaceDir: "",

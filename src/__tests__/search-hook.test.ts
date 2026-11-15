@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { useSearch } from "../hooks/useSearch";
 import {
@@ -8,6 +8,9 @@ import {
 import { useUiStore } from "../store/useUiStore";
 import { useVaultStore } from "../store/useVaultStore";
 import { resetStores, restoreStores } from "./helpers/resetStores";
+import { EditorState } from "@codemirror/state";
+import type { EditorView } from "@codemirror/view";
+import { extractHeadingsFromSource } from "../services/markdown";
 
 type Params = Parameters<typeof useSearch>[0];
 
@@ -45,6 +48,58 @@ describe("useSearch", () => {
 
   const mount = (overrides: Partial<Params> = {}) =>
     renderHook(() => useSearch({ ...defaults, ...overrides }));
+
+  it("routes live heading, block, search and progress jumps to the editor while preserving the hidden reader", async () => {
+    const source = "# original\n\ntext ^block\n\n## new heading\n\nsearch target";
+    const state = EditorState.create({ doc: source });
+    const scroller = document.createElement("div");
+    Object.defineProperty(scroller, "scrollHeight", { value: 2000 });
+    Object.defineProperty(scroller, "clientHeight", { value: 500 });
+    scroller.scrollTo = vi.fn();
+    const reader = document.createElement("div");
+    reader.scrollTo = vi.fn();
+    const editor = {
+      state,
+      scrollDOM: scroller,
+      dispatch: vi.fn(),
+      focus: vi.fn(),
+    } as unknown as EditorView;
+    const session = { source } as NonNullable<Params["session"]>;
+    const { result } = mount({
+      viewMode: "live",
+      session,
+      editorViewRef: { current: editor },
+      readerRef: { current: reader },
+    });
+    const heading = extractHeadingsFromSource(source).at(-1)!;
+    await result.current.jumpToHeading(heading.id, "auto");
+    expect(editor.dispatch).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        selection: { anchor: state.doc.line(5).from, head: state.doc.line(5).from },
+      }),
+    );
+    await result.current.jumpToHeading("^block", "auto");
+    expect(editor.dispatch).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        selection: { anchor: state.doc.line(3).from, head: state.doc.line(3).to },
+      }),
+    );
+    await result.current.handleSearchJump({
+      index: 0,
+      lineNumber: 7,
+      title: "hit",
+      excerpt: "search target",
+    });
+    expect(editor.dispatch).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        selection: { anchor: state.doc.line(7).from, head: state.doc.line(7).from },
+      }),
+    );
+    result.current.jumpToRatio(0.5);
+    expect(scroller.scrollTo).toHaveBeenCalledWith({ top: 750, behavior: "smooth" });
+    expect(reader.scrollTo).not.toHaveBeenCalled();
+    expect(editor.focus).toHaveBeenCalled();
+  });
 
   describe("results", () => {
     it("returns nothing for a blank query", () => {

@@ -109,13 +109,14 @@ function registerSystemHandlers(context) {
   });
 
   ipcMain.handle("bookmd:set-native-theme", (_event, theme) => {
+    if (theme === "eink") theme = "light";
     const isDark = theme === "twitter" || theme === "dark";
     const isLight = theme === "light" || theme === "eink";
     nativeTheme.themeSource = isDark ? "dark" : isLight ? "light" : "system";
     for (const win of context.windows) {
       try {
         if (win && !win.isDestroyed()) {
-          win.setBackgroundColor(isDark ? "#000000" : theme === "eink" ? "#f4f1ea" : "#f6f7f4");
+          win.setBackgroundColor(isDark ? "#111619" : "#ffffff");
         }
       } catch {}
     }

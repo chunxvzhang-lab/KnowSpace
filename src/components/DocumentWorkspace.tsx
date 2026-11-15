@@ -1,15 +1,12 @@
-import { memo, useState, useRef, useCallback, useEffect } from "react";
+import { memo, useState, useRef, useEffect } from "react";
 import type { EditorViewMode, RenderedChapter, ThemeMode } from "../core/types";
 import type { MermaidTheme } from "../services/mermaid";
 import { EditorPane, type WikiLinkTarget } from "./EditorPane";
 import { ReaderPane } from "./ReaderPane";
-import { RefreshCw, AlertCircle, Link2, Link2Off } from "lucide-react";
-import { useSyncScroll } from "../hooks/useSyncScroll";
-import { useSyncSelection } from "../hooks/useSyncSelection";
+import { RefreshCw, AlertCircle } from "lucide-react";
+import type { EditorView } from "@codemirror/view";
 
 import type { LightboxMedia } from "./MediaLightbox";
-
-const SPLIT_RATIO_KEY = "bookmd.layout.splitRatio";
 
 type DocumentWorkspaceProps = {
   viewMode: EditorViewMode;
@@ -65,7 +62,6 @@ export const DocumentWorkspace = memo(function DocumentWorkspace({
   currentFilePath,
   onOpenLightbox,
   onEditorViewReady,
-  navLockUntilRef,
   wikiLinkTargets,
   onToggleTask,
   onWikiLinkClick,
@@ -77,123 +73,37 @@ export const DocumentWorkspace = memo(function DocumentWorkspace({
   onToggleMindmap,
   onRevealInToc,
 }: DocumentWorkspaceProps) {
-  const [splitRatio, setSplitRatio] = useState(() => {
-    try {
-      const saved = localStorage.getItem(SPLIT_RATIO_KEY);
-      if (saved) {
-        const val = parseFloat(saved);
-        if (!Number.isNaN(val) && val >= 0.15 && val <= 0.85) return val;
-      }
-    } catch {
-      // fallback
-    }
-    return 0.5;
-  });
-  const [isDragging, setIsDragging] = useState(false);
-  const workspaceRef = useRef<HTMLDivElement | null>(null);
-
-  const { syncEnabled, toggleSync, editorViewRef, handleEditorScroll } = useSyncScroll({
-    containerRef,
-    viewMode,
-    navLockUntilRef,
-  });
-
-  const { handleEditorSelectionChange, handlePreviewSelectionChange } = useSyncSelection({
-    containerRef,
-    viewMode,
-    editorViewRef,
-  });
-
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  }, []);
+  const [hasEditor, setHasEditor] = useState(viewMode !== "read");
+  const editorViewRef = useRef<EditorView | null>(null);
 
   useEffect(() => {
-    if (!isDragging) return;
+    if (viewMode !== "read") setHasEditor(true);
+  }, [viewMode]);
 
-    const currentRatioRef = { current: splitRatio };
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!workspaceRef.current) return;
-      const rect = workspaceRef.current.getBoundingClientRect();
-      const isNarrow = rect.width < 980;
-
-      let newRatio: number;
-      if (isNarrow) {
-        // Vertical split
-        newRatio = (e.clientY - rect.top) / rect.height;
-      } else {
-        // Horizontal split
-        newRatio = (e.clientX - rect.left) / rect.width;
-      }
-      const clamped = Math.min(Math.max(newRatio, 0.15), 0.85);
-      currentRatioRef.current = clamped;
-      setSplitRatio(clamped);
-    };
-
-    const handleMouseUp = () => {
-      setIsDragging(false);
-      document.body.classList.remove("is-resizing-col");
-      try {
-        localStorage.setItem(SPLIT_RATIO_KEY, currentRatioRef.current.toString());
-      } catch {
-        // ignore
-      }
-    };
-
-    document.body.classList.add("is-resizing-col");
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
-    return () => {
-      document.body.classList.remove("is-resizing-col");
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- splitRatio is intentionally captured only at drag start; adding it would tear down and re-add mousemove listeners on every resize tick
-  }, [isDragging]);
+  useEffect(() => {
+    if (viewMode === "live") editorViewRef.current?.focus();
+  }, [viewMode, currentFilePath]);
 
   return (
-    <div
-      ref={workspaceRef}
-      className={`document-workspace view-${viewMode} ${isDragging ? "is-resizing" : ""}`}
-    >
+    <div className={`document-workspace view-${viewMode}`}>
       {/* Editor Section */}
-      {viewMode !== "read" && (
+      {(hasEditor || viewMode !== "read") && (
         <div
           className="workspace-pane editor-section"
-          style={viewMode === "split" ? { flex: `0 0 ${splitRatio * 100}%` } : { flex: "1 1 100%" }}
+          style={viewMode === "read" ? { display: "none" } : { flex: "1 1 100%" }}
         >
-          {viewMode === "split" && (
-            <div className="pane-header-bar">
-              <span className="pane-header-title">编辑器源码</span>
-              <button
-                type="button"
-                className={`sync-scroll-badge ${syncEnabled ? "active" : ""}`}
-                onClick={toggleSync}
-                title={
-                  syncEnabled
-                    ? "分屏同步滚动：已开启（点击关闭）"
-                    : "分屏同步滚动：已关闭（点击开启）"
-                }
-              >
-                {syncEnabled ? <Link2 size={12} /> : <Link2Off size={12} />}
-                <span>同步滚动</span>
-              </button>
-            </div>
-          )}
           <EditorPane
+            key={currentFilePath}
             value={source}
             onChange={onSourceChange}
             theme={theme}
             fontScale={fontScale}
             onSave={onSave}
             readOnly={readOnly}
+            livePreviewMode
             typewriterMode={typewriterMode}
             currentFilePath={currentFilePath}
             wikiLinkTargets={wikiLinkTargets}
-            onScroll={handleEditorScroll}
-            onSelectionChange={handleEditorSelectionChange}
             onEditorViewReady={(view) => {
               editorViewRef.current = view;
               onEditorViewReady?.(view);
@@ -207,39 +117,11 @@ export const DocumentWorkspace = memo(function DocumentWorkspace({
         </div>
       )}
 
-      {/* Resizer bar for split mode */}
-      {viewMode === "split" && (
-        <div
-          className={`workspace-splitter ${isDragging ? "is-active" : ""}`}
-          onMouseDown={handleMouseDown}
-          onDoubleClick={() => {
-            setSplitRatio(0.5);
-            try {
-              localStorage.setItem(SPLIT_RATIO_KEY, "0.5");
-            } catch {
-              // ignore
-            }
-          }}
-          role="separator"
-          aria-orientation="vertical"
-          title="拖拽调整编辑器与预览窗口比例（双击自适应 1:1 等宽）"
-        >
-          <div className="splitter-handle" />
-        </div>
-      )}
-
       {/* Reader / Preview Section: always mounted so print & PDF export can render markdown in all modes */}
       <div
-        className={`workspace-pane reader-section ${viewMode === "source" ? "source-mode-reader print-only-reader" : ""}`}
-        style={
-          viewMode === "split" ? { flex: `1 1 ${(1 - splitRatio) * 100}%` } : { flex: "1 1 100%" }
-        }
+        className={`workspace-pane reader-section ${viewMode === "live" ? "print-only-reader" : ""}`}
+        style={{ flex: "1 1 100%" }}
       >
-        {viewMode === "split" && (
-          <div className="pane-header-bar">
-            <span className="pane-header-title">实时预览</span>
-          </div>
-        )}
         {autoPreviewPaused && (
           <div className="large-doc-notice">
             <AlertCircle size={15} />
@@ -264,7 +146,6 @@ export const DocumentWorkspace = memo(function DocumentWorkspace({
           fontScale={fontScale}
           mermaidTheme={mermaidTheme}
           onMermaidError={onMermaidError}
-          onElementClick={handlePreviewSelectionChange}
           showLineNumbers={showLineNumbers}
           onOpenLightbox={onOpenLightbox}
           wikiLinkTargets={wikiLinkTargets}

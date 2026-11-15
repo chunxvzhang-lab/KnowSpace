@@ -199,7 +199,7 @@ export function WorkspaceRouter({
         // where there is no path to hand.
         documentKey={session.absolutePath || activeChapter?.src || session.fileName}
         onJumpToHeading={(headingId, _line) => {
-          setViewMode("split");
+          setViewMode("live");
           window.setTimeout(() => {
             jumpToHeading(headingId, "smooth", true);
           }, 80);
@@ -208,7 +208,7 @@ export function WorkspaceRouter({
         // the text is clicked: one answer to "which file is this name",
         // not a second one that could disagree with it.
         onWikiLinkClick={handleWikiLinkClick}
-        onClose={() => setViewMode("split")}
+        onClose={() => setViewMode("live")}
       />
     ) : (viewMode === "canvas" || session?.fileName?.toLowerCase().endsWith(".canvas")) &&
       session ? (
@@ -222,7 +222,7 @@ export function WorkspaceRouter({
         allChapters={allChapters}
         onOpenFile={onOpenDesktopMarkdownPath}
         onExtractToNote={(docTitle, content) => handleCreateCanvasExtractNote(content, docTitle)}
-        onClose={() => setViewMode("split")}
+        onClose={() => setViewMode("live")}
         onSave={saveSession}
         isDirty={isDirty}
         isSaving={isSaving}

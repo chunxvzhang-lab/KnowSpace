@@ -16,6 +16,7 @@ import {
 } from "./reader/ReaderVirtualDom";
 import type { LightboxMedia } from "./MediaLightbox";
 import type { WikiLinkTarget } from "./EditorPane";
+import { ReaderLineNumbers } from "./reader/ReaderLineNumbers";
 
 type ReaderPaneProps = {
   chapter: RenderedChapter | null;
@@ -700,6 +701,15 @@ export const ReaderPane = memo(function ReaderPane({
         onMouseOver={handleMouseOver}
         onMouseOut={handleMouseOut}
       />
+      {showLineNumbers && chapter && (
+        <ReaderLineNumbers
+          key={`line-numbers:${documentKey ?? ""}`}
+          articleRef={articleRef}
+          containerRef={containerRef}
+          revision={`${chapter.checksum}:${mermaidTheme}`}
+          fontScale={fontScale}
+        />
+      )}
       {backlinksCount !== undefined && backlinksCount > 0 && onOpenBacklinks ? (
         <div
           className="article-backlinks-footer"

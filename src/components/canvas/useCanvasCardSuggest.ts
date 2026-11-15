@@ -116,12 +116,15 @@ export function useCanvasCardSuggest({
   const buildCardSuggestItems = useCallback(
     (kind: "note" | "command", query: string): CanvasCardSuggestItem[] => {
       if (kind === "command") {
-        return matchSlashCommands(query).map((cmd) => ({
-          key: `command:${cmd.id}`,
-          icon: cmd.icon,
-          title: cmd.title,
-          subtitle: cmd.description,
-        }));
+        // Document AI needs the document session; canvas textareas only insert templates.
+        return matchSlashCommands(query)
+          .filter((cmd) => !cmd.aiMode)
+          .map((cmd) => ({
+            key: `command:${cmd.id}`,
+            icon: cmd.icon,
+            title: cmd.title,
+            subtitle: cmd.description,
+          }));
       }
       return matchCardRefTargets(query).map((target) => ({
         key: `note:${target.relativePath}:${target.title}`,

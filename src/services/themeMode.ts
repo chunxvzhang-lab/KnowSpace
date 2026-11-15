@@ -1,7 +1,7 @@
 import type { ThemeMode } from "../core/types";
 
 /** 解析后的主题：一定是一个具体主题，不会是 `"system"`。 */
-export type ResolvedThemeMode = Exclude<ThemeMode, "system">;
+export type ResolvedThemeMode = Exclude<ThemeMode, "system" | "eink">;
 
 /**
  * 把 `ThemeMode` 解析成真正用于渲染的具体主题。
@@ -26,8 +26,14 @@ export type ResolvedThemeMode = Exclude<ThemeMode, "system">;
  * @param prefersLight 操作系统当前是否浅色（`prefers-color-scheme: light`）
  */
 export function resolveThemeMode(theme: ThemeMode, prefersLight: boolean): ResolvedThemeMode {
+  if (theme === "eink") return "light";
   if (theme !== "system") return theme;
   // 深色走 "twitter"：它就是主题表里的深色项，胶囊区块没有 `.theme-twitter`
   // 规则，因此落到基线（也就是现在的深色外观），视觉上与改前一致。
   return prefersLight ? "light" : "twitter";
+}
+
+/** Retired application themes must not reach the DOM, even through programmatic updates. */
+export function normalizeThemeMode(theme: ThemeMode): Exclude<ThemeMode, "eink"> {
+  return theme === "eink" ? "light" : theme;
 }

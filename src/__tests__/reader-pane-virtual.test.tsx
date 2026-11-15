@@ -8,12 +8,10 @@
  * the controller reads (clientHeight, scrollTop, per-block rects) is stubbed
  * here to emulate a scroller — the same contract the real browser exercises.
  */
-import { act, render, renderHook } from "@testing-library/react";
+import { act, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { EditorView } from "@codemirror/view";
 import type { RenderedBlock, RenderedChapter } from "../core/types";
 import { ReaderPane } from "../components/ReaderPane";
-import { useSyncScroll } from "../hooks/useSyncScroll";
 import {
   ensureBlockVisible,
   registerVirtualController,
@@ -463,77 +461,5 @@ describe("ReaderPane virtual mount (integration)", () => {
     });
     await new Promise((resolve) => window.requestAnimationFrame(() => resolve(null)));
     expect(article.querySelectorAll("[data-block-key]").length).toBeLessThan(600);
-  });
-});
-
-describe("sync-scroll maps through source-line anchors (2-2)", () => {
-  // The reader holds only anchors (one per K blocks) + a small window, but
-  // useSyncScroll's [data-source-line] query is a DESCENDANT query, so it
-  // picks the anchors up and interpolates between them. That piecewise-linear
-  // mapping between anchors IS the accuracy K buys - assert it, with numbers.
-  function stubRect(el: HTMLElement, docTop: number, container: HTMLElement) {
-    el.getBoundingClientRect = () => ({ top: docTop - container.scrollTop }) as DOMRect;
-  }
-  function stubBox(el: HTMLElement, scrollHeight: number, clientHeight: number) {
-    Object.defineProperty(el, "scrollHeight", { value: scrollHeight, configurable: true });
-    Object.defineProperty(el, "clientHeight", { value: clientHeight, configurable: true });
-  }
-  const flush = () =>
-    act(async () => {
-      await new Promise((r) => window.requestAnimationFrame(() => r(null)));
-    });
-  const waitLock = () =>
-    act(async () => {
-      await new Promise((r) => window.setTimeout(r, 200));
-    });
-
-  it("editor scroll to a line only covered by an anchor windows the reader within the anchor span", async () => {
-    // Container: an article with two anchors at source lines 1 and 1001.
-    const container = document.createElement("div");
-    const article = document.createElement("article");
-    container.appendChild(article);
-    document.body.appendChild(container);
-    const a0 = document.createElement("div");
-    a0.setAttribute("data-source-line", "1");
-    stubRect(a0, 0, container);
-    const a1 = document.createElement("div");
-    a1.setAttribute("data-source-line", "1001");
-    stubRect(a1, 8000, container); // deliberately non-1:1 with the editor
-    article.append(a0, a1);
-    stubBox(container, 10_000, 800);
-    stubRect(container, 0, { scrollTop: 0 } as HTMLElement);
-
-    // Editor: line n starts at (n-1)*10, a 10px-tall block.
-    const scrollDOM = document.createElement("div");
-    stubBox(scrollDOM, 12_000, 800);
-    const doc = {
-      length: 100_000,
-      lines: 2000,
-      line: (n: number) => ({ from: (n - 1) * 10, to: (n - 1) * 10 + 9 }),
-    };
-    const view = {
-      scrollDOM,
-      contentDOM: document.createElement("div"),
-      state: { doc },
-      lineBlockAt: (from: number) => ({ top: from, bottom: from + 10 }),
-    } as unknown as EditorView;
-
-    const containerRef = { current: container as HTMLElement | null };
-    const { result } = renderHook(() => useSyncScroll({ containerRef, viewMode: "split" }));
-    act(() => {
-      result.current.editorViewRef.current = view;
-    });
-    await waitLock();
-
-    // Editor line 750 -> editorY 7490, which lies between the anchors (which
-    // map editor 0->0 and editor 10000->8000). Interpolated reader Y:
-    // 7490/10000 * 8000 = 5992. Assert exactly that bounded value.
-    view.scrollDOM.scrollTop = 7490;
-    act(() => {
-      result.current.handleEditorScroll(view);
-    });
-    await flush();
-    expect(Math.abs(container.scrollTop - 5992)).toBeLessThan(64);
-    container.remove();
   });
 });
